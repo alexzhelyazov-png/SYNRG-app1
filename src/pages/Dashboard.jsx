@@ -5,6 +5,7 @@ import { WORKOUT_CATEGORIES } from '../lib/constants'
 import { C, EASE } from '../theme'
 import StatCard    from '../components/StatCard'
 import ProgressRing from '../components/ProgressRing'
+import Tasks       from './Tasks'
 import { todayDate, fmt1 } from '../lib/utils'
 import { computeReminders } from '../lib/reminders'
 
@@ -542,6 +543,11 @@ function DashboardCoach() {
       {/* ── Coach react panel ───────────────────────────── */}
       <CoachReactPanel />
 
+      {/* ── Tasks (mobile) ──────────────────────────────── */}
+      <Box sx={{ display: { xs: 'block', sm: 'none' } }}>
+        <Tasks />
+      </Box>
+
       {/* ── Workout history ─────────────────────────────── */}
       <Paper sx={{
         p:         2.75,
@@ -914,6 +920,11 @@ function DashboardClient() {
           ))}
         </Paper>
       )}
+
+      {/* ── Tasks (mobile) ──────────────────────────────── */}
+      <Box sx={{ display: { xs: 'block', sm: 'none' }, mt: 2.5 }}>
+        <Tasks />
+      </Box>
     </>
   )
 }

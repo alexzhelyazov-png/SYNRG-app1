@@ -69,6 +69,8 @@ export default function MobileNav() {
         left:          0,
         right:         0,
         zIndex:        50,
+        background:    C.sidebar,
+        borderTop:     `1px solid ${C.border}`,
         paddingBottom: 'env(safe-area-inset-bottom)',
       }}>
         <BottomNavigation
@@ -81,8 +83,8 @@ export default function MobileNav() {
           }}
           sx={{
             height:     '64px',
-            background: C.sidebar,
-            borderTop:  `1px solid ${C.border}`,
+            background: 'transparent',
+            borderTop:  'none',
           }}
         >
           {NAV_ITEMS.map(({ view: v, icon, labelKey }) => (
