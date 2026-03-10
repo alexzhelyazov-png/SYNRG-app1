@@ -198,7 +198,7 @@ export default function MobileNav() {
             const isSel = actualIdx === ri
             return (
               <Box
-                component="button"
+                component="div"
                 key={c.name}
                 onClick={() => {
                   setSelIdx(ri)
