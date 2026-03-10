@@ -543,10 +543,8 @@ function DashboardCoach() {
       {/* ── Coach react panel ───────────────────────────── */}
       <CoachReactPanel />
 
-      {/* ── Tasks (mobile) ──────────────────────────────── */}
-      <Box sx={{ display: { xs: 'block', sm: 'none' } }}>
-        <Tasks />
-      </Box>
+      {/* ── Tasks ───────────────────────────────────────── */}
+      <Tasks />
 
       {/* ── Workout history ─────────────────────────────── */}
       <Paper sx={{
@@ -921,8 +919,8 @@ function DashboardClient() {
         </Paper>
       )}
 
-      {/* ── Tasks (mobile) ──────────────────────────────── */}
-      <Box sx={{ display: { xs: 'block', sm: 'none' }, mt: 2.5 }}>
+      {/* ── Tasks ───────────────────────────────────────── */}
+      <Box sx={{ mt: 2.5 }}>
         <Tasks />
       </Box>
     </>
