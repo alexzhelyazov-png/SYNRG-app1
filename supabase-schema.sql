@@ -1,18 +1,16 @@
 -- ============================================================
--- SYNRG APP — Supabase SQL Schema
--- Изпълни всичко в Supabase → SQL Editor → Run
+-- SYNRG APP — Supabase SQL Schema (safe to run on existing project)
+-- Изпълни в Supabase → SQL Editor → Run
 -- ============================================================
 
--- Coaches
-create table coaches (
+create table if not exists coaches (
   id          uuid primary key default gen_random_uuid(),
   name        text not null unique,
   password    text not null,
   created_at  timestamptz default now()
 );
 
--- Clients
-create table clients (
+create table if not exists clients (
   id                 uuid primary key default gen_random_uuid(),
   name               text not null unique,
   password           text not null,
@@ -22,8 +20,7 @@ create table clients (
   created_at         timestamptz default now()
 );
 
--- Meals
-create table meals (
+create table if not exists meals (
   id          uuid primary key default gen_random_uuid(),
   client_id   uuid references clients(id) on delete cascade,
   date        text not null,
@@ -34,8 +31,7 @@ create table meals (
   created_at  timestamptz default now()
 );
 
--- Workouts
-create table workouts (
+create table if not exists workouts (
   id          uuid primary key default gen_random_uuid(),
   client_id   uuid references clients(id) on delete cascade,
   date        text not null,
@@ -45,18 +41,18 @@ create table workouts (
   created_at  timestamptz default now()
 );
 
--- Weight logs (unique per client + date)
-create table weight_logs (
+create table if not exists weight_logs (
   id          uuid primary key default gen_random_uuid(),
   client_id   uuid references clients(id) on delete cascade,
   date        text not null,
   weight      numeric,
-  created_at  timestamptz default now(),
-  unique(client_id, date)
+  created_at  timestamptz default now()
 );
 
--- Tasks
-create table tasks (
+alter table weight_logs drop constraint if exists weight_logs_client_id_date_key;
+alter table weight_logs add constraint weight_logs_client_id_date_key unique (client_id, date);
+
+create table if not exists tasks (
   id           uuid primary key default gen_random_uuid(),
   client_id    uuid references clients(id) on delete cascade,
   title        text not null,
@@ -66,8 +62,7 @@ create table tasks (
   created_at   timestamptz default now()
 );
 
--- Task comments
-create table task_comments (
+create table if not exists task_comments (
   id          uuid primary key default gen_random_uuid(),
   task_id     uuid references tasks(id) on delete cascade,
   author      text,
@@ -76,8 +71,7 @@ create table task_comments (
   created_at  timestamptz default now()
 );
 
--- Reactions (coach → client)
-create table reactions (
+create table if not exists reactions (
   id            uuid primary key default gen_random_uuid(),
   client_id     uuid references clients(id) on delete cascade,
   type          text,
@@ -87,34 +81,34 @@ create table reactions (
   created_at    timestamptz default now()
 );
 
--- ============================================================
--- ДОСТЪП: Позволяваме anon достъп (app-level auth)
--- Изпълни за всяка таблица:
--- ============================================================
-alter table coaches       enable row level security;
-alter table clients       enable row level security;
-alter table meals         enable row level security;
-alter table workouts      enable row level security;
-alter table weight_logs   enable row level security;
-alter table tasks         enable row level security;
-alter table task_comments enable row level security;
-alter table reactions     enable row level security;
+-- ── RLS policies (skip if already exist) ─────────────────────
+do $$ begin
+  alter table coaches       enable row level security;
+  alter table clients       enable row level security;
+  alter table meals         enable row level security;
+  alter table workouts      enable row level security;
+  alter table weight_logs   enable row level security;
+  alter table tasks         enable row level security;
+  alter table task_comments enable row level security;
+  alter table reactions     enable row level security;
+exception when others then null;
+end $$;
 
-create policy "anon_all" on coaches       for all using (true) with check (true);
-create policy "anon_all" on clients       for all using (true) with check (true);
-create policy "anon_all" on meals         for all using (true) with check (true);
-create policy "anon_all" on workouts      for all using (true) with check (true);
-create policy "anon_all" on weight_logs   for all using (true) with check (true);
-create policy "anon_all" on tasks         for all using (true) with check (true);
-create policy "anon_all" on task_comments for all using (true) with check (true);
-create policy "anon_all" on reactions     for all using (true) with check (true);
+do $$ begin create policy "anon_all" on coaches       for all using (true) with check (true); exception when duplicate_object then null; end $$;
+do $$ begin create policy "anon_all" on clients       for all using (true) with check (true); exception when duplicate_object then null; end $$;
+do $$ begin create policy "anon_all" on meals         for all using (true) with check (true); exception when duplicate_object then null; end $$;
+do $$ begin create policy "anon_all" on workouts      for all using (true) with check (true); exception when duplicate_object then null; end $$;
+do $$ begin create policy "anon_all" on weight_logs   for all using (true) with check (true); exception when duplicate_object then null; end $$;
+do $$ begin create policy "anon_all" on tasks         for all using (true) with check (true); exception when duplicate_object then null; end $$;
+do $$ begin create policy "anon_all" on task_comments for all using (true) with check (true); exception when duplicate_object then null; end $$;
+do $$ begin create policy "anon_all" on reactions     for all using (true) with check (true); exception when duplicate_object then null; end $$;
 
--- ============================================================
--- SEED: Начални треньори (изпълни само веднъж!)
--- ============================================================
-insert into coaches (name, password) values
+-- ── Seed coaches (само ако таблицата е празна) ───────────────
+insert into coaches (name, password)
+select name, password from (values
   ('Елина',  '1111'),
   ('Никола', '1111'),
   ('Ицко',   '1111'),
   ('Алекс',  '1111')
-on conflict (name) do nothing;
+) as t(name, password)
+where not exists (select 1 from coaches limit 1);

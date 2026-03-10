@@ -1,11 +1,62 @@
-import { createClient } from '@supabase/supabase-js'
-
 // ── Detect if Supabase is configured ────────────────────────
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL
 const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
-const USE_SUPABASE  = Boolean(SUPABASE_URL && SUPABASE_KEY)
+export const isUsingSupabase = Boolean(SUPABASE_URL && SUPABASE_KEY)
 
-const supabase = USE_SUPABASE ? createClient(SUPABASE_URL, SUPABASE_KEY) : null
+// ── Supabase REST helpers (direct fetch — no supabase-js) ────
+function sbHeaders(extra = {}) {
+  return {
+    'apikey': SUPABASE_KEY,
+    'Authorization': `Bearer ${SUPABASE_KEY}`,
+    'Content-Type': 'application/json',
+    ...extra,
+  }
+}
+
+function sbUrl(table, params = '') {
+  return `${SUPABASE_URL}/rest/v1/${table}${params}`
+}
+
+async function sbFetch(url, options) {
+  const res = await fetch(url, options)
+  if (!res.ok) {
+    const text = await res.text()
+    throw new Error(`Supabase ${res.status}: ${text}`)
+  }
+  if (res.status === 204) return null
+  return res.json()
+}
+
+const SB = {
+  async selectAll(table) {
+    return (await sbFetch(sbUrl(table, '?select=*'), { headers: sbHeaders() })) || []
+  },
+  async insert(table, row) {
+    const data = await sbFetch(sbUrl(table), {
+      method: 'POST',
+      headers: sbHeaders({ 'Prefer': 'return=representation' }),
+      body: JSON.stringify(row),
+    })
+    return Array.isArray(data) ? data[0] : data
+  },
+  async update(table, id, patch) {
+    const data = await sbFetch(sbUrl(table, `?id=eq.${id}`), {
+      method: 'PATCH',
+      headers: sbHeaders({ 'Prefer': 'return=representation' }),
+      body: JSON.stringify(patch),
+    })
+    return Array.isArray(data) ? data[0] : data
+  },
+  async deleteById(table, id) {
+    await sbFetch(sbUrl(table, `?id=eq.${id}`), {
+      method: 'DELETE',
+      headers: sbHeaders(),
+    })
+  },
+  async findWhere(table, field, value) {
+    return (await sbFetch(sbUrl(table, `?select=*&${field}=eq.${encodeURIComponent(value)}`), { headers: sbHeaders() })) || []
+  },
+}
 
 // ── localStorage fallback (no .env / dev) ───────────────────
 function lsUuid() {
@@ -47,35 +98,7 @@ const LS = {
   },
 }
 
-// ── Supabase implementation ──────────────────────────────────
-const SB = {
-  async selectAll(table) {
-    const { data, error } = await supabase.from(table).select('*')
-    if (error) throw error
-    return data || []
-  },
-  async insert(table, row) {
-    const { data, error } = await supabase.from(table).insert(row).select().single()
-    if (error) throw error
-    return data
-  },
-  async update(table, id, patch) {
-    const { data, error } = await supabase.from(table).update(patch).eq('id', id).select().single()
-    if (error) throw error
-    return data
-  },
-  async deleteById(table, id) {
-    const { error } = await supabase.from(table).delete().eq('id', id)
-    if (error) throw error
-  },
-  async findWhere(table, field, value) {
-    const { data, error } = await supabase.from(table).select('*').eq(field, value)
-    if (error) throw error
-    return data || []
-  },
-}
-
-const impl = USE_SUPABASE ? SB : LS
+const impl = isUsingSupabase ? SB : LS
 
 // ── Public API ───────────────────────────────────────────────
 export const DB = {
@@ -86,11 +109,10 @@ export const DB = {
   findWhere:  (table, field, value) => impl.findWhere(table, field, value),
 
   async upsertByFields(table, row, matchFields) {
-    if (USE_SUPABASE) {
-      let query = supabase.from(table).select('id')
-      matchFields.forEach(f => { query = query.eq(f, row[f]) })
-      const { data: existing } = await query.maybeSingle()
-      if (existing) return SB.update(table, existing.id, row)
+    if (isUsingSupabase) {
+      const params = matchFields.map(f => `${f}=eq.${encodeURIComponent(row[f])}`).join('&')
+      const existing = await sbFetch(sbUrl(table, `?select=id&${params}`), { headers: sbHeaders() })
+      if (existing && existing.length > 0) return SB.update(table, existing[0].id, row)
       return SB.insert(table, row)
     }
     const all      = await LS.selectAll(table)
@@ -101,9 +123,8 @@ export const DB = {
 
   async seedIfEmpty() {
     let first
-    if (USE_SUPABASE) {
-      const { data } = await supabase.from('coaches').select('id').limit(1)
-      first = data || []
+    if (isUsingSupabase) {
+      first = (await sbFetch(sbUrl('coaches', '?select=id&limit=1'), { headers: sbHeaders() })) || []
     } else {
       first = await LS.selectAll('coaches')
     }
@@ -117,5 +138,3 @@ export const DB = {
     }
   },
 }
-
-export const isUsingSupabase = USE_SUPABASE

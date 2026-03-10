@@ -123,8 +123,8 @@ export function AppProvider({ children }) {
           : { protein: true, weight: true, foodLog: true, coach: true },
       })))
     } catch(e) {
-      console.error('loadAll error:', e)
-      setLoadError(`${e.name}: ${e.message}`)
+      console.error('loadAll error:', JSON.stringify(e), e?.message, e?.code, e?.details)
+      setLoadError(`${e?.name || 'Error'}: ${e?.message || JSON.stringify(e)}`)
     }
     setLoading(false)
   }, [])
