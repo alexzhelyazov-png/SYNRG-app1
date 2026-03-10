@@ -1,0 +1,25 @@
+{
+  "name": "SYNRG Beyond Fitness",
+  "short_name": "SYNRG",
+  "description": "\u0422\u0440\u0435\u043d\u044c\u043e\u0440\u0441\u043a\u043e \u043f\u0440\u0438\u043b\u043e\u0436\u0435\u043d\u0438\u0435 \u0437\u0430 SYNRG Beyond Fitness",
+  "start_url": "/synrg-app/",
+  "scope": "/synrg-app/",
+  "display": "standalone",
+  "background_color": "#A4A3C5",
+  "theme_color": "#A4A3C5",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

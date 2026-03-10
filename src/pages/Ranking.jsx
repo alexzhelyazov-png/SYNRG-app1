@@ -1,0 +1,316 @@
+import { Box, Typography, Paper, Chip } from '@mui/material'
+import { useApp } from '../context/AppContext'
+import { C, EASE } from '../theme'
+
+const MEDALS = ['🥇', '🥈', '🥉']
+
+// Podium heights
+const PODIUM_H    = [130, 110, 90]
+const PODIUM_ORDER = [1, 0, 2] // 2nd, 1st, 3rd in display order
+
+export default function Ranking() {
+  const { auth, ranking, t } = useApp()
+  const isMobile = window.innerWidth < 640
+
+  const POINT_TYPES = [
+    { id: 'weight',   icon: '⚖️', label: t('rankWeightLbl'),  desc: `2 ${t('ptsPerDay')}`,    color: C.purple  },
+    { id: 'workout',  icon: '💪', label: t('rankWorkoutLbl'), desc: `5 ${t('ptsPerSession')}`, color: C.primary },
+    { id: 'calories', icon: '🔥', label: t('rankCalLbl'),     desc: `3 ${t('ptsPerDay')}`,     color: C.orange  },
+    { id: 'protein',  icon: '🥩', label: t('rankProtLbl'),    desc: `3 ${t('ptsPerDay')}`,     color: C.purple  },
+  ]
+
+  return (
+    <>
+      {/* ── Header ────────────────────────────────────── */}
+      <Box sx={{
+        mb:        3.5,
+        animation: `fadeInUp 0.22s ${EASE.decelerate} both`,
+      }}>
+        <Typography variant="h2" sx={{ mb: 0.75 }}>{t('rankingTitle')}</Typography>
+        <Typography sx={{ color: C.muted, fontSize: '14px' }}>
+          {t('rankingDesc')}
+        </Typography>
+      </Box>
+
+      {/* ── Point type legend cards ───────────────────── */}
+      <Box sx={{
+        display:             'grid',
+        gridTemplateColumns: isMobile ? 'repeat(2,1fr)' : 'repeat(4,1fr)',
+        gap:                 1.25,
+        mb:                  3.5,
+      }}>
+        {POINT_TYPES.map((item, i) => (
+          <Paper
+            key={item.id}
+            sx={{
+              p:          '16px 18px',
+              borderRadius:'16px',
+              transition:  `box-shadow 0.25s ${EASE.standard}, transform 0.25s ${EASE.standard}, border-color 0.25s ${EASE.standard}`,
+              cursor:      'default',
+              animation:   `fadeInUp 0.22s ${EASE.decelerate} ${i * 0.06}s both`,
+              '&:hover':   {
+                transform:   'translateY(-3px)',
+                boxShadow:   `0 0 0 1px ${item.color}33, 0 8px 28px rgba(0,0,0,0.4)`,
+                borderColor: `${item.color}33`,
+              },
+            }}
+          >
+            <Typography sx={{ fontSize: '22px', mb: 0.75 }}>{item.icon}</Typography>
+            <Typography sx={{
+              fontWeight:    700,
+              color:         item.color,
+              fontSize:      '14px',
+              letterSpacing: '-0.1px',
+            }}>
+              {item.label}
+            </Typography>
+            <Typography sx={{ color: C.muted, fontSize: '12px', mt: 0.4 }}>
+              {item.desc}
+            </Typography>
+          </Paper>
+        ))}
+      </Box>
+
+      {/* ── Podium (top 3) ────────────────────────────── */}
+      {ranking.length >= 3 && (
+        <Box sx={{
+          display:        'flex',
+          alignItems:     'flex-end',
+          justifyContent: 'center',
+          gap:            1.5,
+          mb:             3.5,
+          animation:      `fadeInUp 0.3s ${EASE.decelerate} 0.12s both`,
+        }}>
+          {PODIUM_ORDER.map((rank, displayIdx) => {
+            const item       = ranking[rank]
+            const isFirst    = rank === 0
+            const medalSizes = [28, 36, 28]
+            const emojiSize  = medalSizes[rank]
+
+            return (
+              <Box
+                key={rank}
+                sx={{
+                  textAlign: 'center',
+                  flex:      1,
+                  maxWidth:  isFirst ? '200px' : '180px',
+                  animation: `scaleIn 0.3s ${EASE.spring} ${displayIdx * 0.06 + 0.15}s both`,
+                }}
+              >
+                <Typography sx={{ fontSize: `${emojiSize}px`, mb: 0.75, lineHeight: 1 }}>
+                  {MEDALS[rank]}
+                </Typography>
+                <Paper
+                  sx={{
+                    p:             '16px 10px',
+                    height:        `${PODIUM_H[rank]}px`,
+                    display:       'flex',
+                    flexDirection: 'column',
+                    justifyContent:'center',
+                    alignItems:    'center',
+                    gap:           0.25,
+                    ...(isFirst ? {
+                      background: 'linear-gradient(145deg, rgba(196,233,191,0.12) 0%, rgba(196,233,191,0.07) 100%)',
+                      border:     '1px solid rgba(196,233,191,0.3)',
+                      boxShadow:  '0 0 40px rgba(196,233,191,0.15), 0 0 0 1px rgba(196,233,191,0.12)',
+                    } : {}),
+                    transition: `box-shadow 0.25s ${EASE.standard}, transform 0.25s ${EASE.standard}`,
+                    '&:hover': {
+                      transform: 'translateY(-2px)',
+                      boxShadow: isFirst
+                        ? '0 0 50px rgba(196,233,191,0.2), 0 8px 32px rgba(0,0,0,0.4)'
+                        : '0 6px 24px rgba(0,0,0,0.4)',
+                    },
+                  }}
+                >
+                  <Typography sx={{
+                    fontWeight:    800,
+                    fontSize:      isFirst ? '16px' : '15px',
+                    mb:            0.5,
+                    color:         isFirst ? C.primary : C.text,
+                    letterSpacing: '-0.1px',
+                  }}>
+                    {item?.name}
+                  </Typography>
+                  <Typography sx={{
+                    fontSize:      isFirst ? '30px' : '24px',
+                    fontWeight:    800,
+                    color:         isFirst ? C.primary : rank === 1 ? '#94A3B8' : '#CD7F32',
+                    lineHeight:    1,
+                    letterSpacing: '-0.5px',
+                    fontFamily:    "'Space Grotesk', sans-serif",
+                  }}>
+                    {item?.points}
+                  </Typography>
+                  <Typography sx={{ color: isFirst ? 'rgba(196,233,191,0.55)' : C.muted, fontSize: '12px' }}>
+                    {t('points')}
+                  </Typography>
+                </Paper>
+              </Box>
+            )
+          })}
+        </Box>
+      )}
+
+      {/* ── Full table ────────────────────────────────── */}
+      <Paper sx={{
+        overflow:  'hidden',
+        p:         0,
+        animation: `fadeInUp 0.3s ${EASE.decelerate} 0.18s both`,
+      }}>
+        {/* Table header */}
+        <Box sx={{
+          display:             'grid',
+          gridTemplateColumns: isMobile ? '40px 1fr 70px 70px' : '50px 1fr 80px 80px 80px 80px 90px',
+          px:                  isMobile ? '12px' : '20px',
+          py:                  '12px',
+          borderBottom:        `1px solid ${C.border}`,
+          background:          'rgba(0,0,0,0.25)',
+        }}>
+          {[
+            '#',
+            t('rankClientLbl'),
+            `⚖️ ${t('rankWeightLbl')}`,
+            `💪 ${t('rankWorkoutLbl')}`,
+            '🔥 Kcal',
+            `🥩 ${t('proteinShortLbl')}`,
+            t('rankTotalLbl'),
+          ].map((h, i) => (
+            <Typography
+              key={i}
+              sx={{
+                fontSize:      '10.5px',
+                color:         C.muted,
+                fontWeight:    700,
+                textTransform: 'uppercase',
+                letterSpacing: '0.8px',
+                textAlign:     i >= 2 ? 'center' : 'left',
+                display:       (!isMobile || i < 4) ? 'block' : 'none',
+              }}
+            >
+              {h}
+            </Typography>
+          ))}
+        </Box>
+
+        {/* Rows */}
+        {ranking.map((item, i) => {
+          const isMe    = item.name === auth.name
+          const isFirst = i === 0
+
+          return (
+            <Box
+              key={item.name}
+              sx={{
+                display:             'grid',
+                gridTemplateColumns: isMobile ? '40px 1fr 70px 70px' : '50px 1fr 80px 80px 80px 80px 90px',
+                px:                  isMobile ? '12px' : '20px',
+                py:                  isMobile ? '10px' : '14px',
+                borderBottom:        i < ranking.length - 1 ? `1px solid ${C.border}` : 'none',
+                background:          isMe
+                  ? 'linear-gradient(90deg, rgba(196,233,191,0.07) 0%, rgba(196,233,191,0.03) 100%)'
+                  : 'transparent',
+                alignItems:          'center',
+                transition:          `background-color 0.15s ${EASE.standard}`,
+                animation:           `fadeIn 0.2s ${EASE.standard} both`,
+                animationDelay:      `${i * 0.04 + 0.2}s`,
+                '&:hover':           {
+                  background: isMe
+                    ? 'rgba(196,233,191,0.09)'
+                    : 'rgba(255,255,255,0.025)',
+                },
+              }}
+            >
+              {/* Rank number */}
+              <Typography sx={{ fontWeight: 800, fontSize: isFirst ? '20px' : '15px' }}>
+                {i < 3
+                  ? <span style={{ filter: i === 0 ? 'drop-shadow(0 0 6px rgba(196,233,191,0.35))' : 'none' }}>
+                      {MEDALS[i]}
+                    </span>
+                  : <span style={{ color: C.muted, fontSize: '14px' }}>{i + 1}</span>
+                }
+              </Typography>
+
+              {/* Name + "you" badge */}
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Typography sx={{
+                  fontWeight:    isMe ? 800 : 600,
+                  color:         isMe ? C.primary : C.text,
+                  fontSize:      '14px',
+                  letterSpacing: isFirst ? '-0.1px' : 'normal',
+                }}>
+                  {item.name}
+                </Typography>
+                {isMe && (
+                  <Chip
+                    label={t('youBadge')}
+                    size="small"
+                    sx={{
+                      fontSize:   '10px',
+                      background: C.accentSoft,
+                      color:      C.primary,
+                      border:     '1px solid rgba(196,233,191,0.35)',
+                      fontWeight: 800,
+                      height:     '20px',
+                    }}
+                  />
+                )}
+              </Box>
+
+              {/* Breakdown columns */}
+              <Typography sx={{
+                textAlign:  'center',
+                color:      C.purple,
+                fontWeight: 700,
+                fontSize:   '14px',
+              }}>
+                {item.breakdown.weightPts}
+              </Typography>
+              <Typography sx={{
+                textAlign:  'center',
+                color:      C.primary,
+                fontWeight: 700,
+                fontSize:   '14px',
+              }}>
+                {item.breakdown.workoutPts}
+              </Typography>
+
+              {!isMobile && (
+                <>
+                  <Typography sx={{ textAlign: 'center', color: C.orange, fontWeight: 700, fontSize: '14px' }}>
+                    {item.breakdown.calPts}
+                  </Typography>
+                  <Typography sx={{ textAlign: 'center', color: C.purple, fontWeight: 700, fontSize: '14px' }}>
+                    {item.breakdown.protPts}
+                  </Typography>
+                  <Typography sx={{
+                    textAlign:     'center',
+                    fontWeight:    800,
+                    fontSize:      isFirst ? '18px' : '15px',
+                    color:         isFirst ? C.primary : C.text,
+                    fontFamily:    "'Space Grotesk', sans-serif",
+                    letterSpacing: '-0.3px',
+                    filter:        isFirst ? 'drop-shadow(0 0 6px rgba(196,233,191,0.25))' : 'none',
+                  }}>
+                    {item.points}
+                  </Typography>
+                </>
+              )}
+            </Box>
+          )
+        })}
+      </Paper>
+
+      <Typography sx={{
+        mt:        2,
+        color:     C.muted,
+        fontSize:  '12px',
+        textAlign: 'center',
+        opacity:   0.7,
+        animation: `fadeIn 0.3s ${EASE.decelerate} 0.4s both`,
+      }}>
+        {t('rankFooter')}
+      </Typography>
+    </>
+  )
+}
