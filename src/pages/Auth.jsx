@@ -5,22 +5,44 @@ import { C, EASE } from '../theme'
 import SynrgLogomark from '../layout/SynrgLogomark'
 
 export default function Auth() {
-  const { handleLogin, t, lang, setLang, isDark, setIsDark } = useApp()
+  const { handleLogin, handleRegisterClient, t, lang, setLang, isDark, setIsDark } = useApp()
 
+  const [mode,    setMode]    = useState('login')   // 'login' | 'register'
   const [name,    setName]    = useState('')
   const [pass,    setPass]    = useState('')
+  const [pass2,   setPass2]   = useState('')
   const [error,   setError]   = useState('')
   const [loading, setLoading] = useState(false)
+
+  function switchMode(m) {
+    setMode(m)
+    setError('')
+    setName('')
+    setPass('')
+    setPass2('')
+  }
 
   async function handleSubmit() {
     setError('')
     if (!name.trim()) { setError(t('errName')); return }
     if (!pass)        { setError(t('errPassShort')); return }
-    setLoading(true)
-    const err = await handleLogin(name.trim(), pass)
-    setLoading(false)
-    if (err) setError(err)
+
+    if (mode === 'register') {
+      if (pass.length < 3)   { setError(t('errPassShort')); return }
+      if (pass !== pass2)    { setError(t('errPassMismatch')); return }
+      setLoading(true)
+      const err = await handleRegisterClient(name.trim(), pass)
+      setLoading(false)
+      if (err) setError(err)
+    } else {
+      setLoading(true)
+      const err = await handleLogin(name.trim(), pass)
+      setLoading(false)
+      if (err) setError(err)
+    }
   }
+
+  const isRegister = mode === 'register'
 
   return (
     <Box sx={{
@@ -94,9 +116,41 @@ export default function Auth() {
         borderRadius: '24px',
         animation:    `fadeInUp 0.28s ${EASE.decelerate} 0.05s both`,
       }}>
-        <Typography variant="h2" sx={{ mb: 2.5, textAlign: 'center', letterSpacing: '-0.2px' }}>
-          {t('loginBtn').replace(' →', '')}
-        </Typography>
+
+        {/* Mode tabs */}
+        <Box sx={{
+          display:      'flex',
+          borderRadius: '12px',
+          border:       `1px solid ${C.border}`,
+          overflow:     'hidden',
+          mb:           2.5,
+        }}>
+          {[
+            { key: 'login',    label: t('loginTab') },
+            { key: 'register', label: t('registerClientTab').split(' - ')[1] || t('registerTitle') },
+          ].map(({ key, label }) => (
+            <Box
+              key={key}
+              onClick={() => switchMode(key)}
+              sx={{
+                flex:           1,
+                py:             1.1,
+                textAlign:      'center',
+                cursor:         'pointer',
+                fontSize:       '13px',
+                fontWeight:     700,
+                background:     mode === key ? C.accentSoft : 'transparent',
+                color:          mode === key ? C.primary    : C.muted,
+                borderRight:    key === 'login' ? `1px solid ${C.border}` : 'none',
+                transition:     `all 0.18s ${EASE.standard}`,
+                userSelect:     'none',
+                '&:hover':      { color: C.primary },
+              }}
+            >
+              {label}
+            </Box>
+          ))}
+        </Box>
 
         <Box sx={{ display: 'grid', gap: 1.25 }}>
           <TextField
@@ -114,10 +168,22 @@ export default function Auth() {
             placeholder={t('passPlaceholder')}
             value={pass}
             onChange={e => setPass(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && handleSubmit()}
+            onKeyDown={e => !isRegister && e.key === 'Enter' && handleSubmit()}
             inputProps={{ style: { fontSize: '15px', padding: '13px 14px' } }}
-            autoComplete="current-password"
+            autoComplete={isRegister ? 'new-password' : 'current-password'}
           />
+          {isRegister && (
+            <TextField
+              fullWidth
+              type="password"
+              placeholder={t('repeatPass')}
+              value={pass2}
+              onChange={e => setPass2(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleSubmit()}
+              inputProps={{ style: { fontSize: '15px', padding: '13px 14px' } }}
+              autoComplete="new-password"
+            />
+          )}
 
           {error && (
             <Alert severity="error" sx={{ borderRadius: '12px', fontSize: '13px', py: 0.75 }}>
@@ -133,7 +199,7 @@ export default function Auth() {
             onClick={handleSubmit}
             sx={{ py: 1.625, mt: 0.5, fontWeight: 800, fontSize: '15px', letterSpacing: '0.2px' }}
           >
-            {loading ? t('saving') : t('loginBtn')}
+            {loading ? t('saving') : (isRegister ? t('createProfile') : t('loginBtn'))}
           </Button>
         </Box>
       </Paper>

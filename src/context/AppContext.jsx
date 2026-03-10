@@ -169,6 +169,28 @@ export function AppProvider({ children }) {
     return t('errLogin')
   }
 
+  async function handleRegisterClient(name, pass) {
+    const exists = clients.find(c => !c.is_coach && c.name.toLowerCase() === name.toLowerCase())
+    if (exists) return t('errClientExists')
+    const data = await DB.insert('clients', {
+      name, password: pass, calorie_target: 2000, protein_target: 140, is_coach: false,
+    })
+    const newClient = {
+      id: data.id, name, password: pass, is_coach: false,
+      calorieTarget: 2000, proteinTarget: 140,
+      meals: [], workouts: [], weightLogs: [], tasks: [], reactions: [],
+      reminderSettings: { protein: true, weight: true, foodLog: true, coach: true },
+    }
+    setClients(prev => {
+      const updated = [...prev, newClient]
+      const newRealIdx = updated.filter(c => !c.is_coach).length - 1
+      setSelIdx(newRealIdx)
+      return updated
+    })
+    setAuth({ isLoggedIn: true, role: 'client', name, id: data.id })
+    return null
+  }
+
   function logout() {
     setAuth({ isLoggedIn: false, role: null, name: '', id: null })
     setView('dashboard')
@@ -571,6 +593,7 @@ export function AppProvider({ children }) {
     // Actions
     loadAll,
     handleLogin,
+    handleRegisterClient,
     logout,
     updateClient, updateClientTargets,
     addMealToClient, deleteMealFromClient,
