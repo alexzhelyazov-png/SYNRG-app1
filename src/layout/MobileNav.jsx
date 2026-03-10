@@ -1,5 +1,6 @@
-import { Box, BottomNavigation, BottomNavigationAction, Typography } from '@mui/material'
+import { Box, BottomNavigation, BottomNavigationAction, Typography, IconButton } from '@mui/material'
 import GroupIcon from '@mui/icons-material/Group'
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline'
 import { useApp } from '../context/AppContext'
 import { NAV_ITEMS } from '../lib/constants'
 import { C, EASE } from '../theme'
@@ -56,7 +57,7 @@ export default function MobileNav() {
     auth, view, setView,
     showClientMenu, setShowClientMenu,
     clients, visibleClients, actualIdx, setSelIdx, setCurrentWorkout,
-    client, t,
+    client, t, setConfirmDelete,
   } = useApp()
 
   return (
@@ -276,6 +277,22 @@ export default function MobileNav() {
                 {isSel && (
                   <Box sx={{ fontSize: '16px', flexShrink: 0 }}>✓</Box>
                 )}
+
+                <IconButton
+                  size="small"
+                  onClick={e => {
+                    e.stopPropagation()
+                    setShowClientMenu(false)
+                    setConfirmDelete({ id: c.id, name: c.name })
+                  }}
+                  sx={{
+                    flexShrink: 0,
+                    color: C.muted,
+                    '&:hover': { color: C.danger, bgcolor: 'rgba(255,107,157,0.1)' },
+                  }}
+                >
+                  <DeleteOutlineIcon sx={{ fontSize: 18 }} />
+                </IconButton>
               </Box>
             )
           })}
