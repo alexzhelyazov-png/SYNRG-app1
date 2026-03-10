@@ -85,7 +85,7 @@ export default function InstallScreen({ onSkip }) {
             lineHeight:   1.6,
             textAlign:    'center',
           }}>
-            {t('installIOSHint')} <strong>Share ⬆️</strong> {t('installIOSHint2')}<br />
+            {t('installIOSHint')} <strong>Share</strong> {t('installIOSHint2')}<br />
             <strong>{t('installIOSHint3')}</strong>
           </Box>
         )}

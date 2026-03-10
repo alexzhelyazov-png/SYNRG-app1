@@ -14,6 +14,7 @@ export default function WeightTracker() {
     sortedWeightLogs, weightChartData,
     latestWeight, latestAvg, weeklyRate,
     deleteWeightLog,
+    isTrackerReadOnly,
   } = useApp()
 
   const isMobile           = window.innerWidth < 640
@@ -39,28 +40,30 @@ export default function WeightTracker() {
         />
       </Box>
 
-      {/* ── Input form ──────────────────────────────── */}
-      <Paper sx={{ p: 3, mb: 2.5 }}>
-        <Typography variant="h3" sx={{ mb: 2.25 }}>{t('logWeightLbl')}</Typography>
-        <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center', flexWrap: 'wrap' }}>
-          <TextField
-            type="date"
-            value={weightDate}
-            onChange={e => setWeightDate(e.target.value)}
-            sx={{ width: '160px' }}
-          />
-          <TextField
-            placeholder={t('weightInKg')}
-            value={weightInput}
-            onChange={e => setWeightInput(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && saveWeight()}
-            sx={{ width: '140px' }}
-          />
-          <Button variant="contained" color="primary" onClick={saveWeight}>
-            {t('saveLbl')}
-          </Button>
-        </Box>
-      </Paper>
+      {/* ── Input form (own tracker only) ───────────── */}
+      {!isTrackerReadOnly && (
+        <Paper sx={{ p: 3, mb: 2.5 }}>
+          <Typography variant="h3" sx={{ mb: 2.25 }}>{t('logWeightLbl')}</Typography>
+          <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center', flexWrap: 'wrap' }}>
+            <TextField
+              type="date"
+              value={weightDate}
+              onChange={e => setWeightDate(e.target.value)}
+              sx={{ width: '160px' }}
+            />
+            <TextField
+              placeholder={t('weightInKg')}
+              value={weightInput}
+              onChange={e => setWeightInput(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && saveWeight()}
+              sx={{ width: '140px' }}
+            />
+            <Button variant="contained" color="primary" onClick={saveWeight}>
+              {t('saveLbl')}
+            </Button>
+          </Box>
+        </Paper>
+      )}
 
       {/* ── Chart ───────────────────────────────────── */}
       <Paper sx={{ p: 3, mb: 2.5, overflow: 'hidden' }}>
@@ -115,7 +118,7 @@ export default function WeightTracker() {
               }}>
                 {fmt1(item.weight)} {t('kgUnit')}
               </Typography>
-              {auth.role === 'coach' && (
+              {auth.role === 'coach' && !isTrackerReadOnly && (
                 <Button
                   size="small"
                   onClick={() => deleteWeightLog(client.id, item.id)}

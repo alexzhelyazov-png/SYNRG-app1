@@ -15,6 +15,7 @@ export default function FoodTracker() {
     mealsForDate, selFoodDate,
     foodTotals, kcalPct, protPct,
     addQuickFood, deleteMealFromClient,
+    isTrackerReadOnly,
   } = useApp()
 
   const dailyHistory = useMemo(() => {
@@ -51,9 +52,11 @@ export default function FoodTracker() {
             sx={{ width: '160px' }}
             size="small"
           />
-          <Button variant="contained" color="primary" onClick={() => setFoodModalOpen(true)}>
-            {t('addFoodBtn')}
-          </Button>
+          {!isTrackerReadOnly && (
+            <Button variant="contained" color="primary" onClick={() => setFoodModalOpen(true)}>
+              {t('addFoodBtn')}
+            </Button>
+          )}
         </Box>
       </Box>
 
@@ -116,34 +119,36 @@ export default function FoodTracker() {
         ))}
       </Box>
 
-      {/* ── Quick-add chips ─────────────────────────── */}
-      <Paper sx={{ p: 2.5, mb: 2.5 }}>
-        <Typography variant="overline" sx={{ color: C.muted, display: 'block', mb: 1.5 }}>
-          {t('quickAddLbl')}
-        </Typography>
-        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-          {quickFoods.map(item => (
-            <Chip
-              key={item.key}
-              label={`+ ${item.count !== undefined
-                ? `${item.count} ${foodDB[item.key]?.label}`
-                : `${foodDB[item.key]?.label} ${item.grams}${t('gUnit')}`}`}
-              onClick={() => addQuickFood(item.key, item.grams)}
-              sx={{
-                background: C.purpleSoft,
-                color:      C.purple,
-                border:     '1px solid rgba(200,197,255,0.18)',
-                '&:hover':  {
-                  background: 'rgba(200,197,255,0.2)',
-                  borderColor:'rgba(200,197,255,0.3)',
-                  boxShadow:  '0 3px 12px rgba(200,197,255,0.15)',
-                },
-                '& .MuiChip-label': { fontWeight: 600 },
-              }}
-            />
-          ))}
-        </Box>
-      </Paper>
+      {/* ── Quick-add chips (own tracker only) ──────── */}
+      {!isTrackerReadOnly && (
+        <Paper sx={{ p: 2.5, mb: 2.5 }}>
+          <Typography variant="overline" sx={{ color: C.muted, display: 'block', mb: 1.5 }}>
+            {t('quickAddLbl')}
+          </Typography>
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+            {quickFoods.map(item => (
+              <Chip
+                key={item.key}
+                label={`+ ${item.count !== undefined
+                  ? `${item.count} ${foodDB[item.key]?.label}`
+                  : `${foodDB[item.key]?.label} ${item.grams}${t('gUnit')}`}`}
+                onClick={() => addQuickFood(item.key, item.grams)}
+                sx={{
+                  background: C.purpleSoft,
+                  color:      C.purple,
+                  border:     '1px solid rgba(200,197,255,0.18)',
+                  '&:hover':  {
+                    background: 'rgba(200,197,255,0.2)',
+                    borderColor:'rgba(200,197,255,0.3)',
+                    boxShadow:  '0 3px 12px rgba(200,197,255,0.15)',
+                  },
+                  '& .MuiChip-label': { fontWeight: 600 },
+                }}
+              />
+            ))}
+          </Box>
+        </Paper>
+      )}
 
       {/* ── Meals list ──────────────────────────────── */}
       <Paper sx={{ p: 2.75 }}>
@@ -188,7 +193,7 @@ export default function FoodTracker() {
                     {item.protein}{t('gUnit')}
                   </Typography>
                 )}
-                {auth.role === 'coach' && (
+                {auth.role === 'coach' && !isTrackerReadOnly && (
                   <Button
                     size="small"
                     onClick={() => deleteMealFromClient(client.id, item.id)}
@@ -207,7 +212,7 @@ export default function FoodTracker() {
                         transform:  'translateY(-1px)',
                       },
                     }}
-                  >✕</Button>
+                  >×</Button>
                 )}
               </Box>
             ))}

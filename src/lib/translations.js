@@ -4,7 +4,7 @@ export const T = {
     installTitle:       'Инсталирай приложението',
     installTitleIOS:    'Инсталирай на iPhone',
     installDesc:        'Добави SYNRG към началния екран на телефона си и го ползвай като истинско приложение — без браузър, без реклами.',
-    installBtn:         '📲 Добави към началния екран',
+    installBtn:         'Добави към началния екран',
     installIOSHint:     'Натисни',
     installIOSHint2:    'в Safari, след това',
     installIOSHint3:    '"Add to Home Screen"',
@@ -17,14 +17,15 @@ export const T = {
     retry:              'Опитай отново',
 
     // ── Auth ─────────────────────────────────────────
-    loginTab:           '🔑  Вход',
-    registerCoachTab:   '💪  Треньор - Регистрация',
-    registerClientTab:  '🏃  Клиент - Регистрация',
+    loginTab:           'Вход',
+    registerCoachTab:   'Треньор - Регистрация',
+    registerClientTab:  'Клиент - Регистрация',
     coachRole:          'Треньор',
     clientRole:         'Клиент',
     coachLoginTitle:    'Вход за треньори',
     clientLoginTitle:   'Клиентски вход',
-    namePlaceholder:    'Твоето име',
+    loginTitle:         'Вход',
+    namePlaceholder:    'Напиши Иmе и Фамилия',
     passPlaceholder:    'Парола',
     loginBtn:           'Влез →',
     newCoachTag:        'Нов треньор',
@@ -54,16 +55,26 @@ export const T = {
     navWeight:          'Тегло',
     navRanking:         'Класация',
     navClients:         'Клиенти',
+    navTasks:           'Задачи',
+    navCoaches:         'Треньори',
+    navNotifications:   'Известия',
     navLogout:          'Изход',
     navHide:            'Скрий',
     navExpand:          'Разшири',
     lightMode:          'Светла тема',
     darkMode:           'Тъмна тема',
 
-    // ── Sidebar ──────────────────────────────────────
+    // ── Sidebar / Coaches ─────────────────────────────
     clientsHeader:      'Клиенти',
+    coachesHeader:      'Треньори',
     deleteClientTip:    'Изтрий клиент',
-    top5Label:          '🏆 Топ 5 · 30 дни',
+    top5Label:          'Топ 5 · 30 дни',
+    myTrackerTitle:     'Моят тракер',
+    trackerLabel:       'Тракер',
+    noNotifications:    'Няма известия',
+    newNotifications:   'нови известия',
+    taskNotifLbl:       'Задача',
+    reactionNotifLbl:   'Реакция',
 
     // ── Mobile ───────────────────────────────────────
     selectClient:       'Избери клиент',
@@ -98,14 +109,14 @@ export const T = {
     insufficientData:   'недостатъчно данни',
     gaining:            'качване ▲',
     losing:             'сваляне ▼',
-    myRanking:          '🏆 Моята позиция в класацията',
+    myRanking:          'Моята позиция в класацията',
     seeAll:             'Виж всички →',
     ofClients:          'клиенти',
-    toFirst:            'до 🥇:',
+    toFirst:            'до 1-во:',
     points:             'точки',
 
     // ── Food Tracker ──────────────────────────────────
-    foodTrackerTitle:   '🥗 Хранителен тракер',
+    foodTrackerTitle:   'Хранителен тракер',
     caloriesLbl:        'КАЛОРИИ',
     proteinLbl:         'ПРОТЕИН',
     quickAddLbl:        'БЪРЗО ДОБАВЯНЕ',
@@ -123,7 +134,7 @@ export const T = {
     closeLbl:           'Затвори',
 
     // ── Weight Tracker ────────────────────────────────
-    weightTrackerTitle: '⚖️ Тракер за тегло',
+    weightTrackerTitle: 'Тракер за тегло',
     lastWeightLbl:      'Последно тегло',
     weeklyRateLbl:      'Weekly rate',
     logWeightLbl:       'Запиши тегло',
@@ -136,7 +147,7 @@ export const T = {
     kgWeek:             'кг/сед',
 
     // ── Ranking ───────────────────────────────────────
-    rankingTitle:       '🏆 Класация',
+    rankingTitle:       'Класация',
     rankingDesc:        'Точки за последните 30 дни',
     rankWeightLbl:      'Тегло',
     rankWorkoutLbl:     'Тренировка',
@@ -193,14 +204,13 @@ export const T = {
     gramsLbl:           'Грама',
 
     // ── Tasks ─────────────────────────────────────────
-    navTasks:           'Задачи',
     tasksCoachTitle:    'Задачи',
     tasksClientTitle:   'Моите задачи',
     noTasks:            'Няма задачи все още',
     addTaskPlaceholder: 'Заглавие на задачата...',
     taskDescPlaceholder:'Описание (по избор)',
     addTaskBtn:         'Добави задача',
-    taskDone:           '✓ Изпълнена',
+    taskDone:           'Изпълнена',
     taskPending:        'Предстои',
     taskCommentPlaceholder: 'Коментирай...',
     taskCommentBtn:     'Изпрати',
@@ -210,7 +220,7 @@ export const T = {
     commentSavedMsg:    'Коментарът е изпратен',
 
     // ── Reminders ─────────────────────────────────────
-    remindersTitle:     '🔔 Напомняния',
+    remindersTitle:     'Напомняния',
     reminderProteinMsg: 'Имаш {cur}г протеин. Нужни са ти още {needed}г до целта ({tgt}г).',
     reminderWeightMsg:  'Не си записал/а теглото си от {days} дни.',
     reminderWeightFirst:'Все още не си записал/а тегло.',
@@ -223,13 +233,13 @@ export const T = {
     weightReminderLbl:  'Напомняне за тегло (≥ 3 дни)',
     foodLogReminderLbl: 'Дневник на храненето (след 20:00)',
     coachReminderLbl:   'Съобщения от треньора',
-    dismissLbl:         '✕',
+    dismissLbl:         '×',
     noReminders:        'Няма активни напомняния',
 
     // ── Coach reactions ───────────────────────────────
     reactSectionTitle:  'Изпрати на клиента',
-    reactLikeBtn:       '👍 Браво!',
-    reactTextBtn:       '✉️ Съобщение',
+    reactLikeBtn:       'Браво!',
+    reactTextBtn:       'Съобщение',
     reactionPlaceholder:'Насърчение или забележка...',
     reactionSendBtn:    'Изпрати',
     reactionSentMsg:    'Реакцията е изпратена',
@@ -241,7 +251,7 @@ export const T = {
     installTitle:       'Install the app',
     installTitleIOS:    'Install on iPhone',
     installDesc:        'Add SYNRG to your phone\'s home screen and use it like a native app — no browser, no ads.',
-    installBtn:         '📲 Add to home screen',
+    installBtn:         'Add to home screen',
     installIOSHint:     'Tap',
     installIOSHint2:    'in Safari, then',
     installIOSHint3:    '"Add to Home Screen"',
@@ -254,14 +264,15 @@ export const T = {
     retry:              'Try again',
 
     // ── Auth ─────────────────────────────────────────
-    loginTab:           '🔑  Login',
-    registerCoachTab:   '💪  Coach - Register',
-    registerClientTab:  '🏃  Client - Register',
+    loginTab:           'Login',
+    registerCoachTab:   'Coach - Register',
+    registerClientTab:  'Client - Register',
     coachRole:          'Coach',
     clientRole:         'Client',
     coachLoginTitle:    'Coach Login',
     clientLoginTitle:   'Client Login',
-    namePlaceholder:    'Your name',
+    loginTitle:         'Login',
+    namePlaceholder:    'Enter First and Last Name',
     passPlaceholder:    'Password',
     loginBtn:           'Log in →',
     newCoachTag:        'New Coach',
@@ -291,16 +302,26 @@ export const T = {
     navWeight:          'Weight',
     navRanking:         'Ranking',
     navClients:         'Clients',
+    navTasks:           'Tasks',
+    navCoaches:         'Coaches',
+    navNotifications:   'Notifications',
     navLogout:          'Logout',
     navHide:            'Hide',
     navExpand:          'Expand',
     lightMode:          'Light theme',
     darkMode:           'Dark theme',
 
-    // ── Sidebar ──────────────────────────────────────
+    // ── Sidebar / Coaches ─────────────────────────────
     clientsHeader:      'Clients',
+    coachesHeader:      'Coaches',
     deleteClientTip:    'Delete client',
-    top5Label:          '🏆 Top 5 · 30 days',
+    top5Label:          'Top 5 · 30 days',
+    myTrackerTitle:     'My tracker',
+    trackerLabel:       'Tracker',
+    noNotifications:    'No notifications',
+    newNotifications:   'new notifications',
+    taskNotifLbl:       'Task',
+    reactionNotifLbl:   'Reaction',
 
     // ── Mobile ───────────────────────────────────────
     selectClient:       'Select client',
@@ -335,14 +356,14 @@ export const T = {
     insufficientData:   'insufficient data',
     gaining:            'gaining ▲',
     losing:             'losing ▼',
-    myRanking:          '🏆 My ranking position',
+    myRanking:          'My ranking position',
     seeAll:             'See all →',
     ofClients:          'clients',
-    toFirst:            'to 🥇:',
+    toFirst:            'to 1st:',
     points:             'points',
 
     // ── Food Tracker ──────────────────────────────────
-    foodTrackerTitle:   '🥗 Food Tracker',
+    foodTrackerTitle:   'Food Tracker',
     caloriesLbl:        'CALORIES',
     proteinLbl:         'PROTEIN',
     quickAddLbl:        'QUICK ADD',
@@ -360,7 +381,7 @@ export const T = {
     closeLbl:           'Close',
 
     // ── Weight Tracker ────────────────────────────────
-    weightTrackerTitle: '⚖️ Weight Tracker',
+    weightTrackerTitle: 'Weight Tracker',
     lastWeightLbl:      'Last weight',
     weeklyRateLbl:      'Weekly rate',
     logWeightLbl:       'Log weight',
@@ -373,7 +394,7 @@ export const T = {
     kgWeek:             'kg/week',
 
     // ── Ranking ───────────────────────────────────────
-    rankingTitle:       '🏆 Ranking',
+    rankingTitle:       'Ranking',
     rankingDesc:        'Points for the last 30 days',
     rankWeightLbl:      'Weight',
     rankWorkoutLbl:     'Workout',
@@ -430,14 +451,13 @@ export const T = {
     gramsLbl:           'Grams',
 
     // ── Tasks ─────────────────────────────────────────
-    navTasks:           'Tasks',
     tasksCoachTitle:    'Tasks',
     tasksClientTitle:   'My Tasks',
     noTasks:            'No tasks yet',
     addTaskPlaceholder: 'Task title...',
     taskDescPlaceholder:'Description (optional)',
     addTaskBtn:         'Add task',
-    taskDone:           '✓ Done',
+    taskDone:           'Done',
     taskPending:        'Pending',
     taskCommentPlaceholder: 'Comment...',
     taskCommentBtn:     'Send',
@@ -447,7 +467,7 @@ export const T = {
     commentSavedMsg:    'Comment sent',
 
     // ── Reminders ─────────────────────────────────────
-    remindersTitle:     '🔔 Reminders',
+    remindersTitle:     'Reminders',
     reminderProteinMsg: 'You have {cur}g protein today. You need {needed}g more to reach your target ({tgt}g).',
     reminderWeightMsg:  'You haven\'t logged your weight for {days} days.',
     reminderWeightFirst:'You haven\'t logged your weight yet.',
@@ -460,13 +480,13 @@ export const T = {
     weightReminderLbl:  'Weight reminder (≥ 3 days)',
     foodLogReminderLbl: 'Food diary (after 20:00)',
     coachReminderLbl:   'Messages from coach',
-    dismissLbl:         '✕',
+    dismissLbl:         '×',
     noReminders:        'No active reminders',
 
     // ── Coach reactions ───────────────────────────────
     reactSectionTitle:  'Send to client',
-    reactLikeBtn:       '👍 Well done!',
-    reactTextBtn:       '✉️ Message',
+    reactLikeBtn:       'Well done!',
+    reactTextBtn:       'Message',
     reactionPlaceholder:'Encouragement or note...',
     reactionSendBtn:    'Send',
     reactionSentMsg:    'Reaction sent',

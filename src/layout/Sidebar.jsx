@@ -1,19 +1,43 @@
 import { useState } from 'react'
 import {
   Drawer, Box, List, ListItemButton, ListItemIcon, ListItemText,
-  Typography, IconButton, Divider, Tooltip, Button,
+  Typography, IconButton, Divider, Tooltip, Button, Badge, Collapse,
 } from '@mui/material'
-import ChevronRightIcon  from '@mui/icons-material/ChevronRight'
-import ChevronLeftIcon   from '@mui/icons-material/ChevronLeft'
-import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline'
-import LogoutIcon        from '@mui/icons-material/Logout'
+import ChevronRightIcon    from '@mui/icons-material/ChevronRight'
+import ChevronLeftIcon     from '@mui/icons-material/ChevronLeft'
+import DeleteOutlineIcon   from '@mui/icons-material/DeleteOutline'
+import LogoutIcon          from '@mui/icons-material/Logout'
+import DashboardIcon       from '@mui/icons-material/Dashboard'
+import RestaurantIcon      from '@mui/icons-material/Restaurant'
+import MonitorWeightIcon   from '@mui/icons-material/MonitorWeight'
+import LeaderboardIcon     from '@mui/icons-material/Leaderboard'
+import AssignmentIcon      from '@mui/icons-material/Assignment'
+import PeopleIcon          from '@mui/icons-material/People'
+import NotificationsNoneIcon from '@mui/icons-material/NotificationsNone'
+import PersonIcon          from '@mui/icons-material/Person'
+import LightModeIcon       from '@mui/icons-material/LightMode'
+import DarkModeIcon        from '@mui/icons-material/DarkMode'
 import { useApp } from '../context/AppContext'
-import { NAV_ITEMS } from '../lib/constants'
 import { C, EASE } from '../theme'
 import SynrgLogo from './SynrgLogo'
 
 const DRAWER_WIDTH = 272
 const RAIL_WIDTH   = 72
+
+const NAV_ICON_MAP = {
+  dashboard: DashboardIcon,
+  food:      RestaurantIcon,
+  weight:    MonitorWeightIcon,
+  ranking:   LeaderboardIcon,
+  tasks:     AssignmentIcon,
+}
+
+const NAV_VIEWS = [
+  { view: 'dashboard', labelKey: 'navDashboard' },
+  { view: 'food',      labelKey: 'navFood'      },
+  { view: 'weight',    labelKey: 'navWeight'    },
+  { view: 'ranking',   labelKey: 'navRanking'   },
+]
 
 export default function Sidebar() {
   const {
@@ -21,13 +45,30 @@ export default function Sidebar() {
     clients, visibleClients, actualIdx, setSelIdx, setCurrentWorkout,
     sidebarOpen, setSidebarOpen,
     setConfirmDelete,
+    coaches, coachProfiles,
+    viewingCoach, setViewingCoach,
+    notifications, unreadNotifCount,
     lang, setLang, t,
     isDark, setIsDark,
   } = useApp()
 
-  const [recentIds, setRecentIds] = useState([])
+  const [recentIds,     setRecentIds]     = useState([])
+  const [showNotifs,    setShowNotifs]    = useState(false)
+  const [showCoaches,   setShowCoaches]   = useState(false)
 
   const open = sidebarOpen
+
+  function selectClient(ri, clientId) {
+    setRecentIds(prev => [clientId, ...prev.filter(id => id !== clientId)])
+    setSelIdx(ri)
+    setCurrentWorkout([])
+    setViewingCoach(null) // exit coach tracker mode
+  }
+
+  function selectCoachTracker(coachName) {
+    setViewingCoach(coachName)
+    setView('dashboard')
+  }
 
   return (
     <Drawer
@@ -46,7 +87,7 @@ export default function Sidebar() {
         },
       }}
     >
-      {/* ── Header: logo + toggle ────────────────────── */}
+      {/* ── Header ──────────────────────────────────────── */}
       <Box sx={{
         display:        'flex',
         alignItems:     'center',
@@ -56,219 +97,263 @@ export default function Sidebar() {
         flexShrink:     0,
       }}>
         {open && (
-          <Box sx={{ animation: 'fadeIn 0.2s ease', opacity: 1 }}>
+          <Box sx={{ animation: 'fadeIn 0.2s ease' }}>
             <SynrgLogo width={96} />
           </Box>
         )}
         <Tooltip title={open ? t('navHide') : t('navExpand')} placement="right" arrow>
-          <IconButton
-            onClick={() => setSidebarOpen(p => !p)}
-            size="small"
-            sx={{
-              color:     C.muted,
-              width:     32, height: 32,
-              '&:hover': { color: C.text },
-            }}
-          >
+          <IconButton onClick={() => setSidebarOpen(p => !p)} size="small"
+            sx={{ color: C.muted, width: 32, height: 32, '&:hover': { color: C.text } }}>
             {open ? <ChevronLeftIcon fontSize="small" /> : <ChevronRightIcon fontSize="small" />}
           </IconButton>
         </Tooltip>
       </Box>
 
-      {/* ── Role badge ──────────────────────────────── */}
+      {/* ── Role badge ──────────────────────────────────── */}
       {open && (
         <Box sx={{
-          mx:           1.5,
-          mb:           1,
-          px:           1.75,
-          py:           1.25,
-          background:   auth.role === 'coach'
+          mx: 1.5, mb: 1, px: 1.75, py: 1.25,
+          background: auth.role === 'coach'
             ? 'linear-gradient(135deg, rgba(196,233,191,0.1) 0%, rgba(196,233,191,0.06) 100%)'
             : 'linear-gradient(135deg, rgba(200,197,255,0.1) 0%, rgba(200,197,255,0.06) 100%)',
           borderRadius: '14px',
-          border:       `1px solid ${auth.role === 'coach' ? 'rgba(196,233,191,0.15)' : 'rgba(200,197,255,0.15)'}`,
-          flexShrink:   0,
-          animation:    'fadeIn 0.2s ease',
+          border: `1px solid ${auth.role === 'coach' ? 'rgba(196,233,191,0.15)' : 'rgba(200,197,255,0.15)'}`,
+          flexShrink: 0, animation: 'fadeIn 0.2s ease',
         }}>
           <Typography variant="overline" sx={{
-            color:      auth.role === 'coach' ? C.primary : C.purple,
-            display:    'block',
-            lineHeight: 1,
-            mb:         0.5,
+            color: auth.role === 'coach' ? C.primary : C.purple,
+            display: 'block', lineHeight: 1, mb: 0.5,
           }}>
             {auth.role === 'coach' ? t('coachRole') : t('clientRole')}
           </Typography>
-          <Typography sx={{ fontWeight: 700, fontSize: '14px', color: C.text, letterSpacing: '-0.1px' }}>
+          <Typography sx={{ fontWeight: 700, fontSize: '14px', color: C.text }}>
             {auth.name}
           </Typography>
         </Box>
       )}
 
-      {/* ── Nav items ───────────────────────────────── */}
+      {/* ── Nav items ───────────────────────────────────── */}
       <List sx={{ px: 0, py: 0.5, flexShrink: 0 }}>
-        {NAV_ITEMS.map(({ view: v, icon, labelKey }) => (
-          <Tooltip key={v} title={!open ? t(labelKey) : ''} placement="right" arrow>
+        {NAV_VIEWS.map(({ view: v, labelKey }) => {
+          const Icon = NAV_ICON_MAP[v]
+          const isActive = view === v && !viewingCoach
+          return (
+            <Tooltip key={v} title={!open ? t(labelKey) : ''} placement="right" arrow>
+              <ListItemButton
+                selected={isActive}
+                onClick={() => { setView(v); setViewingCoach(null) }}
+                sx={{
+                  justifyContent: open ? 'flex-start' : 'center',
+                  px: open ? 2 : 0, mx: open ? 1.5 : 1, my: '2px', minHeight: 48,
+                }}
+              >
+                <ListItemIcon sx={{ minWidth: open ? 38 : 'unset', justifyContent: 'center', color: isActive ? C.primary : C.muted }}>
+                  <Icon sx={{ fontSize: '20px' }} />
+                </ListItemIcon>
+                {open && (
+                  <ListItemText primary={t(labelKey)} sx={{
+                    '& .MuiListItemText-primary': {
+                      color: isActive ? C.primary : C.text,
+                      fontWeight: isActive ? 700 : 500,
+                    }
+                  }} />
+                )}
+              </ListItemButton>
+            </Tooltip>
+          )
+        })}
+
+        {/* Tasks */}
+        <Tooltip title={!open ? t('navTasks') : ''} placement="right" arrow>
+          <ListItemButton
+            selected={view === 'tasks'}
+            onClick={() => { setView('tasks'); setViewingCoach(null) }}
+            sx={{ justifyContent: open ? 'flex-start' : 'center', px: open ? 2 : 0, mx: open ? 1.5 : 1, my: '2px', minHeight: 48 }}
+          >
+            <ListItemIcon sx={{ minWidth: open ? 38 : 'unset', justifyContent: 'center', color: view === 'tasks' ? C.primary : C.muted }}>
+              <AssignmentIcon sx={{ fontSize: '20px' }} />
+            </ListItemIcon>
+            {open && <ListItemText primary={t('navTasks')} sx={{ '& .MuiListItemText-primary': { color: view === 'tasks' ? C.primary : C.text, fontWeight: view === 'tasks' ? 700 : 500 } }} />}
+          </ListItemButton>
+        </Tooltip>
+
+        {/* Notifications (coach only) */}
+        {auth.role === 'coach' && (
+          <Tooltip title={!open ? t('navNotifications') : ''} placement="right" arrow>
             <ListItemButton
-              selected={view === v}
-              onClick={() => setView(v)}
-              sx={{
-                justifyContent: open ? 'flex-start' : 'center',
-                px:             open ? 2 : 0,
-                mx:             open ? 1.5 : 1,
-                my:             '2px',
-                minHeight:      48,
-              }}
+              onClick={() => setShowNotifs(p => !p)}
+              sx={{ justifyContent: open ? 'flex-start' : 'center', px: open ? 2 : 0, mx: open ? 1.5 : 1, my: '2px', minHeight: 48 }}
             >
-              <ListItemIcon sx={{
-                minWidth:       open ? 38 : 'unset',
-                justifyContent: 'center',
-                fontSize:       '18px',
-                transition:     `transform 0.15s ${EASE.spring}`,
-                ...(view === v && { transform: 'scale(1.08)' }),
-              }}>
-                <span>{icon}</span>
+              <ListItemIcon sx={{ minWidth: open ? 38 : 'unset', justifyContent: 'center', color: unreadNotifCount > 0 ? C.primary : C.muted }}>
+                <Badge badgeContent={unreadNotifCount} color="error" max={9}>
+                  <NotificationsNoneIcon sx={{ fontSize: '20px' }} />
+                </Badge>
               </ListItemIcon>
-              {open && (
-                <ListItemText
-                  primary={t(labelKey)}
-                  sx={{ '& .MuiListItemText-primary': {
-                    color:      view === v ? C.primary : C.text,
-                    fontWeight: view === v ? 700 : 500,
-                    transition: `color 0.15s ${EASE.standard}`,
-                  }}}
-                />
-              )}
+              {open && <ListItemText primary={t('navNotifications')} sx={{ '& .MuiListItemText-primary': { color: unreadNotifCount > 0 ? C.primary : C.text, fontWeight: unreadNotifCount > 0 ? 700 : 500 } }} />}
             </ListItemButton>
           </Tooltip>
-        ))}
+        )}
 
-        {/* Language + theme toggles */}
+        {/* Lang + Theme */}
         {open ? (
           <Box sx={{ mx: 1.5, my: '4px', px: 2, display: 'flex', gap: 0.5 }}>
             {['bg', 'en'].map(l => (
-              <Button
-                key={l}
-                onClick={() => setLang(l)}
-                size="small"
-                sx={{
-                  flex:         1,
-                  py:           '5px',
-                  minWidth:     0,
-                  fontSize:     '11px',
-                  fontWeight:   700,
-                  letterSpacing:'0.5px',
-                  borderRadius: '8px',
-                  background:   lang === l ? C.accentSoft : 'transparent',
-                  color:        lang === l ? C.primary : C.muted,
-                  border:       `1px solid ${lang === l ? C.primaryA20 : C.border}`,
-                  transition:   `all 0.18s ${EASE.standard}`,
-                  '&:hover':    { background: C.accentSoft, color: C.primary, borderColor: C.primaryA20 },
-                }}
-              >
+              <Button key={l} onClick={() => setLang(l)} size="small" sx={{
+                flex: 1, py: '5px', minWidth: 0, fontSize: '11px', fontWeight: 700,
+                borderRadius: '8px',
+                background: lang === l ? C.accentSoft : 'transparent',
+                color:      lang === l ? C.primary    : C.muted,
+                border:     `1px solid ${lang === l ? C.primaryA20 : C.border}`,
+                '&:hover':  { background: C.accentSoft, color: C.primary, borderColor: C.primaryA20 },
+              }}>
                 {l.toUpperCase()}
               </Button>
             ))}
             <Tooltip title={isDark ? t('lightMode') : t('darkMode')} placement="right" arrow>
-              <Button
-                onClick={() => setIsDark(!isDark)}
-                size="small"
-                sx={{
-                  minWidth:     '36px',
-                  px:           0,
-                  py:           '5px',
-                  fontSize:     '14px',
-                  borderRadius: '8px',
-                  background:   'transparent',
-                  color:        C.muted,
-                  border:       `1px solid ${C.border}`,
-                  transition:   `all 0.18s ${EASE.standard}`,
-                  '&:hover':    { background: C.accentSoft, color: C.primary, borderColor: C.primaryA20 },
-                }}
-              >
-                {isDark ? '☀️' : '🌙'}
-              </Button>
+              <IconButton onClick={() => setIsDark(!isDark)} size="small" sx={{
+                color: C.muted, border: `1px solid ${C.border}`, borderRadius: '8px',
+                width: 36, height: 36,
+                '&:hover': { background: C.accentSoft, color: C.primary, borderColor: C.primaryA20 },
+              }}>
+                {isDark ? <LightModeIcon fontSize="small" /> : <DarkModeIcon fontSize="small" />}
+              </IconButton>
             </Tooltip>
           </Box>
         ) : (
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
             <Tooltip title={lang === 'bg' ? 'English' : 'Български'} placement="right" arrow>
-              <ListItemButton
-                onClick={() => setLang(lang === 'bg' ? 'en' : 'bg')}
-                sx={{ justifyContent: 'center', px: 0, mx: 1, my: '1px', minHeight: 36 }}
-              >
+              <ListItemButton onClick={() => setLang(lang === 'bg' ? 'en' : 'bg')}
+                sx={{ justifyContent: 'center', px: 0, mx: 1, my: '1px', minHeight: 36 }}>
                 <Typography sx={{ fontSize: '10px', fontWeight: 700, color: C.muted }}>
                   {lang === 'bg' ? 'EN' : 'BG'}
                 </Typography>
               </ListItemButton>
             </Tooltip>
             <Tooltip title={isDark ? t('lightMode') : t('darkMode')} placement="right" arrow>
-              <ListItemButton
-                onClick={() => setIsDark(!isDark)}
-                sx={{ justifyContent: 'center', px: 0, mx: 1, my: '1px', minHeight: 36 }}
-              >
-                <Typography sx={{ fontSize: '14px' }}>{isDark ? '☀️' : '🌙'}</Typography>
+              <ListItemButton onClick={() => setIsDark(!isDark)}
+                sx={{ justifyContent: 'center', px: 0, mx: 1, my: '1px', minHeight: 36 }}>
+                {isDark
+                  ? <LightModeIcon sx={{ fontSize: '18px', color: C.muted }} />
+                  : <DarkModeIcon  sx={{ fontSize: '18px', color: C.muted }} />
+                }
               </ListItemButton>
             </Tooltip>
           </Box>
         )}
 
-        {/* Tasks (coach + client) */}
-        <Tooltip title={!open ? t('navTasks') : ''} placement="right" arrow>
-          <ListItemButton
-            selected={view === 'tasks'}
-            onClick={() => setView('tasks')}
-            sx={{
-              justifyContent: open ? 'flex-start' : 'center',
-              px:             open ? 2 : 0,
-              mx:             open ? 1.5 : 1,
-              my:             '2px',
-              minHeight:      48,
-              borderRadius:   '28px',
-            }}
-          >
-            <ListItemIcon sx={{ minWidth: open ? 38 : 'unset', justifyContent: 'center' }}>
-              <Typography sx={{ fontSize: '18px' }}>📋</Typography>
-            </ListItemIcon>
-            {open && <ListItemText primary={t('navTasks')} />}
-          </ListItemButton>
-        </Tooltip>
-
         {/* Logout */}
         <Tooltip title={!open ? t('navLogout') : ''} placement="right" arrow>
-          <ListItemButton
-            onClick={logout}
-            sx={{
-              justifyContent:  open ? 'flex-start' : 'center',
-              px:              open ? 2 : 0,
-              mx:              open ? 1.5 : 1,
-              my:              '2px',
-              minHeight:       48,
-              color:           C.danger,
-              borderRadius:    '28px',
-              '&:hover':       { backgroundColor: 'rgba(255,107,157,0.08)', transform: 'translateX(2px)' },
-            }}
-          >
-            <ListItemIcon sx={{
-              minWidth:       open ? 38 : 'unset',
-              justifyContent: 'center',
-              color:          'inherit',
-            }}>
+          <ListItemButton onClick={logout} sx={{
+            justifyContent: open ? 'flex-start' : 'center',
+            px: open ? 2 : 0, mx: open ? 1.5 : 1, my: '2px', minHeight: 48,
+            color: C.danger,
+            '&:hover': { backgroundColor: 'rgba(255,107,157,0.08)' },
+          }}>
+            <ListItemIcon sx={{ minWidth: open ? 38 : 'unset', justifyContent: 'center', color: 'inherit' }}>
               <LogoutIcon sx={{ fontSize: '18px' }} />
             </ListItemIcon>
-            {open && (
-              <ListItemText
-                primary={t('navLogout')}
-                sx={{ '& .MuiListItemText-primary': { color: C.danger, fontWeight: 600 } }}
-              />
-            )}
+            {open && <ListItemText primary={t('navLogout')} sx={{ '& .MuiListItemText-primary': { color: C.danger, fontWeight: 600 } }} />}
           </ListItemButton>
         </Tooltip>
       </List>
 
-      {/* ── Clients section (coach only, open only) ──── */}
+      {/* ── Notifications panel (coach only) ────────────── */}
+      {open && auth.role === 'coach' && showNotifs && (
+        <Box sx={{ mx: 1.5, mb: 1, maxHeight: '200px', overflowY: 'auto', flexShrink: 0 }}>
+          <Divider sx={{ borderColor: C.border, mb: 1 }} />
+          {notifications.length === 0 ? (
+            <Typography sx={{ color: C.muted, fontSize: '12px', px: 1, pb: 1 }}>{t('noNotifications')}</Typography>
+          ) : notifications.slice(0, 10).map((n, i) => (
+            <Box key={n.id || i} sx={{
+              px: 1.5, py: 0.75, mb: 0.5,
+              background: n.from_coach !== auth.name ? C.accentSoft : 'rgba(255,255,255,0.03)',
+              borderRadius: '10px', border: `1px solid ${n.from_coach !== auth.name ? C.primaryA20 : C.border}`,
+            }}>
+              <Typography sx={{ fontSize: '11.5px', fontWeight: 700, color: n.from_coach !== auth.name ? C.primary : C.muted }}>
+                {n.from_coach}
+                <Box component="span" sx={{ fontWeight: 400, color: C.muted, ml: 0.5 }}>→ {n.client_name}</Box>
+              </Typography>
+              <Typography sx={{ fontSize: '11px', color: C.text, mt: 0.25 }}>
+                {n.action_type === 'task' && `${t('taskNotifLbl')}: `}
+                {n.action_type === 'reaction' && `${t('reactionNotifLbl')}: `}
+                {n.content}
+              </Typography>
+            </Box>
+          ))}
+        </Box>
+      )}
+
+      {/* ── Coaches section (coach only) ─────────────────── */}
       {open && auth.role === 'coach' && (
         <>
-          <Divider sx={{ mx: 2, borderColor: C.border, mt: 0.5, mb: 1.5, flexShrink: 0 }} />
+          <Divider sx={{ mx: 2, borderColor: C.border, mt: 0.5, mb: 1, flexShrink: 0 }} />
+          <Box sx={{ flexShrink: 0 }}>
+            <Button
+              fullWidth
+              onClick={() => setShowCoaches(p => !p)}
+              sx={{
+                justifyContent: 'space-between', px: 2.5, py: 0.75,
+                color: C.muted, fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.8px',
+                '&:hover': { color: C.primary },
+              }}
+            >
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <PeopleIcon sx={{ fontSize: '14px' }} />
+                {t('coachesHeader')}
+              </Box>
+              <Typography sx={{ fontSize: '10px', color: C.muted }}>{showCoaches ? '▲' : '▼'}</Typography>
+            </Button>
+          </Box>
+          <Collapse in={showCoaches}>
+            <Box sx={{ px: 1.5, pb: 1 }}>
+              {/* My Tracker */}
+              <ListItemButton
+                selected={viewingCoach === auth.name}
+                onClick={() => selectCoachTracker(auth.name)}
+                sx={{ borderRadius: '12px', mb: '2px', py: 0.75 }}
+              >
+                <ListItemIcon sx={{ minWidth: 32 }}>
+                  <PersonIcon sx={{ fontSize: '16px', color: viewingCoach === auth.name ? C.primary : C.muted }} />
+                </ListItemIcon>
+                <ListItemText
+                  primary={t('myTrackerTitle')}
+                  sx={{ '& .MuiListItemText-primary': { fontSize: '13px', fontWeight: 700, color: viewingCoach === auth.name ? C.primary : C.text } }}
+                />
+              </ListItemButton>
+              {/* Other coaches */}
+              {coaches.filter(c => c.name !== auth.name).map(c => (
+                <ListItemButton
+                  key={c.name}
+                  selected={viewingCoach === c.name}
+                  onClick={() => selectCoachTracker(c.name)}
+                  sx={{ borderRadius: '12px', mb: '2px', py: 0.75 }}
+                >
+                  <ListItemIcon sx={{ minWidth: 32 }}>
+                    <Box sx={{
+                      width: 20, height: 20, borderRadius: '6px',
+                      background: viewingCoach === c.name ? C.primaryContainer : 'rgba(255,255,255,0.08)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontSize: '10px', fontWeight: 800,
+                      color: viewingCoach === c.name ? C.primary : C.muted,
+                    }}>
+                      {c.name.charAt(0)}
+                    </Box>
+                  </ListItemIcon>
+                  <ListItemText
+                    primary={c.name}
+                    sx={{ '& .MuiListItemText-primary': { fontSize: '13px', fontWeight: 600, color: viewingCoach === c.name ? C.primary : C.text } }}
+                  />
+                </ListItemButton>
+              ))}
+            </Box>
+          </Collapse>
+        </>
+      )}
+
+      {/* ── Clients section (coach only) ─────────────────── */}
+      {open && auth.role === 'coach' && (
+        <>
+          <Divider sx={{ mx: 2, borderColor: C.border, mt: 0.5, mb: 1, flexShrink: 0 }} />
           <Typography variant="overline" sx={{ px: 2.5, color: C.muted, flexShrink: 0, mb: 0.5 }}>
             {t('clientsHeader')}
           </Typography>
@@ -276,72 +361,39 @@ export default function Sidebar() {
           <Box sx={{ overflowY: 'auto', flex: 1, pb: 1 }}>
             {[...visibleClients]
               .sort((a, b) => {
-                const ai = recentIds.indexOf(a.id)
-                const bi = recentIds.indexOf(b.id)
+                const ai = recentIds.indexOf(a.id), bi = recentIds.indexOf(b.id)
                 if (ai === -1 && bi === -1) return 0
                 if (ai === -1) return 1
                 if (bi === -1) return -1
                 return ai - bi
               })
-              .map((c, i) => {
+              .map(c => {
                 const ri    = clients.findIndex(x => x.name === c.name)
-                const isSel = actualIdx === ri
+                const isSel = !viewingCoach && actualIdx === ri
                 return (
-                  <Box
-                    key={c.name}
-                    sx={{
-                      display:   'flex',
-                      alignItems:'center',
-                      mx:        1.5,
-                      mb:        '2px',
-                    }}
-                  >
+                  <Box key={c.name} sx={{ display: 'flex', alignItems: 'center', mx: 1.5, mb: '2px' }}>
                     <ListItemButton
                       selected={isSel}
-                      onClick={() => {
-                        setRecentIds(prev => [c.id, ...prev.filter(id => id !== c.id)])
-                        setSelIdx(ri)
-                        setCurrentWorkout([])
-                      }}
-                      sx={{
-                        flex:          1,
-                        flexDirection: 'column',
-                        alignItems:    'flex-start',
-                        py:            0.9,
-                        gap:           0,
-                      }}
+                      onClick={() => selectClient(ri, c.id)}
+                      sx={{ flex: 1, flexDirection: 'column', alignItems: 'flex-start', py: 0.9, gap: 0 }}
                     >
                       <Typography sx={{
-                        fontWeight:    600,
-                        fontSize:      '13.5px',
-                        lineHeight:    1.35,
-                        color:         isSel ? C.primary : C.text,
-                        letterSpacing: '-0.05px',
-                        transition:    `color 0.15s ${EASE.standard}`,
+                        fontWeight: 600, fontSize: '13.5px', lineHeight: 1.35,
+                        color: isSel ? C.primary : C.text,
                       }}>
                         {c.name}
                       </Typography>
-                      <Typography variant="caption" sx={{
-                        color:      isSel ? 'rgba(196,233,191,0.65)' : C.muted,
-                        transition: `color 0.15s ${EASE.standard}`,
-                      }}>
+                      <Typography variant="caption" sx={{ color: isSel ? 'rgba(196,233,191,0.65)' : C.muted }}>
                         {c.calorieTarget} kcal · {c.proteinTarget}{t('gUnit')}
                       </Typography>
                     </ListItemButton>
-
                     <Tooltip title={t('deleteClientTip')} arrow>
                       <IconButton
                         onClick={() => setConfirmDelete({ id: c.id, name: c.name })}
                         size="small"
                         sx={{
-                          flexShrink: 0,
-                          color:      'transparent',
-                          width:      26, height: 26,
-                          transition: `color 0.15s ${EASE.standard}, background-color 0.15s ${EASE.standard}`,
-                          '&:hover':  {
-                            color:   C.danger,
-                            bgcolor: 'rgba(255,107,157,0.1)',
-                          },
+                          flexShrink: 0, color: 'transparent', width: 26, height: 26,
+                          '&:hover': { color: C.danger, bgcolor: 'rgba(255,107,157,0.1)' },
                           '.MuiBox-root:hover &': { color: C.muted },
                         }}
                       >

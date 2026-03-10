@@ -3,6 +3,9 @@ import {
   Box, Typography, Paper, Button, TextField,
   Checkbox, IconButton, Chip, Collapse, Divider,
 } from '@mui/material'
+import AssignmentIcon        from '@mui/icons-material/Assignment'
+import ChatBubbleOutlineIcon from '@mui/icons-material/ChatBubbleOutline'
+import CloseIcon             from '@mui/icons-material/Close'
 import { useApp }  from '../context/AppContext'
 import { C, EASE } from '../theme'
 
@@ -89,7 +92,7 @@ export default function Tasks() {
           color:     C.muted,
           animation: `fadeIn 0.3s ${EASE.decelerate} both`,
         }}>
-          <Typography sx={{ fontSize: '32px', mb: 1 }}>📋</Typography>
+          <AssignmentIcon sx={{ fontSize: '48px', color: C.muted, mb: 1, opacity: 0.5 }} />
           <Typography>{t('noTasks')}</Typography>
         </Box>
       ) : (
@@ -175,7 +178,8 @@ export default function Tasks() {
                       '&:hover':  { background: C.accentSoft, color: C.primary },
                     }}
                   >
-                    💬 {cmtCount || ''}
+                    <ChatBubbleOutlineIcon sx={{ fontSize: '14px', mr: cmtCount ? 0.4 : 0 }} />
+                    {cmtCount || ''}
                   </Button>
                   {isCoach && (
                     <IconButton
@@ -184,11 +188,10 @@ export default function Tasks() {
                       sx={{
                         color:    C.danger,
                         p:        '4px',
-                        fontSize: '13px',
                         '&:hover': { background: C.dangerSoft },
                       }}
                     >
-                      ✕
+                      <CloseIcon sx={{ fontSize: '16px' }} />
                     </IconButton>
                   )}
                 </Box>

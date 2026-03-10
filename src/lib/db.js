@@ -27,6 +27,16 @@ async function sbFetch(url, options) {
   return res.json()
 }
 
+// Safe fetch — returns null instead of throwing (for optional tables)
+async function sbFetchSafe(url, options) {
+  try {
+    const res = await fetch(url, options)
+    if (!res.ok) return null
+    if (res.status === 204) return null
+    return res.json()
+  } catch { return null }
+}
+
 const SB = {
   async selectAll(table) {
     return (await sbFetch(sbUrl(table, '?select=*'), { headers: sbHeaders() })) || []
@@ -121,20 +131,59 @@ export const DB = {
     return LS.insert(table, row)
   },
 
+  // ── Notifications (Supabase only, optional table) ─────────
+  async insertNotification(fromCoach, clientName, actionType, content) {
+    if (!isUsingSupabase) return
+    try {
+      await sbFetch(sbUrl('notifications'), {
+        method: 'POST',
+        headers: sbHeaders({ 'Prefer': 'return=minimal' }),
+        body: JSON.stringify({ from_coach: fromCoach, client_name: clientName, action_type: actionType, content }),
+      })
+    } catch { /* table may not exist yet */ }
+  },
+
+  async getNotifications(sinceHours = 48) {
+    if (!isUsingSupabase) return []
+    const since = new Date(Date.now() - sinceHours * 3600000).toISOString()
+    const data = await sbFetchSafe(
+      sbUrl('notifications', `?select=*&created_at=gte.${since}&order=created_at.desc&limit=50`),
+      { headers: sbHeaders() }
+    )
+    return data || []
+  },
+
+  // ── Seed coaches & their shadow profiles ──────────────────
   async seedIfEmpty() {
-    let first
+    const COACHES = [
+      { name: 'Виви',   password: 'vivi'   },
+      { name: 'Кари',   password: 'kari'   },
+      { name: 'Алекс',  password: 'alex'   },
+      { name: 'Ицко',   password: 'icko'   },
+      { name: 'Елина',  password: 'elina'  },
+      { name: 'Никола', password: 'nikola' },
+    ]
+
+    let existingCoaches
     if (isUsingSupabase) {
-      first = (await sbFetch(sbUrl('coaches', '?select=id&limit=1'), { headers: sbHeaders() })) || []
+      existingCoaches = (await sbFetchSafe(sbUrl('coaches', '?select=id,name&limit=10'), { headers: sbHeaders() })) || []
     } else {
-      first = await LS.selectAll('coaches')
+      existingCoaches = await LS.selectAll('coaches')
     }
-    if (first.length === 0) {
-      await Promise.all([
-        this.insert('coaches', { name: 'Елина',  password: '1111' }),
-        this.insert('coaches', { name: 'Никола', password: '1111' }),
-        this.insert('coaches', { name: 'Ицко',   password: '1111' }),
-        this.insert('coaches', { name: 'Алекс',  password: '1111' }),
-      ])
+
+    if (existingCoaches.length === 0) {
+      // Insert coaches
+      for (const c of COACHES) {
+        await this.insert('coaches', c)
+      }
+      // Insert shadow client profiles for coaches (for self-tracking)
+      for (const c of COACHES) {
+        await this.insert('clients', {
+          name: c.name, password: c.password,
+          calorie_target: 2500, protein_target: 160,
+          is_coach: true,
+        })
+      }
     }
   },
 }

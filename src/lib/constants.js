@@ -127,18 +127,19 @@ export const quickFoods = [
 ]
 
 export const WORKOUT_CATEGORIES = [
-  { key: 'Предна верига', icon: '🫀' },
-  { key: 'Задна верига',  icon: '🔙' },
-  { key: 'Бутащи',       icon: '💪' },
-  { key: 'Дърпащи',      icon: '🤜' },
-  { key: 'Горна част',   icon: '🏋️' },
-  { key: 'Крака',        icon: '🦵' },
-  { key: 'Кардио',       icon: '🏃' },
+  { key: 'Предна верига' },
+  { key: 'Задна верига'  },
+  { key: 'Бутащи'        },
+  { key: 'Дърпащи'       },
+  { key: 'Горна част'    },
+  { key: 'Крака'         },
+  { key: 'Кардио'        },
 ]
 
+// icon field removed — use MUI icons in Sidebar/MobileNav
 export const NAV_ITEMS = [
-  { view: 'dashboard', icon: '📊', label: 'Табло',             labelKey: 'navDashboard' },
-  { view: 'food',      icon: '🥗', label: 'Хранителен тракер', labelKey: 'navFood'      },
-  { view: 'weight',    icon: '⚖️', label: 'Тегло',             labelKey: 'navWeight'    },
-  { view: 'ranking',   icon: '🏆', label: 'Класация',          labelKey: 'navRanking'   },
+  { view: 'dashboard', labelKey: 'navDashboard' },
+  { view: 'food',      labelKey: 'navFood'      },
+  { view: 'weight',    labelKey: 'navWeight'    },
+  { view: 'ranking',   labelKey: 'navRanking'   },
 ]

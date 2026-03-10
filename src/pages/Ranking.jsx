@@ -2,10 +2,12 @@ import { Box, Typography, Paper, Chip } from '@mui/material'
 import { useApp } from '../context/AppContext'
 import { C, EASE } from '../theme'
 
-const MEDALS = ['🥇', '🥈', '🥉']
+// Styled rank labels for podium
+const RANK_LABELS  = ['1', '2', '3']
+const RANK_COLORS  = [C.primary, '#94A3B8', '#CD7F32']
 
 // Podium heights
-const PODIUM_H    = [130, 110, 90]
+const PODIUM_H     = [130, 110, 90]
 const PODIUM_ORDER = [1, 0, 2] // 2nd, 1st, 3rd in display order
 
 export default function Ranking() {
@@ -13,10 +15,10 @@ export default function Ranking() {
   const isMobile = window.innerWidth < 640
 
   const POINT_TYPES = [
-    { id: 'weight',   icon: '⚖️', label: t('rankWeightLbl'),  desc: `2 ${t('ptsPerDay')}`,    color: C.purple  },
-    { id: 'workout',  icon: '💪', label: t('rankWorkoutLbl'), desc: `5 ${t('ptsPerSession')}`, color: C.primary },
-    { id: 'calories', icon: '🔥', label: t('rankCalLbl'),     desc: `3 ${t('ptsPerDay')}`,     color: C.orange  },
-    { id: 'protein',  icon: '🥩', label: t('rankProtLbl'),    desc: `3 ${t('ptsPerDay')}`,     color: C.purple  },
+    { id: 'weight',   abbr: 'KG', label: t('rankWeightLbl'),  desc: `2 ${t('ptsPerDay')}`,    color: C.purple  },
+    { id: 'workout',  abbr: 'WO', label: t('rankWorkoutLbl'), desc: `5 ${t('ptsPerSession')}`, color: C.primary },
+    { id: 'calories', abbr: 'KC', label: t('rankCalLbl'),     desc: `3 ${t('ptsPerDay')}`,     color: C.orange  },
+    { id: 'protein',  abbr: 'PR', label: t('rankProtLbl'),    desc: `3 ${t('ptsPerDay')}`,     color: C.purple  },
   ]
 
   return (
@@ -55,7 +57,20 @@ export default function Ranking() {
               },
             }}
           >
-            <Typography sx={{ fontSize: '22px', mb: 0.75 }}>{item.icon}</Typography>
+            <Box sx={{
+              display:        'inline-flex',
+              alignItems:     'center',
+              justifyContent: 'center',
+              width:          '36px',
+              height:         '28px',
+              borderRadius:   '8px',
+              background:     `${item.color}18`,
+              mb:             0.75,
+            }}>
+              <Typography sx={{ fontSize: '11px', fontWeight: 800, color: item.color, letterSpacing: '0.5px' }}>
+                {item.abbr}
+              </Typography>
+            </Box>
             <Typography sx={{
               fontWeight:    700,
               color:         item.color,
@@ -82,10 +97,8 @@ export default function Ranking() {
           animation:      `fadeInUp 0.3s ${EASE.decelerate} 0.12s both`,
         }}>
           {PODIUM_ORDER.map((rank, displayIdx) => {
-            const item       = ranking[rank]
-            const isFirst    = rank === 0
-            const medalSizes = [28, 36, 28]
-            const emojiSize  = medalSizes[rank]
+            const item    = ranking[rank]
+            const isFirst = rank === 0
 
             return (
               <Box
@@ -97,9 +110,29 @@ export default function Ranking() {
                   animation: `scaleIn 0.3s ${EASE.spring} ${displayIdx * 0.06 + 0.15}s both`,
                 }}
               >
-                <Typography sx={{ fontSize: `${emojiSize}px`, mb: 0.75, lineHeight: 1 }}>
-                  {MEDALS[rank]}
-                </Typography>
+                {/* Rank number badge */}
+                <Box sx={{
+                  display:        'inline-flex',
+                  alignItems:     'center',
+                  justifyContent: 'center',
+                  width:          isFirst ? '44px' : '36px',
+                  height:         isFirst ? '44px' : '36px',
+                  borderRadius:   '50%',
+                  background:     `${RANK_COLORS[rank]}22`,
+                  border:         `2px solid ${RANK_COLORS[rank]}55`,
+                  mb:             0.75,
+                }}>
+                  <Typography sx={{
+                    fontWeight:  900,
+                    fontSize:    isFirst ? '20px' : '16px',
+                    color:       RANK_COLORS[rank],
+                    lineHeight:  1,
+                    fontFamily:  "'Space Grotesk', sans-serif",
+                  }}>
+                    {RANK_LABELS[rank]}
+                  </Typography>
+                </Box>
+
                 <Paper
                   sx={{
                     p:             '16px 10px',
@@ -135,7 +168,7 @@ export default function Ranking() {
                   <Typography sx={{
                     fontSize:      isFirst ? '30px' : '24px',
                     fontWeight:    800,
-                    color:         isFirst ? C.primary : rank === 1 ? '#94A3B8' : '#CD7F32',
+                    color:         RANK_COLORS[rank],
                     lineHeight:    1,
                     letterSpacing: '-0.5px',
                     fontFamily:    "'Space Grotesk', sans-serif",
@@ -170,10 +203,10 @@ export default function Ranking() {
           {[
             '#',
             t('rankClientLbl'),
-            `⚖️ ${t('rankWeightLbl')}`,
-            `💪 ${t('rankWorkoutLbl')}`,
-            '🔥 Kcal',
-            `🥩 ${t('proteinShortLbl')}`,
+            t('rankWeightLbl'),
+            t('rankWorkoutLbl'),
+            'Kcal',
+            t('proteinShortLbl'),
             t('rankTotalLbl'),
           ].map((h, i) => (
             <Typography
@@ -222,13 +255,8 @@ export default function Ranking() {
               }}
             >
               {/* Rank number */}
-              <Typography sx={{ fontWeight: 800, fontSize: isFirst ? '20px' : '15px' }}>
-                {i < 3
-                  ? <span style={{ filter: i === 0 ? 'drop-shadow(0 0 6px rgba(196,233,191,0.35))' : 'none' }}>
-                      {MEDALS[i]}
-                    </span>
-                  : <span style={{ color: C.muted, fontSize: '14px' }}>{i + 1}</span>
-                }
+              <Typography sx={{ fontWeight: 800, fontSize: isFirst ? '18px' : '14px', color: i < 3 ? RANK_COLORS[i] : C.muted }}>
+                {i + 1}
               </Typography>
 
               {/* Name + "you" badge */}

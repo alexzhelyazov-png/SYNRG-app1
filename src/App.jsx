@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react'
 import { Box, CircularProgress, Typography, Button, Alert, Snackbar, useMediaQuery } from '@mui/material'
+import WarningAmberIcon from '@mui/icons-material/WarningAmber'
 import { ThemeProvider, useTheme } from '@mui/material/styles'
 import CssBaseline from '@mui/material/CssBaseline'
 import { AppProvider, useApp } from './context/AppContext'
@@ -54,7 +55,7 @@ function ErrorScreen({ error, onRetry, t }) {
       p:              3,
       animation:      'fadeInUp 0.3s ease',
     }}>
-      <Typography sx={{ fontSize: '32px' }}>⚠️</Typography>
+      <WarningAmberIcon sx={{ fontSize: '40px', color: C.danger }} />
       <Typography sx={{ color: C.danger, fontWeight: 700, letterSpacing: '-0.1px' }}>
         {t('loadError')}
       </Typography>

@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react'
+import { createContext, useContext, useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { DB } from '../lib/db'
 import { foodDB, quickFoods } from '../lib/constants'
 import { T } from '../lib/translations'
@@ -13,11 +13,13 @@ export const useApp = () => useContext(AppContext)
 
 export function AppProvider({ children }) {
   // ── Core data ─────────────────────────────────────────────────
-  const [clients,   setClients]   = useState([])
-  const [coaches,   setCoaches]   = useState([])
-  const [auth,      setAuth]      = useState({ isLoggedIn: false, role: null, name: '', id: null })
-  const [loading,   setLoading]   = useState(true)
-  const [loadError, setLoadError] = useState('')
+  const [clients,      setClients]      = useState([])
+  const [coaches,      setCoaches]      = useState([])
+  const [auth,         setAuth]         = useState({ isLoggedIn: false, role: null, name: '', id: null })
+  const [loading,      setLoading]      = useState(true)
+  const [loadError,    setLoadError]    = useState('')
+  const [notifications, setNotifications] = useState([])
+  const [viewingCoach, setViewingCoach] = useState(null) // coach name being viewed, or null
 
   // ── Theme mode ────────────────────────────────────────────────
   const [isDark, setIsDarkState] = useState(() => localStorage.getItem('themeMode') !== 'light')
@@ -36,11 +38,11 @@ export function AppProvider({ children }) {
   const t = useCallback((key) => T[lang]?.[key] ?? key, [lang])
 
   // ── UI state ──────────────────────────────────────────────────
-  const [view,            setView]            = useState('dashboard')
-  const [selIdx,          setSelIdx]          = useState(0)
-  const [sidebarOpen,     setSidebarOpen]     = useState(false)
-  const [showClientMenu,  setShowClientMenu]  = useState(false)
-  const [confirmDelete,   setConfirmDelete]   = useState(null) // { id, name }
+  const [view,           setView]           = useState('dashboard')
+  const [selIdx,         setSelIdx]         = useState(0)
+  const [sidebarOpen,    setSidebarOpen]    = useState(false)
+  const [showClientMenu, setShowClientMenu] = useState(false)
+  const [confirmDelete,  setConfirmDelete]  = useState(null)
 
   // ── Snackbar ─────────────────────────────────────────────────
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' })
@@ -60,10 +62,10 @@ export function AppProvider({ children }) {
   const [selCoach,        setSelCoach]        = useState('')
 
   // ── Food state ────────────────────────────────────────────────
-  const [foodDate,       setFoodDate]       = useState(dateToInput(todayDate()))
-  const [foodModalOpen,  setFoodModalOpen]  = useState(false)
-  const [foodSearch,     setFoodSearch]     = useState('')
-  const [gramsInput,     setGramsInput]     = useState('')
+  const [foodDate,      setFoodDate]      = useState(dateToInput(todayDate()))
+  const [foodModalOpen, setFoodModalOpen] = useState(false)
+  const [foodSearch,    setFoodSearch]    = useState('')
+  const [gramsInput,    setGramsInput]    = useState('')
 
   // ── Weight state ──────────────────────────────────────────────
   const [weightInput, setWeightInput] = useState('')
@@ -93,6 +95,7 @@ export function AppProvider({ children }) {
         id:             c.id,
         name:           c.name,
         password:       c.password,
+        is_coach:       c.is_coach || false,
         calorieTarget:  c.calorie_target  || c.calorieTarget  || 2000,
         proteinTarget:  c.protein_target  || c.proteinTarget  || 140,
         meals: meals.filter(m => m.client_id === c.id).map(m => ({
@@ -123,7 +126,7 @@ export function AppProvider({ children }) {
           : { protein: true, weight: true, foodLog: true, coach: true },
       })))
     } catch(e) {
-      console.error('loadAll error:', JSON.stringify(e), e?.message, e?.code, e?.details)
+      console.error('loadAll error:', JSON.stringify(e), e?.message)
       setLoadError(`${e?.name || 'Error'}: ${e?.message || JSON.stringify(e)}`)
     }
     setLoading(false)
@@ -131,57 +134,86 @@ export function AppProvider({ children }) {
 
   useEffect(() => { loadAll() }, [loadAll])
 
+  // ── Notification polling (coaches only, every 60s) ────────────
+  const notifTimerRef = useRef(null)
+  const pollNotifications = useCallback(async () => {
+    const data = await DB.getNotifications(48)
+    setNotifications(data)
+  }, [])
+
+  useEffect(() => {
+    if (!auth.isLoggedIn || auth.role !== 'coach') return
+    pollNotifications()
+    notifTimerRef.current = setInterval(pollNotifications, 60000)
+    return () => clearInterval(notifTimerRef.current)
+  }, [auth.isLoggedIn, auth.role, pollNotifications])
+
   // ── Auth ──────────────────────────────────────────────────────
-  async function handleLoginCoach(name, pass) {
-    const coach = coaches.find(c => c.name.toLowerCase() === name.trim().toLowerCase() && c.password === pass)
-    if (!coach) return t('errLogin')
-    setAuth({ isLoggedIn: true, role: 'coach', name: coach.name, id: coach.id })
-    setSelCoach(coach.name)
-    return null
-  }
-
-  async function handleLoginClient(name, pass) {
-    const c = clients.find(c => c.name.toLowerCase() === name.trim().toLowerCase() && c.password === pass)
-    if (!c) return t('errLogin')
-    setSelIdx(clients.findIndex(x => x.name === c.name))
-    setAuth({ isLoggedIn: true, role: 'client', name: c.name, id: c.id })
-    return null
-  }
-
-  async function handleRegisterCoach(name, pass) {
-    try {
-      await DB.insert('coaches', { name, password: pass })
-      await loadAll()
+  async function handleLogin(name, pass) {
+    // Try coaches first
+    const coach = coaches.find(c => c.name.toLowerCase() === name.toLowerCase() && c.password === pass)
+    if (coach) {
+      setAuth({ isLoggedIn: true, role: 'coach', name: coach.name, id: coach.id })
+      setSelCoach(coach.name)
+      setViewingCoach(null)
       return null
-    } catch(e) { return e.message }
-  }
-
-  async function handleRegisterClient(name, pass) {
-    try {
-      await DB.insert('clients', { name, password: pass, calorie_target: 2000, protein_target: 140 })
-      await loadAll()
+    }
+    // Try clients (only non-coach profiles)
+    const c = clients.find(c => !c.is_coach && c.name.toLowerCase() === name.toLowerCase() && c.password === pass)
+    if (c) {
+      const i = clients.findIndex(x => x.name === c.name)
+      setSelIdx(i)
+      setAuth({ isLoggedIn: true, role: 'client', name: c.name, id: c.id })
       return null
-    } catch(e) { return e.message }
+    }
+    return t('errLogin')
   }
 
   function logout() {
     setAuth({ isLoggedIn: false, role: null, name: '', id: null })
     setView('dashboard')
     setCurrentWorkout([])
+    setViewingCoach(null)
+    setNotifications([])
   }
 
-  // ── Computed ──────────────────────────────────────────────────
+  // ── Computed: real clients (no coach profiles) ────────────────
+  const realClients = useMemo(() => clients.filter(c => !c.is_coach), [clients])
+
+  // ── Computed: coach profiles (shadow clients for coaches) ──────
+  const coachProfiles = useMemo(() => clients.filter(c => c.is_coach), [clients])
+
+  // ── actualIdx points into realClients for both roles ──────────
   const actualIdx = useMemo(() => {
     if (auth.role === 'coach') return selIdx
-    const i = clients.findIndex(c => c.name === auth.name)
+    const i = realClients.findIndex(c => c.name === auth.name)
     return i >= 0 ? i : 0
-  }, [auth, selIdx, clients])
+  }, [auth, selIdx, realClients])
 
-  const client = clients[actualIdx] || {
-    name: '', calorieTarget: 0, proteinTarget: 0,
-    meals: [], workouts: [], weightLogs: [],
-    tasks: [], reactions: [], reminderSettings: {},
-  }
+  // ── The active "subject" being viewed ─────────────────────────
+  const client = useMemo(() => {
+    const blank = {
+      name: '', calorieTarget: 0, proteinTarget: 0,
+      meals: [], workouts: [], weightLogs: [],
+      tasks: [], reactions: [], reminderSettings: {},
+    }
+    if (auth.role === 'coach' && viewingCoach) {
+      return coachProfiles.find(c => c.name === viewingCoach) || blank
+    }
+    return realClients[actualIdx] || blank
+  }, [auth, viewingCoach, coachProfiles, realClients, actualIdx])
+
+  // ── Read-only: viewing another coach's data (blocks everything) ──────
+  const isReadOnly = auth.role === 'coach' && viewingCoach !== null && viewingCoach !== auth.name
+
+  // ── Tracker read-only: coaches can only edit their OWN tracker ────────
+  // Blocks food + weight writes when coach is managing a client OR viewing another coach
+  const isTrackerReadOnly = auth.role === 'coach' && viewingCoach !== auth.name
+
+  // ── visibleClients for coach's client list ────────────────────
+  const visibleClients = auth.role === 'coach'
+    ? realClients
+    : realClients.filter(c => c.name === auth.name)
 
   const selFoodDate = inputToDate(foodDate)
 
@@ -234,17 +266,27 @@ export function AppProvider({ children }) {
     return null
   }, [sortedWeightLogs])
 
-  const ranking  = useMemo(() => computeRanking(clients), [clients])
+  // ── Ranking excludes coach profiles ───────────────────────────
+  const ranking  = useMemo(() => computeRanking(realClients), [realClients])
   const kcalPct  = Math.min((foodTotals.kcal    / (client.calorieTarget || 1)) * 100, 100)
   const protPct  = Math.min((foodTotals.protein / (client.proteinTarget || 1)) * 100, 100)
 
-  const visibleClients = auth.role === 'coach'
-    ? clients
-    : clients.filter(c => c.name === auth.name)
+  // ── Notifications: unread count ───────────────────────────────
+  const unreadNotifCount = useMemo(() => {
+    if (!auth.isLoggedIn || auth.role !== 'coach') return 0
+    return notifications.filter(n => n.from_coach !== auth.name).length
+  }, [notifications, auth])
 
   // ── Update helpers ────────────────────────────────────────────
   function updateClient(fn) {
-    setClients(prev => prev.map((c, i) => i === actualIdx ? fn(c) : c))
+    if (viewingCoach) {
+      setClients(prev => prev.map(c => c.is_coach && c.name === viewingCoach ? fn(c) : c))
+    } else {
+      setClients(prev => prev.map((c, i) => {
+        const ri = realClients.findIndex(rc => rc.id === c.id)
+        return ri === actualIdx ? fn(c) : c
+      }))
+    }
   }
 
   async function updateClientTargets(id, calorieTarget, proteinTarget) {
@@ -253,6 +295,7 @@ export function AppProvider({ children }) {
   }
 
   async function addMealToClient(clientId, meal) {
+    if (isTrackerReadOnly) return
     const data = await DB.insert('meals', {
       client_id: clientId, date: meal.date, label: meal.label,
       grams: meal.grams, kcal: meal.kcal, protein: meal.protein,
@@ -264,6 +307,7 @@ export function AppProvider({ children }) {
   }
 
   async function deleteMealFromClient(clientId, mealId) {
+    if (isTrackerReadOnly) return
     await DB.deleteById('meals', mealId)
     setClients(prev => prev.map(c => c.id === clientId
       ? { ...c, meals: c.meals.filter(m => m.id !== mealId) }
@@ -272,6 +316,7 @@ export function AppProvider({ children }) {
   }
 
   async function saveWorkoutToClient(clientId, workout) {
+    if (isReadOnly) return
     const data = await DB.insert('workouts', {
       client_id: clientId, date: workout.date, coach: workout.coach,
       category: workout.category, items: workout.items,
@@ -283,6 +328,7 @@ export function AppProvider({ children }) {
   }
 
   async function saveWeightLog(clientId, date, weight) {
+    if (isTrackerReadOnly) return
     const data = await DB.upsertByFields('weight_logs', { client_id: clientId, date, weight }, ['client_id', 'date'])
     setClients(prev => prev.map(c => {
       if (c.id !== clientId) return c
@@ -292,6 +338,7 @@ export function AppProvider({ children }) {
   }
 
   async function deleteWeightLog(clientId, logId) {
+    if (isTrackerReadOnly) return
     await DB.deleteById('weight_logs', logId)
     setClients(prev => prev.map(c => c.id === clientId
       ? { ...c, weightLogs: c.weightLogs.filter(l => l.id !== logId) }
@@ -313,10 +360,20 @@ export function AppProvider({ children }) {
     ])
     setClients(prev => {
       const newList = prev.filter(c => c.id !== clientId)
-      setSelIdx(i => Math.min(i, Math.max(0, newList.length - 1)))
+      const newReal = newList.filter(c => !c.is_coach)
+      setSelIdx(i => Math.min(i, Math.max(0, newReal.length - 1)))
       return newList
     })
     showSnackbar(t('clientDeletedMsg'), 'info')
+  }
+
+  // ── Send notification to other coaches ────────────────────────
+  async function sendCoachNotification(actionType, clientName, content) {
+    if (auth.role !== 'coach') return
+    await DB.insertNotification(auth.name, clientName, actionType, content)
+    // Refresh local notifications
+    const fresh = await DB.getNotifications(48)
+    setNotifications(fresh)
   }
 
   // ── Task actions ──────────────────────────────────────────────
@@ -328,17 +385,18 @@ export function AppProvider({ children }) {
       assigned_by: auth.name,
       status:      'pending',
     })
-    setClients(prev => prev.map((c, i) => i === actualIdx
+    setClients(prev => prev.map(c => c.id === client.id
       ? { ...c, tasks: [{ ...data, comments: [] }, ...(c.tasks || [])] }
       : c
     ))
     showSnackbar(t('taskSavedMsg'))
+    await sendCoachNotification('task', client.name, taskData.title)
   }
 
   async function toggleTaskDone(taskId, done) {
     const newStatus = done ? 'done' : 'pending'
     await DB.update('tasks', taskId, { status: newStatus })
-    setClients(prev => prev.map((c, i) => i === actualIdx
+    setClients(prev => prev.map(c => c.id === client.id
       ? { ...c, tasks: (c.tasks || []).map(tk => tk.id === taskId ? { ...tk, status: newStatus } : tk) }
       : c
     ))
@@ -346,7 +404,7 @@ export function AppProvider({ children }) {
 
   async function deleteTask(taskId) {
     await DB.deleteById('tasks', taskId)
-    setClients(prev => prev.map((c, i) => i === actualIdx
+    setClients(prev => prev.map(c => c.id === client.id
       ? { ...c, tasks: (c.tasks || []).filter(tk => tk.id !== taskId) }
       : c
     ))
@@ -359,7 +417,7 @@ export function AppProvider({ children }) {
       text,
       is_coach: auth.role === 'coach',
     })
-    setClients(prev => prev.map((c, i) => i === actualIdx
+    setClients(prev => prev.map(c => c.id === client.id
       ? {
           ...c,
           tasks: (c.tasks || []).map(tk => tk.id === taskId
@@ -381,16 +439,18 @@ export function AppProvider({ children }) {
       trainer_name: auth.name,
       dismissed:    false,
     })
-    setClients(prev => prev.map((c, i) => i === actualIdx
+    setClients(prev => prev.map(c => c.id === client.id
       ? { ...c, reactions: [data, ...(c.reactions || [])] }
       : c
     ))
     showSnackbar(t('reactionSentMsg'))
+    const notifContent = reactionType === 'like' ? 'Браво!' : message
+    await sendCoachNotification('reaction', client.name, notifContent)
   }
 
   async function dismissReaction(reactionId) {
     await DB.update('reactions', reactionId, { dismissed: true })
-    setClients(prev => prev.map((c, i) => i === actualIdx
+    setClients(prev => prev.map(c => c.id === client.id
       ? { ...c, reactions: (c.reactions || []).map(r => r.id === reactionId ? { ...r, dismissed: true } : r) }
       : c
     ))
@@ -471,15 +531,22 @@ export function AppProvider({ children }) {
     // Language
     lang, setLang, t,
     // Data
-    clients, coaches, auth, loading, loadError,
+    clients, coaches, realClients, coachProfiles,
+    auth, loading, loadError,
     // UI
     view, setView,
     selIdx, setSelIdx,
     sidebarOpen, setSidebarOpen,
     showClientMenu, setShowClientMenu,
     confirmDelete, setConfirmDelete,
+    // Coach tracker viewing
+    viewingCoach, setViewingCoach,
+    isReadOnly,
+    isTrackerReadOnly,
     // Snackbar
     snackbar, showSnackbar, closeSnackbar,
+    // Notifications
+    notifications, unreadNotifCount, pollNotifications,
     // Workout
     exName, setExName,
     exScheme, setExScheme,
@@ -503,8 +570,7 @@ export function AppProvider({ children }) {
     ranking, kcalPct, protPct, visibleClients,
     // Actions
     loadAll,
-    handleLoginCoach, handleLoginClient,
-    handleRegisterCoach, handleRegisterClient,
+    handleLogin,
     logout,
     updateClient, updateClientTargets,
     addMealToClient, deleteMealFromClient,

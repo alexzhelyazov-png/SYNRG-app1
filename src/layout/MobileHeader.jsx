@@ -1,5 +1,7 @@
 import { AppBar, Toolbar, Box, Typography, IconButton, Button } from '@mui/material'
-import LogoutIcon from '@mui/icons-material/Logout'
+import LogoutIcon        from '@mui/icons-material/Logout'
+import FitnessCenterIcon from '@mui/icons-material/FitnessCenter'
+import DirectionsRunIcon from '@mui/icons-material/DirectionsRun'
 import { useApp } from '../context/AppContext'
 import { C, EASE } from '../theme'
 
@@ -22,10 +24,12 @@ export default function MobileHeader() {
             display:        'flex',
             alignItems:     'center',
             justifyContent: 'center',
-            fontSize:       '18px',
             flexShrink:     0,
           }}>
-            {auth.role === 'coach' ? '🏋' : '🏃'}
+            {auth.role === 'coach'
+              ? <FitnessCenterIcon sx={{ fontSize: '20px', color: C.primary }} />
+              : <DirectionsRunIcon sx={{ fontSize: '20px', color: C.purple }} />
+            }
           </Box>
 
           <Box sx={{ minWidth: 0 }}>
