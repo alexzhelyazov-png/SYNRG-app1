@@ -227,7 +227,7 @@ export default function MobileNav() {
           </Box>
 
           {sortedClients.map((c, i) => {
-            const ri    = clients.findIndex(x => x.name === c.name)
+            const ri    = realClients.findIndex(x => x.name === c.name)
             const isSel = !viewingCoach && actualIdx === ri
             return (
               <Box component="div" key={c.name} onClick={() => {

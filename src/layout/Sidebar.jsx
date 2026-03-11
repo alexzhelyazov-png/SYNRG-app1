@@ -59,7 +59,7 @@ function getNavItems(auth, admin) {
 export default function Sidebar() {
   const {
     auth, view, setView, logout,
-    clients, visibleClients, actualIdx, setSelIdx, setCurrentWorkout,
+    clients, realClients, visibleClients, actualIdx, setSelIdx, setCurrentWorkout,
     sidebarOpen, setSidebarOpen,
     setConfirmDelete,
     coaches, coachProfiles,
@@ -338,7 +338,7 @@ export default function Sidebar() {
                 return ai - bi
               })
               .map(c => {
-                const ri    = clients.findIndex(x => x.name === c.name)
+                const ri    = realClients.findIndex(x => x.name === c.name)
                 const isSel = !viewingCoach && actualIdx === ri
                 return (
                   <Box key={c.name} sx={{ display: 'flex', alignItems: 'center', mx: 1.5, mb: '2px' }}>
