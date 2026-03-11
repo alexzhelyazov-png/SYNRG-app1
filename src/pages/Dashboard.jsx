@@ -393,11 +393,11 @@ function ClientProgressSection() {
 
 // ─── Today's schedule (shown at top of coach dashboard) ──────────
 function TodayScheduleCard() {
-  const { t } = useApp()
-  const { slots } = useBooking()
+  const { auth } = useApp()
+  const { slots, slotBookings } = useBooking()
   const todayStr = new Date().toISOString().slice(0, 10)
   const todaySlots = (slots || [])
-    .filter(s => s.slot_date === todayStr && s.status !== 'cancelled')
+    .filter(s => s.slot_date === todayStr && s.status !== 'cancelled' && s.coach_name === auth.name)
     .sort((a, b) => (a.start_time || '').localeCompare(b.start_time || ''))
 
   if (todaySlots.length === 0) return null
@@ -411,31 +411,38 @@ function TodayScheduleCard() {
     }}>
       <Typography variant="h3" sx={{ mb: 1.25 }}>График днес</Typography>
       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75 }}>
-        {todaySlots.map((s, i) => (
-          <Box key={s.id || i} sx={{
-            display: 'flex', alignItems: 'center', gap: 1.5,
-            py: 0.75, px: 1.25,
-            background: s.booked_count > 0 ? C.accentSoft : 'rgba(255,255,255,0.03)',
-            border: `1px solid ${s.booked_count > 0 ? C.primaryA20 : C.border}`,
-            borderRadius: '10px',
-          }}>
-            <Typography sx={{
-              fontSize: '13.5px', fontWeight: 700, color: C.primary,
-              minWidth: '50px', fontFamily: "'Space Grotesk', sans-serif",
+        {todaySlots.map((s, i) => {
+          const bookings = slotBookings[s.id] || []
+          return (
+            <Box key={s.id || i} sx={{
+              py: 0.75, px: 1.25,
+              background: s.booked_count > 0 ? C.accentSoft : 'rgba(255,255,255,0.03)',
+              border: `1px solid ${s.booked_count > 0 ? C.primaryA20 : C.border}`,
+              borderRadius: '10px',
             }}>
-              {(s.start_time || '').slice(0, 5)}
-            </Typography>
-            <Typography sx={{ fontSize: '13px', color: C.text, flex: 1 }}>
-              {s.coach_name}
-            </Typography>
-            <Typography sx={{
-              fontSize: '12px', fontWeight: 700,
-              color: s.booked_count > 0 ? C.primary : C.muted,
-            }}>
-              {s.booked_count}/{s.capacity}
-            </Typography>
-          </Box>
-        ))}
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                <Typography sx={{
+                  fontSize: '13.5px', fontWeight: 700, color: C.primary,
+                  minWidth: '50px', fontFamily: "'Space Grotesk', sans-serif",
+                }}>
+                  {(s.start_time || '').slice(0, 5)}
+                </Typography>
+                <Typography sx={{ fontSize: '12px', fontWeight: 700, color: s.booked_count > 0 ? C.primary : C.muted }}>
+                  {s.booked_count}/{s.capacity}
+                </Typography>
+              </Box>
+              {bookings.length > 0 && (
+                <Box sx={{ mt: 0.4, pl: '58px' }}>
+                  {bookings.map((b, j) => (
+                    <Typography key={j} sx={{ fontSize: '12px', color: C.text, lineHeight: 1.5 }}>
+                      {b.client_name}
+                    </Typography>
+                  ))}
+                </Box>
+              )}
+            </Box>
+          )
+        })}
       </Box>
     </Paper>
   )
@@ -445,7 +452,7 @@ function TodayScheduleCard() {
 function DashboardCoach() {
   const {
     auth, client, t,
-    coachClientMode,
+    coachClientMode, ranking,
     exName, setExName, exScheme, setExScheme, exWeight, setExWeight,
     workoutCategory, setWorkoutCategory,
     currentWorkout, setCurrentWorkout,
@@ -460,31 +467,45 @@ function DashboardCoach() {
       {/* ── Today's schedule (only before client is explicitly selected) ── */}
       {!coachClientMode && <TodayScheduleCard />}
 
-      {/* ── Client viewing banner ──── */}
-      <Box sx={{
-        display: 'flex', alignItems: 'center', gap: 1,
-        mb: 2, px: 2, py: 1, borderRadius: '10px',
-        background: 'rgba(200,197,255,0.08)',
-        border: '1px solid rgba(200,197,255,0.2)',
-        animation: 'fadeIn 0.2s ease',
-      }}>
-        <Box sx={{ width: 8, height: 8, borderRadius: '50%', background: C.purple, flexShrink: 0 }} />
-        <Typography sx={{ fontSize: '12px', fontWeight: 700, color: C.purple }}>
-          {t('viewingClient')}: {client.name}
-        </Typography>
-      </Box>
+      {/* ── Ranking (shown on coach's own dashboard, not when viewing a client) ── */}
+      {!coachClientMode && ranking.length > 0 && (
+        <Paper sx={{ p: 2, mb: 2.5, border: `1px solid ${C.border}`, borderRadius: '16px', animation: `fadeInUp 0.24s ${EASE.decelerate} 0.04s both` }}>
+          <Typography variant="h3" sx={{ mb: 1.25 }}>Класация</Typography>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+            {ranking.slice(0, 10).map((r, i) => (
+              <Box key={r.name} sx={{
+                display: 'flex', alignItems: 'center', gap: 1.5,
+                py: '6px', px: 1, borderRadius: '8px',
+                background: i === 0 ? C.accentSoft : 'transparent',
+              }}>
+                <Typography sx={{
+                  fontSize: '12px', fontWeight: 800, color: i === 0 ? C.primary : C.muted,
+                  minWidth: '22px', textAlign: 'right', fontFamily: "'Space Grotesk', sans-serif",
+                }}>#{i + 1}</Typography>
+                <Typography sx={{ flex: 1, fontSize: '13.5px', fontWeight: i === 0 ? 700 : 500, color: C.text }}>{r.name}</Typography>
+                <Typography sx={{ fontSize: '13px', fontWeight: 700, color: i === 0 ? C.primary : C.muted, fontFamily: "'Space Grotesk', sans-serif" }}>
+                  {r.points} т.
+                </Typography>
+              </Box>
+            ))}
+          </Box>
+        </Paper>
+      )}
 
-      {/* ── Header ────────────────────────────────────── */}
+      {/* ── "Данните на:" header (shown when coach has selected a client) ── */}
       <Box sx={{
-        display:        'flex',
-        justifyContent: 'space-between',
-        alignItems:     'flex-start',
-        mb:             3,
-        gap:            2,
-        flexWrap:       'wrap',
-        animation:      `fadeInUp 0.22s ${EASE.decelerate} both`,
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        mb: 2.5, gap: 2, flexWrap: 'wrap',
+        animation: `fadeInUp 0.22s ${EASE.decelerate} both`,
       }}>
-        <Typography variant="h2" sx={{ mb: 0.75 }}>{client.name}</Typography>
+        <Box>
+          {coachClientMode && (
+            <Typography sx={{ fontSize: '11px', fontWeight: 700, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.8px', mb: 0.4 }}>
+              Данните на
+            </Typography>
+          )}
+          <Typography variant="h2">{client.name || '—'}</Typography>
+        </Box>
 
         {/* Target inputs */}
         <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>

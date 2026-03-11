@@ -24,7 +24,7 @@ const HOURS       = [8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]
 const WEEKDAYS_BG = ['Нед', 'Пон', 'Вт', 'Ср', 'Чет', 'Пет', 'Съб']
 const WEEKDAYS_EN = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
-// Each coach gets a distinct color, derived from their name
+// Fixed colors for known coaches; hash-based fallback for others
 const SLOT_COLORS = [
   { bg: 'rgba(196,233,191,0.18)', bd: 'rgba(196,233,191,0.40)', txt: '#C4E9BF' }, // green
   { bg: 'rgba(200,197,255,0.18)', bd: 'rgba(200,197,255,0.40)', txt: '#C8C5FF' }, // purple
@@ -33,8 +33,14 @@ const SLOT_COLORS = [
   { bg: 'rgba(255,135,145,0.18)', bd: 'rgba(255,135,145,0.40)', txt: '#FF8791' }, // red/pink
   { bg: 'rgba(255,220,122,0.18)', bd: 'rgba(255,220,122,0.40)', txt: '#FFDC7A' }, // yellow
 ]
+const FIXED_COACH_COLORS = {
+  'Ицко':  { bg: 'rgba(200,197,255,0.18)', bd: 'rgba(200,197,255,0.40)', txt: '#C8C5FF' }, // purple
+  'Елина': { bg: 'rgba(196,233,191,0.18)', bd: 'rgba(196,233,191,0.40)', txt: '#C4E9BF' }, // green
+  'Никола':{ bg: 'rgba(255,220,122,0.18)', bd: 'rgba(255,220,122,0.40)', txt: '#FFDC7A' }, // yellow
+}
 function coachColor(name) {
   if (!name) return SLOT_COLORS[0]
+  if (FIXED_COACH_COLORS[name]) return FIXED_COACH_COLORS[name]
   let h = 0
   for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) & 0xffff
   return SLOT_COLORS[h % SLOT_COLORS.length]
@@ -339,7 +345,7 @@ function AddClientDialog({ open, onClose, onAdd, slot, realClients, t }) {
 }
 
 // ── Slot Card inside a calendar cell ──────────────────────────
-function SlotCell({ slot, adminMode, onEdit, onDelete, onAddClient }) {
+function SlotCell({ slot, adminMode, onEdit, onDelete, onAddClient, bookings = [] }) {
   const [hover,      setHover]      = useState(false)
   const [confirmDel, setConfirmDel] = useState(false)
   const color  = coachColor(slot.coach_name)
@@ -353,7 +359,7 @@ function SlotCell({ slot, adminMode, onEdit, onDelete, onAddClient }) {
       sx={{
         position: 'relative',
         borderRadius: '7px',
-        px: '7px', py: '5px',
+        pl: '10px', pr: '7px', py: '5px',
         mb: '3px',
         background: isFull ? 'rgba(248,113,113,0.12)' : color.bg,
         border: `1px solid ${isFull ? 'rgba(248,113,113,0.35)' : color.bd}`,
@@ -362,19 +368,32 @@ function SlotCell({ slot, adminMode, onEdit, onDelete, onAddClient }) {
         minHeight: 40,
       }}
     >
-      {/* Coach name */}
+      {/* Color bar (replaces coach name text) */}
+      <Box sx={{
+        position: 'absolute', left: 0, top: 0, bottom: 0, width: '4px',
+        background: isFull ? '#F87171' : color.txt,
+        borderRadius: '7px 0 0 7px',
+      }} />
+
+      {/* Occupancy count */}
       <Typography sx={{
-        fontSize: '12px', fontWeight: 700, lineHeight: 1.3,
+        fontSize: '11px', fontWeight: 700, lineHeight: 1.3,
         color: isFull ? '#F87171' : color.txt,
         pr: adminMode && hover ? '52px' : 0,
-        whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
       }}>
-        {slot.coach_name}
-      </Typography>
-      {/* Occupancy */}
-      <Typography sx={{ fontSize: '10px', color: isFull ? '#F87171' : C.muted, lineHeight: 1.2 }}>
         {booked}/{slot.capacity}
       </Typography>
+
+      {/* Booked client names */}
+      {bookings.slice(0, 3).map((b, i) => (
+        <Typography key={i} sx={{
+          fontSize: '10px', color: C.muted, lineHeight: 1.35,
+          pr: adminMode && hover ? '52px' : 0,
+          whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+        }}>
+          {b.client_name}
+        </Typography>
+      ))}
 
       {/* Admin action buttons (shown on hover) */}
       {adminMode && hover && !confirmDel && (
@@ -652,6 +671,7 @@ export default function Schedule() {
                         key={slot.id}
                         slot={slot}
                         adminMode={admin}
+                        bookings={slotBookings[slot.id] || []}
                         onEdit={s => { setEditTarget(s); setShowEditDlg(true) }}
                         onDelete={handleDeleteSlot}
                         onAddClient={s => { setAddTarget(s); setShowAddDlg(true) }}

@@ -365,14 +365,27 @@ export function AppProvider({ children }) {
 
   async function saveWorkoutToClient(clientId, workout) {
     if (isReadOnly) return
-    const data = await DB.insert('workouts', {
-      client_id: clientId, date: workout.date, coach: workout.coach,
-      category: workout.category, items: workout.items,
-    })
+    // Optimistic update — show in history immediately
+    const tmpId = 'tmp_' + Date.now()
     setClients(prev => prev.map(c => c.id === clientId
-      ? { ...c, workouts: [{ ...workout, id: data.id }, ...c.workouts] }
+      ? { ...c, workouts: [{ ...workout, id: tmpId }, ...c.workouts] }
       : c
     ))
+    try {
+      const data = await DB.insert('workouts', {
+        client_id: clientId, date: workout.date, coach: workout.coach,
+        category: workout.category, items: workout.items,
+      })
+      // Replace tmp id with real DB id
+      if (data?.id) {
+        setClients(prev => prev.map(c => c.id === clientId
+          ? { ...c, workouts: c.workouts.map(w => w.id === tmpId ? { ...w, id: data.id } : w) }
+          : c
+        ))
+      }
+    } catch (e) {
+      console.error('saveWorkoutToClient error:', e)
+    }
   }
 
   async function saveWeightLog(clientId, date, weight) {
