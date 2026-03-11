@@ -352,14 +352,15 @@ function hexRgba(hex, a) {
   return `rgba(${r},${g},${b},${a})`
 }
 
-// ── Slot Card inside a calendar cell — Google Calendar style ───
+// ── Slot Card inside a calendar cell — horizontal pill row ────
 function SlotCell({ slot, adminMode, onEdit, onDelete, onAddClient, bookings = [] }) {
   const [hover,      setHover]      = useState(false)
   const [confirmDel, setConfirmDel] = useState(false)
-  const color  = coachColor(slot.coach_name)
-  const booked = slot.booked_count || 0
-  const isFull = booked >= slot.capacity
-  const base   = color.txt // e.g. '#C8C5FF'
+  const color    = coachColor(slot.coach_name)
+  const base     = color.txt
+  const capacity = Math.min(slot.capacity || 3, 6)
+  // Array of capacity length: filled with booking or null
+  const cells    = Array.from({ length: capacity }, (_, i) => bookings[i] || null)
 
   return (
     <Box
@@ -367,44 +368,38 @@ function SlotCell({ slot, adminMode, onEdit, onDelete, onAddClient, bookings = [
       onMouseLeave={() => { setHover(false); setConfirmDel(false) }}
       sx={{ position: 'relative', mb: '3px', userSelect: 'none' }}
     >
-      {bookings.length === 0 ? (
-        // Empty slot — single very faint card
-        <Box sx={{
-          borderRadius: '6px', px: '8px', py: '5px',
-          background: hexRgba(base, 0.06),
-          border:     `1px solid ${hexRgba(base, 0.18)}`,
-          minHeight:  26, display: 'flex', alignItems: 'center', gap: '6px',
-        }}>
-          <Box sx={{ width: 3, alignSelf: 'stretch', background: hexRgba(base, 0.25), borderRadius: '2px', flexShrink: 0 }} />
-          <Typography sx={{ fontSize: '10px', fontWeight: 700, color: hexRgba(base, 0.35) }}>
-            {booked}/{slot.capacity}
-          </Typography>
-        </Box>
-      ) : (
-        bookings.slice(0, slot.capacity).map((b, i) => (
+      {/* One pill per capacity slot, all in a row */}
+      <Box sx={{ display: 'flex', gap: '2px' }}>
+        {cells.map((booking, i) => (
           <Box key={i} sx={{
-            borderRadius: '6px', px: '8px', py: '4px', mb: '2px',
-            background: isFull ? hexRgba(base, 0.28) : hexRgba(base, 0.10),
-            border:     `1px solid ${isFull ? hexRgba(base, 0.55) : hexRgba(base, 0.22)}`,
-            overflow: 'hidden',
+            flex: 1,
+            borderRadius: '5px',
+            px: '4px', py: '5px',
+            background: booking ? hexRgba(base, 0.30) : hexRgba(base, 0.06),
+            border:     `1px solid ${booking ? hexRgba(base, 0.58) : hexRgba(base, 0.16)}`,
+            overflow: 'hidden', minHeight: 30,
+            display: 'flex', alignItems: 'center',
           }}>
-            <Typography sx={{
-              fontSize: '12px', fontWeight: 700, lineHeight: 1.35,
-              color: isFull ? base : hexRgba(base, 0.55),
-              whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-            }}>
-              {b.client_name}
-            </Typography>
+            {booking && (
+              <Typography sx={{
+                fontSize: '10px', fontWeight: 800,
+                color: base,
+                whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                lineHeight: 1.2, width: '100%',
+              }}>
+                {booking.client_name}
+              </Typography>
+            )}
           </Box>
-        ))
-      )}
+        ))}
+      </Box>
 
       {/* Admin action buttons (shown on hover) */}
       {adminMode && hover && !confirmDel && (
         <Box sx={{
           position: 'absolute', top: 2, right: 2, zIndex: 10,
           display: 'flex', gap: '2px',
-          background: 'rgba(12,10,9,0.80)', borderRadius: '6px', p: '2px',
+          background: 'rgba(12,10,9,0.85)', borderRadius: '6px', p: '2px',
         }}>
           <IconButton size="small"
             onClick={e => { e.stopPropagation(); onAddClient(slot) }}
@@ -427,7 +422,7 @@ function SlotCell({ slot, adminMode, onEdit, onDelete, onAddClient, bookings = [
       {/* Delete confirmation overlay */}
       {confirmDel && (
         <Box sx={{
-          position: 'absolute', inset: 0, borderRadius: '6px',
+          position: 'absolute', inset: 0, borderRadius: '5px',
           background: 'rgba(12,10,9,0.92)',
           display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5,
           zIndex: 10,
