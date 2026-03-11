@@ -344,73 +344,81 @@ function AddClientDialog({ open, onClose, onAdd, slot, realClients, t }) {
   )
 }
 
-// ── Slot Card inside a calendar cell ──────────────────────────
+// ── Convert hex color to rgba ─────────────────────────────────
+function hexRgba(hex, a) {
+  const r = parseInt(hex.slice(1, 3), 16)
+  const g = parseInt(hex.slice(3, 5), 16)
+  const b = parseInt(hex.slice(5, 7), 16)
+  return `rgba(${r},${g},${b},${a})`
+}
+
+// ── Slot Card inside a calendar cell — Google Calendar style ───
 function SlotCell({ slot, adminMode, onEdit, onDelete, onAddClient, bookings = [] }) {
   const [hover,      setHover]      = useState(false)
   const [confirmDel, setConfirmDel] = useState(false)
   const color  = coachColor(slot.coach_name)
   const booked = slot.booked_count || 0
   const isFull = booked >= slot.capacity
+  const base   = color.txt // e.g. '#C8C5FF'
 
   return (
     <Box
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => { setHover(false); setConfirmDel(false) }}
-      sx={{
-        position: 'relative',
-        borderRadius: '7px',
-        pl: '10px', pr: '7px', py: '5px',
-        mb: '3px',
-        background: isFull ? 'rgba(248,113,113,0.12)' : color.bg,
-        border: `1px solid ${isFull ? 'rgba(248,113,113,0.35)' : color.bd}`,
-        userSelect: 'none',
-        overflow: 'hidden',
-        minHeight: 40,
-      }}
+      sx={{ position: 'relative', mb: '3px', userSelect: 'none' }}
     >
-      {/* Color bar (replaces coach name text) */}
-      <Box sx={{
-        position: 'absolute', left: 0, top: 0, bottom: 0, width: '4px',
-        background: isFull ? '#F87171' : color.txt,
-        borderRadius: '7px 0 0 7px',
-      }} />
-
-      {/* Occupancy count */}
-      <Typography sx={{
-        fontSize: '11px', fontWeight: 700, lineHeight: 1.3,
-        color: isFull ? '#F87171' : color.txt,
-        pr: adminMode && hover ? '52px' : 0,
-      }}>
-        {booked}/{slot.capacity}
-      </Typography>
-
-      {/* Booked client names */}
-      {bookings.slice(0, 3).map((b, i) => (
-        <Typography key={i} sx={{
-          fontSize: '10px', color: C.muted, lineHeight: 1.35,
-          pr: adminMode && hover ? '52px' : 0,
-          whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+      {bookings.length === 0 ? (
+        // Empty slot — single very faint card
+        <Box sx={{
+          borderRadius: '6px', px: '8px', py: '5px',
+          background: hexRgba(base, 0.06),
+          border:     `1px solid ${hexRgba(base, 0.18)}`,
+          minHeight:  26, display: 'flex', alignItems: 'center', gap: '6px',
         }}>
-          {b.client_name}
-        </Typography>
-      ))}
+          <Box sx={{ width: 3, alignSelf: 'stretch', background: hexRgba(base, 0.25), borderRadius: '2px', flexShrink: 0 }} />
+          <Typography sx={{ fontSize: '10px', fontWeight: 700, color: hexRgba(base, 0.35) }}>
+            {booked}/{slot.capacity}
+          </Typography>
+        </Box>
+      ) : (
+        bookings.slice(0, slot.capacity).map((b, i) => (
+          <Box key={i} sx={{
+            borderRadius: '6px', px: '8px', py: '4px', mb: '2px',
+            background: isFull ? hexRgba(base, 0.28) : hexRgba(base, 0.10),
+            border:     `1px solid ${isFull ? hexRgba(base, 0.55) : hexRgba(base, 0.22)}`,
+            overflow: 'hidden',
+          }}>
+            <Typography sx={{
+              fontSize: '12px', fontWeight: 700, lineHeight: 1.35,
+              color: isFull ? base : hexRgba(base, 0.55),
+              whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+            }}>
+              {b.client_name}
+            </Typography>
+          </Box>
+        ))
+      )}
 
       {/* Admin action buttons (shown on hover) */}
       {adminMode && hover && !confirmDel && (
-        <Box sx={{ position: 'absolute', top: 3, right: 3, display: 'flex', gap: '2px' }}>
+        <Box sx={{
+          position: 'absolute', top: 2, right: 2, zIndex: 10,
+          display: 'flex', gap: '2px',
+          background: 'rgba(12,10,9,0.80)', borderRadius: '6px', p: '2px',
+        }}>
           <IconButton size="small"
             onClick={e => { e.stopPropagation(); onAddClient(slot) }}
-            sx={{ p: '2px', bgcolor: 'rgba(0,0,0,0.35)', borderRadius: '4px', color: C.muted, '&:hover': { color: C.primary } }}>
+            sx={{ p: '2px', color: C.muted, '&:hover': { color: C.primary } }}>
             <PersonAddIcon sx={{ fontSize: 11 }} />
           </IconButton>
           <IconButton size="small"
             onClick={e => { e.stopPropagation(); onEdit(slot) }}
-            sx={{ p: '2px', bgcolor: 'rgba(0,0,0,0.35)', borderRadius: '4px', color: C.muted, '&:hover': { color: C.primary } }}>
+            sx={{ p: '2px', color: C.muted, '&:hover': { color: C.primary } }}>
             <EditIcon sx={{ fontSize: 11 }} />
           </IconButton>
           <IconButton size="small"
             onClick={e => { e.stopPropagation(); setConfirmDel(true) }}
-            sx={{ p: '2px', bgcolor: 'rgba(0,0,0,0.35)', borderRadius: '4px', color: C.muted, '&:hover': { color: '#F87171' } }}>
+            sx={{ p: '2px', color: C.muted, '&:hover': { color: '#F87171' } }}>
             <DeleteOutlineIcon sx={{ fontSize: 11 }} />
           </IconButton>
         </Box>
@@ -419,9 +427,10 @@ function SlotCell({ slot, adminMode, onEdit, onDelete, onAddClient, bookings = [
       {/* Delete confirmation overlay */}
       {confirmDel && (
         <Box sx={{
-          position: 'absolute', inset: 0, borderRadius: '7px',
+          position: 'absolute', inset: 0, borderRadius: '6px',
           background: 'rgba(12,10,9,0.92)',
           display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5,
+          zIndex: 10,
         }}>
           <Button size="small"
             onClick={e => { e.stopPropagation(); onDelete(slot.id); setConfirmDel(false) }}

@@ -521,7 +521,9 @@ export function ClientDetail() {
           <Typography sx={{ fontSize: '11px', fontWeight: 700, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.8px', mb: 0.4 }}>
             Данните на
           </Typography>
-          <Typography variant="h2">{client.name || '—'}</Typography>
+          <Typography variant="h2" sx={{ textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+            {client.name || '—'}
+          </Typography>
         </Box>
         <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
           <TextField
