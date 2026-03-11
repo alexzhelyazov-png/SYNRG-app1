@@ -233,7 +233,7 @@ export function AppProvider({ children }) {
 
   // ── actualIdx points into realClients for both roles ──────────
   const actualIdx = useMemo(() => {
-    if (auth.role === 'coach') return selIdx
+    if (auth.role === 'coach' || auth.role === 'admin') return selIdx
     const i = realClients.findIndex(c => c.name === auth.name)
     return i >= 0 ? i : 0
   }, [auth, selIdx, realClients])
@@ -245,21 +245,21 @@ export function AppProvider({ children }) {
       meals: [], workouts: [], weightLogs: [],
       tasks: [], reactions: [], reminderSettings: {},
     }
-    if (auth.role === 'coach' && viewingCoach) {
+    if ((auth.role === 'coach' || auth.role === 'admin') && viewingCoach) {
       return coachProfiles.find(c => c.name === viewingCoach) || blank
     }
     return realClients[actualIdx] || blank
   }, [auth, viewingCoach, coachProfiles, realClients, actualIdx])
 
   // ── Read-only: viewing another coach's data (blocks everything) ──────
-  const isReadOnly = auth.role === 'coach' && viewingCoach !== null && viewingCoach !== auth.name
+  const isReadOnly = (auth.role === 'coach' || auth.role === 'admin') && viewingCoach !== null && viewingCoach !== auth.name
 
-  // ── Tracker read-only: coaches can only edit their OWN tracker ────────
-  // Blocks food + weight writes when coach is managing a client OR viewing another coach
-  const isTrackerReadOnly = auth.role === 'coach' && viewingCoach !== auth.name
+  // ── Tracker read-only: coaches/admins can only edit their OWN tracker ─
+  // Blocks food + weight writes when viewing a client OR another coach
+  const isTrackerReadOnly = (auth.role === 'coach' || auth.role === 'admin') && viewingCoach !== auth.name
 
   // ── visibleClients for coach's client list ────────────────────
-  const visibleClients = auth.role === 'coach'
+  const visibleClients = (auth.role === 'coach' || auth.role === 'admin')
     ? realClients
     : realClients.filter(c => c.name === auth.name)
 

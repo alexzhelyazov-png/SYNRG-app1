@@ -356,7 +356,7 @@ function hexRgba(hex, a) {
 function SlotCell({ slot, adminMode, onEdit, onDelete, onAddClient, bookings = [] }) {
   const [hover,      setHover]      = useState(false)
   const [confirmDel, setConfirmDel] = useState(false)
-  const { auth, clients, setSelIdx, setCoachClientMode } = useApp()
+  const { auth, realClients, setSelIdx, setCoachClientMode } = useApp()
   const color    = coachColor(slot.coach_name)
   const base     = color.txt
   const capacity = Math.min(slot.capacity || 3, 6)
@@ -365,7 +365,7 @@ function SlotCell({ slot, adminMode, onEdit, onDelete, onAddClient, bookings = [
 
   function openClient(booking) {
     if (auth.role === 'client') return
-    const idx = clients.findIndex(c => c.id === booking.client_id)
+    const idx = realClients.findIndex(c => c.id === booking.client_id)
     if (idx >= 0) { setSelIdx(idx); setCoachClientMode(true) }
   }
 
