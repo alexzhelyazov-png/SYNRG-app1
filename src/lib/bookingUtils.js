@@ -12,7 +12,11 @@ export const PLAN_CONFIGS = {
   'unlimited':{ label: 'Unlimited',     credits: null, unlimited: true  },
 }
 
-export function planLabel(planType) {
+export function planLabel(planType, t) {
+  if (t) {
+    const key = planType === 'unlimited' ? 'planTypeUnlimited' : `planType${planType}`
+    return t(key) || PLAN_CONFIGS[planType]?.label || planType
+  }
   return PLAN_CONFIGS[planType]?.label || planType
 }
 

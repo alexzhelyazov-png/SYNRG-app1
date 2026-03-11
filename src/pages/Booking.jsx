@@ -53,7 +53,7 @@ function PlanCard({ plan, t, lang }) {
           </Typography>
         </Box>
         <Chip
-          label={planLabel(plan.plan_type)}
+          label={planLabel(plan.plan_type, t)}
           size="small"
           sx={{ background: C.primaryContainer, color: C.primary, fontWeight: 700, fontSize: '11px' }}
         />

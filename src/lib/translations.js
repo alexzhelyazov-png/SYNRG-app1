@@ -138,7 +138,7 @@ export const T = {
     // ── Weight Tracker ────────────────────────────────
     weightTrackerTitle: 'Тракер за тегло',
     lastWeightLbl:      'Последно тегло',
-    weeklyRateLbl:      'Weekly rate',
+    weeklyRateLbl:      'Седмичен темп',
     logWeightLbl:       'Запиши тегло',
     saveLbl:            'Запази',
     chartLbl:           'Графика',

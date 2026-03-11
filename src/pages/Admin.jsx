@@ -284,7 +284,7 @@ function PlanDialog({ open, onClose, onActivate, onExtend, onAdjust, client, pla
             border: `1px solid ${C.border}`,
           }}>
             <Typography sx={{ fontSize: '12px', color: C.muted }}>
-              {t('hasActivePlan')}: {planLabel(plan.plan_type)}
+              {t('hasActivePlan')}: {planLabel(plan.plan_type, t)}
               {plan.plan_type !== 'unlimited' && ` · ${creditsRemaining(plan)}/${plan.credits_total}`}
               {' · '}{t('validUntil')}: {fmtValidTo(plan)}
             </Typography>
@@ -298,7 +298,7 @@ function PlanDialog({ open, onClose, onActivate, onExtend, onAdjust, client, pla
               <InputLabel sx={{ color: C.muted }}>{t('selectPlanType')}</InputLabel>
               <Select value={planType} onChange={e => setPlanType(e.target.value)} label={t('selectPlanType')}
                 sx={{ color: C.text, '.MuiOutlinedInput-notchedOutline': { borderColor: C.border } }}>
-                {PLAN_TYPES.map(pt => <MenuItem key={pt} value={pt}>{planLabel(pt)}</MenuItem>)}
+                {PLAN_TYPES.map(pt => <MenuItem key={pt} value={pt}>{planLabel(pt, t)}</MenuItem>)}
               </Select>
             </FormControl>
             <TextField label={t('validFromLbl')} type="date" size="small"
@@ -345,7 +345,7 @@ function PlanDialog({ open, onClose, onActivate, onExtend, onAdjust, client, pla
 }
 
 // ── Client Plan Row ──────────────────────────────────────────
-function ClientPlanRow({ client, plan, onManage }) {
+function ClientPlanRow({ client, plan, onManage, t }) {
   const active   = isPlanActive(plan)
   const daysLeft = plan ? daysUntilExpiry(plan) : null
   const credits  = plan ? creditsRemaining(plan) : null
@@ -372,7 +372,7 @@ function ClientPlanRow({ client, plan, onManage }) {
         </Typography>
         {plan ? (
           <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mt: 0.25 }}>
-            <Chip label={planLabel(plan.plan_type)} size="small"
+            <Chip label={planLabel(plan.plan_type, t)} size="small"
               sx={{ fontSize: '10px', height: 18, background: active ? C.primaryContainer : 'rgba(255,255,255,0.06)', color: active ? C.primary : C.muted }} />
             {plan.plan_type !== 'unlimited' && (
               <Chip label={`${credits}/${plan.credits_total}`} size="small"
@@ -670,7 +670,7 @@ function PlansTab({ t }) {
             filtered.map(client => {
               const plan = getClientPlan(client.id)
               return (
-                <ClientPlanRow key={client.id} client={client} plan={plan}
+                <ClientPlanRow key={client.id} client={client} plan={plan} t={t}
                   onManage={(c, p) => setPlanDlg({ client: c, plan: p })} />
               )
             })
@@ -761,7 +761,7 @@ function ClientsTab({ t }) {
         {active.map(client => {
           const plan = getClientPlan(client.id)
           return (
-            <ClientPlanRow key={client.id} client={client} plan={plan}
+            <ClientPlanRow key={client.id} client={client} plan={plan} t={t}
               onManage={(c, p) => setPlanDlg({ client: c, plan: p })} />
           )
         })}
