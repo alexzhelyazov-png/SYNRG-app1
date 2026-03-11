@@ -184,8 +184,8 @@ export default function Sidebar() {
           )
         })}
 
-        {/* Моят тракер (coach only) */}
-        {auth.role === 'coach' && (() => {
+        {/* Моят тракер (coach + admin) */}
+        {(auth.role === 'coach' || auth.role === 'admin') && (() => {
           const isTrackerActive = view === 'dashboard' && viewingCoach === auth.name
           return (
             <Tooltip title={!open ? t('myTrackerTitle') : ''} placement="right" arrow>

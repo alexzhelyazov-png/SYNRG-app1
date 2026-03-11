@@ -31,7 +31,8 @@ function getNavItems(auth, admin) {
   if (auth.role === 'client') {
     return [
       ...BASE_NAV,
-      { view: 'booking', Icon: EventIcon, labelKey: 'navBooking' },
+      { view: 'tasks',    Icon: AssignmentIcon,    labelKey: 'navTasks'   },
+      { view: 'schedule', Icon: CalendarMonthIcon, labelKey: 'navSchedule' },
     ]
   }
   // Coach / Admin — dashboard, schedule, tasks [, admin]
@@ -136,8 +137,8 @@ export default function MobileNav() {
             />
           ))}
 
-          {/* Моят тракер (coach only) */}
-          {auth.role === 'coach' && (
+          {/* Моят тракер (coach + admin) */}
+          {(auth.role === 'coach' || auth.role === 'admin') && (
             <NavAction
               value="__tracker__"
               Icon={PersonIcon}
@@ -151,8 +152,8 @@ export default function MobileNav() {
             />
           )}
 
-          {/* Clients sheet — all coaches (including admins) */}
-          {auth.role === 'coach' && (
+          {/* Clients sheet — coaches + admins */}
+          {(auth.role === 'coach' || auth.role === 'admin') && (
             <BottomNavigationAction
               value="__clients__"
               onClick={e => {
@@ -195,7 +196,7 @@ export default function MobileNav() {
 
 
       {/* ── Client selector — bottom sheet ───────────── */}
-      {showClientMenu && auth.role === 'coach' && (
+      {showClientMenu && (auth.role === 'coach' || auth.role === 'admin') && (
         <Box sx={{
           position: 'fixed', bottom: '64px', left: 0, right: 0,
           maxHeight: '65vh', background: C.sidebar,

@@ -570,7 +570,7 @@ function AdminScheduleTab({ t, lang }) {
 
 function AddClientDialog({ open, onClose, onAdd, slot, realClients, t }) {
   const [selId, setSelId] = useState('')
-  const [useCredit, setUseCredit] = useState(false)
+  const [useCredit, setUseCredit] = useState(true)
   const [loading, setLoading] = useState(false)
   const [err, setErr] = useState('')
   async function handleAdd() {
@@ -580,7 +580,7 @@ function AddClientDialog({ open, onClose, onAdd, slot, realClients, t }) {
     const res = await onAdd(slot.id, selId, client.name, useCredit)
     setLoading(false)
     if (res?.error) { setErr(res.error); return }
-    onClose(); setSelId(''); setUseCredit(false)
+    onClose(); setSelId(''); setUseCredit(true)
   }
   return (
     <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth

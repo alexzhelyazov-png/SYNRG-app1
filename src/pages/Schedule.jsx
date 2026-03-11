@@ -294,7 +294,7 @@ function EditSlotDialog({ open, onClose, onSave, slot, coaches, t }) {
 // ── Add Client to Slot Dialog ──────────────────────────────────
 function AddClientDialog({ open, onClose, onAdd, slot, realClients, t }) {
   const [selId,     setSelId]     = useState('')
-  const [useCredit, setUseCredit] = useState(false)
+  const [useCredit, setUseCredit] = useState(true)
   const [loading,   setLoading]   = useState(false)
   const [err,       setErr]       = useState('')
 
@@ -305,7 +305,7 @@ function AddClientDialog({ open, onClose, onAdd, slot, realClients, t }) {
     const res = await onAdd(slot.id, selId, client.name, useCredit)
     setLoading(false)
     if (res?.error) { setErr(res.error); return }
-    onClose(); setSelId(''); setUseCredit(false)
+    onClose(); setSelId(''); setUseCredit(true)
   }
 
   return (
@@ -356,11 +356,18 @@ function hexRgba(hex, a) {
 function SlotCell({ slot, adminMode, onEdit, onDelete, onAddClient, bookings = [] }) {
   const [hover,      setHover]      = useState(false)
   const [confirmDel, setConfirmDel] = useState(false)
+  const { auth, clients, setSelIdx, setCoachClientMode } = useApp()
   const color    = coachColor(slot.coach_name)
   const base     = color.txt
   const capacity = Math.min(slot.capacity || 3, 6)
   // Array of capacity length: filled with booking or null
   const cells    = Array.from({ length: capacity }, (_, i) => bookings[i] || null)
+
+  function openClient(booking) {
+    if (auth.role === 'client') return
+    const idx = clients.findIndex(c => c.id === booking.client_id)
+    if (idx >= 0) { setSelIdx(idx); setCoachClientMode(true) }
+  }
 
   return (
     <Box
@@ -380,13 +387,13 @@ function SlotCell({ slot, adminMode, onEdit, onDelete, onAddClient, bookings = [
               leaveTouchDelay={2000}
               arrow
             >
-              <Box sx={{
+              <Box onClick={() => openClient(booking)} sx={{
                 borderRadius: '6px',
                 px: '6px', py: '5px',
                 background: hexRgba(base, 0.30),
                 border: `1px solid ${hexRgba(base, 0.58)}`,
                 overflow: 'hidden',
-                cursor: 'pointer',
+                cursor: auth.role !== 'client' ? 'pointer' : 'default',
               }}>
                 <Typography sx={{
                   fontSize: '12px', fontWeight: 800,

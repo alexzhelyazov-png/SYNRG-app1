@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { Box, CircularProgress, Typography, Button, Alert, Snackbar, useMediaQuery } from '@mui/material'
 import WarningAmberIcon from '@mui/icons-material/WarningAmber'
 import { ThemeProvider, useTheme } from '@mui/material/styles'
@@ -14,7 +14,7 @@ import MobileHeader   from './layout/MobileHeader'
 import MobileNav      from './layout/MobileNav'
 
 import Auth           from './pages/Auth'
-import Dashboard, { ClientDetail } from './pages/Dashboard'
+import Dashboard, { ClientDetail, ClientSchedule } from './pages/Dashboard'
 import FoodTracker    from './pages/FoodTracker'
 import WeightTracker  from './pages/WeightTracker'
 import Ranking        from './pages/Ranking'
@@ -111,7 +111,12 @@ function AppShell() {
   const admin            = isAdmin(auth)
   const theme            = useTheme()
   const isMobile         = useMediaQuery(theme.breakpoints.down('sm'))
-  const showClientDetail = auth.role === 'coach' && coachClientMode
+  const showClientDetail = (auth.role === 'coach' || auth.role === 'admin') && coachClientMode
+
+  // Scroll to top whenever coach/admin opens a client
+  useEffect(() => {
+    if (coachClientMode) window.scrollTo({ top: 0, behavior: 'smooth' })
+  }, [coachClientMode])
 
   if (loading)      return <LoadingScreen t={t} />
   if (loadError)    return <ErrorScreen error={loadError} onRetry={() => loadAll()} t={t} />
@@ -161,10 +166,11 @@ function AppShell() {
                 {view === 'food'      && <FoodTracker />}
                 {view === 'weight'    && <WeightTracker />}
                 {view === 'ranking'   && <Ranking />}
-                {view === 'tasks'     && auth.role === 'coach' && <AllClientsTasks />}
-                {view === 'tasks'     && auth.role !== 'coach' && <Tasks />}
+                {view === 'tasks'     && (auth.role === 'coach' || auth.role === 'admin') && <AllClientsTasks />}
+                {view === 'tasks'     && auth.role === 'client' && <Tasks />}
                 {view === 'booking'   && <Booking />}
-                {view === 'schedule'  && <Schedule />}
+                {view === 'schedule'  && auth.role === 'client' && <ClientSchedule />}
+                {view === 'schedule'  && auth.role !== 'client' && <Schedule />}
                 {view === 'admin'     && admin && <Admin />}
               </>
             )}
