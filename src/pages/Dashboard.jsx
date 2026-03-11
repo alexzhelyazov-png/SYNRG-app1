@@ -298,7 +298,7 @@ function ClientProgressSection() {
     }}>
       {/* Header + message button */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-        <Typography variant="h3">Прогрес</Typography>
+        <Typography variant="h3">Progress</Typography>
         <Button
           size="small"
           onClick={() => setMsgOpen(p => !p)}
@@ -476,12 +476,12 @@ function ClientSessionSummary() {
       border: `1px solid ${C.border}`, borderRadius: '16px',
       animation: `fadeInUp 0.28s ${EASE.decelerate} 0.06s both`,
     }}>
-      <Typography variant="h3" sx={{ mb: 1.5 }}>Тренировки</Typography>
+      <Typography variant="h3" sx={{ mb: 1.5 }}>Workouts</Typography>
       <Box sx={{ display: 'flex', gap: 3, mb: upcoming.length > 0 ? 1.5 : 0, flexWrap: 'wrap' }}>
         {plan && (
           <Box>
             <Typography sx={{ fontSize: '11px', color: C.muted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.7px', mb: 0.3 }}>
-              Оставащи
+              Remaining
             </Typography>
             <Typography sx={{ fontSize: '22px', fontWeight: 800, color: C.primary, lineHeight: 1.1, fontFamily: "'Space Grotesk', sans-serif" }}>
               {plan.plan_type === 'unlimited' ? '∞' : `${remCred} / ${plan.credits_total}`}
@@ -492,7 +492,7 @@ function ClientSessionSummary() {
       {upcoming.length > 0 && (
         <>
           <Typography sx={{ fontSize: '11px', color: C.muted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.7px', mb: 0.75 }}>
-            Следващи записвания
+            Upcoming Sessions
           </Typography>
           {upcoming.map(s => (
             <Box key={s.id} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center',
@@ -525,7 +525,7 @@ function TodayScheduleCard() {
       borderRadius: '16px',
       animation: `fadeInUp 0.22s ${EASE.decelerate} both`,
     }}>
-      <Typography variant="h3" sx={{ mb: 1.25 }}>График днес</Typography>
+      <Typography variant="h3" sx={{ mb: 1.25 }}>Today's Schedule</Typography>
       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75 }}>
         {todaySlots.map((s, i) => {
           const bookings = slotBookings[s.id] || []
@@ -573,7 +573,7 @@ function DashboardCoach() {
       <TodayScheduleCard />
       {ranking.length > 0 && (
         <Paper sx={{ p: 2, mb: 2.5, border: `1px solid ${C.border}`, borderRadius: '16px', animation: `fadeInUp 0.24s ${EASE.decelerate} 0.04s both` }}>
-          <Typography variant="h3" sx={{ mb: 1.25 }}>Класация</Typography>
+          <Typography variant="h3" sx={{ mb: 1.25 }}>Rankings</Typography>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
             {ranking.slice(0, 10).map((r, i) => (
               <Box key={r.name} sx={{
@@ -622,7 +622,7 @@ export function ClientDetail() {
           startIcon={<ArrowBackIcon />}
           sx={{ color: C.muted, '&:hover': { color: C.primary }, pl: 0 }}
         >
-          Назад
+          Back
         </Button>
       </Box>
 
@@ -841,35 +841,9 @@ function DashboardClient({ isCoachView = false }) {
     latestWeight, latestAvg, weeklyRate,
     kcalPct, protPct, foodTotals,
     setView, viewingCoach,
-    saveWorkoutToClient,
   } = useApp()
 
   const [tab, setTab] = useState(0)
-
-  // Local workout builder state (for client self-logging)
-  const [myExName,   setMyExName]   = useState('')
-  const [myExScheme, setMyExScheme] = useState('')
-  const [myExWeight, setMyExWeight] = useState('')
-  const [myWCat,     setMyWCat]     = useState('Предна верига')
-  const [myExList,   setMyExList]   = useState([])
-  const [savingWkt,  setSavingWkt]  = useState(false)
-
-  function addMyExercise() {
-    if (!myExName.trim()) return
-    setMyExList(prev => [...prev, { exercise: myExName.trim(), scheme: myExScheme, weight: myExWeight }])
-    setMyExName(''); setMyExScheme(''); setMyExWeight('')
-  }
-
-  async function saveMyWorkout() {
-    if (myExList.length === 0) return
-    setSavingWkt(true)
-    await saveWorkoutToClient(auth.id, {
-      date: todayDate(), category: myWCat,
-      items: myExList, coach: '—',
-    })
-    setMyExList([]); setMyWCat('Предна верига')
-    setSavingWkt(false)
-  }
 
   const myRank = isCoachView ? -1 : ranking.findIndex(r => r.name === client.name)
   const myData = ranking[myRank]
@@ -878,10 +852,10 @@ function DashboardClient({ isCoachView = false }) {
     ? (viewingCoach === auth.name ? t('myTrackerTitle') : `${client.name} — ${t('trackerLabel')}`)
     : `${t('greeting')}, ${client.name}`
 
-  // New 3-tab structure: [Тренировки, Задачи (clients only), Прогрес]
+  // 3-tab structure: [Workouts, Tasks (clients only), Progress]
   const tabLabels = isCoachView
-    ? ['Тренировки', 'Прогрес']
-    : ['Тренировки', 'Задачи', 'Прогрес']
+    ? ['Workouts', 'Progress']
+    : ['Workouts', 'Tasks', 'Progress']
   const progressTabIdx = isCoachView ? 1 : 2
 
   // Workouts this week (Mon–Sun)
@@ -973,62 +947,11 @@ function DashboardClient({ isCoachView = false }) {
             ))}
           </Box>
 
-          {/* Workout builder — client self-log */}
-          <Paper sx={{ p: 2.25, mb: 2.5, border: `1px solid rgba(196,233,191,0.2)`, borderRadius: '16px', animation: `fadeInUp 0.24s ${EASE.decelerate} 0.08s both` }}>
-            <Typography variant="h3" sx={{ mb: 1.5 }}>Запиши тренировка</Typography>
-            {/* Category chips */}
-            <Box sx={{ display: 'flex', gap: '6px', flexWrap: 'wrap', mb: 1.5 }}>
-              {Object.keys(WORKOUT_CATEGORIES).map(cat => (
-                <Chip key={cat} label={t(cat)} size="small" onClick={() => setMyWCat(cat)}
-                  sx={{
-                    background: myWCat === cat ? C.primary : 'transparent',
-                    color: myWCat === cat ? '#0f1c11' : C.muted,
-                    border: `1px solid ${myWCat === cat ? C.primary : C.border}`,
-                    fontWeight: myWCat === cat ? 800 : 500, fontSize: '11.5px', cursor: 'pointer',
-                    '&:hover': { background: myWCat === cat ? C.primary : C.accentSoft },
-                  }}
-                />
-              ))}
-            </Box>
-            {/* Exercise input row */}
-            <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 100px 80px 36px', gap: 0.75, mb: 1 }}>
-              <TextField size="small" placeholder="Упражнение" value={myExName} onChange={e => setMyExName(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && addMyExercise()}
-                inputProps={{ style: { fontSize: '13px' } }} />
-              <TextField size="small" placeholder="3×10" value={myExScheme} onChange={e => setMyExScheme(e.target.value)}
-                inputProps={{ style: { fontSize: '13px' } }} />
-              <TextField size="small" placeholder="кг" value={myExWeight} onChange={e => setMyExWeight(e.target.value)}
-                inputProps={{ style: { fontSize: '13px' } }} />
-              <Button variant="contained" size="small" onClick={addMyExercise} disabled={!myExName.trim()}
-                sx={{ minWidth: 0, p: '6px', background: C.primary, color: '#0f1c11', fontWeight: 800, fontSize: '18px' }}>
-                +
-              </Button>
-            </Box>
-            {/* Exercise list */}
-            {myExList.map((ex, i) => (
-              <Box key={i} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: '4px', fontSize: '13px' }}>
-                <Typography sx={{ fontSize: '13px', color: C.text }}>{ex.exercise}</Typography>
-                <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center' }}>
-                  <Typography sx={{ fontSize: '12px', color: C.muted }}>{ex.scheme}</Typography>
-                  <Typography sx={{ fontSize: '12px', color: C.muted }}>{ex.weight} кг</Typography>
-                  <Button size="small" onClick={() => setMyExList(p => p.filter((_, j) => j !== i))}
-                    sx={{ minWidth: 0, color: C.danger, p: '2px', fontSize: '12px' }}>✕</Button>
-                </Box>
-              </Box>
-            ))}
-            {myExList.length > 0 && (
-              <Button fullWidth variant="contained" size="small" onClick={saveMyWorkout} disabled={savingWkt}
-                sx={{ mt: 1.25, background: C.primary, color: '#0f1c11', fontWeight: 800, borderRadius: '10px' }}>
-                Запази ({myExList.length} упражнения)
-              </Button>
-            )}
-          </Paper>
-
           {/* Workouts this week */}
           <Paper sx={{ p: 2.25, mb: 2.5, border: `1px solid ${C.border}`, borderRadius: '16px', animation: `fadeInUp 0.26s ${EASE.decelerate} 0.1s both` }}>
-            <Typography variant="h3" sx={{ mb: 1.5 }}>Тренировки тази седмица</Typography>
+            <Typography variant="h3" sx={{ mb: 1.5 }}>Workouts This Week</Typography>
             {weekWorkouts.length === 0 ? (
-              <Typography sx={{ color: C.muted, fontSize: '13px' }}>Няма тренировки тази седмица</Typography>
+              <Typography sx={{ color: C.muted, fontSize: '13px' }}>No workouts this week</Typography>
             ) : weekWorkouts.map((w, i) => (
               <Box key={i} sx={{ display: 'flex', alignItems: 'center', gap: 1.5, py: '8px',
                 borderBottom: i < weekWorkouts.length - 1 ? `1px solid ${C.border}` : 'none' }}>
@@ -1158,7 +1081,7 @@ export function ClientSchedule() {
   return (
     <Box sx={{ maxWidth: 640, mx: 'auto' }}>
       <Typography variant="h5" sx={{ fontWeight: 800, mb: 2, color: C.text }}>
-        График
+        Schedule
       </Typography>
 
       {/* Credits summary */}
@@ -1167,7 +1090,7 @@ export function ClientSchedule() {
           background: 'linear-gradient(135deg, rgba(196,233,191,0.08) 0%, rgba(196,233,191,0.04) 100%)' }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <Typography sx={{ fontSize: '13px', fontWeight: 600, color: C.text }}>
-              Оставащи тренировки
+              Remaining Sessions
             </Typography>
             <Typography sx={{ fontSize: '20px', fontWeight: 800, color: C.primary, fontFamily: "'Space Grotesk', sans-serif" }}>
               {myPlan.plan_type === 'unlimited' ? '∞' : `${creditsRemaining(myPlan)} / ${myPlan.credits_total}`}
@@ -1183,7 +1106,7 @@ export function ClientSchedule() {
       ) : dates.length === 0 ? (
         <Paper sx={{ p: 4, borderRadius: '16px', border: `1px solid ${C.border}`, textAlign: 'center' }}>
           <Typography sx={{ color: C.muted, fontSize: '14px' }}>
-            Нямаш предстоящи тренировки
+            No upcoming sessions
           </Typography>
         </Paper>
       ) : (
@@ -1210,7 +1133,7 @@ export function ClientSchedule() {
                   onClick={() => handleCancel(slot.id)}
                   sx={{ fontSize: '11px', py: 0.5, px: 1.5, borderColor: C.border, color: C.muted,
                     '&:hover': { borderColor: '#F87171', color: '#F87171', background: 'rgba(248,113,113,0.08)' } }}>
-                  Откажи
+                  Cancel
                 </Button>
               </Box>
             ))}
