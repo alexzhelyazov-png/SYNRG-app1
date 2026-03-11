@@ -3,41 +3,58 @@ import {
   Drawer, Box, List, ListItemButton, ListItemIcon, ListItemText,
   Typography, IconButton, Divider, Tooltip, Button, Badge, Collapse,
 } from '@mui/material'
-import ChevronRightIcon    from '@mui/icons-material/ChevronRight'
-import ChevronLeftIcon     from '@mui/icons-material/ChevronLeft'
-import DeleteOutlineIcon   from '@mui/icons-material/DeleteOutline'
-import LogoutIcon          from '@mui/icons-material/Logout'
-import DashboardIcon       from '@mui/icons-material/Dashboard'
-import RestaurantIcon      from '@mui/icons-material/Restaurant'
-import MonitorWeightIcon   from '@mui/icons-material/MonitorWeight'
-import LeaderboardIcon     from '@mui/icons-material/Leaderboard'
-import AssignmentIcon      from '@mui/icons-material/Assignment'
-import PeopleIcon          from '@mui/icons-material/People'
+import ChevronRightIcon      from '@mui/icons-material/ChevronRight'
+import ChevronLeftIcon       from '@mui/icons-material/ChevronLeft'
+import DeleteOutlineIcon     from '@mui/icons-material/DeleteOutline'
+import LogoutIcon            from '@mui/icons-material/Logout'
+import DashboardIcon         from '@mui/icons-material/Dashboard'
+import RestaurantIcon        from '@mui/icons-material/Restaurant'
+import MonitorWeightIcon     from '@mui/icons-material/MonitorWeight'
+import LeaderboardIcon       from '@mui/icons-material/Leaderboard'
+import AssignmentIcon        from '@mui/icons-material/Assignment'
+import PeopleIcon            from '@mui/icons-material/People'
 import NotificationsNoneIcon from '@mui/icons-material/NotificationsNone'
-import PersonIcon          from '@mui/icons-material/Person'
-import LightModeIcon       from '@mui/icons-material/LightMode'
-import DarkModeIcon        from '@mui/icons-material/DarkMode'
-import { useApp } from '../context/AppContext'
-import { C, EASE } from '../theme'
-import SynrgLogo from './SynrgLogo'
+import PersonIcon            from '@mui/icons-material/Person'
+import LightModeIcon         from '@mui/icons-material/LightMode'
+import DarkModeIcon          from '@mui/icons-material/DarkMode'
+import CalendarMonthIcon     from '@mui/icons-material/CalendarMonth'
+import EventIcon             from '@mui/icons-material/Event'
+import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings'
+import { useApp }            from '../context/AppContext'
+import { C, EASE }           from '../theme'
+import { isAdmin }           from '../lib/bookingUtils'
+import SynrgLogo             from './SynrgLogo'
 
 const DRAWER_WIDTH = 272
 const RAIL_WIDTH   = 72
 
-const NAV_ICON_MAP = {
-  dashboard: DashboardIcon,
-  food:      RestaurantIcon,
-  weight:    MonitorWeightIcon,
-  ranking:   LeaderboardIcon,
-  tasks:     AssignmentIcon,
+// ── Nav items — adjust per role ──────────────────────────────
+function getNavItems(auth, admin) {
+  const base = [
+    { view: 'dashboard', labelKey: 'navDashboard', Icon: DashboardIcon },
+    { view: 'food',      labelKey: 'navFood',      Icon: RestaurantIcon },
+    { view: 'weight',    labelKey: 'navWeight',    Icon: MonitorWeightIcon },
+    { view: 'ranking',   labelKey: 'navRanking',   Icon: LeaderboardIcon },
+    { view: 'tasks',     labelKey: 'navTasks',     Icon: AssignmentIcon },
+  ]
+  if (auth.role === 'client') {
+    return [
+      ...base.filter(i => i.view !== 'tasks'),
+      { view: 'booking', labelKey: 'navBooking', Icon: EventIcon },
+      { view: 'tasks',   labelKey: 'navTasks',   Icon: AssignmentIcon },
+    ]
+  }
+  // Coaches — dashboard, schedule, tasks [, admin]
+  const coachItems = [
+    { view: 'dashboard', labelKey: 'navDashboard', Icon: DashboardIcon },
+    { view: 'schedule',  labelKey: 'navSchedule',  Icon: CalendarMonthIcon },
+    { view: 'tasks',     labelKey: 'navTasks',      Icon: AssignmentIcon },
+  ]
+  if (admin) {
+    coachItems.push({ view: 'admin', labelKey: 'navAdmin', Icon: AdminPanelSettingsIcon })
+  }
+  return coachItems
 }
-
-const NAV_VIEWS = [
-  { view: 'dashboard', labelKey: 'navDashboard' },
-  { view: 'food',      labelKey: 'navFood'      },
-  { view: 'weight',    labelKey: 'navWeight'    },
-  { view: 'ranking',   labelKey: 'navRanking'   },
-]
 
 export default function Sidebar() {
   const {
@@ -47,22 +64,26 @@ export default function Sidebar() {
     setConfirmDelete,
     coaches, coachProfiles,
     viewingCoach, setViewingCoach,
+    coachClientMode, setCoachClientMode,
     notifications, unreadNotifCount,
     lang, setLang, t,
     isDark, setIsDark,
   } = useApp()
 
-  const [recentIds,     setRecentIds]     = useState([])
-  const [showNotifs,    setShowNotifs]    = useState(false)
-  const [showCoaches,   setShowCoaches]   = useState(false)
+  const admin = isAdmin(auth)
 
-  const open = sidebarOpen
+  const [recentIds,  setRecentIds]  = useState([])
+  const [showNotifs, setShowNotifs] = useState(false)
+
+  const open    = sidebarOpen
+  const navItems = getNavItems(auth, admin)
 
   function selectClient(ri, clientId) {
     setRecentIds(prev => [clientId, ...prev.filter(id => id !== clientId)])
     setSelIdx(ri)
     setCurrentWorkout([])
-    setViewingCoach(null) // exit coach tracker mode
+    setViewingCoach(null)
+    setCoachClientMode(true)
   }
 
   function selectCoachTracker(coachName) {
@@ -124,7 +145,7 @@ export default function Sidebar() {
             color: auth.role === 'coach' ? C.primary : C.purple,
             display: 'block', lineHeight: 1, mb: 0.5,
           }}>
-            {auth.role === 'coach' ? t('coachRole') : t('clientRole')}
+            {admin ? 'Admin' : auth.role === 'coach' ? t('coachRole') : t('clientRole')}
           </Typography>
           <Typography sx={{ fontWeight: 700, fontSize: '14px', color: C.text }}>
             {auth.name}
@@ -134,17 +155,16 @@ export default function Sidebar() {
 
       {/* ── Nav items ───────────────────────────────────── */}
       <List sx={{ px: 0, py: 0.5, flexShrink: 0 }}>
-        {NAV_VIEWS.map(({ view: v, labelKey }) => {
-          const Icon = NAV_ICON_MAP[v]
+        {navItems.map(({ view: v, labelKey, Icon }) => {
           const isActive = view === v && !viewingCoach
           return (
             <Tooltip key={v} title={!open ? t(labelKey) : ''} placement="right" arrow>
               <ListItemButton
                 selected={isActive}
-                onClick={() => { setView(v); setViewingCoach(null) }}
+                onClick={() => { setView(v); setViewingCoach(null); setCoachClientMode(false) }}
                 sx={{
                   justifyContent: open ? 'flex-start' : 'center',
-                  px: open ? 2 : 0, mx: open ? 1.5 : 1, my: '2px', minHeight: 48,
+                  px: open ? 2 : 0, mx: open ? 1.5 : 1, my: '2px', minHeight: 44,
                 }}
               >
                 <ListItemIcon sx={{ minWidth: open ? 38 : 'unset', justifyContent: 'center', color: isActive ? C.primary : C.muted }}>
@@ -153,8 +173,9 @@ export default function Sidebar() {
                 {open && (
                   <ListItemText primary={t(labelKey)} sx={{
                     '& .MuiListItemText-primary': {
-                      color: isActive ? C.primary : C.text,
+                      color:      isActive ? C.primary : C.text,
                       fontWeight: isActive ? 700 : 500,
+                      fontSize:   '14px',
                     }
                   }} />
                 )}
@@ -163,33 +184,49 @@ export default function Sidebar() {
           )
         })}
 
-        {/* Tasks */}
-        <Tooltip title={!open ? t('navTasks') : ''} placement="right" arrow>
-          <ListItemButton
-            selected={view === 'tasks'}
-            onClick={() => { setView('tasks'); setViewingCoach(null) }}
-            sx={{ justifyContent: open ? 'flex-start' : 'center', px: open ? 2 : 0, mx: open ? 1.5 : 1, my: '2px', minHeight: 48 }}
-          >
-            <ListItemIcon sx={{ minWidth: open ? 38 : 'unset', justifyContent: 'center', color: view === 'tasks' ? C.primary : C.muted }}>
-              <AssignmentIcon sx={{ fontSize: '20px' }} />
-            </ListItemIcon>
-            {open && <ListItemText primary={t('navTasks')} sx={{ '& .MuiListItemText-primary': { color: view === 'tasks' ? C.primary : C.text, fontWeight: view === 'tasks' ? 700 : 500 } }} />}
-          </ListItemButton>
-        </Tooltip>
+        {/* Моят тракер (coach only) */}
+        {auth.role === 'coach' && (() => {
+          const isTrackerActive = view === 'dashboard' && viewingCoach === auth.name
+          return (
+            <Tooltip title={!open ? t('myTrackerTitle') : ''} placement="right" arrow>
+              <ListItemButton
+                selected={isTrackerActive}
+                onClick={() => selectCoachTracker(auth.name)}
+                sx={{
+                  justifyContent: open ? 'flex-start' : 'center',
+                  px: open ? 2 : 0, mx: open ? 1.5 : 1, my: '2px', minHeight: 44,
+                }}
+              >
+                <ListItemIcon sx={{ minWidth: open ? 38 : 'unset', justifyContent: 'center', color: isTrackerActive ? C.primary : C.muted }}>
+                  <PersonIcon sx={{ fontSize: '20px' }} />
+                </ListItemIcon>
+                {open && (
+                  <ListItemText primary={t('myTrackerTitle')} sx={{
+                    '& .MuiListItemText-primary': {
+                      color:      isTrackerActive ? C.primary : C.text,
+                      fontWeight: isTrackerActive ? 700 : 500,
+                      fontSize:   '14px',
+                    }
+                  }} />
+                )}
+              </ListItemButton>
+            </Tooltip>
+          )
+        })()}
 
         {/* Notifications (coach only) */}
         {auth.role === 'coach' && (
           <Tooltip title={!open ? t('navNotifications') : ''} placement="right" arrow>
             <ListItemButton
               onClick={() => setShowNotifs(p => !p)}
-              sx={{ justifyContent: open ? 'flex-start' : 'center', px: open ? 2 : 0, mx: open ? 1.5 : 1, my: '2px', minHeight: 48 }}
+              sx={{ justifyContent: open ? 'flex-start' : 'center', px: open ? 2 : 0, mx: open ? 1.5 : 1, my: '2px', minHeight: 44 }}
             >
               <ListItemIcon sx={{ minWidth: open ? 38 : 'unset', justifyContent: 'center', color: unreadNotifCount > 0 ? C.primary : C.muted }}>
                 <Badge badgeContent={unreadNotifCount} color="error" max={9}>
                   <NotificationsNoneIcon sx={{ fontSize: '20px' }} />
                 </Badge>
               </ListItemIcon>
-              {open && <ListItemText primary={t('navNotifications')} sx={{ '& .MuiListItemText-primary': { color: unreadNotifCount > 0 ? C.primary : C.text, fontWeight: unreadNotifCount > 0 ? 700 : 500 } }} />}
+              {open && <ListItemText primary={t('navNotifications')} sx={{ '& .MuiListItemText-primary': { color: unreadNotifCount > 0 ? C.primary : C.text, fontWeight: unreadNotifCount > 0 ? 700 : 500, fontSize: '14px' } }} />}
             </ListItemButton>
           </Tooltip>
         )}
@@ -245,7 +282,7 @@ export default function Sidebar() {
         <Tooltip title={!open ? t('navLogout') : ''} placement="right" arrow>
           <ListItemButton onClick={logout} sx={{
             justifyContent: open ? 'flex-start' : 'center',
-            px: open ? 2 : 0, mx: open ? 1.5 : 1, my: '2px', minHeight: 48,
+            px: open ? 2 : 0, mx: open ? 1.5 : 1, my: '2px', minHeight: 44,
             color: C.danger,
             '&:hover': { backgroundColor: 'rgba(255,107,157,0.08)' },
           }}>
@@ -283,74 +320,7 @@ export default function Sidebar() {
         </Box>
       )}
 
-      {/* ── Coaches section (coach only) ─────────────────── */}
-      {open && auth.role === 'coach' && (
-        <>
-          <Divider sx={{ mx: 2, borderColor: C.border, mt: 0.5, mb: 1, flexShrink: 0 }} />
-          <Box sx={{ flexShrink: 0 }}>
-            <Button
-              fullWidth
-              onClick={() => setShowCoaches(p => !p)}
-              sx={{
-                justifyContent: 'space-between', px: 2.5, py: 0.75,
-                color: C.muted, fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.8px',
-                '&:hover': { color: C.primary },
-              }}
-            >
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <PeopleIcon sx={{ fontSize: '14px' }} />
-                {t('coachesHeader')}
-              </Box>
-              <Typography sx={{ fontSize: '10px', color: C.muted }}>{showCoaches ? '▲' : '▼'}</Typography>
-            </Button>
-          </Box>
-          <Collapse in={showCoaches}>
-            <Box sx={{ px: 1.5, pb: 1 }}>
-              {/* My Tracker */}
-              <ListItemButton
-                selected={viewingCoach === auth.name}
-                onClick={() => selectCoachTracker(auth.name)}
-                sx={{ borderRadius: '12px', mb: '2px', py: 0.75 }}
-              >
-                <ListItemIcon sx={{ minWidth: 32 }}>
-                  <PersonIcon sx={{ fontSize: '16px', color: viewingCoach === auth.name ? C.primary : C.muted }} />
-                </ListItemIcon>
-                <ListItemText
-                  primary={t('myTrackerTitle')}
-                  sx={{ '& .MuiListItemText-primary': { fontSize: '13px', fontWeight: 700, color: viewingCoach === auth.name ? C.primary : C.text } }}
-                />
-              </ListItemButton>
-              {/* Other coaches */}
-              {coaches.filter(c => c.name !== auth.name).map(c => (
-                <ListItemButton
-                  key={c.name}
-                  selected={viewingCoach === c.name}
-                  onClick={() => selectCoachTracker(c.name)}
-                  sx={{ borderRadius: '12px', mb: '2px', py: 0.75 }}
-                >
-                  <ListItemIcon sx={{ minWidth: 32 }}>
-                    <Box sx={{
-                      width: 20, height: 20, borderRadius: '6px',
-                      background: viewingCoach === c.name ? C.primaryContainer : 'rgba(255,255,255,0.08)',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      fontSize: '10px', fontWeight: 800,
-                      color: viewingCoach === c.name ? C.primary : C.muted,
-                    }}>
-                      {c.name.charAt(0)}
-                    </Box>
-                  </ListItemIcon>
-                  <ListItemText
-                    primary={c.name}
-                    sx={{ '& .MuiListItemText-primary': { fontSize: '13px', fontWeight: 600, color: viewingCoach === c.name ? C.primary : C.text } }}
-                  />
-                </ListItemButton>
-              ))}
-            </Box>
-          </Collapse>
-        </>
-      )}
-
-      {/* ── Clients section (coach only) ─────────────────── */}
+      {/* ── CLIENTS section (coach only) — NOW ABOVE COACHES ── */}
       {open && auth.role === 'coach' && (
         <>
           <Divider sx={{ mx: 2, borderColor: C.border, mt: 0.5, mb: 1, flexShrink: 0 }} />
@@ -406,6 +376,7 @@ export default function Sidebar() {
           </Box>
         </>
       )}
+
     </Drawer>
   )
 }

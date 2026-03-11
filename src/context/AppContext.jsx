@@ -15,7 +15,10 @@ export function AppProvider({ children }) {
   // ── Core data ─────────────────────────────────────────────────
   const [clients,      setClients]      = useState([])
   const [coaches,      setCoaches]      = useState([])
-  const [auth,         setAuth]         = useState({ isLoggedIn: false, role: null, name: '', id: null })
+  const [auth,         setAuth]         = useState(() => {
+    try { const s = localStorage.getItem('synrg_auth'); return s ? JSON.parse(s) : { isLoggedIn: false, role: null, name: '', id: null } }
+    catch { return { isLoggedIn: false, role: null, name: '', id: null } }
+  })
   const [loading,      setLoading]      = useState(true)
   const [loadError,    setLoadError]    = useState('')
   const [notifications, setNotifications] = useState([])
@@ -39,10 +42,11 @@ export function AppProvider({ children }) {
 
   // ── UI state ──────────────────────────────────────────────────
   const [view,           setView]           = useState('dashboard')
-  const [selIdx,         setSelIdx]         = useState(0)
+  const [selIdx,         setSelIdx]         = useState(() => Number(localStorage.getItem('synrg_selidx') || 0))
   const [sidebarOpen,    setSidebarOpen]    = useState(false)
   const [showClientMenu, setShowClientMenu] = useState(false)
   const [confirmDelete,  setConfirmDelete]  = useState(null)
+  const [coachClientMode, setCoachClientMode] = useState(false) // true after coach explicitly clicks a client
 
   // ── Snackbar ─────────────────────────────────────────────────
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' })
@@ -153,7 +157,9 @@ export function AppProvider({ children }) {
     // Try coaches first
     const coach = coaches.find(c => c.name.toLowerCase() === name.toLowerCase() && c.password === pass)
     if (coach) {
-      setAuth({ isLoggedIn: true, role: 'coach', name: coach.name, id: coach.id })
+      const a = { isLoggedIn: true, role: 'coach', name: coach.name, id: coach.id }
+      setAuth(a)
+      localStorage.setItem('synrg_auth', JSON.stringify(a))
       setSelCoach(coach.name)
       setViewingCoach(null)
       return null
@@ -163,7 +169,10 @@ export function AppProvider({ children }) {
     if (c) {
       const i = clients.findIndex(x => x.name === c.name)
       setSelIdx(i)
-      setAuth({ isLoggedIn: true, role: 'client', name: c.name, id: c.id })
+      localStorage.setItem('synrg_selidx', String(i))
+      const a = { isLoggedIn: true, role: 'client', name: c.name, id: c.id }
+      setAuth(a)
+      localStorage.setItem('synrg_auth', JSON.stringify(a))
       return null
     }
     return t('errLogin')
@@ -192,12 +201,29 @@ export function AppProvider({ children }) {
   }
 
   function logout() {
+    localStorage.removeItem('synrg_auth')
+    localStorage.removeItem('synrg_selidx')
     setAuth({ isLoggedIn: false, role: null, name: '', id: null })
     setView('dashboard')
     setCurrentWorkout([])
     setViewingCoach(null)
     setNotifications([])
   }
+
+  // ── Validate stored auth after data loads ─────────────────────
+  useEffect(() => {
+    if (loading) return
+    if (!auth.isLoggedIn) return
+    if (auth.role === 'coach') {
+      const valid = coaches.find(c => c.id === auth.id)
+      if (!valid) { logout(); return }
+      setSelCoach(auth.name)
+    } else if (auth.role === 'client') {
+      const valid = clients.find(c => c.id === auth.id && !c.is_coach)
+      if (!valid) { logout(); return }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading])
 
   // ── Computed: real clients (no coach profiles) ────────────────
   const realClients = useMemo(() => clients.filter(c => !c.is_coach), [clients])
@@ -415,21 +441,41 @@ export function AppProvider({ children }) {
     await sendCoachNotification('task', client.name, taskData.title)
   }
 
+  async function addTaskForClient(clientId, taskData) {
+    const targetClient = clients.find(c => c.id === clientId)
+    if (!targetClient) return
+    const data = await DB.insert('tasks', {
+      client_id:   clientId,
+      title:       taskData.title,
+      description: taskData.description || '',
+      assigned_by: auth.name,
+      status:      'pending',
+    })
+    setClients(prev => prev.map(c => c.id === clientId
+      ? { ...c, tasks: [{ ...data, comments: [] }, ...(c.tasks || [])] }
+      : c
+    ))
+    showSnackbar(t('taskSavedMsg'))
+    await sendCoachNotification('task', targetClient.name, taskData.title)
+  }
+
   async function toggleTaskDone(taskId, done) {
     const newStatus = done ? 'done' : 'pending'
     await DB.update('tasks', taskId, { status: newStatus })
-    setClients(prev => prev.map(c => c.id === client.id
-      ? { ...c, tasks: (c.tasks || []).map(tk => tk.id === taskId ? { ...tk, status: newStatus } : tk) }
-      : c
-    ))
+    // Update across all clients (supports AllClientsTasks view)
+    setClients(prev => prev.map(c => ({
+      ...c,
+      tasks: (c.tasks || []).map(tk => tk.id === taskId ? { ...tk, status: newStatus } : tk),
+    })))
   }
 
   async function deleteTask(taskId) {
     await DB.deleteById('tasks', taskId)
-    setClients(prev => prev.map(c => c.id === client.id
-      ? { ...c, tasks: (c.tasks || []).filter(tk => tk.id !== taskId) }
-      : c
-    ))
+    // Remove across all clients (supports AllClientsTasks view)
+    setClients(prev => prev.map(c => ({
+      ...c,
+      tasks: (c.tasks || []).filter(tk => tk.id !== taskId),
+    })))
   }
 
   async function addTaskComment(taskId, text) {
@@ -439,16 +485,14 @@ export function AppProvider({ children }) {
       text,
       is_coach: auth.role === 'coach',
     })
-    setClients(prev => prev.map(c => c.id === client.id
-      ? {
-          ...c,
-          tasks: (c.tasks || []).map(tk => tk.id === taskId
-            ? { ...tk, comments: [...(tk.comments || []), data] }
-            : tk
-          ),
-        }
-      : c
-    ))
+    // Update across all clients (supports AllClientsTasks view)
+    setClients(prev => prev.map(c => ({
+      ...c,
+      tasks: (c.tasks || []).map(tk => tk.id === taskId
+        ? { ...tk, comments: [...(tk.comments || []), data] }
+        : tk
+      ),
+    })))
     showSnackbar(t('commentSavedMsg'))
   }
 
@@ -563,6 +607,7 @@ export function AppProvider({ children }) {
     confirmDelete, setConfirmDelete,
     // Coach tracker viewing
     viewingCoach, setViewingCoach,
+    coachClientMode, setCoachClientMode,
     isReadOnly,
     isTrackerReadOnly,
     // Snackbar
@@ -602,7 +647,7 @@ export function AppProvider({ children }) {
     deleteClient,
     addFoodFromModal, addQuickFood,
     saveWeight, addExercise, saveWorkout,
-    addTask, toggleTaskDone, deleteTask, addTaskComment,
+    addTask, addTaskForClient, toggleTaskDone, deleteTask, addTaskComment,
     sendReaction, dismissReaction,
     updateReminderSettings,
   }

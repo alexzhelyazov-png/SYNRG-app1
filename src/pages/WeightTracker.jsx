@@ -8,6 +8,7 @@ import { fmt1, last30Days } from '../lib/utils'
 export default function WeightTracker() {
   const {
     auth, client, t,
+    viewingCoach,
     weightInput, setWeightInput,
     weightDate,  setWeightDate,
     saveWeight,
@@ -23,6 +24,28 @@ export default function WeightTracker() {
 
   return (
     <>
+      {/* ── Viewing banner (coaches only) ───────────── */}
+      {auth.role === 'coach' && (
+        <Box sx={{
+          display: 'flex', alignItems: 'center', gap: 1,
+          mb: 2, px: 2, py: 1, borderRadius: '10px',
+          background: viewingCoach === auth.name
+            ? 'linear-gradient(135deg, rgba(196,233,191,0.12) 0%, rgba(196,233,191,0.06) 100%)'
+            : 'rgba(200,197,255,0.08)',
+          border: `1px solid ${viewingCoach === auth.name ? 'rgba(196,233,191,0.25)' : 'rgba(200,197,255,0.2)'}`,
+          animation: 'fadeIn 0.2s ease',
+        }}>
+          <Box sx={{
+            width: 8, height: 8, borderRadius: '50%',
+            background: viewingCoach === auth.name ? C.primary : C.purple,
+            flexShrink: 0,
+          }} />
+          <Typography sx={{ fontSize: '12px', fontWeight: 700, color: viewingCoach === auth.name ? C.primary : C.purple }}>
+            {viewingCoach === auth.name ? t('viewingOwnTracker') : `${t('viewingClient')}: ${client.name}`}
+          </Typography>
+        </Box>
+      )}
+
       {/* ── Header ─────────────────────────────────── */}
       <Box sx={{ mb: 3.5 }}>
         <Typography variant="h2">{t('weightTrackerTitle')}</Typography>

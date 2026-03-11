@@ -1,0 +1,935 @@
+import { useEffect, useState, useMemo } from 'react'
+import {
+  Box, Typography, Paper, Button, Chip, Divider, IconButton, Tooltip,
+  Dialog, DialogTitle, DialogContent, DialogActions, TextField,
+  MenuItem, Select, FormControl, InputLabel, CircularProgress,
+  Tab, Tabs, Alert, Collapse, useMediaQuery,
+} from '@mui/material'
+import { useTheme }          from '@mui/material/styles'
+import CalendarMonthIcon     from '@mui/icons-material/CalendarMonth'
+import AccessTimeIcon        from '@mui/icons-material/AccessTime'
+import AddIcon               from '@mui/icons-material/Add'
+import EditIcon              from '@mui/icons-material/Edit'
+import DeleteOutlineIcon     from '@mui/icons-material/DeleteOutline'
+import PersonAddIcon         from '@mui/icons-material/PersonAdd'
+import PersonRemoveIcon      from '@mui/icons-material/PersonRemove'
+import CreditCardIcon        from '@mui/icons-material/CreditCard'
+import PeopleIcon            from '@mui/icons-material/People'
+import WarningAmberIcon      from '@mui/icons-material/WarningAmber'
+import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline'
+import FitnessCenterIcon     from '@mui/icons-material/FitnessCenter'
+import ExpandMoreIcon        from '@mui/icons-material/ExpandMore'
+import ExpandLessIcon        from '@mui/icons-material/ExpandLess'
+import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings'
+import { useApp }            from '../context/AppContext'
+import { useBooking }        from '../context/BookingContext'
+import { C }                 from '../theme'
+import {
+  isoToday, isoDatePlusDays, groupByDate, dayLabel, fmtTime,
+  occupancyStr, planLabel, fmtValidTo, isPlanActive, creditsRemaining,
+  daysUntilExpiry, effectiveValidTo,
+} from '../lib/bookingUtils'
+
+const PLAN_TYPES = ['8', '12', 'unlimited']
+const WEEKDAY_KEYS = [1, 2, 3, 4, 5, 6, 0] // Mon–Sun display order
+
+// ── Stat Card (dashboard) ────────────────────────────────────
+function StatCard({ icon: Icon, label, value, color, onClick }) {
+  return (
+    <Paper onClick={onClick} sx={{
+      p: 2, borderRadius: '16px', flex: 1, minWidth: 120,
+      border: `1px solid ${color}22`,
+      background: `${color}08`,
+      cursor: onClick ? 'pointer' : 'default',
+      transition: 'transform 0.15s',
+      '&:hover': onClick ? { transform: 'translateY(-2px)' } : {},
+    }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+        <Icon sx={{ fontSize: 18, color }} />
+        <Typography sx={{ fontSize: '11px', color: C.muted, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+          {label}
+        </Typography>
+      </Box>
+      <Typography sx={{ fontWeight: 800, fontSize: '26px', color }}>
+        {value}
+      </Typography>
+    </Paper>
+  )
+}
+
+// ── Create/edit slot dialog ──────────────────────────────────
+function SlotDialog({ open, onClose, onSave, coaches, t }) {
+  const today = isoToday()
+  const [mode,       setMode]       = useState('single') // 'single' | 'recurring'
+  const [slotDate,   setSlotDate]   = useState(today)
+  const [startTime,  setStartTime]  = useState('09:00')
+  const [endTime,    setEndTime]    = useState('10:00')
+  const [coachName,  setCoachName]  = useState(coaches[0]?.name || '')
+  const [capacity,   setCapacity]   = useState(3)
+  const [notes,      setNotes]      = useState('')
+  const [startDate,  setStartDate]  = useState(today)
+  const [endDate,    setEndDate]    = useState(isoDatePlusDays(13))
+  const [weekdays,   setWeekdays]   = useState([1, 2, 3, 4, 5]) // Mon–Fri
+  const [saving,     setSaving]     = useState(false)
+  const [result,     setResult]     = useState(null) // { created: N }
+
+  const WEEKDAY_LABELS_BG = { 0:'Нед',1:'Пон',2:'Вт',3:'Ср',4:'Чет',5:'Пет',6:'Съб' }
+
+  function toggleWeekday(d) {
+    setWeekdays(prev => prev.includes(d) ? prev.filter(x => x !== d) : [...prev, d])
+  }
+
+  async function handleSave() {
+    setSaving(true); setResult(null)
+    const coach = coaches.find(c => c.name === coachName)
+    if (mode === 'single') {
+      const res = await onSave({ mode: 'single', slot_date: slotDate, start_time: startTime, end_time: endTime,
+        coach_id: coach?.id || null, coach_name: coachName, capacity: Number(capacity), notes })
+      setSaving(false)
+      if (!res?.error) { onClose(); resetForm() }
+    } else {
+      const res = await onSave({ mode: 'recurring', startDate, endDate, weekdays,
+        startTime, endTime, coachId: coach?.id || null, coachName, capacity: Number(capacity), notes })
+      setSaving(false)
+      if (res?.created !== undefined) setResult(res)
+    }
+  }
+
+  function resetForm() {
+    setSlotDate(today); setStartTime('09:00'); setEndTime('10:00')
+    setCapacity(3); setNotes(''); setResult(null)
+  }
+
+  const inputSx = {
+    '& .MuiInputBase-input':           { color: C.text },
+    '& .MuiOutlinedInput-notchedOutline': { borderColor: C.border },
+    '& .MuiInputLabel-root':            { color: C.muted },
+    '& .MuiInputBase-input::-webkit-calendar-picker-indicator': { filter: 'invert(0.7)' },
+  }
+
+  return (
+    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth
+      PaperProps={{ sx: { borderRadius: '20px', background: C.card, border: `1px solid ${C.border}` } }}>
+      <DialogTitle sx={{ fontWeight: 700, color: C.text }}>{t('createSlotTitle')}</DialogTitle>
+      <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: '4px !important' }}>
+
+        {/* Mode tabs */}
+        <Box sx={{ display: 'flex', gap: 1, mb: 0.5 }}>
+          {['single', 'recurring'].map(m => (
+            <Box key={m} onClick={() => setMode(m)} sx={{
+              px: 2, py: 0.75, borderRadius: '10px', cursor: 'pointer', fontSize: '13px', fontWeight: 600,
+              background: mode === m ? C.primaryContainer : 'rgba(255,255,255,0.05)',
+              color:      mode === m ? C.primary : C.muted,
+              border:     `1px solid ${mode === m ? C.primaryA20 : C.border}`,
+            }}>
+              {m === 'single' ? t('createOne') : t('createMulti')}
+            </Box>
+          ))}
+        </Box>
+
+        {/* Coach */}
+        <FormControl fullWidth size="small">
+          <InputLabel sx={{ color: C.muted }}>{t('slotCoachLbl')}</InputLabel>
+          <Select value={coachName} onChange={e => setCoachName(e.target.value)} label={t('slotCoachLbl')}
+            sx={{ color: C.text, '.MuiOutlinedInput-notchedOutline': { borderColor: C.border } }}>
+            {coaches.map(c => <MenuItem key={c.name} value={c.name}>{c.name}</MenuItem>)}
+          </Select>
+        </FormControl>
+
+        {/* Time */}
+        <Box sx={{ display: 'flex', gap: 1.5 }}>
+          <TextField label={t('slotStartLbl')} type="time" size="small" fullWidth
+            value={startTime} onChange={e => setStartTime(e.target.value)} sx={inputSx}
+            InputLabelProps={{ shrink: true }} />
+          <TextField label={t('slotEndLbl')} type="time" size="small" fullWidth
+            value={endTime} onChange={e => setEndTime(e.target.value)} sx={inputSx}
+            InputLabelProps={{ shrink: true }} />
+        </Box>
+
+        {/* Capacity */}
+        <TextField label={t('slotCapacityLbl')} type="number" size="small"
+          value={capacity} onChange={e => setCapacity(e.target.value)}
+          inputProps={{ min: 1, max: 30 }} sx={inputSx} />
+
+        {/* Single: date */}
+        {mode === 'single' && (
+          <TextField label={t('slotDateLbl')} type="date" size="small"
+            value={slotDate} onChange={e => setSlotDate(e.target.value)}
+            sx={inputSx} InputLabelProps={{ shrink: true }} />
+        )}
+
+        {/* Recurring: date range + weekdays */}
+        {mode === 'recurring' && (
+          <>
+            <Box sx={{ display: 'flex', gap: 1.5 }}>
+              <TextField label={t('dateFrom')} type="date" size="small" fullWidth
+                value={startDate} onChange={e => setStartDate(e.target.value)}
+                sx={inputSx} InputLabelProps={{ shrink: true }} />
+              <TextField label={t('dateTo')} type="date" size="small" fullWidth
+                value={endDate} onChange={e => setEndDate(e.target.value)}
+                sx={inputSx} InputLabelProps={{ shrink: true }} />
+            </Box>
+            <Box>
+              <Typography sx={{ fontSize: '12px', color: C.muted, mb: 0.75 }}>
+                {t('selectWeekdays')}
+              </Typography>
+              <Box sx={{ display: 'flex', gap: 0.75, flexWrap: 'wrap' }}>
+                {WEEKDAY_KEYS.map(d => (
+                  <Box key={d} onClick={() => toggleWeekday(d)} sx={{
+                    px: 1.5, py: 0.5, borderRadius: '8px', cursor: 'pointer',
+                    fontSize: '12px', fontWeight: 700,
+                    background: weekdays.includes(d) ? C.primaryContainer : 'rgba(255,255,255,0.06)',
+                    color:      weekdays.includes(d) ? C.primary : C.muted,
+                    border:     `1px solid ${weekdays.includes(d) ? C.primaryA20 : C.border}`,
+                  }}>
+                    {WEEKDAY_LABELS_BG[d]}
+                  </Box>
+                ))}
+              </Box>
+            </Box>
+          </>
+        )}
+
+        {/* Notes */}
+        <TextField label={t('slotNotesLbl')} size="small" multiline rows={2}
+          value={notes} onChange={e => setNotes(e.target.value)} sx={inputSx} />
+
+        {/* Result */}
+        {result && (
+          <Alert severity="success" sx={{ borderRadius: '10px' }}>
+            {t('slotsCreatedMsg')}: {result.created}
+          </Alert>
+        )}
+      </DialogContent>
+      <DialogActions sx={{ px: 3, pb: 2 }}>
+        <Button onClick={() => { onClose(); resetForm() }} sx={{ color: C.muted }}>
+          {t('cancelBtn')}
+        </Button>
+        <Button variant="contained" onClick={handleSave} disabled={saving}
+          sx={{ background: C.primary, color: '#0f1c11', fontWeight: 700 }}>
+          {saving ? <CircularProgress size={16} /> : (mode === 'single' ? t('createSlotBtn') : t('createRecurring'))}
+        </Button>
+      </DialogActions>
+    </Dialog>
+  )
+}
+
+// ── Activate/manage plan dialog ──────────────────────────────
+function PlanDialog({ open, onClose, onActivate, onExtend, onAdjust, client, plan, t }) {
+  const [mode,        setMode]       = useState('activate') // 'activate' | 'extend' | 'adjust'
+  const [planType,    setPlanType]   = useState('8')
+  const [validFrom,   setValidFrom]  = useState(isoToday())
+  const [extendTo,    setExtendTo]   = useState('')
+  const [credUsed,    setCredUsed]   = useState(plan?.credits_used ?? 0)
+  const [saving,      setSaving]     = useState(false)
+
+  useEffect(() => {
+    if (plan) {
+      const eff = effectiveValidTo(plan)
+      setExtendTo(eff || isoDatePlusDays(7))
+      setCredUsed(plan.credits_used || 0)
+    }
+  }, [plan])
+
+  async function handleSave() {
+    setSaving(true)
+    let res
+    if (mode === 'activate') {
+      res = await onActivate(client.id, planType, validFrom)
+    } else if (mode === 'extend') {
+      res = await onExtend(plan.id, extendTo)
+    } else if (mode === 'adjust') {
+      res = await onAdjust(plan.id, Number(credUsed))
+    }
+    setSaving(false)
+    if (!res?.error) onClose()
+  }
+
+  const inputSx = {
+    '& .MuiInputBase-input':           { color: C.text },
+    '& .MuiOutlinedInput-notchedOutline': { borderColor: C.border },
+    '& .MuiInputLabel-root':            { color: C.muted },
+    '& .MuiInputBase-input::-webkit-calendar-picker-indicator': { filter: 'invert(0.7)' },
+  }
+
+  return (
+    <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth
+      PaperProps={{ sx: { borderRadius: '20px', background: C.card, border: `1px solid ${C.border}` } }}>
+      <DialogTitle sx={{ fontWeight: 700, color: C.text }}>
+        {t('planFor')}: {client?.name}
+      </DialogTitle>
+      <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: '4px !important' }}>
+        {/* Mode buttons */}
+        <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+          {[
+            { key: 'activate', label: t('activatePlanBtn') },
+            ...(plan ? [{ key: 'extend', label: t('extendPlanBtn') }] : []),
+            ...(plan && plan.plan_type !== 'unlimited' ? [{ key: 'adjust', label: t('adjustCreditsBtn') }] : []),
+          ].map(({ key, label }) => (
+            <Box key={key} onClick={() => setMode(key)} sx={{
+              px: 2, py: 0.75, borderRadius: '10px', cursor: 'pointer', fontSize: '12px', fontWeight: 600,
+              background: mode === key ? C.primaryContainer : 'rgba(255,255,255,0.05)',
+              color:      mode === key ? C.primary : C.muted,
+              border:     `1px solid ${mode === key ? C.primaryA20 : C.border}`,
+            }}>
+              {label}
+            </Box>
+          ))}
+        </Box>
+
+        {/* Current plan info */}
+        {plan && (
+          <Box sx={{
+            p: 1.5, borderRadius: '10px', background: 'rgba(255,255,255,0.04)',
+            border: `1px solid ${C.border}`,
+          }}>
+            <Typography sx={{ fontSize: '12px', color: C.muted }}>
+              {t('hasActivePlan')}: {planLabel(plan.plan_type)}
+              {plan.plan_type !== 'unlimited' && ` · ${creditsRemaining(plan)}/${plan.credits_total}`}
+              {' · '}{t('validUntil')}: {fmtValidTo(plan)}
+            </Typography>
+          </Box>
+        )}
+
+        {/* Activate mode */}
+        {mode === 'activate' && (
+          <>
+            <FormControl fullWidth size="small">
+              <InputLabel sx={{ color: C.muted }}>{t('selectPlanType')}</InputLabel>
+              <Select value={planType} onChange={e => setPlanType(e.target.value)} label={t('selectPlanType')}
+                sx={{ color: C.text, '.MuiOutlinedInput-notchedOutline': { borderColor: C.border } }}>
+                {PLAN_TYPES.map(pt => <MenuItem key={pt} value={pt}>{planLabel(pt)}</MenuItem>)}
+              </Select>
+            </FormControl>
+            <TextField label={t('validFromLbl')} type="date" size="small"
+              value={validFrom} onChange={e => setValidFrom(e.target.value)}
+              sx={inputSx} InputLabelProps={{ shrink: true }} />
+            <Typography sx={{ fontSize: '12px', color: C.muted }}>
+              Валиден до: {(() => {
+                const d = new Date(validFrom + 'T00:00:00'); d.setDate(d.getDate() + 30)
+                return d.toLocaleDateString('bg-BG', { day: 'numeric', month: 'long', year: 'numeric' })
+              })()}
+            </Typography>
+          </>
+        )}
+
+        {/* Extend mode */}
+        {mode === 'extend' && plan && (
+          <TextField label={t('extendTo')} type="date" size="small"
+            value={extendTo} onChange={e => setExtendTo(e.target.value)}
+            sx={inputSx} InputLabelProps={{ shrink: true }} />
+        )}
+
+        {/* Adjust credits */}
+        {mode === 'adjust' && plan && plan.plan_type !== 'unlimited' && (
+          <>
+            <TextField label={t('newCreditsUsed')} type="number" size="small"
+              value={credUsed} onChange={e => setCredUsed(e.target.value)}
+              inputProps={{ min: 0, max: plan.credits_total || 99 }}
+              sx={inputSx} />
+            <Typography sx={{ fontSize: '12px', color: C.muted }}>
+              {t('creditsLeft')}: {Math.max(0, plan.credits_total - Number(credUsed))}
+            </Typography>
+          </>
+        )}
+      </DialogContent>
+      <DialogActions sx={{ px: 3, pb: 2 }}>
+        <Button onClick={onClose} sx={{ color: C.muted }}>{t('cancelBtn')}</Button>
+        <Button variant="contained" onClick={handleSave} disabled={saving}
+          sx={{ background: C.primary, color: '#0f1c11', fontWeight: 700 }}>
+          {saving ? <CircularProgress size={16} /> : t('saveBtn')}
+        </Button>
+      </DialogActions>
+    </Dialog>
+  )
+}
+
+// ── Client Plan Row ──────────────────────────────────────────
+function ClientPlanRow({ client, plan, onManage }) {
+  const active   = isPlanActive(plan)
+  const daysLeft = plan ? daysUntilExpiry(plan) : null
+  const credits  = plan ? creditsRemaining(plan) : null
+  const isLow    = plan && plan.plan_type !== 'unlimited' && credits !== null && credits <= 2
+  const isExpiring = daysLeft !== null && daysLeft <= 7
+
+  return (
+    <Box sx={{
+      display: 'flex', alignItems: 'center', gap: 1.5, py: 1.25, px: 1.5,
+      borderBottom: `1px solid ${C.border}`,
+      '&:last-child': { borderBottom: 'none' },
+    }}>
+      <Box sx={{
+        width: 36, height: 36, borderRadius: '50%', flexShrink: 0,
+        background: active ? C.primaryContainer : 'rgba(255,255,255,0.06)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        fontSize: '14px', fontWeight: 800, color: active ? C.primary : C.muted,
+      }}>
+        {client.name.charAt(0).toUpperCase()}
+      </Box>
+      <Box sx={{ flex: 1, minWidth: 0 }}>
+        <Typography sx={{ fontWeight: 700, fontSize: '14px', color: C.text }}>
+          {client.name}
+        </Typography>
+        {plan ? (
+          <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mt: 0.25 }}>
+            <Chip label={planLabel(plan.plan_type)} size="small"
+              sx={{ fontSize: '10px', height: 18, background: active ? C.primaryContainer : 'rgba(255,255,255,0.06)', color: active ? C.primary : C.muted }} />
+            {plan.plan_type !== 'unlimited' && (
+              <Chip label={`${credits}/${plan.credits_total}`} size="small"
+                sx={{ fontSize: '10px', height: 18, background: isLow ? 'rgba(251,146,60,0.12)' : 'rgba(255,255,255,0.06)', color: isLow ? '#FB923C' : C.muted }} />
+            )}
+            {daysLeft !== null && (
+              <Chip label={`${daysLeft}d`} size="small"
+                sx={{ fontSize: '10px', height: 18, background: isExpiring ? 'rgba(251,146,60,0.12)' : 'rgba(255,255,255,0.06)', color: isExpiring ? '#FB923C' : C.muted }} />
+            )}
+          </Box>
+        ) : (
+          <Typography sx={{ fontSize: '11px', color: '#F87171' }}>Без активен план</Typography>
+        )}
+      </Box>
+      <Button size="small" variant="outlined" onClick={() => onManage(client, plan)}
+        sx={{ fontSize: '11px', borderColor: C.border, color: C.muted,
+          '&:hover': { borderColor: C.primary, color: C.primary }, flexShrink: 0 }}>
+        {plan ? 'Управлявай' : 'Активирай'}
+      </Button>
+    </Box>
+  )
+}
+
+// ── Admin Schedule Tab ───────────────────────────────────────
+function AdminScheduleTab({ t, lang }) {
+  const { coaches, showSnackbar, realClients: rc } = useApp()
+  const { slots, slotBookings, loadSlots, loadSlotBookings, createSlot,
+    createRecurringSlots, deleteSlot, adminAddToSlot, adminRemoveFromSlot } = useBooking()
+  const [showCreate,  setShowCreate]  = useState(false)
+  const [addTarget,   setAddTarget]   = useState(null)
+  const [removeTarget, setRemoveTarget] = useState(null) // { slotId, clientId, name }
+  const [loaded,      setLoaded]      = useState(false)
+  const [rangeStart,  setRangeStart]  = useState(isoToday())
+  const [rangeEnd,    setRangeEnd]    = useState(isoDatePlusDays(13))
+
+  useEffect(() => {
+    async function load() {
+      const data = await loadSlots(rangeStart, rangeEnd)
+      if (data.length) await loadSlotBookings(data.map(s => s.id))
+      setLoaded(true)
+    }
+    load()
+  }, [rangeStart, rangeEnd])
+
+  async function handleSave(data) {
+    if (data.mode === 'single') {
+      const res = await createSlot(data)
+      if (res?.error) { showSnackbar('Грешка: ' + res.error); return res }
+      showSnackbar(t('slotSavedMsg'))
+      return {}
+    } else {
+      const res = await createRecurringSlots(data)
+      if (res?.error) { showSnackbar('Грешка: ' + res.error); return res }
+      showSnackbar(`${t('slotsCreatedMsg')}: ${res.created}`)
+      return res
+    }
+  }
+
+  async function handleDelete(slotId) {
+    const res = await deleteSlot(slotId)
+    if (res?.error) { showSnackbar('Грешка: ' + res.error); return }
+    showSnackbar(t('slotDeletedMsg'))
+  }
+
+  async function handleAddClient(slotId, clientId, clientName, useCredit) {
+    const res = await adminAddToSlot(slotId, clientId, clientName, useCredit)
+    if (!res?.error) {
+      showSnackbar(`${clientName} записан`)
+      await loadSlotBookings([slotId])
+    }
+    return res
+  }
+
+  async function handleRemove(slotId, clientId) {
+    const res = await adminRemoveFromSlot(slotId, clientId, true)
+    if (!res?.error) {
+      showSnackbar(t('removeFromSlot') + ' ✓')
+      await loadSlotBookings([slotId])
+    }
+  }
+
+  const grouped = groupByDate(slots)
+  const dates   = Object.keys(grouped).sort()
+
+  return (
+    <Box>
+      <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
+        <Button variant="contained" startIcon={<AddIcon />} onClick={() => setShowCreate(true)}
+          sx={{ background: C.primary, color: '#0f1c11', fontWeight: 700 }}>
+          {t('createSlotBtn')}
+        </Button>
+      </Box>
+
+      {/* Date range */}
+      <Box sx={{ display: 'flex', gap: 1.5, mb: 2, flexWrap: 'wrap' }}>
+        <TextField label={t('dateFrom')} type="date" size="small" value={rangeStart}
+          onChange={e => setRangeStart(e.target.value)}
+          sx={{ '& .MuiInputBase-input': { color: C.text }, '& .MuiOutlinedInput-notchedOutline': { borderColor: C.border }, '& .MuiInputLabel-root': { color: C.muted }, '& .MuiInputBase-input::-webkit-calendar-picker-indicator': { filter: 'invert(0.7)' } }}
+          InputLabelProps={{ shrink: true }} />
+        <TextField label={t('dateTo')} type="date" size="small" value={rangeEnd}
+          onChange={e => setRangeEnd(e.target.value)}
+          sx={{ '& .MuiInputBase-input': { color: C.text }, '& .MuiOutlinedInput-notchedOutline': { borderColor: C.border }, '& .MuiInputLabel-root': { color: C.muted }, '& .MuiInputBase-input::-webkit-calendar-picker-indicator': { filter: 'invert(0.7)' } }}
+          InputLabelProps={{ shrink: true }} />
+      </Box>
+
+      {!loaded ? (
+        <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+          <CircularProgress size={24} sx={{ color: C.primary }} />
+        </Box>
+      ) : dates.length === 0 ? (
+        <Typography sx={{ color: C.muted, textAlign: 'center', py: 4 }}>{t('slotsEmpty')}</Typography>
+      ) : (
+        dates.map(date => (
+          <Box key={date} sx={{ mb: 3 }}>
+            <Typography sx={{ fontWeight: 800, fontSize: '14px', color: date === isoToday() ? C.primary : C.text,
+              mb: 1, pl: 1, borderLeft: `3px solid ${date === isoToday() ? C.primary : C.border}` }}>
+              {dayLabel(date, lang)} · {date}
+            </Typography>
+            {grouped[date].map(slot => {
+              const bookings = slotBookings[slot.id] || []
+              const isFull   = (slot.booked_count || 0) >= slot.capacity
+              return (
+                <Paper key={slot.id} sx={{ mb: 1.5, borderRadius: '14px', border: `1px solid ${C.border}`, overflow: 'hidden' }}>
+                  {/* Slot row */}
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, px: 2, py: 1.5 }}>
+                    <Box sx={{ minWidth: 60 }}>
+                      <Typography sx={{ fontWeight: 800, fontSize: '14px', color: C.text }}>{fmtTime(slot.start_time)}</Typography>
+                      <Typography sx={{ fontSize: '11px', color: C.muted }}>{fmtTime(slot.end_time)}</Typography>
+                    </Box>
+                    <Box sx={{ flex: 1 }}>
+                      <Typography sx={{ fontWeight: 700, fontSize: '13px', color: C.text }}>{slot.coach_name}</Typography>
+                      <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', mt: 0.25 }}>
+                        <Chip label={`${occupancyStr(slot.booked_count || 0, slot.capacity)}`} size="small"
+                          sx={{ fontSize: '10px', height: 18, background: isFull ? 'rgba(248,113,113,0.12)' : C.accentSoft,
+                            color: isFull ? '#F87171' : C.primary }} />
+                        {slot.notes && <Typography sx={{ fontSize: '11px', color: C.muted, fontStyle: 'italic' }}>{slot.notes}</Typography>}
+                      </Box>
+                    </Box>
+                    <Box sx={{ display: 'flex', gap: 0.5 }}>
+                      <Tooltip title={t('addClientToSlot')} arrow>
+                        <IconButton size="small" onClick={() => setAddTarget(slot)}
+                          sx={{ color: C.muted, '&:hover': { color: C.primary } }}>
+                          <PersonAddIcon sx={{ fontSize: 16 }} />
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title={t('deleteSlotBtn')} arrow>
+                        <IconButton size="small" onClick={() => handleDelete(slot.id)}
+                          sx={{ color: C.muted, '&:hover': { color: '#F87171' } }}>
+                          <DeleteOutlineIcon sx={{ fontSize: 16 }} />
+                        </IconButton>
+                      </Tooltip>
+                    </Box>
+                  </Box>
+                  {/* Clients list */}
+                  {bookings.length > 0 && (
+                    <Box sx={{ borderTop: `1px solid ${C.border}`, px: 2, py: 1 }}>
+                      {bookings.map(b => (
+                        <Box key={b.id} sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', py: 0.4 }}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <Box sx={{ width: 22, height: 22, borderRadius: '50%', background: C.primaryContainer,
+                              display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              fontSize: '10px', fontWeight: 800, color: C.primary }}>
+                              {b.client_name.charAt(0).toUpperCase()}
+                            </Box>
+                            <Typography sx={{ fontSize: '13px', color: C.text }}>{b.client_name}</Typography>
+                          </Box>
+                          <Tooltip title={t('removeFromSlot')} arrow>
+                            <IconButton size="small" onClick={() => handleRemove(slot.id, b.client_id)}
+                              sx={{ color: C.muted, '&:hover': { color: '#F87171' } }}>
+                              <PersonRemoveIcon sx={{ fontSize: 13 }} />
+                            </IconButton>
+                          </Tooltip>
+                        </Box>
+                      ))}
+                    </Box>
+                  )}
+                </Paper>
+              )
+            })}
+          </Box>
+        ))
+      )}
+
+      {/* Dialogs */}
+      {showCreate && (
+        <SlotDialog open={showCreate} onClose={() => setShowCreate(false)} onSave={handleSave} coaches={coaches} t={t} />
+      )}
+      {addTarget && (
+        <AddClientDialog open={!!addTarget} onClose={() => setAddTarget(null)} onAdd={handleAddClient}
+          slot={addTarget} realClients={rc} t={t} />
+      )}
+    </Box>
+  )
+}
+
+function AddClientDialog({ open, onClose, onAdd, slot, realClients, t }) {
+  const [selId, setSelId] = useState('')
+  const [useCredit, setUseCredit] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [err, setErr] = useState('')
+  async function handleAdd() {
+    if (!selId) return
+    setLoading(true); setErr('')
+    const client = realClients.find(c => c.id === selId)
+    const res = await onAdd(slot.id, selId, client.name, useCredit)
+    setLoading(false)
+    if (res?.error) { setErr(res.error); return }
+    onClose(); setSelId(''); setUseCredit(false)
+  }
+  return (
+    <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth
+      PaperProps={{ sx: { borderRadius: '20px', background: C.card, border: `1px solid ${C.border}` } }}>
+      <DialogTitle sx={{ fontWeight: 700, color: C.text }}>{t('addToSlotTitle')}</DialogTitle>
+      <DialogContent>
+        {slot && <Typography sx={{ fontSize: '12px', color: C.muted, mb: 1 }}>{slot.slot_date} · {fmtTime(slot.start_time)}</Typography>}
+        <FormControl fullWidth size="small" sx={{ mb: 2 }}>
+          <InputLabel sx={{ color: C.muted }}>{t('selectClientLbl')}</InputLabel>
+          <Select value={selId} onChange={e => setSelId(e.target.value)} label={t('selectClientLbl')}
+            sx={{ color: C.text, '.MuiOutlinedInput-notchedOutline': { borderColor: C.border } }}>
+            {realClients.map(c => <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>)}
+          </Select>
+        </FormControl>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <input type="checkbox" id="uc2" checked={useCredit} onChange={e => setUseCredit(e.target.checked)} />
+          <label htmlFor="uc2" style={{ fontSize: '13px', color: C.muted, cursor: 'pointer' }}>{t('useCredit')}</label>
+        </Box>
+        {err && <Typography sx={{ fontSize: '12px', color: '#F87171', mt: 1 }}>{err}</Typography>}
+      </DialogContent>
+      <DialogActions sx={{ px: 3, pb: 2 }}>
+        <Button onClick={onClose} sx={{ color: C.muted }}>{t('cancelBtn')}</Button>
+        <Button variant="contained" onClick={handleAdd} disabled={!selId || loading}
+          sx={{ background: C.primary, color: '#0f1c11', fontWeight: 700 }}>
+          {loading ? <CircularProgress size={16} /> : t('addClientToSlot')}
+        </Button>
+      </DialogActions>
+    </Dialog>
+  )
+}
+
+// ── Plans Tab ────────────────────────────────────────────────
+function PlansTab({ t }) {
+  const { realClients, showSnackbar } = useApp()
+  const { allPlans, loadAllPlans, activatePlan, extendPlan, adjustCredits } = useBooking()
+  const [search,    setSearch]    = useState('')
+  const [planDlg,   setPlanDlg]   = useState(null) // { client, plan }
+  const [loaded,    setLoaded]    = useState(false)
+
+  useEffect(() => {
+    loadAllPlans().then(() => setLoaded(true))
+  }, [])
+
+  function getClientPlan(clientId) {
+    return allPlans.find(p => p.client_id === clientId && p.status === 'active') || null
+  }
+
+  async function handleActivate(clientId, planType, from) {
+    const res = await activatePlan(clientId, planType, from)
+    if (res?.error) { showSnackbar('Грешка: ' + res.error); return res }
+    showSnackbar(t('planActivatedMsg'))
+    return { ok: true }
+  }
+  async function handleExtend(planId, date) {
+    const res = await extendPlan(planId, date)
+    if (res?.error) { showSnackbar('Грешка: ' + res.error); return res }
+    showSnackbar(t('planExtendedMsg'))
+    return { ok: true }
+  }
+  async function handleAdjust(planId, credits) {
+    const res = await adjustCredits(planId, credits)
+    if (res?.error) { showSnackbar('Грешка: ' + res.error); return res }
+    showSnackbar(t('creditsAdjustedMsg'))
+    return { ok: true }
+  }
+
+  const filtered = realClients.filter(c =>
+    !search || c.name.toLowerCase().includes(search.toLowerCase())
+  )
+
+  return (
+    <Box>
+      <TextField size="small" placeholder={t('searchClientPh')} value={search}
+        onChange={e => setSearch(e.target.value)} fullWidth sx={{ mb: 2,
+          '& .MuiInputBase-input': { color: C.text },
+          '& .MuiOutlinedInput-notchedOutline': { borderColor: C.border } }} />
+
+      {!loaded ? (
+        <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+          <CircularProgress size={24} sx={{ color: C.primary }} />
+        </Box>
+      ) : (
+        <Paper sx={{ borderRadius: '16px', border: `1px solid ${C.border}`, overflow: 'hidden' }}>
+          {filtered.length === 0 ? (
+            <Typography sx={{ color: C.muted, p: 3, textAlign: 'center' }}>Няма клиенти</Typography>
+          ) : (
+            filtered.map(client => {
+              const plan = getClientPlan(client.id)
+              return (
+                <ClientPlanRow key={client.id} client={client} plan={plan}
+                  onManage={(c, p) => setPlanDlg({ client: c, plan: p })} />
+              )
+            })
+          )}
+        </Paper>
+      )}
+
+      {planDlg && (
+        <PlanDialog
+          open={!!planDlg}
+          onClose={() => setPlanDlg(null)}
+          onActivate={handleActivate}
+          onExtend={handleExtend}
+          onAdjust={handleAdjust}
+          client={planDlg.client}
+          plan={planDlg.plan}
+          t={t}
+        />
+      )}
+    </Box>
+  )
+}
+
+// ── Clients Tab ──────────────────────────────────────────────
+function ClientsTab({ t }) {
+  const { realClients, showSnackbar } = useApp()
+  const { allPlans, loadAllPlans, activatePlan, extendPlan, adjustCredits } = useBooking()
+  const [planDlg, setPlanDlg] = useState(null)
+  const [loaded, setLoaded]   = useState(false)
+
+  useEffect(() => { loadAllPlans().then(() => setLoaded(true)) }, [])
+
+  function getClientPlan(clientId) {
+    return allPlans.find(p => p.client_id === clientId && p.status === 'active') || null
+  }
+
+  const pending = realClients.filter(c => !getClientPlan(c.id))
+  const active  = realClients.filter(c => !!getClientPlan(c.id))
+
+  async function handleActivate(clientId, planType, from) {
+    const res = await activatePlan(clientId, planType, from)
+    if (res?.error) { showSnackbar('Грешка: ' + res.error); return res }
+    showSnackbar(t('planActivatedMsg'))
+    return { ok: true }
+  }
+
+  return (
+    <Box>
+      {/* Pending activation */}
+      <Typography sx={{ fontWeight: 700, fontSize: '14px', color: '#F87171', mb: 1 }}>
+        {t('pendingActivation')} ({pending.length})
+      </Typography>
+      {pending.length === 0 ? (
+        <Typography sx={{ color: C.muted, fontSize: '13px', mb: 3 }}>{t('noPendingClients')}</Typography>
+      ) : (
+        <Paper sx={{ borderRadius: '16px', border: `1px solid rgba(248,113,113,0.3)`, overflow: 'hidden', mb: 3 }}>
+          {pending.map(client => (
+            <Box key={client.id} sx={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              px: 2, py: 1.25, borderBottom: `1px solid ${C.border}`, '&:last-child': { borderBottom: 'none' },
+            }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                <Box sx={{ width: 32, height: 32, borderRadius: '50%', background: 'rgba(248,113,113,0.15)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: '13px', fontWeight: 800, color: '#F87171' }}>
+                  {client.name.charAt(0).toUpperCase()}
+                </Box>
+                <Box>
+                  <Typography sx={{ fontWeight: 700, fontSize: '14px', color: C.text }}>{client.name}</Typography>
+                  <Typography sx={{ fontSize: '11px', color: '#F87171' }}>{t('hasNoPlan')}</Typography>
+                </Box>
+              </Box>
+              <Button size="small" variant="contained"
+                onClick={() => setPlanDlg({ client, plan: null })}
+                sx={{ background: C.primary, color: '#0f1c11', fontWeight: 700, fontSize: '11px' }}>
+                {t('activatePlanBtn')}
+              </Button>
+            </Box>
+          ))}
+        </Paper>
+      )}
+
+      {/* Active clients */}
+      <Typography sx={{ fontWeight: 700, fontSize: '14px', color: C.text, mb: 1 }}>
+        {t('allClientsLbl')} ({realClients.length})
+      </Typography>
+      <Paper sx={{ borderRadius: '16px', border: `1px solid ${C.border}`, overflow: 'hidden' }}>
+        {active.map(client => {
+          const plan = getClientPlan(client.id)
+          return (
+            <ClientPlanRow key={client.id} client={client} plan={plan}
+              onManage={(c, p) => setPlanDlg({ client: c, plan: p })} />
+          )
+        })}
+      </Paper>
+
+      {planDlg && (
+        <PlanDialog open={!!planDlg} onClose={() => setPlanDlg(null)}
+          onActivate={handleActivate}
+          onExtend={async (planId, date) => { const r = await extendPlan(planId, date); if (r?.error) { showSnackbar('Грешка: ' + r.error); return r } showSnackbar(t('planExtendedMsg')); return { ok: true } }}
+          onAdjust={async (planId, credits) => { const r = await adjustCredits(planId, credits); if (r?.error) { showSnackbar('Грешка: ' + r.error); return r } showSnackbar(t('creditsAdjustedMsg')); return { ok: true } }}
+          client={planDlg.client} plan={planDlg.plan} t={t} />
+      )}
+    </Box>
+  )
+}
+
+// ── Dashboard Tab ────────────────────────────────────────────
+function DashboardTab({ t, lang, setTab }) {
+  const { realClients, showSnackbar } = useApp()
+  const { allPlans, slots, loadAllPlans, loadSlots } = useBooking()
+  const [loaded, setLoaded] = useState(false)
+
+  useEffect(() => {
+    async function load() {
+      await Promise.all([loadAllPlans(), loadSlots(isoToday(), isoDatePlusDays(1))])
+      setLoaded(true)
+    }
+    load()
+  }, [])
+
+  function getActivePlan(clientId) {
+    return allPlans.find(p => p.client_id === clientId && p.status === 'active') || null
+  }
+
+  const pending    = realClients.filter(c => !getActivePlan(c.id))
+  const expiring   = realClients.filter(c => {
+    const p = getActivePlan(c.id)
+    if (!p) return false
+    const d = daysUntilExpiry(p)
+    return d !== null && d >= 0 && d <= 7
+  })
+  const lowCred    = realClients.filter(c => {
+    const p = getActivePlan(c.id)
+    if (!p || p.plan_type === 'unlimited') return false
+    return creditsRemaining(p) <= 2
+  })
+  const todaySlots = slots.filter(s => s.slot_date === isoToday())
+
+  return (
+    <Box>
+      {/* Summary cards */}
+      <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', mb: 3 }}>
+        <StatCard icon={PeopleIcon}      label={t('pendingCard')}  value={pending.length}    color="#F87171" onClick={() => setTab(3)} />
+        <StatCard icon={WarningAmberIcon} label={t('expiringCard')} value={expiring.length}   color="#FB923C" onClick={() => setTab(2)} />
+        <StatCard icon={CreditCardIcon}  label={t('lowCredCard')}  value={lowCred.length}    color="#FBBF24" onClick={() => setTab(2)} />
+        <StatCard icon={CalendarMonthIcon} label={t('todayScheduleCard')} value={todaySlots.length} color={C.primary} onClick={() => setTab(1)} />
+      </Box>
+
+      {/* Pending list */}
+      {pending.length > 0 && (
+        <>
+          <Typography sx={{ fontWeight: 700, fontSize: '14px', color: '#F87171', mb: 1 }}>
+            {t('pendingActivation')} ({pending.length})
+          </Typography>
+          <Paper sx={{ borderRadius: '14px', border: `1px solid rgba(248,113,113,0.25)`, mb: 2, overflow: 'hidden' }}>
+            {pending.slice(0, 5).map(c => (
+              <Box key={c.id} sx={{ px: 2, py: 1, display: 'flex', alignItems: 'center', gap: 1.5,
+                borderBottom: `1px solid ${C.border}`, '&:last-child': { borderBottom: 'none' } }}>
+                <Typography sx={{ fontWeight: 600, fontSize: '14px', color: C.text, flex: 1 }}>{c.name}</Typography>
+                <Typography sx={{ fontSize: '11px', color: '#F87171' }}>Без план</Typography>
+              </Box>
+            ))}
+          </Paper>
+        </>
+      )}
+
+      {/* Expiring plans */}
+      {expiring.length > 0 && (
+        <>
+          <Typography sx={{ fontWeight: 700, fontSize: '14px', color: '#FB923C', mb: 1 }}>
+            {t('expiringPlans')} (7 дни)
+          </Typography>
+          <Paper sx={{ borderRadius: '14px', border: `1px solid rgba(251,146,60,0.25)`, mb: 2, overflow: 'hidden' }}>
+            {expiring.map(c => {
+              const p = getActivePlan(c.id)
+              const d = daysUntilExpiry(p)
+              return (
+                <Box key={c.id} sx={{ px: 2, py: 1, display: 'flex', alignItems: 'center', gap: 1.5,
+                  borderBottom: `1px solid ${C.border}`, '&:last-child': { borderBottom: 'none' } }}>
+                  <Typography sx={{ fontWeight: 600, fontSize: '14px', color: C.text, flex: 1 }}>{c.name}</Typography>
+                  <Typography sx={{ fontSize: '11px', color: '#FB923C' }}>{d}д</Typography>
+                </Box>
+              )
+            })}
+          </Paper>
+        </>
+      )}
+
+      {/* Today's schedule */}
+      {todaySlots.length > 0 && (
+        <>
+          <Typography sx={{ fontWeight: 700, fontSize: '14px', color: C.text, mb: 1 }}>
+            {t('todaySlotsLbl')}
+          </Typography>
+          <Paper sx={{ borderRadius: '14px', border: `1px solid ${C.border}`, overflow: 'hidden' }}>
+            {todaySlots.map(s => (
+              <Box key={s.id} sx={{ px: 2, py: 1, display: 'flex', alignItems: 'center', gap: 1.5,
+                borderBottom: `1px solid ${C.border}`, '&:last-child': { borderBottom: 'none' } }}>
+                <Typography sx={{ fontWeight: 700, fontSize: '14px', color: C.primary, minWidth: 48 }}>
+                  {fmtTime(s.start_time)}
+                </Typography>
+                <Typography sx={{ fontSize: '13px', color: C.text, flex: 1 }}>{s.coach_name}</Typography>
+                <Chip label={`${s.booked_count || 0}/${s.capacity}`} size="small"
+                  sx={{ fontSize: '10px', background: C.accentSoft, color: C.primary }} />
+              </Box>
+            ))}
+          </Paper>
+        </>
+      )}
+    </Box>
+  )
+}
+
+// ── Main Admin Page ──────────────────────────────────────────
+export default function Admin() {
+  const { t, lang } = useApp()
+  const [tab, setTab] = useState(0)
+
+  const TABS = [
+    { label: t('adminDashboard'), key: 0 },
+    { label: t('slotsManagement'), key: 1 },
+    { label: t('plansManagement'), key: 2 },
+    { label: t('clientsMgmt'), key: 3 },
+  ]
+
+  return (
+    <Box sx={{ maxWidth: 860, mx: 'auto' }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2.5 }}>
+        <AdminPanelSettingsIcon sx={{ fontSize: 24, color: C.primary }} />
+        <Typography variant="h5" sx={{ fontWeight: 800, color: C.text }}>
+          {t('adminTitle')}
+        </Typography>
+      </Box>
+
+      {/* Tabs */}
+      <Box sx={{
+        display: 'flex', gap: 0.75, mb: 2.5, flexWrap: 'wrap',
+        borderBottom: `1px solid ${C.border}`, pb: 0.5,
+      }}>
+        {TABS.map(({ label, key }) => (
+          <Box key={key} onClick={() => setTab(key)} sx={{
+            px: 1.75, py: 0.75, borderRadius: '10px 10px 0 0', cursor: 'pointer',
+            fontSize: '13px', fontWeight: tab === key ? 700 : 500,
+            background: tab === key ? C.primaryContainer : 'transparent',
+            color:      tab === key ? C.primary : C.muted,
+            borderBottom: tab === key ? `2px solid ${C.primary}` : '2px solid transparent',
+            transition: 'all 0.15s',
+          }}>
+            {label}
+          </Box>
+        ))}
+      </Box>
+
+      {/* Tab content */}
+      {tab === 0 && <DashboardTab t={t} lang={lang} setTab={setTab} />}
+      {tab === 1 && <AdminScheduleTab t={t} lang={lang} />}
+      {tab === 2 && <PlansTab t={t} />}
+      {tab === 3 && <ClientsTab t={t} />}
+    </Box>
+  )
+}

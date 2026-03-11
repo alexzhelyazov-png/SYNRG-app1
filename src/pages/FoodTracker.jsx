@@ -10,6 +10,7 @@ import { useMemo } from 'react'
 export default function FoodTracker() {
   const {
     auth, client, t,
+    viewingCoach,
     foodDate, setFoodDate,
     setFoodModalOpen,
     mealsForDate, selFoodDate,
@@ -37,6 +38,28 @@ export default function FoodTracker() {
   return (
     <>
       <FoodModal />
+
+      {/* ── Viewing banner (coaches only) ───────────── */}
+      {auth.role === 'coach' && (
+        <Box sx={{
+          display: 'flex', alignItems: 'center', gap: 1,
+          mb: 2, px: 2, py: 1, borderRadius: '10px',
+          background: viewingCoach === auth.name
+            ? 'linear-gradient(135deg, rgba(196,233,191,0.12) 0%, rgba(196,233,191,0.06) 100%)'
+            : 'rgba(200,197,255,0.08)',
+          border: `1px solid ${viewingCoach === auth.name ? 'rgba(196,233,191,0.25)' : 'rgba(200,197,255,0.2)'}`,
+          animation: 'fadeIn 0.2s ease',
+        }}>
+          <Box sx={{
+            width: 8, height: 8, borderRadius: '50%',
+            background: viewingCoach === auth.name ? C.primary : C.purple,
+            flexShrink: 0,
+          }} />
+          <Typography sx={{ fontSize: '12px', fontWeight: 700, color: viewingCoach === auth.name ? C.primary : C.purple }}>
+            {viewingCoach === auth.name ? t('viewingOwnTracker') : `${t('viewingClient')}: ${client.name}`}
+          </Typography>
+        </Box>
+      )}
 
       {/* ── Header ─────────────────────────────────── */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 3.5, flexWrap: 'wrap', gap: 2 }}>

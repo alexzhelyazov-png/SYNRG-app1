@@ -4,7 +4,9 @@ import WarningAmberIcon from '@mui/icons-material/WarningAmber'
 import { ThemeProvider, useTheme } from '@mui/material/styles'
 import CssBaseline from '@mui/material/CssBaseline'
 import { AppProvider, useApp } from './context/AppContext'
-import { C, EASE, makeTheme } from './theme'
+import { BookingProvider }     from './context/BookingContext'
+import { C, EASE, makeTheme }  from './theme'
+import { isAdmin }             from './lib/bookingUtils'
 
 import InstallScreen  from './layout/InstallScreen'
 import Sidebar        from './layout/Sidebar'
@@ -16,7 +18,10 @@ import Dashboard      from './pages/Dashboard'
 import FoodTracker    from './pages/FoodTracker'
 import WeightTracker  from './pages/WeightTracker'
 import Ranking        from './pages/Ranking'
-import Tasks          from './pages/Tasks'
+import Tasks, { AllClientsTasks } from './pages/Tasks'
+import Booking        from './pages/Booking'
+import Schedule       from './pages/Schedule'
+import Admin          from './pages/Admin'
 
 import ConfirmDeleteModal from './components/ConfirmDeleteModal'
 
@@ -102,6 +107,7 @@ function AppShell() {
     t,
   } = useApp()
 
+  const admin    = isAdmin(auth)
   const theme    = useTheme()
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'))
 
@@ -149,7 +155,11 @@ function AppShell() {
             {view === 'food'      && <FoodTracker />}
             {view === 'weight'    && <WeightTracker />}
             {view === 'ranking'   && <Ranking />}
-            {view === 'tasks'     && <Tasks />}
+            {view === 'tasks'     && auth.role === 'coach' && <AllClientsTasks />}
+            {view === 'tasks'     && auth.role !== 'coach' && <Tasks />}
+            {view === 'booking'   && <Booking />}
+            {view === 'schedule'  && <Schedule />}
+            {view === 'admin'     && admin && <Admin />}
           </PageTransition>
         </Box>
       </Box>
@@ -203,7 +213,10 @@ export default function App() {
   return (
     <AppProvider>
       <ThemedWrapper>
-        <AppContent />
+        {/* BookingProvider lives inside AppProvider so it can use useApp() */}
+        <BookingProvider>
+          <AppContent />
+        </BookingProvider>
       </ThemedWrapper>
     </AppProvider>
   )

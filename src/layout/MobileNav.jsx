@@ -1,23 +1,52 @@
-import { useState } from 'react'
-import { Box, BottomNavigation, BottomNavigationAction, Typography, IconButton, Badge } from '@mui/material'
-import DashboardIcon       from '@mui/icons-material/Dashboard'
-import RestaurantIcon      from '@mui/icons-material/Restaurant'
-import MonitorWeightIcon   from '@mui/icons-material/MonitorWeight'
-import LeaderboardIcon     from '@mui/icons-material/Leaderboard'
-import GroupIcon           from '@mui/icons-material/Group'
-import PeopleIcon          from '@mui/icons-material/People'
-import DeleteOutlineIcon   from '@mui/icons-material/DeleteOutline'
-import PersonIcon          from '@mui/icons-material/Person'
-import { useApp } from '../context/AppContext'
-import { C, EASE } from '../theme'
+import { useState, useMemo } from 'react'
+import {
+  Box, BottomNavigation, BottomNavigationAction,
+  Typography, IconButton, Badge,
+} from '@mui/material'
+import DashboardIcon          from '@mui/icons-material/Dashboard'
+import RestaurantIcon         from '@mui/icons-material/Restaurant'
+import MonitorWeightIcon      from '@mui/icons-material/MonitorWeight'
+import LeaderboardIcon        from '@mui/icons-material/Leaderboard'
+import EventIcon              from '@mui/icons-material/Event'
+import CalendarMonthIcon      from '@mui/icons-material/CalendarMonth'
+import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings'
+import GroupIcon              from '@mui/icons-material/Group'
+import PersonIcon            from '@mui/icons-material/Person'
+import AssignmentIcon         from '@mui/icons-material/Assignment'
+import DeleteOutlineIcon      from '@mui/icons-material/DeleteOutline'
+import { useApp }             from '../context/AppContext'
+import { isAdmin }            from '../lib/bookingUtils'
+import { C, EASE }            from '../theme'
 
-const NAV_VIEWS = [
+// Base nav items shared by all roles
+const BASE_NAV = [
   { view: 'dashboard', Icon: DashboardIcon,     labelKey: 'navDashboard' },
   { view: 'food',      Icon: RestaurantIcon,    labelKey: 'navFood'      },
   { view: 'weight',    Icon: MonitorWeightIcon, labelKey: 'navWeight'    },
   { view: 'ranking',   Icon: LeaderboardIcon,   labelKey: 'navRanking'   },
 ]
 
+// Build role-specific nav item list
+function getNavItems(auth, admin) {
+  if (auth.role === 'client') {
+    return [
+      ...BASE_NAV,
+      { view: 'booking', Icon: EventIcon, labelKey: 'navBooking' },
+    ]
+  }
+  // Coach / Admin — dashboard, schedule, tasks [, admin]
+  const items = [
+    { view: 'dashboard', Icon: DashboardIcon,     labelKey: 'navDashboard' },
+    { view: 'schedule',  Icon: CalendarMonthIcon, labelKey: 'navSchedule'  },
+    { view: 'tasks',     Icon: AssignmentIcon,    labelKey: 'navTasks'     },
+  ]
+  if (admin) {
+    items.push({ view: 'admin', Icon: AdminPanelSettingsIcon, labelKey: 'navAdmin' })
+  }
+  return items
+}
+
+// ── Shared pill-style nav button ─────────────────────────────
 function NavAction({ value, Icon, label, isSelected, onClick, ...rest }) {
   return (
     <BottomNavigationAction
@@ -28,24 +57,28 @@ function NavAction({ value, Icon, label, isSelected, onClick, ...rest }) {
       icon={
         <Box sx={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <Box sx={{
-            position: 'absolute', width: '56px', height: '28px', borderRadius: '14px',
+            position: 'absolute', width: '48px', height: '28px', borderRadius: '14px',
             background: isSelected ? C.primaryContainer : 'transparent',
             transition: `background 0.2s ${EASE.standard}`,
           }} />
-          <Box sx={{ position: 'relative', zIndex: 1, display: 'flex', transform: isSelected ? 'scale(1.08)' : 'scale(1)', transition: `transform 0.2s ${EASE.spring}` }}>
+          <Box sx={{
+            position: 'relative', zIndex: 1, display: 'flex',
+            transform: isSelected ? 'scale(1.08)' : 'scale(1)',
+            transition: `transform 0.2s ${EASE.spring}`,
+          }}>
             <Icon sx={{ fontSize: '20px', color: isSelected ? C.primary : C.muted }} />
           </Box>
         </Box>
       }
       sx={{
         '& .MuiBottomNavigationAction-label': {
-          fontSize: '10.5px !important',
+          fontSize: '10px !important',
           fontWeight: isSelected ? '700 !important' : '500 !important',
           color: isSelected ? `${C.primary} !important` : `${C.muted} !important`,
           opacity: '1 !important',
           transition: `color 0.2s ${EASE.standard}`,
         },
-        minWidth: 0, px: 0.5,
+        minWidth: 0, px: 0.25,
       }}
     />
   )
@@ -55,20 +88,22 @@ export default function MobileNav() {
   const {
     auth, view, setView,
     showClientMenu, setShowClientMenu,
-    clients, visibleClients, actualIdx, setSelIdx, setCurrentWorkout,
+    clients, visibleClients, realClients, actualIdx, setSelIdx, setCurrentWorkout,
     client, t, setConfirmDelete,
-    coaches, viewingCoach, setViewingCoach,
+    viewingCoach, setViewingCoach,
+    coachClientMode, setCoachClientMode,
     unreadNotifCount, notifications,
   } = useApp()
 
-  const [showCoachMenu, setShowCoachMenu] = useState(false)
+  const admin = isAdmin(auth)
+  const navItems = getNavItems(auth, admin)
 
-  function selectCoachTracker(coachName) {
-    setViewingCoach(coachName)
-    setView('dashboard')
-    setShowCoachMenu(false)
-    setShowClientMenu(false)
-  }
+  // Selected client always at top of list
+  const sortedClients = useMemo(() => {
+    const sel = realClients[actualIdx]
+    if (!sel) return visibleClients
+    return [sel, ...visibleClients.filter(c => c.name !== sel.name)]
+  }, [visibleClients, actualIdx, realClients])
 
   return (
     <>
@@ -82,15 +117,16 @@ export default function MobileNav() {
           value={view}
           showLabels
           onChange={(_, newView) => {
-            if (newView === '__clients__' || newView === '__coaches__') return
+            if (newView === '__clients__' || newView === '__tracker__') return
             setView(newView)
             setShowClientMenu(false)
-            setShowCoachMenu(false)
             setViewingCoach(null)
+            setCoachClientMode(false)
           }}
           sx={{ height: '64px', background: 'transparent', borderTop: 'none' }}
         >
-          {NAV_VIEWS.map(({ view: v, Icon, labelKey }) => (
+          {/* Role-specific nav items */}
+          {navItems.map(({ view: v, Icon, labelKey }) => (
             <NavAction
               key={v}
               value={v}
@@ -100,70 +136,55 @@ export default function MobileNav() {
             />
           ))}
 
-          {/* Coaches (coach only) */}
+          {/* Моят тракер (coach only) */}
           {auth.role === 'coach' && (
-            <BottomNavigationAction
-              value="__coaches__"
-              onClick={e => {
-                e.stopPropagation()
-                setShowCoachMenu(p => !p)
+            <NavAction
+              value="__tracker__"
+              Icon={PersonIcon}
+              label={t('myTrackerTitle')}
+              isSelected={view === 'dashboard' && viewingCoach === auth.name}
+              onClick={() => {
+                setViewingCoach(auth.name)
+                setView('dashboard')
                 setShowClientMenu(false)
-              }}
-              label={t('navCoaches')}
-              icon={
-                <Box sx={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <Box sx={{
-                    position: 'absolute', width: '56px', height: '28px', borderRadius: '14px',
-                    background: (showCoachMenu || viewingCoach) ? C.primaryContainer : 'transparent',
-                    transition: `background 0.2s ${EASE.standard}`,
-                  }} />
-                  <Box sx={{ position: 'relative', zIndex: 1, transform: (showCoachMenu || viewingCoach) ? 'scale(1.08)' : 'scale(1)', transition: `transform 0.2s ${EASE.spring}` }}>
-                    <PeopleIcon sx={{ fontSize: '20px', color: (showCoachMenu || viewingCoach) ? C.primary : C.muted }} />
-                  </Box>
-                </Box>
-              }
-              sx={{
-                minWidth: 0, px: 0.5,
-                '& .MuiBottomNavigationAction-label': {
-                  fontSize: '10.5px !important', fontWeight: '500 !important',
-                  color: (showCoachMenu || viewingCoach) ? `${C.primary} !important` : `${C.muted} !important`,
-                  opacity: '1 !important',
-                },
               }}
             />
           )}
 
-          {/* Clients switcher */}
+          {/* Clients sheet — all coaches (including admins) */}
           {auth.role === 'coach' && (
             <BottomNavigationAction
               value="__clients__"
               onClick={e => {
                 e.stopPropagation()
                 setShowClientMenu(p => !p)
-                setShowCoachMenu(false)
               }}
               label={!viewingCoach ? (client?.name || t('navClients')) : t('navClients')}
               icon={
                 <Box sx={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <Box sx={{
-                    position: 'absolute', width: '56px', height: '28px', borderRadius: '14px',
+                    position: 'absolute', width: '48px', height: '28px', borderRadius: '14px',
                     background: showClientMenu ? C.primaryContainer : 'transparent',
                     transition: `background 0.2s ${EASE.standard}`,
                   }} />
                   <Badge badgeContent={unreadNotifCount} color="error" max={9}
                     sx={{ '& .MuiBadge-badge': { fontSize: '9px', minWidth: '16px', height: '16px' } }}>
-                    <Box sx={{ position: 'relative', zIndex: 1, display: 'flex', transform: showClientMenu ? 'scale(1.08)' : 'scale(1)', transition: `transform 0.2s ${EASE.spring}` }}>
+                    <Box sx={{
+                      position: 'relative', zIndex: 1, display: 'flex',
+                      transform: showClientMenu ? 'scale(1.08)' : 'scale(1)',
+                      transition: `transform 0.2s ${EASE.spring}`,
+                    }}>
                       <GroupIcon sx={{ fontSize: '20px', color: showClientMenu ? C.primary : C.muted }} />
                     </Box>
                   </Badge>
                 </Box>
               }
               sx={{
-                minWidth: 0, px: 0.5,
+                minWidth: 0, px: 0.25,
                 '& .MuiBottomNavigationAction-label': {
                   fontSize: '10px !important', fontWeight: '700 !important',
                   color: showClientMenu ? `${C.primary} !important` : `${C.muted} !important`,
-                  opacity: '1 !important', maxWidth: '64px',
+                  opacity: '1 !important', maxWidth: '60px',
                   overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                 },
               }}
@@ -172,61 +193,8 @@ export default function MobileNav() {
         </BottomNavigation>
       </Box>
 
-      {/* ── Coaches bottom sheet ────────────────────── */}
-      {showCoachMenu && auth.role === 'coach' && (
-        <Box sx={{
-          position: 'fixed', bottom: '64px', left: 0, right: 0,
-          maxHeight: '60vh', background: C.sidebar,
-          borderTop: `1px solid ${C.border}`, borderRadius: '24px 24px 0 0',
-          zIndex: 49, overflowY: 'auto', p: '16px 16px 24px',
-          animation: 'fadeInUp 0.22s ease both',
-        }}>
-          <Box onClick={() => setShowCoachMenu(false)} sx={{ position: 'fixed', inset: 0, zIndex: -1 }} />
-          <Box sx={{ width: 36, height: 4, borderRadius: '2px', background: 'rgba(255,255,255,0.18)', mx: 'auto', mb: 2 }} />
-          <Typography variant="overline" sx={{ color: C.muted, px: 0.5, mb: 1.5, display: 'block' }}>
-            {t('coachesHeader')}
-          </Typography>
 
-          {/* My tracker */}
-          <Box component="div" onClick={() => selectCoachTracker(auth.name)} sx={{
-            display: 'flex', alignItems: 'center', gap: '12px',
-            background: viewingCoach === auth.name ? 'linear-gradient(135deg, rgba(196,233,191,0.14) 0%, rgba(196,233,191,0.08) 100%)' : 'rgba(255,255,255,0.04)',
-            border: `1px solid ${viewingCoach === auth.name ? 'rgba(196,233,191,0.3)' : 'rgba(255,255,255,0.06)'}`,
-            borderRadius: '14px', px: 1.75, py: 1.2, cursor: 'pointer', mb: 0.75,
-          }}>
-            <Box sx={{ width: 36, height: 36, borderRadius: '50%', background: viewingCoach === auth.name ? C.primaryContainer : 'rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-              <PersonIcon sx={{ fontSize: '18px', color: viewingCoach === auth.name ? C.primary : C.muted }} />
-            </Box>
-            <Box sx={{ flex: 1 }}>
-              <Typography sx={{ fontWeight: 700, fontSize: '14px', color: viewingCoach === auth.name ? C.primary : C.text }}>{t('myTrackerTitle')}</Typography>
-              <Typography sx={{ fontSize: '12px', color: C.muted }}>{auth.name}</Typography>
-            </Box>
-            {viewingCoach === auth.name && <Box sx={{ fontSize: '14px', color: C.primary }}>✓</Box>}
-          </Box>
-
-          {/* Other coaches */}
-          {coaches.filter(c => c.name !== auth.name).map((c, i) => (
-            <Box component="div" key={c.name} onClick={() => selectCoachTracker(c.name)} sx={{
-              display: 'flex', alignItems: 'center', gap: '12px',
-              background: viewingCoach === c.name ? 'linear-gradient(135deg, rgba(196,233,191,0.14) 0%, rgba(196,233,191,0.08) 100%)' : 'rgba(255,255,255,0.04)',
-              border: `1px solid ${viewingCoach === c.name ? 'rgba(196,233,191,0.3)' : 'rgba(255,255,255,0.06)'}`,
-              borderRadius: '14px', px: 1.75, py: 1.2, cursor: 'pointer', mb: 0.75,
-              animation: `slideInLeft 0.2s ${EASE.standard} both`, animationDelay: `${i * 0.05}s`,
-            }}>
-              <Box sx={{ width: 36, height: 36, borderRadius: '50%', background: viewingCoach === c.name ? C.primaryContainer : 'rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '15px', fontWeight: 800, flexShrink: 0, color: viewingCoach === c.name ? C.primary : C.muted }}>
-                {c.name.charAt(0).toUpperCase()}
-              </Box>
-              <Box sx={{ flex: 1 }}>
-                <Typography sx={{ fontWeight: 700, fontSize: '14.5px', color: viewingCoach === c.name ? C.primary : C.text }}>{c.name}</Typography>
-                <Typography sx={{ fontSize: '11px', color: C.muted }}>{t('coachRole')}</Typography>
-              </Box>
-              {viewingCoach === c.name && <Box sx={{ fontSize: '14px', color: C.primary }}>✓</Box>}
-            </Box>
-          ))}
-        </Box>
-      )}
-
-      {/* ── Client selector — bottom sheet ──────────── */}
+      {/* ── Client selector — bottom sheet ───────────── */}
       {showClientMenu && auth.role === 'coach' && (
         <Box sx={{
           position: 'fixed', bottom: '64px', left: 0, right: 0,
@@ -257,7 +225,7 @@ export default function MobileNav() {
             <Typography variant="caption" sx={{ color: C.muted }}>{visibleClients.length} {t('ofClients')}</Typography>
           </Box>
 
-          {visibleClients.map((c, i) => {
+          {sortedClients.map((c, i) => {
             const ri    = clients.findIndex(x => x.name === c.name)
             const isSel = !viewingCoach && actualIdx === ri
             return (
@@ -267,24 +235,36 @@ export default function MobileNav() {
                 setShowClientMenu(false)
                 setViewingCoach(null)
                 setView('dashboard')
+                setCoachClientMode(true)
               }} sx={{
                 width: '100%', textAlign: 'left',
-                background: isSel ? 'linear-gradient(135deg, rgba(196,233,191,0.14) 0%, rgba(196,233,191,0.08) 100%)' : 'rgba(255,255,255,0.04)',
+                background: isSel
+                  ? 'linear-gradient(135deg, rgba(196,233,191,0.14) 0%, rgba(196,233,191,0.08) 100%)'
+                  : 'rgba(255,255,255,0.04)',
                 color: isSel ? C.primary : C.text,
                 border: `1px solid ${isSel ? 'rgba(196,233,191,0.3)' : 'rgba(255,255,255,0.06)'}`,
                 borderRadius: '14px', px: 1.75, py: 1.4, cursor: 'pointer',
                 fontFamily: "'DM Sans', sans-serif", mb: 0.75,
                 display: 'flex', alignItems: 'center', gap: '12px',
-                animation: `slideInLeft 0.2s ${EASE.standard} both`, animationDelay: `${i * 0.05}s`,
+                animation: `slideInLeft 0.2s ${EASE.standard} both`,
+                animationDelay: `${i * 0.05}s`,
               }}>
-                <Box sx={{ width: 36, height: 36, borderRadius: '50%', background: isSel ? C.primaryContainer : 'rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '15px', fontWeight: 800, color: isSel ? C.primary : C.muted, flexShrink: 0 }}>
+                <Box sx={{
+                  width: 36, height: 36, borderRadius: '50%',
+                  background: isSel ? C.primaryContainer : 'rgba(255,255,255,0.08)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: '15px', fontWeight: 800, color: isSel ? C.primary : C.muted, flexShrink: 0,
+                }}>
                   {c.name.charAt(0).toUpperCase()}
                 </Box>
                 <Box sx={{ flex: 1, minWidth: 0 }}>
                   <Box sx={{ fontWeight: 700, fontSize: '14.5px', lineHeight: 1.3, color: isSel ? C.primary : C.text }}>
                     {c.name}
                     {isSel && (
-                      <Box component="span" sx={{ ml: 1, fontSize: '10px', background: C.primaryContainer, color: C.primary, px: 0.75, py: '2px', borderRadius: '99px', fontWeight: 700, verticalAlign: 'middle' }}>
+                      <Box component="span" sx={{
+                        ml: 1, fontSize: '10px', background: C.primaryContainer, color: C.primary,
+                        px: 0.75, py: '2px', borderRadius: '99px', fontWeight: 700, verticalAlign: 'middle',
+                      }}>
                         {t('activeLabel')}
                       </Box>
                     )}

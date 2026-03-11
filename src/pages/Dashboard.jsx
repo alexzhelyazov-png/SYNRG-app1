@@ -1,11 +1,14 @@
 import { useState } from 'react'
-import { Box, Typography, TextField, Button, Chip, Paper, Switch, Collapse } from '@mui/material'
+import { Box, Typography, TextField, Button, Chip, Paper, Switch, Collapse, Tabs, Tab } from '@mui/material'
 import { useApp } from '../context/AppContext'
+import { useBooking } from '../context/BookingContext'
 import { WORKOUT_CATEGORIES } from '../lib/constants'
 import { C, EASE } from '../theme'
 import StatCard    from '../components/StatCard'
 import ProgressRing from '../components/ProgressRing'
 import Tasks       from './Tasks'
+import FoodTracker from './FoodTracker'
+import WeightTracker from './WeightTracker'
 import { todayDate, fmt1 } from '../lib/utils'
 import { computeReminders } from '../lib/reminders'
 
@@ -252,11 +255,197 @@ function CoachReactPanel() {
   )
 }
 
+// ─── Client progress section (shown in coach view) ───────────────
+function ClientProgressSection() {
+  const { client, t, latestAvg, weeklyRate, sendReaction } = useApp()
+  const [msgOpen, setMsgOpen] = useState(false)
+  const [msg,     setMsg]     = useState('')
+
+  // Last 7 days in YYYY-MM-DD
+  const today = new Date()
+  const last7 = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(today)
+    d.setDate(d.getDate() - (6 - i))
+    return d.toISOString().slice(0, 10)
+  })
+
+  // Sum calories per day
+  const kcalByDate = {}
+  ;(client.meals || []).forEach(m => {
+    if (m.date && last7.includes(m.date)) {
+      kcalByDate[m.date] = (kcalByDate[m.date] || 0) + (m.calories || 0)
+    }
+  })
+
+  const target  = client.calorieTarget || 2000
+  const DAY_BG  = ['Нд', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб']
+  const dayData = last7.map(date => {
+    const kcal   = kcalByDate[date] || 0
+    const pct    = Math.min(kcal / target, 1)
+    const logged = kcal > 0
+    return { date, kcal, pct, logged }
+  })
+
+  return (
+    <Paper sx={{
+      p: 2.25, mb: 2.5,
+      border: `1px solid ${C.border}`,
+      borderRadius: '16px',
+      animation: `fadeInUp 0.26s ${EASE.decelerate} 0.04s both`,
+    }}>
+      {/* Header + message button */}
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+        <Typography variant="h3">Прогрес</Typography>
+        <Button
+          size="small"
+          onClick={() => setMsgOpen(p => !p)}
+          sx={{
+            fontSize: '12px', borderRadius: '99px', px: 1.5, py: '4px',
+            color: msgOpen ? C.primary : C.muted,
+            background: msgOpen ? C.accentSoft : 'transparent',
+            border: `1px solid ${msgOpen ? C.primaryA20 : C.border}`,
+            '&:hover': { background: C.accentSoft, color: C.primary, borderColor: C.primaryA20 },
+          }}
+        >
+          💬 {t('reactTextBtn')}
+        </Button>
+      </Box>
+
+      {/* Inline message form */}
+      <Collapse in={msgOpen}>
+        <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
+          <TextField
+            size="small" fullWidth
+            placeholder={t('reactionPlaceholder')}
+            value={msg}
+            onChange={e => setMsg(e.target.value)}
+            onKeyDown={e => {
+              if (e.key === 'Enter') {
+                sendReaction('text', msg); setMsg(''); setMsgOpen(false)
+              }
+            }}
+            inputProps={{ style: { fontSize: '13px' } }}
+          />
+          <Button
+            variant="contained" size="small"
+            disabled={!msg.trim()}
+            onClick={() => { sendReaction('text', msg); setMsg(''); setMsgOpen(false) }}
+            sx={{ px: 2, flexShrink: 0 }}
+          >
+            {t('reactionSendBtn')}
+          </Button>
+        </Box>
+      </Collapse>
+
+      {/* Weight stats */}
+      <Box sx={{ display: 'flex', gap: 2.5, mb: 2, flexWrap: 'wrap' }}>
+        <Box>
+          <Typography sx={{ fontSize: '11px', color: C.muted, mb: 0.3, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.7px' }}>
+            {t('sevenDayAvg')}
+          </Typography>
+          <Typography sx={{ fontSize: '22px', fontWeight: 800, color: C.purple, fontFamily: "'Space Grotesk', sans-serif", lineHeight: 1.1 }}>
+            {latestAvg !== null ? `${fmt1(latestAvg)} кг` : '—'}
+          </Typography>
+        </Box>
+        <Box>
+          <Typography sx={{ fontSize: '11px', color: C.muted, mb: 0.3, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.7px' }}>
+            Weekly Rate
+          </Typography>
+          <Typography sx={{
+            fontSize: '22px', fontWeight: 800, fontFamily: "'Space Grotesk', sans-serif", lineHeight: 1.1,
+            color: weeklyRate === null ? C.muted : weeklyRate > 0 ? C.orange : C.primary,
+          }}>
+            {weeklyRate !== null ? `${weeklyRate > 0 ? '+' : ''}${fmt1(weeklyRate)} ${t('kgWeek')}` : '—'}
+          </Typography>
+        </Box>
+      </Box>
+
+      {/* 7-day calorie bars */}
+      <Typography sx={{ fontSize: '11px', color: C.muted, mb: 1, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.7px' }}>
+        Калории — последните 7 дни
+      </Typography>
+      <Box sx={{ display: 'flex', gap: 0.75 }}>
+        {dayData.map(({ date, kcal, pct, logged }) => {
+          const weekday = new Date(date + 'T12:00:00').getDay()
+          const barH    = logged ? Math.max(12, Math.round(Math.min(pct, 1) * 40)) : 3
+          return (
+            <Box key={date} sx={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5 }}>
+              <Box sx={{ width: '100%', height: '44px', display: 'flex', alignItems: 'flex-end' }}>
+                <Box sx={{
+                  width: '100%', height: `${barH}px`,
+                  borderRadius: '4px',
+                  background: logged
+                    ? (pct >= 0.85 ? C.primary : 'rgba(196,233,191,0.45)')
+                    : 'rgba(255,255,255,0.06)',
+                  transition: `height 0.3s ${EASE.standard}`,
+                }} />
+              </Box>
+              <Typography sx={{ fontSize: '10px', color: C.muted, lineHeight: 1 }}>
+                {DAY_BG[weekday]}
+              </Typography>
+            </Box>
+          )
+        })}
+      </Box>
+    </Paper>
+  )
+}
+
+// ─── Today's schedule (shown at top of coach dashboard) ──────────
+function TodayScheduleCard() {
+  const { t } = useApp()
+  const { slots } = useBooking()
+  const todayStr = new Date().toISOString().slice(0, 10)
+  const todaySlots = (slots || [])
+    .filter(s => s.slot_date === todayStr && s.status !== 'cancelled')
+    .sort((a, b) => (a.start_time || '').localeCompare(b.start_time || ''))
+
+  if (todaySlots.length === 0) return null
+
+  return (
+    <Paper sx={{
+      p: 2, mb: 2.5,
+      border: `1px solid ${C.border}`,
+      borderRadius: '16px',
+      animation: `fadeInUp 0.22s ${EASE.decelerate} both`,
+    }}>
+      <Typography variant="h3" sx={{ mb: 1.25 }}>График днес</Typography>
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75 }}>
+        {todaySlots.map((s, i) => (
+          <Box key={s.id || i} sx={{
+            display: 'flex', alignItems: 'center', gap: 1.5,
+            py: 0.75, px: 1.25,
+            background: s.booked_count > 0 ? C.accentSoft : 'rgba(255,255,255,0.03)',
+            border: `1px solid ${s.booked_count > 0 ? C.primaryA20 : C.border}`,
+            borderRadius: '10px',
+          }}>
+            <Typography sx={{
+              fontSize: '13.5px', fontWeight: 700, color: C.primary,
+              minWidth: '50px', fontFamily: "'Space Grotesk', sans-serif",
+            }}>
+              {(s.start_time || '').slice(0, 5)}
+            </Typography>
+            <Typography sx={{ fontSize: '13px', color: C.text, flex: 1 }}>
+              {s.coach_name}
+            </Typography>
+            <Typography sx={{
+              fontSize: '12px', fontWeight: 700,
+              color: s.booked_count > 0 ? C.primary : C.muted,
+            }}>
+              {s.booked_count}/{s.capacity}
+            </Typography>
+          </Box>
+        ))}
+      </Box>
+    </Paper>
+  )
+}
+
 // ─── Coach view (managing a client) ─────────────────────────────
 function DashboardCoach() {
   const {
     auth, client, t,
-    latestWeight, latestAvg, weeklyRate,
+    coachClientMode,
     exName, setExName, exScheme, setExScheme, exWeight, setExWeight,
     workoutCategory, setWorkoutCategory,
     currentWorkout, setCurrentWorkout,
@@ -268,6 +457,23 @@ function DashboardCoach() {
 
   return (
     <>
+      {/* ── Today's schedule (only before client is explicitly selected) ── */}
+      {!coachClientMode && <TodayScheduleCard />}
+
+      {/* ── Client viewing banner ──── */}
+      <Box sx={{
+        display: 'flex', alignItems: 'center', gap: 1,
+        mb: 2, px: 2, py: 1, borderRadius: '10px',
+        background: 'rgba(200,197,255,0.08)',
+        border: '1px solid rgba(200,197,255,0.2)',
+        animation: 'fadeIn 0.2s ease',
+      }}>
+        <Box sx={{ width: 8, height: 8, borderRadius: '50%', background: C.purple, flexShrink: 0 }} />
+        <Typography sx={{ fontSize: '12px', fontWeight: 700, color: C.purple }}>
+          {t('viewingClient')}: {client.name}
+        </Typography>
+      </Box>
+
       {/* ── Header ────────────────────────────────────── */}
       <Box sx={{
         display:        'flex',
@@ -278,36 +484,7 @@ function DashboardCoach() {
         flexWrap:       'wrap',
         animation:      `fadeInUp 0.22s ${EASE.decelerate} both`,
       }}>
-        <Box>
-          <Typography variant="h2" sx={{ mb: 0.75 }}>{client.name}</Typography>
-          <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', mt: 0.5 }}>
-            {[
-              [t('kgUnit'),           latestWeight !== null ? `${fmt1(latestWeight)} ${t('kgUnit')}` : '—', C.text],
-              [t('sevenDayAvg'),      latestAvg    !== null ? `${fmt1(latestAvg)} ${t('kgUnit')}`    : '—', C.purple],
-              ['trend', weeklyRate !== null
-                ? `${weeklyRate > 0 ? '+' : ''}${fmt1(weeklyRate)} ${t('kgWeek')}`
-                : '—',
-                weeklyRate === null ? C.muted : weeklyRate > 0 ? C.orange : C.primary],
-              ['kcal', `${client.calorieTarget} kcal`, C.text],
-              [t('proteinShortLbl'), `${client.proteinTarget}${t('gUnit')}`, C.text],
-            ].map(([label, val, color]) => (
-              <Box key={label} sx={{
-                display:      'inline-flex',
-                alignItems:   'center',
-                gap:          0.5,
-                px:           1.25,
-                py:           '4px',
-                background:   'rgba(255,255,255,0.04)',
-                border:       `1px solid ${C.border}`,
-                borderRadius: '99px',
-                fontSize:     '12.5px',
-                color:        C.muted,
-              }}>
-                {label} <span style={{ color, fontWeight: 700 }}>{val}</span>
-              </Box>
-            ))}
-          </Box>
-        </Box>
+        <Typography variant="h2" sx={{ mb: 0.75 }}>{client.name}</Typography>
 
         {/* Target inputs */}
         <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -341,6 +518,9 @@ function DashboardCoach() {
           />
         </Box>
       </Box>
+
+      {/* ── Client progress & messaging ─────────────────── */}
+      <ClientProgressSection />
 
       {/* ── Workout Builder ────────────────────────────── */}
       <Paper sx={{
@@ -496,12 +676,6 @@ function DashboardCoach() {
         </Button>
       </Paper>
 
-      {/* ── Coach react panel ───────────────────────────── */}
-      <CoachReactPanel />
-
-      {/* ── Tasks ───────────────────────────────────────── */}
-      <Tasks />
-
       {/* ── Workout history ─────────────────────────────── */}
       <Paper sx={{ p: 2.75, animation: `fadeInUp 0.3s ${EASE.decelerate} 0.1s both` }}>
         <Typography variant="h3" sx={{ mb: 2 }}>{t('workoutHistory')}</Typography>
@@ -549,6 +723,9 @@ function DashboardCoach() {
           ))
         )}
       </Paper>
+
+      {/* ── Изпрати на клиента ──────────────────────────── */}
+      <CoachReactPanel />
     </>
   )
 }
@@ -562,152 +739,203 @@ function DashboardClient({ isCoachView = false }) {
     setView, viewingCoach,
   } = useApp()
 
-  const isMobile  = window.innerWidth < 640
-  // Only real clients participate in ranking; coaches in tracker mode don't
-  const myRank    = isCoachView ? -1 : ranking.findIndex(r => r.name === client.name)
-  const myData    = ranking[myRank]
-  const rankNums  = ['1', '2', '3']
+  const [tab, setTab] = useState(0)
+
+  const myRank = isCoachView ? -1 : ranking.findIndex(r => r.name === client.name)
+  const myData = ranking[myRank]
 
   const title = isCoachView
     ? (viewingCoach === auth.name ? t('myTrackerTitle') : `${client.name} — ${t('trackerLabel')}`)
     : `${t('greeting')}, ${client.name}`
+
+  // Coaches viewing own tracker get 3 tabs (no tasks); clients get 4
+  const tabLabels = isCoachView
+    ? ['Табло', 'Тренировки', 'Прогрес']
+    : ['Табло', 'Тренировки', 'Задачи', 'Прогрес']
+  const progressTabIdx = isCoachView ? 2 : 3
 
   return (
     <>
       {/* ── Reminder banners (not shown in coach tracker view) ── */}
       {!isCoachView && <ReminderBanners />}
 
+      {/* ── Own tracker banner (shown when coach views personal tracker) ── */}
+      {isCoachView && (
+        <Box sx={{
+          display: 'flex', alignItems: 'center', gap: 1,
+          mb: 2, px: 2, py: 1, borderRadius: '10px',
+          background: viewingCoach === auth.name
+            ? 'linear-gradient(135deg, rgba(196,233,191,0.12) 0%, rgba(196,233,191,0.06) 100%)'
+            : 'rgba(200,197,255,0.08)',
+          border: `1px solid ${viewingCoach === auth.name ? 'rgba(196,233,191,0.25)' : 'rgba(200,197,255,0.2)'}`,
+          animation: 'fadeIn 0.2s ease',
+        }}>
+          <Box sx={{
+            width: 8, height: 8, borderRadius: '50%',
+            background: viewingCoach === auth.name ? C.primary : C.purple,
+            flexShrink: 0,
+          }} />
+          <Typography sx={{ fontSize: '12px', fontWeight: 700, color: viewingCoach === auth.name ? C.primary : C.purple }}>
+            {viewingCoach === auth.name ? t('viewingOwnTracker') : `${t('viewingClient')}: ${client.name}`}
+          </Typography>
+        </Box>
+      )}
+
       {/* ── Greeting ──────────────────────────────────── */}
-      <Box sx={{ mb: 3.5, animation: `fadeInUp 0.22s ${EASE.decelerate} both` }}>
+      <Box sx={{ mb: 2.5, animation: `fadeInUp 0.22s ${EASE.decelerate} both` }}>
         <Typography variant="h2" sx={{ mb: 0.5 }}>{title}</Typography>
         {!isCoachView && (
           <Typography sx={{ color: C.muted, fontSize: '14px' }}>{t('yourProgress')}</Typography>
         )}
       </Box>
 
-      {/* ── Today's progress rings ────────────────────── */}
-      <Box sx={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-        gap: 1.5, mb: 2.5,
-      }}>
-        {[
-          [t('todayCalLbl'), kcalPct, foodTotals.kcal,   client.calorieTarget, '',          C.primary, 'primary'],
-          [t('todayProtLbl'), protPct, foodTotals.protein, client.proteinTarget, t('gUnit'), C.purple,  'purple'],
-        ].map(([label, pct, cur, tgt, suf, color, cn], idx) => (
-          <Box key={label} sx={{
-            background:   `linear-gradient(145deg, var(--c-${cn}A5) 0%, var(--c-${cn}A3) 100%)`,
-            border:       `1px solid var(--c-${cn}A13)`,
-            borderRadius: '16px',
-            p:            '18px 20px',
-            display:      'flex',
-            alignItems:   'center',
-            gap:          1.75,
-            animation:    `fadeInUp 0.22s ${EASE.decelerate} ${0.06 + idx * 0.04}s both`,
-          }}>
-            <Box sx={{ position: 'relative', flexShrink: 0 }}>
-              <ProgressRing percent={pct} color={color} size={64} />
-              <Box sx={{
-                position: 'absolute', inset: 0,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: '11px', fontWeight: 700, color,
-              }}>
-                {Math.round(pct)}%
-              </Box>
-            </Box>
-            <Box>
-              <Typography sx={{
-                fontSize: '10.5px', color: C.muted, mb: 0.6,
-                textTransform: 'uppercase', letterSpacing: '0.8px', fontWeight: 700,
-              }}>
-                {label}
-              </Typography>
-              <Box sx={{ display: 'flex', alignItems: 'baseline', gap: '4px' }}>
-                <Typography sx={{
-                  fontSize: '26px', fontWeight: 800, color, lineHeight: 1.1,
-                  letterSpacing: '-0.5px', fontFamily: "'Space Grotesk', sans-serif",
-                }}>
-                  {fmt1(cur)}{suf}
-                </Typography>
-                <Typography sx={{ color: C.muted, fontSize: '13px', fontWeight: 600 }}>
-                  / {tgt}{suf}
-                </Typography>
-              </Box>
-            </Box>
-          </Box>
-        ))}
-      </Box>
+      {/* ── Tabs ──────────────────────────────────────── */}
+      <Tabs
+        value={tab}
+        onChange={(_, v) => setTab(v)}
+        sx={{
+          mb: 2.5,
+          '& .MuiTabs-indicator': { background: C.primary },
+          '& .MuiTab-root': {
+            color: C.muted, fontSize: '13.5px', fontWeight: 600,
+            textTransform: 'none', minWidth: 0, px: 1.75, py: 1,
+          },
+          '& .Mui-selected': { color: `${C.primary} !important` },
+          borderBottom: `1px solid ${C.border}`,
+        }}
+      >
+        {tabLabels.map((label, i) => <Tab key={i} label={label} />)}
+      </Tabs>
 
-      {/* ── Weight stat cards ─────────────────────────── */}
-      <Box sx={{
-        display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-        gap: 1.5, mb: 2.5,
-        animation: `fadeInUp 0.26s ${EASE.decelerate} 0.1s both`,
-      }}>
-        <StatCard label={t('weightKgLbl')} value={latestWeight !== null ? `${fmt1(latestWeight)} ${t('kgUnit')}` : '—'} sub={t('lastMeasurement')} />
-        <StatCard label={t('sevenDayAvg')} value={latestAvg !== null ? `${fmt1(latestAvg)} ${t('kgUnit')}` : '—'} />
-        <StatCard
-          label="Weekly Rate"
-          value={weeklyRate !== null ? `${weeklyRate > 0 ? '+' : ''}${fmt1(weeklyRate)} ${t('kgWeek')}` : '—'}
-          accent={weeklyRate !== null && weeklyRate < 0}
-          sub={weeklyRate === null ? t('insufficientData') : weeklyRate > 0 ? t('gaining') : t('losing')}
-        />
-      </Box>
-
-      {/* ── Ranking (clients only, not coach tracker view) ── */}
-      {!isCoachView && myData && (
-        <Paper sx={{ p: 2.75, animation: `fadeInUp 0.28s ${EASE.decelerate} 0.14s both` }}>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-            <Typography variant="h3">{t('myRanking')}</Typography>
-            <Button variant="outlined" size="small" onClick={() => setView('ranking')}
-              sx={{ fontSize: '13px' }}>
-              {t('seeAll')}
-            </Button>
-          </Box>
+      {/* ── Tab 0: Табло ──────────────────────────────── */}
+      {tab === 0 && (
+        <>
+          {/* Today's progress rings */}
           <Box sx={{
-            display: 'flex', alignItems: 'center', gap: 2.5,
-            background: 'linear-gradient(135deg, rgba(196,233,191,0.1) 0%, rgba(196,233,191,0.06) 100%)',
-            border: '1px solid rgba(196,233,191,0.2)', borderRadius: '16px', p: '16px 20px',
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+            gap: 1.5, mb: 2.5,
           }}>
-            <Typography sx={{ fontSize: '36px', fontWeight: 800, lineHeight: 1, minWidth: '56px', textAlign: 'center', color: C.primary, fontFamily: "'Space Grotesk', sans-serif" }}>
-              {myRank < 3 ? `#${myRank + 1}` : `#${myRank + 1}`}
-            </Typography>
-            <Box sx={{ flex: 1 }}>
-              <Typography sx={{ fontWeight: 800, fontSize: '22px', color: C.primary, mb: 0.75, fontFamily: "'Space Grotesk', sans-serif", letterSpacing: '-0.4px' }}>
-                {myData.points} {t('points')}
-              </Typography>
-              <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-                {[
-                  [`${t('kgUnit')}`, myData.breakdown.weightPts],
-                  [t('rankWorkoutLbl'), myData.breakdown.workoutPts],
-                  ['kcal', myData.breakdown.calPts],
-                  [t('proteinShortLbl'), myData.breakdown.protPts],
-                ].map(([ico, pts]) => (
-                  <Typography key={ico} sx={{ fontSize: '13px', color: C.muted }}>
-                    {ico} <span style={{ color: C.text, fontWeight: 700 }}>{pts}</span>
+            {[
+              [t('todayCalLbl'),  kcalPct, foodTotals.kcal,    client.calorieTarget, '',          C.primary, 'primary'],
+              [t('todayProtLbl'), protPct, foodTotals.protein, client.proteinTarget, t('gUnit'), C.purple,  'purple'],
+            ].map(([label, pct, cur, tgt, suf, color, cn], idx) => (
+              <Box key={label} sx={{
+                background:   `linear-gradient(145deg, var(--c-${cn}A5) 0%, var(--c-${cn}A3) 100%)`,
+                border:       `1px solid var(--c-${cn}A13)`,
+                borderRadius: '16px',
+                p:            '18px 20px',
+                display:      'flex',
+                alignItems:   'center',
+                gap:          1.75,
+                animation:    `fadeInUp 0.22s ${EASE.decelerate} ${0.06 + idx * 0.04}s both`,
+              }}>
+                <Box sx={{ position: 'relative', flexShrink: 0 }}>
+                  <ProgressRing percent={pct} color={color} size={64} />
+                  <Box sx={{
+                    position: 'absolute', inset: 0,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: '11px', fontWeight: 700, color,
+                  }}>
+                    {Math.round(pct)}%
+                  </Box>
+                </Box>
+                <Box>
+                  <Typography sx={{
+                    fontSize: '10.5px', color: C.muted, mb: 0.6,
+                    textTransform: 'uppercase', letterSpacing: '0.8px', fontWeight: 700,
+                  }}>
+                    {label}
                   </Typography>
-                ))}
+                  <Box sx={{ display: 'flex', alignItems: 'baseline', gap: '4px' }}>
+                    <Typography sx={{
+                      fontSize: '26px', fontWeight: 800, color, lineHeight: 1.1,
+                      letterSpacing: '-0.5px', fontFamily: "'Space Grotesk', sans-serif",
+                    }}>
+                      {fmt1(cur)}{suf}
+                    </Typography>
+                    <Typography sx={{ color: C.muted, fontSize: '13px', fontWeight: 600 }}>
+                      / {tgt}{suf}
+                    </Typography>
+                  </Box>
+                </Box>
               </Box>
-            </Box>
-            <Box sx={{ textAlign: 'right', flexShrink: 0 }}>
-              <Typography sx={{ fontSize: '13px', color: C.muted }}>{t('ofLbl')} {ranking.length} {t('ofClients')}</Typography>
-              {myRank > 0 && (
-                <Typography sx={{ fontSize: '13px', color: C.muted, mt: 0.5 }}>
-                  {t('toFirst')} <span style={{ color: C.primary, fontWeight: 700 }}>
-                    {ranking[0].points - myData.points} {t('points')}
-                  </span>
-                </Typography>
-              )}
-            </Box>
+            ))}
           </Box>
-        </Paper>
+
+          {/* Weight stat cards */}
+          <Box sx={{
+            display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+            gap: 1.5, mb: 2.5,
+            animation: `fadeInUp 0.26s ${EASE.decelerate} 0.1s both`,
+          }}>
+            <StatCard label={t('weightKgLbl')} value={latestWeight !== null ? `${fmt1(latestWeight)} ${t('kgUnit')}` : '—'} sub={t('lastMeasurement')} />
+            <StatCard label={t('sevenDayAvg')} value={latestAvg !== null ? `${fmt1(latestAvg)} ${t('kgUnit')}` : '—'} />
+            <StatCard
+              label="Weekly Rate"
+              value={weeklyRate !== null ? `${weeklyRate > 0 ? '+' : ''}${fmt1(weeklyRate)} ${t('kgWeek')}` : '—'}
+              accent={weeklyRate !== null && weeklyRate < 0}
+              sub={weeklyRate === null ? t('insufficientData') : weeklyRate > 0 ? t('gaining') : t('losing')}
+            />
+          </Box>
+
+          {/* Ranking (clients only) */}
+          {!isCoachView && myData && (
+            <Paper sx={{ p: 2.75, animation: `fadeInUp 0.28s ${EASE.decelerate} 0.14s both` }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                <Typography variant="h3">{t('myRanking')}</Typography>
+                <Button variant="outlined" size="small" onClick={() => setView('ranking')} sx={{ fontSize: '13px' }}>
+                  {t('seeAll')}
+                </Button>
+              </Box>
+              <Box sx={{
+                display: 'flex', alignItems: 'center', gap: 2.5,
+                background: 'linear-gradient(135deg, rgba(196,233,191,0.1) 0%, rgba(196,233,191,0.06) 100%)',
+                border: '1px solid rgba(196,233,191,0.2)', borderRadius: '16px', p: '16px 20px',
+              }}>
+                <Typography sx={{ fontSize: '36px', fontWeight: 800, lineHeight: 1, minWidth: '56px', textAlign: 'center', color: C.primary, fontFamily: "'Space Grotesk', sans-serif" }}>
+                  #{myRank + 1}
+                </Typography>
+                <Box sx={{ flex: 1 }}>
+                  <Typography sx={{ fontWeight: 800, fontSize: '22px', color: C.primary, mb: 0.75, fontFamily: "'Space Grotesk', sans-serif", letterSpacing: '-0.4px' }}>
+                    {myData.points} {t('points')}
+                  </Typography>
+                  <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+                    {[
+                      [`${t('kgUnit')}`, myData.breakdown.weightPts],
+                      [t('rankWorkoutLbl'), myData.breakdown.workoutPts],
+                      ['kcal', myData.breakdown.calPts],
+                      [t('proteinShortLbl'), myData.breakdown.protPts],
+                    ].map(([ico, pts]) => (
+                      <Typography key={ico} sx={{ fontSize: '13px', color: C.muted }}>
+                        {ico} <span style={{ color: C.text, fontWeight: 700 }}>{pts}</span>
+                      </Typography>
+                    ))}
+                  </Box>
+                </Box>
+                <Box sx={{ textAlign: 'right', flexShrink: 0 }}>
+                  <Typography sx={{ fontSize: '13px', color: C.muted }}>{t('ofLbl')} {ranking.length} {t('ofClients')}</Typography>
+                  {myRank > 0 && (
+                    <Typography sx={{ fontSize: '13px', color: C.muted, mt: 0.5 }}>
+                      {t('toFirst')} <span style={{ color: C.primary, fontWeight: 700 }}>
+                        {ranking[0].points - myData.points} {t('points')}
+                      </span>
+                    </Typography>
+                  )}
+                </Box>
+              </Box>
+            </Paper>
+          )}
+        </>
       )}
 
-      {/* ── Workout history ────────────────────────────── */}
-      {client.workouts && client.workouts.length > 0 && (
-        <Paper sx={{ p: 2.75, mt: 2.5, animation: `fadeInUp 0.3s ${EASE.decelerate} 0.18s both` }}>
+      {/* ── Tab 1: Тренировки ─────────────────────────── */}
+      {tab === 1 && (
+        <Paper sx={{ p: 2.75, animation: `fadeInUp 0.3s ${EASE.decelerate} both` }}>
           <Typography variant="h3" sx={{ mb: 2 }}>{t('workoutHistory')}</Typography>
-          {client.workouts.slice(0, 10).map((w, i) => (
+          {(!client.workouts || client.workouts.length === 0) ? (
+            <Typography sx={{ color: C.muted, py: 1 }}>{t('noWorkouts')}</Typography>
+          ) : client.workouts.slice(0, 10).map((w, i) => (
             <Box key={i} sx={{
               display: 'flex', alignItems: 'center', gap: 1.5,
               py: 1.1, px: 1, mx: -1,
@@ -735,10 +963,16 @@ function DashboardClient({ isCoachView = false }) {
         </Paper>
       )}
 
-      {/* ── Tasks (not shown in coach tracker view) ─────── */}
-      {!isCoachView && (
-        <Box sx={{ mt: 2.5 }}>
-          <Tasks />
+      {/* ── Tab 2: Задачи (clients only) ──────────────── */}
+      {tab === 2 && !isCoachView && <Tasks />}
+
+      {/* ── Tab Прогрес: food + weight trackers ──────── */}
+      {tab === progressTabIdx && (
+        <Box sx={{ animation: `fadeInUp 0.22s ${EASE.decelerate} both` }}>
+          <FoodTracker />
+          <Box sx={{ mt: 2.5 }}>
+            <WeightTracker />
+          </Box>
         </Box>
       )}
     </>

@@ -153,15 +153,202 @@ export const DB = {
     return data || []
   },
 
+  // ── Booking: get upcoming slots ────────────────────────────
+  async getSlots(from, to) {
+    if (isUsingSupabase) {
+      return (await sbFetchSafe(
+        sbUrl('booking_slots',
+          `?select=*&slot_date=gte.${from}&slot_date=lte.${to}&status=eq.active&order=slot_date.asc,start_time.asc`),
+        { headers: sbHeaders() }
+      )) || []
+    }
+    const all = await LS.selectAll('booking_slots')
+    return all
+      .filter(s => s.slot_date >= from && s.slot_date <= to && s.status === 'active')
+      .sort((a, b) => a.slot_date.localeCompare(b.slot_date) || a.start_time.localeCompare(b.start_time))
+  },
+
+  // ── Booking: count active bookings per slot ─────────────────
+  async getSlotBookingCounts(slotIds) {
+    if (!slotIds || !slotIds.length) return {}
+    if (isUsingSupabase) {
+      const inClause = slotIds.map(id => `"${id}"`).join(',')
+      const data = await sbFetchSafe(
+        sbUrl('slot_bookings', `?select=slot_id&status=eq.active&slot_id=in.(${slotIds.join(',')})`),
+        { headers: sbHeaders() }
+      ) || []
+      const counts = {}
+      for (const b of data) {
+        counts[b.slot_id] = (counts[b.slot_id] || 0) + 1
+      }
+      return counts
+    }
+    const all = await LS.selectAll('slot_bookings')
+    const counts = {}
+    for (const b of all.filter(b => slotIds.includes(b.slot_id) && b.status === 'active')) {
+      counts[b.slot_id] = (counts[b.slot_id] || 0) + 1
+    }
+    return counts
+  },
+
+  // ── Booking: full bookings for a slot (coach/admin) ─────────
+  async getSlotBookings(slotId) {
+    if (isUsingSupabase) {
+      return (await sbFetchSafe(
+        sbUrl('slot_bookings', `?select=*&slot_id=eq.${slotId}&status=eq.active&order=booked_at.asc`),
+        { headers: sbHeaders() }
+      )) || []
+    }
+    const all = await LS.selectAll('slot_bookings')
+    return all.filter(b => b.slot_id === slotId && b.status === 'active')
+  },
+
+  // ── Booking: a client's active bookings ─────────────────────
+  async getClientBookings(clientId) {
+    if (isUsingSupabase) {
+      return (await sbFetchSafe(
+        sbUrl('slot_bookings', `?select=*&client_id=eq.${clientId}&status=eq.active`),
+        { headers: sbHeaders() }
+      )) || []
+    }
+    const all = await LS.selectAll('slot_bookings')
+    return all.filter(b => b.client_id === clientId && b.status === 'active')
+  },
+
+  // ── Plans: get client's current active plan ──────────────────
+  async getClientActivePlan(clientId) {
+    if (isUsingSupabase) {
+      const data = await sbFetchSafe(
+        sbUrl('client_plans', `?select=*&client_id=eq.${clientId}&status=eq.active&order=created_at.desc&limit=1`),
+        { headers: sbHeaders() }
+      )
+      return (data && data[0]) || null
+    }
+    const all = await LS.selectAll('client_plans')
+    const plans = all
+      .filter(p => p.client_id === clientId && p.status === 'active')
+      .sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))
+    return plans[0] || null
+  },
+
+  // ── Plans: all plans (admin) ─────────────────────────────────
+  async getAllClientPlans() {
+    if (isUsingSupabase) {
+      return (await sbFetchSafe(
+        sbUrl('client_plans', `?select=*&order=created_at.desc`),
+        { headers: sbHeaders() }
+      )) || []
+    }
+    const all = await LS.selectAll('client_plans')
+    return all.sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))
+  },
+
+  // ── Call Supabase RPC (with localStorage fallback) ───────────
+  async callRpc(funcName, params) {
+    if (isUsingSupabase) {
+      return sbFetch(`${SUPABASE_URL}/rest/v1/rpc/${funcName}`, {
+        method: 'POST',
+        headers: sbHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify(params),
+      })
+    }
+    return this._localRpc(funcName, params)
+  },
+
+  // ── localStorage RPC fallback (non-atomic, for dev only) ─────
+  async _localRpc(funcName, params) {
+    if (funcName === 'book_slot') {
+      const { p_slot_id, p_client_id, p_client_name } = params
+      const slots = await LS.selectAll('booking_slots')
+      const slot  = slots.find(s => s.id === p_slot_id)
+      if (!slot || slot.status === 'cancelled') return { error: 'Слотът не е намерен' }
+      const bookings = await LS.selectAll('slot_bookings')
+      const active   = bookings.filter(b => b.slot_id === p_slot_id && b.status === 'active')
+      if (active.length >= slot.capacity)            return { error: 'Този час вече е запълнен' }
+      if (active.some(b => b.client_id === p_client_id)) return { error: 'Вече сте записани за този час' }
+      const plan = await this.getClientActivePlan(p_client_id)
+      if (!plan) return { error: 'Нямате активен план' }
+      let credit_used = false
+      if (plan.plan_type !== 'unlimited') {
+        if (plan.credits_used >= plan.credits_total) return { error: 'Нямате оставащи кредити' }
+        credit_used = true
+        await LS.update('client_plans', plan.id, { credits_used: plan.credits_used + 1 })
+      }
+      await LS.insert('slot_bookings', {
+        slot_id: p_slot_id, client_id: p_client_id, client_name: p_client_name,
+        status: 'active', credit_used,
+      })
+      return { success: true }
+    }
+
+    if (funcName === 'cancel_booking') {
+      const { p_slot_id, p_client_id } = params
+      const all     = await LS.selectAll('slot_bookings')
+      const booking = all.find(b => b.slot_id === p_slot_id && b.client_id === p_client_id && b.status === 'active')
+      if (!booking) return { error: 'Не сте записани за този час' }
+      await LS.update('slot_bookings', booking.id, { status: 'cancelled', cancelled_at: new Date().toISOString() })
+      if (booking.credit_used) {
+        const plan = await this.getClientActivePlan(p_client_id)
+        if (plan && plan.credits_used > 0) {
+          await LS.update('client_plans', plan.id, { credits_used: plan.credits_used - 1 })
+        }
+      }
+      return { success: true }
+    }
+
+    if (funcName === 'admin_book_slot') {
+      const { p_slot_id, p_client_id, p_client_name, p_use_credit } = params
+      const slots = await LS.selectAll('booking_slots')
+      const slot  = slots.find(s => s.id === p_slot_id)
+      if (!slot || slot.status === 'cancelled') return { error: 'Слотът не е намерен' }
+      const bookings = await LS.selectAll('slot_bookings')
+      const active   = bookings.filter(b => b.slot_id === p_slot_id && b.status === 'active')
+      if (active.length >= slot.capacity)                return { error: 'Слотът е запълнен' }
+      if (active.some(b => b.client_id === p_client_id)) return { error: 'Клиентът вече е записан' }
+      let credit_used = false
+      if (p_use_credit) {
+        const plan = await this.getClientActivePlan(p_client_id)
+        if (plan && plan.plan_type !== 'unlimited' && plan.credits_used < plan.credits_total) {
+          credit_used = true
+          await LS.update('client_plans', plan.id, { credits_used: plan.credits_used + 1 })
+        }
+      }
+      await LS.insert('slot_bookings', {
+        slot_id: p_slot_id, client_id: p_client_id, client_name: p_client_name,
+        status: 'active', credit_used,
+      })
+      return { success: true }
+    }
+
+    if (funcName === 'admin_cancel_booking') {
+      const { p_slot_id, p_client_id, p_return_credit } = params
+      const all     = await LS.selectAll('slot_bookings')
+      const booking = all.find(b => b.slot_id === p_slot_id && b.client_id === p_client_id && b.status === 'active')
+      if (!booking) return { error: 'Клиентът не е записан за този час' }
+      await LS.update('slot_bookings', booking.id, { status: 'cancelled', cancelled_at: new Date().toISOString() })
+      if (p_return_credit && booking.credit_used) {
+        const plan = await this.getClientActivePlan(p_client_id)
+        if (plan && plan.credits_used > 0) {
+          await LS.update('client_plans', plan.id, { credits_used: plan.credits_used - 1 })
+        }
+      }
+      return { success: true }
+    }
+
+    return { error: `Unknown RPC: ${funcName}` }
+  },
+
   // ── Seed coaches & their shadow profiles ──────────────────
   async seedIfEmpty() {
     const COACHES = [
-      { name: 'Виви',   password: 'vivi'   },
-      { name: 'Кари',   password: 'kari'   },
-      { name: 'Алекс',  password: 'alex'   },
-      { name: 'Ицко',   password: 'icko'   },
-      { name: 'Елина',  password: 'elina'  },
-      { name: 'Никола', password: 'nikola' },
+      { name: 'АдминАлекс', password: '1234' },  // Admin
+      { name: 'АдминКари',  password: '1234' },  // Admin
+      { name: 'Виви',       password: 'vivi'  },
+      { name: 'Кари',       password: 'kari'  },
+      { name: 'Алекс',      password: 'alex'  },
+      { name: 'Ицко',       password: 'icko'  },
+      { name: 'Елина',      password: 'elina' },
+      { name: 'Никола',     password: 'nikola'},
     ]
 
     let existingCoaches
