@@ -14,7 +14,7 @@ import MobileHeader   from './layout/MobileHeader'
 import MobileNav      from './layout/MobileNav'
 
 import Auth           from './pages/Auth'
-import Dashboard      from './pages/Dashboard'
+import Dashboard, { ClientDetail } from './pages/Dashboard'
 import FoodTracker    from './pages/FoodTracker'
 import WeightTracker  from './pages/WeightTracker'
 import Ranking        from './pages/Ranking'
@@ -101,15 +101,17 @@ function PageTransition({ children, viewKey }) {
 // ── Main logged-in layout ────────────────────────────────────────
 function AppShell() {
   const {
-    auth, view,
+    auth, view, client,
     loading, loadError, loadAll,
     snackbar, closeSnackbar,
+    coachClientMode,
     t,
   } = useApp()
 
-  const admin    = isAdmin(auth)
-  const theme    = useTheme()
-  const isMobile = useMediaQuery(theme.breakpoints.down('sm'))
+  const admin            = isAdmin(auth)
+  const theme            = useTheme()
+  const isMobile         = useMediaQuery(theme.breakpoints.down('sm'))
+  const showClientDetail = auth.role === 'coach' && coachClientMode
 
   if (loading)      return <LoadingScreen t={t} />
   if (loadError)    return <ErrorScreen error={loadError} onRetry={() => loadAll()} t={t} />
@@ -150,16 +152,22 @@ function AppShell() {
             minWidth:  0,
           }}
         >
-          <PageTransition viewKey={view}>
-            {view === 'dashboard' && <Dashboard />}
-            {view === 'food'      && <FoodTracker />}
-            {view === 'weight'    && <WeightTracker />}
-            {view === 'ranking'   && <Ranking />}
-            {view === 'tasks'     && auth.role === 'coach' && <AllClientsTasks />}
-            {view === 'tasks'     && auth.role !== 'coach' && <Tasks />}
-            {view === 'booking'   && <Booking />}
-            {view === 'schedule'  && <Schedule />}
-            {view === 'admin'     && admin && <Admin />}
+          <PageTransition viewKey={showClientDetail ? `client-${client?.id}` : view}>
+            {showClientDetail ? (
+              <ClientDetail />
+            ) : (
+              <>
+                {view === 'dashboard' && <Dashboard />}
+                {view === 'food'      && <FoodTracker />}
+                {view === 'weight'    && <WeightTracker />}
+                {view === 'ranking'   && <Ranking />}
+                {view === 'tasks'     && auth.role === 'coach' && <AllClientsTasks />}
+                {view === 'tasks'     && auth.role !== 'coach' && <Tasks />}
+                {view === 'booking'   && <Booking />}
+                {view === 'schedule'  && <Schedule />}
+                {view === 'admin'     && admin && <Admin />}
+              </>
+            )}
           </PageTransition>
         </Box>
       </Box>

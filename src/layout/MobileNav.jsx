@@ -234,7 +234,6 @@ export default function MobileNav() {
                 setCurrentWorkout([])
                 setShowClientMenu(false)
                 setViewingCoach(null)
-                setView('dashboard')
                 setCoachClientMode(true)
               }} sx={{
                 width: '100%', textAlign: 'left',
