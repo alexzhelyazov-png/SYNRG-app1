@@ -368,42 +368,47 @@ function SlotCell({ slot, adminMode, onEdit, onDelete, onAddClient, bookings = [
       onMouseLeave={() => { setHover(false); setConfirmDel(false) }}
       sx={{ position: 'relative', mb: '3px', userSelect: 'none' }}
     >
-      {/* One pill per capacity slot, all in a row */}
-      <Box sx={{ display: 'flex', gap: '2px' }}>
+      {/* Pills stacked vertically — booked=full card, empty=thin line */}
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
         {cells.map((booking, i) => (
-          <Tooltip
-            key={i}
-            title={booking ? booking.client_name : ''}
-            placement="top"
-            enterTouchDelay={0}
-            leaveTouchDelay={2000}
-            arrow
-            disableHoverListener={!booking}
-            disableFocusListener={!booking}
-            disableTouchListener={!booking}
-          >
-            <Box sx={{
-              flex: 1,
-              borderRadius: '6px',
-              px: '6px', py: '8px',
-              background: booking ? hexRgba(base, 0.30) : hexRgba(base, 0.06),
-              border:     `1px solid ${booking ? hexRgba(base, 0.58) : hexRgba(base, 0.16)}`,
-              overflow: 'hidden', minHeight: 56,
-              display: 'flex', alignItems: 'flex-start',
-              cursor: booking ? 'pointer' : 'default',
-            }}>
-              {booking && (
+          booking ? (
+            <Tooltip
+              key={i}
+              title={booking.client_name}
+              placement="top"
+              enterTouchDelay={0}
+              leaveTouchDelay={2000}
+              arrow
+            >
+              <Box sx={{
+                borderRadius: '6px',
+                px: '6px', py: '5px',
+                background: hexRgba(base, 0.30),
+                border: `1px solid ${hexRgba(base, 0.58)}`,
+                overflow: 'hidden',
+                cursor: 'pointer',
+              }}>
                 <Typography sx={{
-                  fontSize: '13px', fontWeight: 800,
+                  fontSize: '12px', fontWeight: 800,
                   color: base,
-                  whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-                  lineHeight: 1.3, width: '100%',
+                  lineHeight: 1.3,
+                  display: '-webkit-box',
+                  WebkitLineClamp: 2,
+                  WebkitBoxOrient: 'vertical',
+                  overflow: 'hidden',
                 }}>
                   {booking.client_name}
                 </Typography>
-              )}
-            </Box>
-          </Tooltip>
+              </Box>
+            </Tooltip>
+          ) : (
+            <Box key={i} sx={{
+              borderRadius: '4px',
+              height: '8px',
+              background: hexRgba(base, 0.07),
+              border: `1px solid ${hexRgba(base, 0.15)}`,
+            }} />
+          )
         ))}
       </Box>
 
