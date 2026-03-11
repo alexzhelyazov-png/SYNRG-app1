@@ -371,26 +371,39 @@ function SlotCell({ slot, adminMode, onEdit, onDelete, onAddClient, bookings = [
       {/* One pill per capacity slot, all in a row */}
       <Box sx={{ display: 'flex', gap: '2px' }}>
         {cells.map((booking, i) => (
-          <Box key={i} sx={{
-            flex: 1,
-            borderRadius: '5px',
-            px: '4px', py: '5px',
-            background: booking ? hexRgba(base, 0.30) : hexRgba(base, 0.06),
-            border:     `1px solid ${booking ? hexRgba(base, 0.58) : hexRgba(base, 0.16)}`,
-            overflow: 'hidden', minHeight: 30,
-            display: 'flex', alignItems: 'center',
-          }}>
-            {booking && (
-              <Typography sx={{
-                fontSize: '10px', fontWeight: 800,
-                color: base,
-                whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-                lineHeight: 1.2, width: '100%',
-              }}>
-                {booking.client_name}
-              </Typography>
-            )}
-          </Box>
+          <Tooltip
+            key={i}
+            title={booking ? booking.client_name : ''}
+            placement="top"
+            enterTouchDelay={0}
+            leaveTouchDelay={2000}
+            arrow
+            disableHoverListener={!booking}
+            disableFocusListener={!booking}
+            disableTouchListener={!booking}
+          >
+            <Box sx={{
+              flex: 1,
+              borderRadius: '5px',
+              px: '4px', py: '5px',
+              background: booking ? hexRgba(base, 0.30) : hexRgba(base, 0.06),
+              border:     `1px solid ${booking ? hexRgba(base, 0.58) : hexRgba(base, 0.16)}`,
+              overflow: 'hidden', minHeight: 30,
+              display: 'flex', alignItems: 'center',
+              cursor: booking ? 'pointer' : 'default',
+            }}>
+              {booking && (
+                <Typography sx={{
+                  fontSize: '10px', fontWeight: 800,
+                  color: base,
+                  whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                  lineHeight: 1.2, width: '100%',
+                }}>
+                  {booking.client_name}
+                </Typography>
+              )}
+            </Box>
+          </Tooltip>
         ))}
       </Box>
 
