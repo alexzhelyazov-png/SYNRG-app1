@@ -384,20 +384,20 @@ function SlotCell({ slot, adminMode, onEdit, onDelete, onAddClient, bookings = [
           >
             <Box sx={{
               flex: 1,
-              borderRadius: '5px',
-              px: '4px', py: '5px',
+              borderRadius: '6px',
+              px: '6px', py: '8px',
               background: booking ? hexRgba(base, 0.30) : hexRgba(base, 0.06),
               border:     `1px solid ${booking ? hexRgba(base, 0.58) : hexRgba(base, 0.16)}`,
-              overflow: 'hidden', minHeight: 30,
-              display: 'flex', alignItems: 'center',
+              overflow: 'hidden', minHeight: 56,
+              display: 'flex', alignItems: 'flex-start',
               cursor: booking ? 'pointer' : 'default',
             }}>
               {booking && (
                 <Typography sx={{
-                  fontSize: '10px', fontWeight: 800,
+                  fontSize: '13px', fontWeight: 800,
                   color: base,
                   whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-                  lineHeight: 1.2, width: '100%',
+                  lineHeight: 1.3, width: '100%',
                 }}>
                   {booking.client_name}
                 </Typography>
@@ -651,7 +651,7 @@ export default function Schedule() {
               gridTemplateColumns: '48px repeat(3, 1fr)',
               borderBottom: `1px solid ${C.border}`,
               '&:last-child': { borderBottom: 'none' },
-              minHeight: 58,
+              minHeight: 72,
             }}>
               {/* Time label */}
               <Box sx={{
