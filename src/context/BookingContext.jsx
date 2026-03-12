@@ -220,7 +220,7 @@ export function BookingProvider({ children }) {
   }, [loadSlots])
 
   // ── Admin: activate plan for client ──────────────────────
-  const activatePlan = useCallback(async (clientId, planType, validFrom) => {
+  const activatePlan = useCallback(async (clientId, planType, validFrom, price = 0) => {
     try {
       const creditsTotal = planType === '8' ? 8 : planType === '12' ? 12 : null
       const from = validFrom || isoToday()
@@ -240,6 +240,7 @@ export function BookingProvider({ children }) {
         valid_to:      to,
         status:        'active',
         activated_by:  auth.name,
+        price:         Number(price) || 0,
       })
       await loadAllPlans()
       return result

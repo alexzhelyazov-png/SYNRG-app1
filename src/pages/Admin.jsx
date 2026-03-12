@@ -221,6 +221,7 @@ function PlanDialog({ open, onClose, onActivate, onExtend, onAdjust, client, pla
   const [validFrom,   setValidFrom]  = useState(isoToday())
   const [extendTo,    setExtendTo]   = useState('')
   const [credUsed,    setCredUsed]   = useState(plan?.credits_used ?? 0)
+  const [price,       setPrice]      = useState(plan?.price ?? 0)
   const [saving,      setSaving]     = useState(false)
 
   useEffect(() => {
@@ -235,7 +236,7 @@ function PlanDialog({ open, onClose, onActivate, onExtend, onAdjust, client, pla
     setSaving(true)
     let res
     if (mode === 'activate') {
-      res = await onActivate(client.id, planType, validFrom)
+      res = await onActivate(client.id, planType, validFrom, price)
     } else if (mode === 'extend') {
       res = await onExtend(plan.id, extendTo)
     } else if (mode === 'adjust') {
@@ -304,8 +305,14 @@ function PlanDialog({ open, onClose, onActivate, onExtend, onAdjust, client, pla
             <TextField label={t('validFromLbl')} type="date" size="small"
               value={validFrom} onChange={e => setValidFrom(e.target.value)}
               sx={inputSx} InputLabelProps={{ shrink: true }} />
+            <TextField label={t('priceLbl')} type="number" size="small"
+              value={price} onChange={e => setPrice(e.target.value)}
+              inputProps={{ min: 0 }} sx={inputSx}
+              helperText={Number(price) === 0 ? t('freeLbl') : `${price} лв.`}
+              FormHelperTextProps={{ sx: { color: Number(price) === 0 ? C.muted : C.primary } }}
+            />
             <Typography sx={{ fontSize: '12px', color: C.muted }}>
-              Валиден до: {(() => {
+              {t('validUntil')}: {(() => {
                 const d = new Date(validFrom + 'T00:00:00'); d.setDate(d.getDate() + 30)
                 return d.toLocaleDateString('bg-BG', { day: 'numeric', month: 'long', year: 'numeric' })
               })()}
@@ -379,18 +386,25 @@ function ClientPlanRow({ client, plan, onManage, t }) {
                 sx={{ fontSize: '10px', height: 18, background: isLow ? 'rgba(251,146,60,0.12)' : 'rgba(255,255,255,0.06)', color: isLow ? '#FB923C' : C.muted }} />
             )}
             {daysLeft !== null && (
-              <Chip label={`${daysLeft}d`} size="small"
+              <Chip label={`${daysLeft}д`} size="small"
                 sx={{ fontSize: '10px', height: 18, background: isExpiring ? 'rgba(251,146,60,0.12)' : 'rgba(255,255,255,0.06)', color: isExpiring ? '#FB923C' : C.muted }} />
             )}
+            <Chip
+              label={Number(plan.price) > 0 ? `${plan.price} лв.` : t('freeLbl')}
+              size="small"
+              sx={{ fontSize: '10px', height: 18,
+                background: Number(plan.price) > 0 ? 'rgba(196,233,191,0.12)' : 'rgba(255,255,255,0.06)',
+                color: Number(plan.price) > 0 ? C.primary : C.muted }}
+            />
           </Box>
         ) : (
-          <Typography sx={{ fontSize: '11px', color: '#F87171' }}>Без активен план</Typography>
+          <Typography sx={{ fontSize: '11px', color: '#F87171' }}>{t('noPlanLbl')}</Typography>
         )}
       </Box>
       <Button size="small" variant="outlined" onClick={() => onManage(client, plan)}
         sx={{ fontSize: '11px', borderColor: C.border, color: C.muted,
           '&:hover': { borderColor: C.primary, color: C.primary }, flexShrink: 0 }}>
-        {plan ? 'Управлявай' : 'Активирай'}
+        {plan ? t('managePlanBtn') : t('activatePlanRowBtn')}
       </Button>
     </Box>
   )
@@ -628,8 +642,8 @@ function PlansTab({ t }) {
     return allPlans.find(p => p.client_id === clientId && p.status === 'active') || null
   }
 
-  async function handleActivate(clientId, planType, from) {
-    const res = await activatePlan(clientId, planType, from)
+  async function handleActivate(clientId, planType, from, price) {
+    const res = await activatePlan(clientId, planType, from, price)
     if (res?.error) { showSnackbar('Грешка: ' + res.error); return res }
     showSnackbar(t('planActivatedMsg'))
     return { ok: true }
@@ -710,8 +724,8 @@ function ClientsTab({ t }) {
   const pending = realClients.filter(c => !getClientPlan(c.id))
   const active  = realClients.filter(c => !!getClientPlan(c.id))
 
-  async function handleActivate(clientId, planType, from) {
-    const res = await activatePlan(clientId, planType, from)
+  async function handleActivate(clientId, planType, from, price) {
+    const res = await activatePlan(clientId, planType, from, price)
     if (res?.error) { showSnackbar('Грешка: ' + res.error); return res }
     showSnackbar(t('planActivatedMsg'))
     return { ok: true }
@@ -778,18 +792,149 @@ function ClientsTab({ t }) {
   )
 }
 
+// ── Analytics Tab ─────────────────────────────────────────────
+function AnalyticsTab({ t }) {
+  const { realClients } = useApp()
+  const { allPlans, loadAllPlans } = useBooking()
+
+  useEffect(() => { loadAllPlans() }, []) // eslint-disable-line
+
+  const activePlans  = allPlans.filter(p => p.status === 'active')
+  const allRevenue   = allPlans.reduce((sum, p) => sum + (Number(p.price) || 0), 0)
+  const payingCount  = activePlans.filter(p => Number(p.price) > 0).length
+  const freeCount    = activePlans.filter(p => !(Number(p.price) > 0)).length
+
+  const sorted = [...activePlans].sort((a, b) => (Number(b.price) || 0) - (Number(a.price) || 0))
+
+  return (
+    <Box>
+      {/* Revenue summary cards */}
+      <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 1.5, mb: 3 }}>
+        <Paper sx={{ p: 2.5, borderRadius: '16px',
+          border: `1px solid ${C.primaryA20}`,
+          background: 'linear-gradient(135deg, rgba(196,233,191,0.1) 0%, rgba(196,233,191,0.05) 100%)' }}>
+          <Typography sx={{ fontSize: '10.5px', color: C.muted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.8px', mb: 0.75 }}>
+            {t('totalRevenueLbl')}
+          </Typography>
+          <Typography sx={{ fontSize: '30px', fontWeight: 800, color: C.primary, fontFamily: "'Space Grotesk', sans-serif", lineHeight: 1.1 }}>
+            {allRevenue} лв.
+          </Typography>
+        </Paper>
+        <Paper sx={{ p: 2.5, borderRadius: '16px', border: `1px solid ${C.border}` }}>
+          <Typography sx={{ fontSize: '10.5px', color: C.muted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.8px', mb: 0.75 }}>
+            {t('payingClientsLbl')}
+          </Typography>
+          <Typography sx={{ fontSize: '30px', fontWeight: 800, color: C.text, fontFamily: "'Space Grotesk', sans-serif", lineHeight: 1.1 }}>
+            {payingCount}
+          </Typography>
+        </Paper>
+        <Paper sx={{ p: 2.5, borderRadius: '16px', border: `1px solid ${C.border}` }}>
+          <Typography sx={{ fontSize: '10.5px', color: C.muted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.8px', mb: 0.75 }}>
+            {t('freeClientsLbl')}
+          </Typography>
+          <Typography sx={{ fontSize: '30px', fontWeight: 800, color: C.muted, fontFamily: "'Space Grotesk', sans-serif", lineHeight: 1.1 }}>
+            {freeCount}
+          </Typography>
+        </Paper>
+      </Box>
+
+      {/* Per-client breakdown */}
+      <Typography variant="h3" sx={{ mb: 1.5 }}>{t('allActivePlans')}</Typography>
+      <Paper sx={{ borderRadius: '16px', border: `1px solid ${C.border}`, overflow: 'hidden' }}>
+        {sorted.length === 0 ? (
+          <Typography sx={{ color: C.muted, p: 3, textAlign: 'center' }}>{t('noActivePlans')}</Typography>
+        ) : sorted.map(plan => {
+          const client = realClients.find(c => c.id === plan.client_id)
+          if (!client) return null
+          const fee = Number(plan.price) || 0
+          return (
+            <Box key={plan.id} sx={{ display: 'flex', alignItems: 'center', gap: 1.5,
+              px: 2, py: 1.25,
+              borderBottom: `1px solid ${C.border}`, '&:last-child': { borderBottom: 'none' } }}>
+              <Box sx={{ width: 34, height: 34, borderRadius: '50%', flexShrink: 0,
+                background: C.primaryContainer,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: '13px', fontWeight: 800, color: C.primary }}>
+                {client.name.charAt(0).toUpperCase()}
+              </Box>
+              <Typography sx={{ flex: 1, fontWeight: 600, fontSize: '14px', color: C.text }}>{client.name}</Typography>
+              <Chip label={planLabel(plan.plan_type, t)} size="small"
+                sx={{ fontSize: '10px', background: C.primaryContainer, color: C.primary }} />
+              <Typography sx={{ fontWeight: 700, fontSize: '15px', minWidth: '72px', textAlign: 'right',
+                color: fee > 0 ? C.primary : C.muted,
+                fontFamily: "'Space Grotesk', sans-serif" }}>
+                {fee > 0 ? `${fee} лв.` : t('freeLbl')}
+              </Typography>
+            </Box>
+          )
+        })}
+      </Paper>
+    </Box>
+  )
+}
+
+// ── Coaches Tab ───────────────────────────────────────────────
+function CoachesTab({ t }) {
+  const { realClients } = useApp()
+
+  const coachStats = useMemo(() => {
+    const counts = {}
+    realClients.forEach(c => {
+      ;(c.workouts || []).forEach(w => {
+        const name = w.coach || '—'
+        counts[name] = (counts[name] || 0) + 1
+      })
+    })
+    return Object.entries(counts)
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count)
+  }, [realClients])
+
+  return (
+    <Box>
+      <Paper sx={{ borderRadius: '16px', border: `1px solid ${C.border}`, overflow: 'hidden' }}>
+        {coachStats.length === 0 ? (
+          <Typography sx={{ color: C.muted, p: 3, textAlign: 'center' }}>{t('noDataLbl')}</Typography>
+        ) : coachStats.map(({ name, count }, i) => (
+          <Box key={name} sx={{ display: 'flex', alignItems: 'center', gap: 1.5,
+            px: 2, py: 1.5,
+            borderBottom: `1px solid ${C.border}`, '&:last-child': { borderBottom: 'none' } }}>
+            <Typography sx={{ fontSize: '18px', fontWeight: 800, color: i === 0 ? C.primary : C.muted,
+              minWidth: 28, fontFamily: "'Space Grotesk', sans-serif" }}>
+              #{i + 1}
+            </Typography>
+            <Box sx={{ width: 36, height: 36, borderRadius: '50%', flexShrink: 0,
+              background: i === 0 ? C.primaryContainer : 'rgba(255,255,255,0.06)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: '14px', fontWeight: 800, color: i === 0 ? C.primary : C.muted }}>
+              {name.charAt(0).toUpperCase()}
+            </Box>
+            <Typography sx={{ flex: 1, fontWeight: 700, fontSize: '15px', color: C.text }}>{name}</Typography>
+            <Box sx={{ textAlign: 'right' }}>
+              <Typography sx={{ fontSize: '22px', fontWeight: 800,
+                color: i === 0 ? C.primary : C.text,
+                fontFamily: "'Space Grotesk', sans-serif", lineHeight: 1 }}>
+                {count}
+              </Typography>
+              <Typography sx={{ fontSize: '10px', color: C.muted, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                {t('tabWorkouts')}
+              </Typography>
+            </Box>
+          </Box>
+        ))}
+      </Paper>
+    </Box>
+  )
+}
+
 // ── Dashboard Tab ────────────────────────────────────────────
 function DashboardTab({ t, lang, setTab }) {
   const { realClients, showSnackbar } = useApp()
-  const { allPlans, slots, loadAllPlans, loadSlots } = useBooking()
+  const { allPlans, loadAllPlans } = useBooking()
   const [loaded, setLoaded] = useState(false)
 
   useEffect(() => {
-    async function load() {
-      await Promise.all([loadAllPlans(), loadSlots(isoToday(), isoDatePlusDays(1))])
-      setLoaded(true)
-    }
-    load()
+    loadAllPlans().then(() => setLoaded(true))
   }, [])
 
   function getActivePlan(clientId) {
@@ -808,16 +953,14 @@ function DashboardTab({ t, lang, setTab }) {
     if (!p || p.plan_type === 'unlimited') return false
     return creditsRemaining(p) <= 2
   })
-  const todaySlots = slots.filter(s => s.slot_date === isoToday())
 
   return (
     <Box>
       {/* Summary cards */}
       <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', mb: 3 }}>
-        <StatCard icon={PeopleIcon}      label={t('pendingCard')}  value={pending.length}    color="#F87171" onClick={() => setTab(3)} />
-        <StatCard icon={WarningAmberIcon} label={t('expiringCard')} value={expiring.length}   color="#FB923C" onClick={() => setTab(2)} />
-        <StatCard icon={CreditCardIcon}  label={t('lowCredCard')}  value={lowCred.length}    color="#FBBF24" onClick={() => setTab(2)} />
-        <StatCard icon={CalendarMonthIcon} label={t('todayScheduleCard')} value={todaySlots.length} color={C.primary} onClick={() => setTab(1)} />
+        <StatCard icon={PeopleIcon}       label={t('pendingCard')}  value={pending.length}   color="#F87171" onClick={() => setTab(2)} />
+        <StatCard icon={WarningAmberIcon} label={t('expiringCard')} value={expiring.length}  color="#FB923C" onClick={() => setTab(1)} />
+        <StatCard icon={CreditCardIcon}   label={t('lowCredCard')}  value={lowCred.length}   color="#FBBF24" onClick={() => setTab(1)} />
       </Box>
 
       {/* Pending list */}
@@ -831,7 +974,7 @@ function DashboardTab({ t, lang, setTab }) {
               <Box key={c.id} sx={{ px: 2, py: 1, display: 'flex', alignItems: 'center', gap: 1.5,
                 borderBottom: `1px solid ${C.border}`, '&:last-child': { borderBottom: 'none' } }}>
                 <Typography sx={{ fontWeight: 600, fontSize: '14px', color: C.text, flex: 1 }}>{c.name}</Typography>
-                <Typography sx={{ fontSize: '11px', color: '#F87171' }}>Без план</Typography>
+                <Typography sx={{ fontSize: '11px', color: '#F87171' }}>{t('noPlanShort')}</Typography>
               </Box>
             ))}
           </Paper>
@@ -842,7 +985,7 @@ function DashboardTab({ t, lang, setTab }) {
       {expiring.length > 0 && (
         <>
           <Typography sx={{ fontWeight: 700, fontSize: '14px', color: '#FB923C', mb: 1 }}>
-            {t('expiringPlans')} (7 дни)
+            {t('expiringPlans')}
           </Typography>
           <Paper sx={{ borderRadius: '14px', border: `1px solid rgba(251,146,60,0.25)`, mb: 2, overflow: 'hidden' }}>
             {expiring.map(c => {
@@ -860,27 +1003,6 @@ function DashboardTab({ t, lang, setTab }) {
         </>
       )}
 
-      {/* Today's schedule */}
-      {todaySlots.length > 0 && (
-        <>
-          <Typography sx={{ fontWeight: 700, fontSize: '14px', color: C.text, mb: 1 }}>
-            {t('todaySlotsLbl')}
-          </Typography>
-          <Paper sx={{ borderRadius: '14px', border: `1px solid ${C.border}`, overflow: 'hidden' }}>
-            {todaySlots.map(s => (
-              <Box key={s.id} sx={{ px: 2, py: 1, display: 'flex', alignItems: 'center', gap: 1.5,
-                borderBottom: `1px solid ${C.border}`, '&:last-child': { borderBottom: 'none' } }}>
-                <Typography sx={{ fontWeight: 700, fontSize: '14px', color: C.primary, minWidth: 48 }}>
-                  {fmtTime(s.start_time)}
-                </Typography>
-                <Typography sx={{ fontSize: '13px', color: C.text, flex: 1 }}>{s.coach_name}</Typography>
-                <Chip label={`${s.booked_count || 0}/${s.capacity}`} size="small"
-                  sx={{ fontSize: '10px', background: C.accentSoft, color: C.primary }} />
-              </Box>
-            ))}
-          </Paper>
-        </>
-      )}
     </Box>
   )
 }
@@ -891,10 +1013,11 @@ export default function Admin() {
   const [tab, setTab] = useState(0)
 
   const TABS = [
-    { label: t('adminDashboard'), key: 0 },
-    { label: t('slotsManagement'), key: 1 },
-    { label: t('plansManagement'), key: 2 },
-    { label: t('clientsMgmt'), key: 3 },
+    { label: t('adminDashboard'),  key: 0 },
+    { label: t('plansManagement'), key: 1 },
+    { label: t('clientsMgmt'),     key: 2 },
+    { label: t('analyticsTab'),    key: 3 },
+    { label: t('coachesTab'),      key: 4 },
   ]
 
   return (
@@ -927,9 +1050,10 @@ export default function Admin() {
 
       {/* Tab content */}
       {tab === 0 && <DashboardTab t={t} lang={lang} setTab={setTab} />}
-      {tab === 1 && <AdminScheduleTab t={t} lang={lang} />}
-      {tab === 2 && <PlansTab t={t} />}
-      {tab === 3 && <ClientsTab t={t} />}
+      {tab === 1 && <PlansTab t={t} />}
+      {tab === 2 && <ClientsTab t={t} />}
+      {tab === 3 && <AnalyticsTab t={t} />}
+      {tab === 4 && <CoachesTab t={t} />}
     </Box>
   )
 }

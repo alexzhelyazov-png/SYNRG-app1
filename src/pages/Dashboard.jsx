@@ -298,7 +298,7 @@ function ClientProgressSection() {
     }}>
       {/* Header + message button */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-        <Typography variant="h3">Progress</Typography>
+        <Typography variant="h3">{t('progressTitle')}</Typography>
         <Button
           size="small"
           onClick={() => setMsgOpen(p => !p)}
