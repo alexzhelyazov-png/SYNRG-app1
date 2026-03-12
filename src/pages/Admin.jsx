@@ -24,6 +24,7 @@ import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings'
 import { useApp }            from '../context/AppContext'
 import { useBooking }        from '../context/BookingContext'
 import { C }                 from '../theme'
+import { DB }                from '../lib/db'
 import {
   isoToday, isoDatePlusDays, groupByDate, dayLabel, fmtTime,
   occupancyStr, planLabel, fmtValidTo, isPlanActive, creditsRemaining,
@@ -795,25 +796,166 @@ function ClientsTab({ t }) {
 // ── Analytics Tab ─────────────────────────────────────────────
 function AnalyticsTab({ t }) {
   const { allPlans, loadAllPlans } = useBooking()
+  const [expenses, setExpenses] = useState([])
 
-  useEffect(() => { loadAllPlans() }, []) // eslint-disable-line
+  useEffect(() => {
+    loadAllPlans()
+    DB.selectAll('expenses').then(rows => setExpenses(rows || []))
+  }, []) // eslint-disable-line
 
-  const allRevenue = allPlans.reduce((sum, p) => sum + (Number(p.price) || 0), 0)
+  const allRevenue  = allPlans.reduce((sum, p) => sum + (Number(p.price) || 0), 0)
+  const allExpenses = expenses.reduce((sum, e) => sum + (Number(e.amount) || 0), 0)
+
+  const bigBox = (label, value, positive) => (
+    <Paper sx={{
+      p: 3.5, borderRadius: '20px',
+      border: `1px solid ${positive ? C.primaryA20 : 'rgba(248,113,113,0.25)'}`,
+      background: positive
+        ? 'linear-gradient(135deg, rgba(196,233,191,0.12) 0%, rgba(196,233,191,0.05) 100%)'
+        : 'linear-gradient(135deg, rgba(248,113,113,0.10) 0%, rgba(248,113,113,0.04) 100%)',
+    }}>
+      <Typography sx={{ fontSize: '11px', color: C.muted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.9px', mb: 1.25 }}>
+        {label}
+      </Typography>
+      <Typography sx={{ fontSize: '48px', fontWeight: 800, color: positive ? C.primary : '#F87171',
+        fontFamily: "'Space Grotesk', sans-serif", lineHeight: 1, letterSpacing: '-1px' }}>
+        {value} <Typography component="span" sx={{ fontSize: '22px', fontWeight: 600,
+          color: positive ? C.primary : '#F87171', fontFamily: "'Space Grotesk', sans-serif" }}>лв.</Typography>
+      </Typography>
+    </Paper>
+  )
+
+  return (
+    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+      {bigBox(t('totalRevenueLbl'),  allRevenue,  true)}
+      {bigBox(t('totalExpensesLbl'), allExpenses, false)}
+    </Box>
+  )
+}
+
+// ── Expenses Tab ──────────────────────────────────────────────
+const EXPENSE_CATEGORIES = [
+  'expCategoryTok', 'expCategoryOsig', 'expCategoryToalet', 'expCategoryReklama',
+  'expCategoryNaem', 'expCategoryVoda', 'expCategoryIcko', 'expCategoryEli',
+  'expCategoryNiki', 'expCategoryVivi', 'expCategorySche',
+]
+
+function ExpensesTab({ t }) {
+  const { showSnackbar } = useApp()
+  const [expenses, setExpenses]   = useState([])
+  const [open, setOpen]           = useState(false)
+  const [category, setCategory]   = useState('')
+  const [amount, setAmount]       = useState('')
+  const [saving, setSaving]       = useState(false)
+
+  async function loadExpenses() {
+    const rows = await DB.selectAll('expenses')
+    setExpenses((rows || []).sort((a, b) => b.created_at?.localeCompare(a.created_at || '') || 0))
+  }
+
+  useEffect(() => { loadExpenses() }, [])
+
+  async function handleAdd() {
+    if (!category || !amount || Number(amount) <= 0) return
+    setSaving(true)
+    await DB.insert('expenses', {
+      category,
+      amount: Number(amount),
+      created_at: new Date().toISOString(),
+    })
+    setSaving(false)
+    setOpen(false)
+    setCategory('')
+    setAmount('')
+    loadExpenses()
+    showSnackbar?.('Разходът е добавен')
+  }
+
+  async function handleDelete(id) {
+    await DB.deleteById('expenses', id)
+    loadExpenses()
+  }
+
+  const total = expenses.reduce((s, e) => s + (Number(e.amount) || 0), 0)
 
   return (
     <Box>
-      <Paper sx={{
-        p: 3.5, borderRadius: '20px',
-        border: `1px solid ${C.primaryA20}`,
-        background: 'linear-gradient(135deg, rgba(196,233,191,0.12) 0%, rgba(196,233,191,0.05) 100%)',
-      }}>
-        <Typography sx={{ fontSize: '11px', color: C.muted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.9px', mb: 1.25 }}>
-          {t('totalRevenueLbl')}
-        </Typography>
-        <Typography sx={{ fontSize: '48px', fontWeight: 800, color: C.primary, fontFamily: "'Space Grotesk', sans-serif", lineHeight: 1, letterSpacing: '-1px' }}>
-          {allRevenue} <Typography component="span" sx={{ fontSize: '22px', fontWeight: 600, color: C.primary, fontFamily: "'Space Grotesk', sans-serif" }}>лв.</Typography>
-        </Typography>
+      {/* Total + Add button */}
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+        <Box>
+          <Typography sx={{ fontSize: '11px', color: C.muted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.9px' }}>
+            {t('totalExpensesLbl')}
+          </Typography>
+          <Typography sx={{ fontSize: '36px', fontWeight: 800, color: '#F87171',
+            fontFamily: "'Space Grotesk', sans-serif", lineHeight: 1, letterSpacing: '-1px' }}>
+            {total} <Typography component="span" sx={{ fontSize: '18px', fontWeight: 600, color: '#F87171' }}>лв.</Typography>
+          </Typography>
+        </Box>
+        <Button variant="contained" startIcon={<AddIcon />}
+          onClick={() => setOpen(true)}
+          sx={{ borderRadius: '12px', background: C.primary, color: '#0a0a0a',
+            fontWeight: 700, textTransform: 'none', px: 2 }}>
+          {t('addExpenseBtn')}
+        </Button>
+      </Box>
+
+      {/* Expenses list */}
+      <Paper sx={{ borderRadius: '16px', border: `1px solid ${C.border}`, overflow: 'hidden' }}>
+        {expenses.length === 0 ? (
+          <Typography sx={{ color: C.muted, p: 3, textAlign: 'center' }}>{t('noExpensesLbl')}</Typography>
+        ) : expenses.map(exp => (
+          <Box key={exp.id} sx={{ display: 'flex', alignItems: 'center', gap: 1.5,
+            px: 2, py: 1.25,
+            borderBottom: `1px solid ${C.border}`, '&:last-child': { borderBottom: 'none' } }}>
+            <Box sx={{ flex: 1 }}>
+              <Typography sx={{ fontWeight: 600, fontSize: '14px', color: C.text }}>{exp.category}</Typography>
+              <Typography sx={{ fontSize: '11px', color: C.muted }}>
+                {exp.created_at ? new Date(exp.created_at).toLocaleDateString('bg-BG') : ''}
+              </Typography>
+            </Box>
+            <Typography sx={{ fontWeight: 700, fontSize: '15px', color: '#F87171',
+              fontFamily: "'Space Grotesk', sans-serif", minWidth: '64px', textAlign: 'right' }}>
+              {exp.amount} лв.
+            </Typography>
+            <IconButton size="small" onClick={() => handleDelete(exp.id)}
+              sx={{ color: C.muted, '&:hover': { color: '#F87171' } }}>
+              <DeleteOutlineIcon fontSize="small" />
+            </IconButton>
+          </Box>
+        ))}
       </Paper>
+
+      {/* Add Dialog */}
+      <Dialog open={open} onClose={() => setOpen(false)} PaperProps={{
+        sx: { background: '#1a1a1a', border: `1px solid ${C.border}`, borderRadius: '20px', minWidth: 320 }
+      }}>
+        <DialogTitle sx={{ color: C.text, fontWeight: 700 }}>{t('addExpenseBtn')}</DialogTitle>
+        <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: '8px !important' }}>
+          <FormControl fullWidth size="small">
+            <InputLabel sx={{ color: C.muted }}>{t('expenseCategoryLbl')}</InputLabel>
+            <Select value={category} onChange={e => setCategory(e.target.value)}
+              label={t('expenseCategoryLbl')}
+              sx={{ color: C.text, '& .MuiOutlinedInput-notchedOutline': { borderColor: C.border } }}>
+              {EXPENSE_CATEGORIES.map(key => (
+                <MenuItem key={key} value={t(key)}>{t(key)}</MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          <TextField label={t('expenseAmountLbl')} type="number" size="small"
+            value={amount} onChange={e => setAmount(e.target.value)}
+            inputProps={{ min: 0 }}
+            sx={{ '& .MuiOutlinedInput-root': { color: C.text, '& fieldset': { borderColor: C.border } },
+              '& .MuiInputLabel-root': { color: C.muted } }} />
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setOpen(false)} sx={{ color: C.muted, textTransform: 'none' }}>Откажи</Button>
+          <Button onClick={handleAdd} disabled={saving || !category || Number(amount) <= 0}
+            variant="contained"
+            sx={{ background: C.primary, color: '#0a0a0a', fontWeight: 700, textTransform: 'none', borderRadius: '10px' }}>
+            {saving ? <CircularProgress size={18} /> : 'Добави'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   )
 }
@@ -821,15 +963,6 @@ function AnalyticsTab({ t }) {
 // ── Coaches Tab ───────────────────────────────────────────────
 function CoachesTab({ t }) {
   const { realClients } = useApp()
-  const { allPlans, loadAllPlans } = useBooking()
-
-  useEffect(() => { loadAllPlans() }, []) // eslint-disable-line
-
-  const activePlans = useMemo(
-    () => [...allPlans.filter(p => p.status === 'active')]
-      .sort((a, b) => (Number(b.price) || 0) - (Number(a.price) || 0)),
-    [allPlans]
-  )
 
   const coachStats = useMemo(() => {
     const counts = {}
@@ -846,8 +979,7 @@ function CoachesTab({ t }) {
 
   return (
     <Box>
-      {/* Coach workout counts */}
-      <Paper sx={{ borderRadius: '16px', border: `1px solid ${C.border}`, overflow: 'hidden', mb: 3 }}>
+      <Paper sx={{ borderRadius: '16px', border: `1px solid ${C.border}`, overflow: 'hidden' }}>
         {coachStats.length === 0 ? (
           <Typography sx={{ color: C.muted, p: 3, textAlign: 'center' }}>{t('noDataLbl')}</Typography>
         ) : coachStats.map(({ name, count }, i) => (
@@ -877,38 +1009,6 @@ function CoachesTab({ t }) {
             </Box>
           </Box>
         ))}
-      </Paper>
-
-      {/* Client plan fees */}
-      <Typography variant="h3" sx={{ mb: 1.5 }}>{t('allActivePlans')}</Typography>
-      <Paper sx={{ borderRadius: '16px', border: `1px solid ${C.border}`, overflow: 'hidden' }}>
-        {activePlans.length === 0 ? (
-          <Typography sx={{ color: C.muted, p: 3, textAlign: 'center' }}>{t('noActivePlans')}</Typography>
-        ) : activePlans.map(plan => {
-          const client = realClients.find(c => c.id === plan.client_id)
-          if (!client) return null
-          const fee = Number(plan.price) || 0
-          return (
-            <Box key={plan.id} sx={{ display: 'flex', alignItems: 'center', gap: 1.5,
-              px: 2, py: 1.25,
-              borderBottom: `1px solid ${C.border}`, '&:last-child': { borderBottom: 'none' } }}>
-              <Box sx={{ width: 34, height: 34, borderRadius: '50%', flexShrink: 0,
-                background: C.primaryContainer,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: '13px', fontWeight: 800, color: C.primary }}>
-                {client.name.charAt(0).toUpperCase()}
-              </Box>
-              <Typography sx={{ flex: 1, fontWeight: 600, fontSize: '14px', color: C.text }}>{client.name}</Typography>
-              <Chip label={planLabel(plan.plan_type, t)} size="small"
-                sx={{ fontSize: '10px', background: C.primaryContainer, color: C.primary }} />
-              <Typography sx={{ fontWeight: 700, fontSize: '15px', minWidth: '72px', textAlign: 'right',
-                color: fee > 0 ? C.primary : C.muted,
-                fontFamily: "'Space Grotesk', sans-serif" }}>
-                {fee > 0 ? `${fee} лв.` : t('freeLbl')}
-              </Typography>
-            </Box>
-          )
-        })}
       </Paper>
     </Box>
   )
@@ -1004,6 +1104,7 @@ export default function Admin() {
     { label: t('clientsMgmt'),     key: 1 },
     { label: t('analyticsTab'),    key: 2 },
     { label: t('coachesTab'),      key: 3 },
+    { label: t('expensesTab'),     key: 4 },
   ]
 
   return (
@@ -1039,6 +1140,7 @@ export default function Admin() {
       {tab === 1 && <ClientsTab t={t} />}
       {tab === 2 && <AnalyticsTab t={t} />}
       {tab === 3 && <CoachesTab t={t} />}
+      {tab === 4 && <ExpensesTab t={t} />}
     </Box>
   )
 }
