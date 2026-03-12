@@ -31,8 +31,8 @@ function getNavItems(auth, admin) {
   if (auth.role === 'client') {
     return [
       ...BASE_NAV,
-      { view: 'tasks',    Icon: AssignmentIcon,    labelKey: 'navTasks'   },
-      { view: 'schedule', Icon: CalendarMonthIcon, labelKey: 'navSchedule' },
+      { view: 'tasks',    Icon: AssignmentIcon,    labelKey: 'navTasks'    },
+      { view: 'schedule', Icon: CalendarMonthIcon, labelKey: 'navBookSlot' },
     ]
   }
   // Coach / Admin — dashboard, schedule, tasks [, admin]

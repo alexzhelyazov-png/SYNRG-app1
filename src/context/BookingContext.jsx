@@ -111,6 +111,24 @@ export function BookingProvider({ children }) {
     }
   }, [auth, loadSlots, loadMyBookings, loadMyPlan])
 
+  // Coach/admin cancels a booking on behalf of a specific client
+  const cancelBookingForClient = useCallback(async (slotId, clientId) => {
+    setBookingBusy(true)
+    try {
+      const result = await DB.callRpc('cancel_booking', {
+        p_slot_id:   slotId,
+        p_client_id: clientId,
+      })
+      if (result?.error) return { error: result.error }
+      await loadSlots()
+      return { ok: true }
+    } catch (e) {
+      return { error: e.message || 'Error cancelling' }
+    } finally {
+      setBookingBusy(false)
+    }
+  }, [loadSlots])
+
   // ── Admin: create single slot ─────────────────────────────
   const createSlot = useCallback(async (data) => {
     try {
@@ -291,7 +309,7 @@ export function BookingProvider({ children }) {
       loadSlots, loadSlotBookings, loadMyBookings, loadMyPlan, loadAllPlans,
       refreshClientView,
       // Client actions
-      bookSlot, cancelBookingForSlot,
+      bookSlot, cancelBookingForSlot, cancelBookingForClient,
       // Admin slot actions
       createSlot, createRecurringSlots, createShiftSlots, updateSlot, deleteSlot,
       // Admin plan actions

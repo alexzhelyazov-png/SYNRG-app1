@@ -250,6 +250,7 @@ export const T = {
     // ── Booking (client view) ─────────────────────────
     navBooking:         'Записване',
     navSchedule:        'График',
+    navBookSlot:        'Запази час',
     navAdmin:           'Админ',
     bookingTitle:       'Записване',
     myPlanTitle:        'Моят план',
@@ -626,6 +627,7 @@ export const T = {
     // ── Booking (client view) ─────────────────────────
     navBooking:         'Booking',
     navSchedule:        'Schedule',
+    navBookSlot:        'Book a Slot',
     navAdmin:           'Admin',
     bookingTitle:       'Book a Session',
     myPlanTitle:        'My Plan',

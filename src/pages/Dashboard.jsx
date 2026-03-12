@@ -453,7 +453,8 @@ function ClientProgressSection() {
 // ─── Remaining sessions + upcoming bookings (coach view for a client) ─
 function ClientSessionSummary() {
   const { client } = useApp()
-  const { allPlans, loadAllPlans, slots, slotBookings } = useBooking()
+  const { allPlans, loadAllPlans, slots, slotBookings, bookingBusy, cancelBookingForClient } = useBooking()
+  const [cancelErr, setCancelErr] = useState({})
 
   useEffect(() => { loadAllPlans() }, []) // eslint-disable-line
 
@@ -461,12 +462,19 @@ function ClientSessionSummary() {
   const remCred = plan ? creditsRemaining(plan) : null
   const today   = isoToday()
 
-  // Find upcoming bookings for this client
+  // Find upcoming bookings for this client (with booking record for cancel)
   const upcoming = (slots || [])
     .filter(s => s.slot_date >= today && s.status !== 'cancelled')
-    .filter(s => (slotBookings[s.id] || []).some(b => b.client_id === client.id))
-    .sort((a, b) => (a.slot_date + a.start_time).localeCompare(b.slot_date + b.start_time))
-    .slice(0, 3)
+    .map(s => ({ slot: s, booking: (slotBookings[s.id] || []).find(b => b.client_id === client.id) }))
+    .filter(({ booking }) => !!booking)
+    .sort((a, b) => (a.slot.slot_date + a.slot.start_time).localeCompare(b.slot.slot_date + b.slot.start_time))
+    .slice(0, 5)
+
+  async function handleCancel(slotId) {
+    setCancelErr({})
+    const res = await cancelBookingForClient(slotId, client.id)
+    if (res?.error) setCancelErr(prev => ({ ...prev, [slotId]: res.error }))
+  }
 
   if (!plan && upcoming.length === 0) return null
 
@@ -476,7 +484,7 @@ function ClientSessionSummary() {
       border: `1px solid ${C.border}`, borderRadius: '16px',
       animation: `fadeInUp 0.28s ${EASE.decelerate} 0.06s both`,
     }}>
-      <Typography variant="h3" sx={{ mb: 1.5 }}>Workouts</Typography>
+      <Typography variant="h3" sx={{ mb: 1.5 }}>Sessions</Typography>
       <Box sx={{ display: 'flex', gap: 3, mb: upcoming.length > 0 ? 1.5 : 0, flexWrap: 'wrap' }}>
         {plan && (
           <Box>
@@ -494,11 +502,25 @@ function ClientSessionSummary() {
           <Typography sx={{ fontSize: '11px', color: C.muted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.7px', mb: 0.75 }}>
             Upcoming Sessions
           </Typography>
-          {upcoming.map(s => (
-            <Box key={s.id} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-              py: '6px', borderBottom: `1px solid ${C.border}` }}>
-              <Typography sx={{ fontSize: '13px', fontWeight: 700, color: C.text }}>{s.slot_date}</Typography>
-              <Typography sx={{ fontSize: '12px', color: C.muted }}>{s.start_time?.slice(0, 5)} · {s.coach_name}</Typography>
+          {upcoming.map(({ slot, booking }) => (
+            <Box key={slot.id} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+              py: '7px', borderBottom: `1px solid ${C.border}`, gap: 1 }}>
+              <Box sx={{ flex: 1, minWidth: 0 }}>
+                <Typography sx={{ fontSize: '13px', fontWeight: 700, color: C.text }}>
+                  {slot.slot_date} · {slot.start_time?.slice(0, 5)}
+                </Typography>
+                <Typography sx={{ fontSize: '11.5px', color: C.muted }}>{slot.coach_name}</Typography>
+                {cancelErr[slot.id] && (
+                  <Typography sx={{ fontSize: '11px', color: '#F87171', mt: 0.25 }}>{cancelErr[slot.id]}</Typography>
+                )}
+              </Box>
+              <Button size="small" variant="outlined" disabled={bookingBusy}
+                onClick={() => handleCancel(slot.id)}
+                sx={{ fontSize: '11px', py: 0.4, px: 1.25, flexShrink: 0,
+                  borderColor: C.border, color: C.muted,
+                  '&:hover': { borderColor: '#F87171', color: '#F87171', background: 'rgba(248,113,113,0.08)' } }}>
+                Cancel
+              </Button>
             </Box>
           ))}
         </>
@@ -1081,7 +1103,7 @@ export function ClientSchedule() {
   return (
     <Box sx={{ maxWidth: 640, mx: 'auto' }}>
       <Typography variant="h5" sx={{ fontWeight: 800, mb: 2, color: C.text }}>
-        Schedule
+        {t('navBookSlot')}
       </Typography>
 
       {/* Credits summary */}
