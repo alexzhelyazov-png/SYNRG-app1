@@ -309,7 +309,7 @@ function PlanDialog({ open, onClose, onActivate, onExtend, onAdjust, client, pla
             <TextField label={t('priceLbl')} type="number" size="small"
               value={price} onChange={e => setPrice(e.target.value)}
               inputProps={{ min: 0 }} sx={inputSx}
-              helperText={Number(price) === 0 ? t('freeLbl') : `${price} лв.`}
+              helperText={Number(price) === 0 ? t('freeLbl') : `${price} €`}
               FormHelperTextProps={{ sx: { color: Number(price) === 0 ? C.muted : C.primary } }}
             />
             <Typography sx={{ fontSize: '12px', color: C.muted }}>
@@ -391,7 +391,7 @@ function ClientPlanRow({ client, plan, onManage, t }) {
                 sx={{ fontSize: '10px', height: 18, background: isExpiring ? 'rgba(251,146,60,0.12)' : 'rgba(255,255,255,0.06)', color: isExpiring ? '#FB923C' : C.muted }} />
             )}
             <Chip
-              label={Number(plan.price) > 0 ? `${plan.price} лв.` : t('freeLbl')}
+              label={Number(plan.price) > 0 ? `${plan.price} €` : t('freeLbl')}
               size="small"
               sx={{ fontSize: '10px', height: 18,
                 background: Number(plan.price) > 0 ? 'rgba(196,233,191,0.12)' : 'rgba(255,255,255,0.06)',
@@ -820,7 +820,7 @@ function AnalyticsTab({ t }) {
       <Typography sx={{ fontSize: '48px', fontWeight: 800, color: positive ? C.primary : '#F87171',
         fontFamily: "'MontBlanc', sans-serif", lineHeight: 1, letterSpacing: '-1px' }}>
         {value} <Typography component="span" sx={{ fontSize: '22px', fontWeight: 600,
-          color: positive ? C.primary : '#F87171', fontFamily: "'MontBlanc', sans-serif" }}>лв.</Typography>
+          color: positive ? C.primary : '#F87171', fontFamily: "'MontBlanc', sans-serif" }}>€</Typography>
       </Typography>
     </Paper>
   )
@@ -888,7 +888,7 @@ function ExpensesTab({ t }) {
           </Typography>
           <Typography sx={{ fontSize: '36px', fontWeight: 800, color: '#F87171',
             fontFamily: "'MontBlanc', sans-serif", lineHeight: 1, letterSpacing: '-1px' }}>
-            {total} <Typography component="span" sx={{ fontSize: '18px', fontWeight: 600, color: '#F87171' }}>лв.</Typography>
+            {total} <Typography component="span" sx={{ fontSize: '18px', fontWeight: 600, color: '#F87171' }}>€</Typography>
           </Typography>
         </Box>
         <Button variant="contained" startIcon={<AddIcon />}
@@ -915,7 +915,7 @@ function ExpensesTab({ t }) {
             </Box>
             <Typography sx={{ fontWeight: 700, fontSize: '15px', color: '#F87171',
               fontFamily: "'MontBlanc', sans-serif", minWidth: '64px', textAlign: 'right' }}>
-              {exp.amount} лв.
+              {exp.amount} €
             </Typography>
             <IconButton size="small" onClick={() => handleDelete(exp.id)}
               sx={{ color: C.muted, '&:hover': { color: '#F87171' } }}>
