@@ -278,7 +278,7 @@ export function AppProvider({ children }) {
   const foodSuggestions = useMemo(() => {
     const s = foodSearch.trim().toLowerCase()
     if (!s) return []
-    return Object.entries(foodDB).filter(([k, f]) => k.includes(s) || f.label.toLowerCase().includes(s)).slice(0, 8)
+    return Object.entries(foodDB).filter(([k, f]) => k.includes(s) || f.label.toLowerCase().includes(s) || (f.labelEn || '').toLowerCase().includes(s)).slice(0, 8)
   }, [foodSearch])
 
   const sortedWeightLogs = useMemo(

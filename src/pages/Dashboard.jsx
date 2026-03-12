@@ -402,7 +402,7 @@ function ClientProgressSection() {
           '&:hover': { background: C.accentSoft, color: C.primary, borderColor: C.primaryA20 },
         }}
       >
-        {historyOpen ? 'Скрий история ↑' : 'История на храна и тегло ↓'}
+        {historyOpen ? t('hideHistoryBtn') : t('showHistoryBtn')}
       </Button>
 
       {/* Expandable history */}

@@ -1,6 +1,6 @@
 import { Box, Typography, TextField, Button, Chip, Paper } from '@mui/material'
 import { useApp } from '../context/AppContext'
-import { quickFoods, foodDB } from '../lib/constants'
+import { quickFoods, foodDB, foodLabel } from '../lib/constants'
 import { C, EASE } from '../theme'
 import ProgressRing from '../components/ProgressRing'
 import FoodModal    from '../components/FoodModal'
@@ -9,7 +9,7 @@ import { useMemo } from 'react'
 
 export default function FoodTracker() {
   const {
-    auth, client, t,
+    auth, client, t, lang,
     viewingCoach,
     foodDate, setFoodDate,
     setFoodModalOpen,
@@ -153,8 +153,8 @@ export default function FoodTracker() {
               <Chip
                 key={item.key}
                 label={`+ ${item.count !== undefined
-                  ? `${item.count} ${foodDB[item.key]?.label}`
-                  : `${foodDB[item.key]?.label} ${item.grams}${t('gUnit')}`}`}
+                  ? `${item.count} ${foodLabel(foodDB[item.key], lang)}`
+                  : `${foodLabel(foodDB[item.key], lang)} ${item.grams}${t('gUnit')}`}`}
                 onClick={() => addQuickFood(item.key, item.grams)}
                 sx={{
                   background: C.purpleSoft,
@@ -204,7 +204,7 @@ export default function FoodTracker() {
                   animationDelay: `${i * 0.04}s`,
                 }}
               >
-                <Typography sx={{ fontWeight: 600, fontSize: '14px' }}>{item.label}</Typography>
+                <Typography sx={{ fontWeight: 600, fontSize: '14px' }}>{lang === 'en' ? (foodDB[item.key]?.labelEn || item.label) : item.label}</Typography>
                 <Typography variant="body2" sx={{ color: C.muted }}>{item.grams}{t('gUnit')}</Typography>
                 {!isMobile && (
                   <Typography variant="body2" sx={{ color: C.text }}>

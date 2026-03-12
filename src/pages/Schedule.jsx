@@ -101,11 +101,11 @@ function QuickShiftDialog({ open, onClose, onSave, coaches, defaultDate, t }) {
     <Dialog open={open} onClose={close} maxWidth="xs" fullWidth
       PaperProps={{ sx: { borderRadius: '20px', background: C.card, border: `1px solid ${C.border}` } }}>
       <DialogTitle sx={{ fontWeight: 700, color: C.text, display: 'flex', alignItems: 'center', gap: 1 }}>
-        <BoltIcon sx={{ color: C.orange, fontSize: 20 }} /> Нова смяна
+        <BoltIcon sx={{ color: C.orange, fontSize: 20 }} /> {t('newShiftTitle')}
       </DialogTitle>
       <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: '4px !important' }}>
         {/* Date */}
-        <TextField label="Дата" type="date" size="small"
+        <TextField label={t('slotDateLbl')} type="date" size="small"
           value={date} onChange={e => setDate(e.target.value)}
           InputLabelProps={{ shrink: true }} sx={inputSx} />
 
@@ -121,16 +121,16 @@ function QuickShiftDialog({ open, onClose, onSave, coaches, defaultDate, t }) {
         {/* From – To hour */}
         <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center' }}>
           <FormControl size="small" sx={{ flex: 1 }}>
-            <InputLabel sx={{ color: C.muted }}>От</InputLabel>
-            <Select value={fromH} onChange={e => setFromH(Number(e.target.value))} label="От"
+            <InputLabel sx={{ color: C.muted }}>{t('fromLbl')}</InputLabel>
+            <Select value={fromH} onChange={e => setFromH(Number(e.target.value))} label={t('fromLbl')}
               sx={{ color: C.text, '.MuiOutlinedInput-notchedOutline': { borderColor: C.border } }}>
               {HOURS.map(h => <MenuItem key={h} value={h}>{p2(h)}:00</MenuItem>)}
             </Select>
           </FormControl>
           <Typography sx={{ color: C.muted, fontWeight: 700, flexShrink: 0 }}>–</Typography>
           <FormControl size="small" sx={{ flex: 1 }}>
-            <InputLabel sx={{ color: C.muted }}>До</InputLabel>
-            <Select value={toH} onChange={e => setToH(Number(e.target.value))} label="До"
+            <InputLabel sx={{ color: C.muted }}>{t('toLbl')}</InputLabel>
+            <Select value={toH} onChange={e => setToH(Number(e.target.value))} label={t('toLbl')}
               sx={{ color: C.text, '.MuiOutlinedInput-notchedOutline': { borderColor: C.border } }}>
               {[...HOURS.slice(1), 20].map(h => <MenuItem key={h} value={h}>{p2(h)}:00</MenuItem>)}
             </Select>
@@ -150,7 +150,7 @@ function QuickShiftDialog({ open, onClose, onSave, coaches, defaultDate, t }) {
         {count > 0 && !done && (
           <Box sx={{ p: 1.5, borderRadius: '10px', background: C.primaryContainer, border: `1px solid ${C.primaryA20}` }}>
             <Typography sx={{ fontSize: '12px', color: C.primary, fontWeight: 700, mb: 0.5 }}>
-              Ще се създадат {count} часа:
+              {t('willCreateSlots')} {count} {t('hoursLbl')}:
             </Typography>
             <Typography sx={{ fontSize: '11px', color: C.muted, lineHeight: 1.6 }}>
               {hourList.join(' · ')}
@@ -160,7 +160,7 @@ function QuickShiftDialog({ open, onClose, onSave, coaches, defaultDate, t }) {
         {done !== null && (
           <Box sx={{ p: 1.5, borderRadius: '10px', background: 'rgba(196,233,191,0.1)', border: `1px solid ${C.primaryA20}` }}>
             <Typography sx={{ fontSize: '13px', color: C.primary, fontWeight: 700 }}>
-              ✓ Добавени {done} часа
+              ✓ {t('addedSlots')} {done} {t('hoursLbl')}
             </Typography>
           </Box>
         )}
@@ -169,7 +169,7 @@ function QuickShiftDialog({ open, onClose, onSave, coaches, defaultDate, t }) {
         <Button onClick={close} sx={{ color: C.muted }}>{t('cancelBtn')}</Button>
         <Button variant="contained" onClick={handleSave} disabled={saving || count === 0}
           sx={{ background: C.primary, color: '#0f1c11', fontWeight: 700 }}>
-          {saving ? <CircularProgress size={16} /> : 'Създай смяна'}
+          {saving ? <CircularProgress size={16} /> : t('createShiftBtn')}
         </Button>
       </DialogActions>
     </Dialog>

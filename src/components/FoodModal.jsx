@@ -5,44 +5,65 @@ import {
 } from '@mui/material'
 import CloseIcon from '@mui/icons-material/Close'
 import { useApp } from '../context/AppContext'
-import { foodDB } from '../lib/constants'
+import { foodDB, foodLabel } from '../lib/constants'
 import { C } from '../theme'
 
 export default function FoodModal() {
-  const { foodModalOpen, setFoodModalOpen, addFoodFromModal, t } = useApp()
-  const [search, setSearch] = useState('')
-  const [amount, setAmount] = useState('')  // grams OR count, depending on food
+  const { foodModalOpen, setFoodModalOpen, addFoodFromModal, t, lang } = useApp()
+  const [search,      setSearch]      = useState('')
+  const [selectedKey, setSelectedKey] = useState(null)  // actual DB key after suggestion click
+  const [amount,      setAmount]      = useState('')
+
+  const isEn = lang === 'en'
 
   const suggestions = (() => {
     const s = search.trim().toLowerCase()
     if (!s) return []
     return Object.entries(foodDB)
-      .filter(([k, f]) => k.includes(s) || f.label.toLowerCase().includes(s))
+      .filter(([k, f]) => {
+        const bgMatch = k.includes(s) || f.label.toLowerCase().includes(s)
+        const enMatch = isEn && (f.labelEn || '').toLowerCase().includes(s)
+        return bgMatch || enMatch
+      })
       .slice(0, 8)
   })()
 
-  const selectedFood = foodDB[search.trim().toLowerCase()] || null
-  const isPiece      = !!selectedFood?.perPiece
+  // Lookup: use selectedKey if set (after clicking suggestion), else try direct match
+  const lookupKey  = selectedKey || search.trim().toLowerCase()
+  const selectedFood = foodDB[lookupKey] || null
+  const isPiece    = !!selectedFood?.perPiece
 
-  // For calculation: if per-piece, multiply count × gramsPerPiece
   const gramsForCalc = isPiece
     ? Number(amount) * (selectedFood?.gramsPerPiece || 55)
     : Number(amount)
 
+  function handleSelectSuggestion(key) {
+    setSelectedKey(key)
+    setSearch(foodLabel(foodDB[key], lang))  // show localized name in field
+    setAmount('')
+  }
+
+  function handleSearchChange(val) {
+    setSearch(val)
+    setSelectedKey(null)  // clear selection when typing again
+    setAmount('')
+  }
+
   function handleAdd() {
-    const key    = search.trim().toLowerCase()
-    const food   = foodDB[key]
+    if (!selectedFood || !amount) return
     const rawNum = Number(String(amount).replace(',', '.'))
-    if (!food || !rawNum) return
-    const grams  = food.perPiece ? rawNum * (food.gramsPerPiece || 55) : rawNum
-    addFoodFromModal(key, grams)
+    if (!rawNum) return
+    const grams = selectedFood.perPiece ? rawNum * (selectedFood.gramsPerPiece || 55) : rawNum
+    addFoodFromModal(lookupKey, grams)
     setSearch('')
+    setSelectedKey(null)
     setAmount('')
   }
 
   function handleClose() {
     setFoodModalOpen(false)
     setSearch('')
+    setSelectedKey(null)
     setAmount('')
   }
 
@@ -61,12 +82,12 @@ export default function FoodModal() {
             fullWidth
             placeholder={t('foodSearchPlaceholder')}
             value={search}
-            onChange={e => { setSearch(e.target.value); setAmount('') }}
+            onChange={e => handleSearchChange(e.target.value)}
             autoFocus
           />
 
           {/* Suggestions dropdown */}
-          {search.trim() && suggestions.length > 0 && (
+          {search.trim() && !selectedKey && suggestions.length > 0 && (
             <Box sx={{
               border:       `1px solid ${C.border}`,
               borderRadius: '12px',
@@ -76,7 +97,7 @@ export default function FoodModal() {
               {suggestions.map(([key, food]) => (
                 <Box
                   key={key}
-                  onClick={() => setSearch(key)}
+                  onClick={() => handleSelectSuggestion(key)}
                   sx={{
                     px: 1.75, py: 1.25,
                     cursor: 'pointer',
@@ -85,7 +106,9 @@ export default function FoodModal() {
                     '&:hover': { background: C.accentSoft },
                   }}
                 >
-                  <Typography sx={{ fontWeight: 600, fontSize: '14px' }}>{food.label}</Typography>
+                  <Typography sx={{ fontWeight: 600, fontSize: '14px' }}>
+                    {foodLabel(food, lang)}
+                  </Typography>
                   <Typography sx={{ color: C.muted, fontSize: '12px' }}>
                     {food.perPiece
                       ? `${Math.round(food.kcal / 100 * food.gramsPerPiece)} kcal · ${Math.round(food.protein / 100 * food.gramsPerPiece * 10) / 10}${t('gUnit')} ${t('proteinShortLbl')} / ${t('pieceUnit')}`

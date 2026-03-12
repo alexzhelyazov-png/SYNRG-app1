@@ -897,7 +897,7 @@ function ExpensesTab({ t }) {
     setCategory('')
     setAmount('')
     loadExpenses()
-    showSnackbar?.('Разходът е добавен')
+    showSnackbar?.(t('expenseAddedMsg'))
   }
 
   async function handleDelete(id) {
@@ -981,7 +981,7 @@ function ExpensesTab({ t }) {
           <Button onClick={handleAdd} disabled={saving || !category || Number(amount) <= 0}
             variant="contained"
             sx={{ background: C.primary, color: '#0a0a0a', fontWeight: 700, textTransform: 'none', borderRadius: '10px' }}>
-            {saving ? <CircularProgress size={18} /> : 'Добави'}
+            {saving ? <CircularProgress size={18} /> : t('addBtn')}
           </Button>
         </DialogActions>
       </Dialog>
