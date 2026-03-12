@@ -12,7 +12,7 @@ import FoodTracker from './FoodTracker'
 import WeightTracker from './WeightTracker'
 import { todayDate, fmt1 } from '../lib/utils'
 import { computeReminders } from '../lib/reminders'
-import { creditsRemaining, isoToday } from '../lib/bookingUtils'
+import { creditsRemaining, isoToday, daysUntilExpiry, fmtValidTo } from '../lib/bookingUtils'
 
 // ─── Reminder banners (client) ───────────────────────────────────
 function ReminderBanners() {
@@ -865,8 +865,8 @@ function DashboardClient({ isCoachView = false }) {
     setView, viewingCoach,
   } = useApp()
   const {
-    slots, myBookings, bookingBusy,
-    loadSlots, loadMyBookings, cancelBookingForSlot,
+    slots, myBookings, myPlan, bookingBusy,
+    loadSlots, loadMyBookings, loadMyPlan, cancelBookingForSlot,
   } = useBooking()
 
   const [tab, setTab] = useState(0)
@@ -877,6 +877,7 @@ function DashboardClient({ isCoachView = false }) {
     if (!isCoachView && auth.id) {
       loadSlots()
       loadMyBookings(auth.id)
+      loadMyPlan(auth.id)
     }
   }, [isCoachView, auth.id]) // eslint-disable-line
 
@@ -965,129 +966,216 @@ function DashboardClient({ isCoachView = false }) {
         {tabLabels.map((label, i) => <Tab key={i} label={label} />)}
       </Tabs>
 
-      {/* ── Tab 0: Тренировки ─────────────────────────── */}
-      {tab === 0 && (
-        <>
-          {/* Today's calorie & protein progress rings */}
-          <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 1.5, mb: 2.5 }}>
-            {[
-              [t('todayCalLbl'),  kcalPct, foodTotals.kcal,    client.calorieTarget, '',          C.primary, 'primary'],
-              [t('todayProtLbl'), protPct, foodTotals.protein, client.proteinTarget, t('gUnit'), C.purple,  'purple'],
-            ].map(([label, pct, cur, tgt, suf, color, cn], idx) => (
-              <Box key={label} sx={{
-                background: `linear-gradient(145deg, var(--c-${cn}A5) 0%, var(--c-${cn}A3) 100%)`,
-                border: `1px solid var(--c-${cn}A13)`, borderRadius: '16px', p: '18px 20px',
-                display: 'flex', alignItems: 'center', gap: 1.75,
-                animation: `fadeInUp 0.22s ${EASE.decelerate} ${0.06 + idx * 0.04}s both`,
+      {/* ── Tab 0: Начало ─────────────────────────────── */}
+      {tab === 0 && !isCoachView && (() => {
+        const today = isoToday()
+
+        // Next upcoming session
+        const nextSession = (myBookings || [])
+          .filter(b => b.status === 'active')
+          .map(b => ({ booking: b, slot: (slots || []).find(s => s.id === b.slot_id) }))
+          .filter(({ slot }) => slot && slot.slot_date >= today && slot.status !== 'cancelled')
+          .sort((a, b) => (a.slot.slot_date + a.slot.start_time).localeCompare(b.slot.slot_date + b.slot.start_time))[0] || null
+
+        // Plan status
+        const credits  = myPlan ? (myPlan.plan_type === 'unlimited' ? null : creditsRemaining(myPlan)) : null
+        const daysLeft = myPlan ? daysUntilExpiry(myPlan) : null
+        const planColor = !myPlan ? '#F87171'
+          : (credits !== null && credits <= 2) || (daysLeft !== null && daysLeft <= 3) ? '#F87171'
+          : (credits !== null && credits <= 4) || (daysLeft !== null && daysLeft <= 7) ? '#FB923C'
+          : C.primary
+
+        // Today logging status
+        const todayFoodLogged   = foodTotals.kcal > 0
+        const todayWeightLogged = (client.weightLogs || []).some(w => (w.date || '').slice(0, 10) === today)
+
+        function bgDate(iso) {
+          if (!iso) return ''
+          return new Date(iso + 'T00:00:00').toLocaleDateString('bg-BG', { weekday: 'long', day: 'numeric', month: 'long' })
+        }
+
+        return (
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+
+            {/* ── Следваща тренировка ── */}
+            {nextSession ? (
+              <Paper sx={{
+                p: 2.5, borderRadius: '20px',
+                background: 'linear-gradient(135deg, rgba(196,233,191,0.12) 0%, rgba(196,233,191,0.05) 100%)',
+                border: `1px solid ${C.primaryA20}`,
               }}>
-                <Box sx={{ position: 'relative', flexShrink: 0 }}>
-                  <ProgressRing percent={pct} color={color} size={64} />
-                  <Box sx={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 700, color }}>
-                    {Math.round(pct)}%
-                  </Box>
-                </Box>
-                <Box>
-                  <Typography sx={{ fontSize: '10.5px', color: C.muted, mb: 0.6, textTransform: 'uppercase', letterSpacing: '0.8px', fontWeight: 700 }}>
-                    {label}
+                <Typography sx={{ fontSize: '11px', color: C.muted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.9px', mb: 1 }}>
+                  {t('nextSessionLbl')}
+                </Typography>
+                <Typography sx={{ fontSize: '22px', fontWeight: 800, color: C.text, lineHeight: 1.2, mb: 0.5, textTransform: 'capitalize' }}>
+                  {bgDate(nextSession.slot.slot_date)}
+                </Typography>
+                <Typography sx={{ fontSize: '28px', fontWeight: 800, color: C.primary, fontFamily: "'Space Grotesk', sans-serif", lineHeight: 1, mb: 1 }}>
+                  {nextSession.slot.start_time?.slice(0,5)} – {nextSession.slot.end_time?.slice(0,5)}
+                </Typography>
+                {nextSession.slot.coach_name && (
+                  <Typography sx={{ fontSize: '15px', color: C.muted, mb: 1.5 }}>
+                    с {nextSession.slot.coach_name}
                   </Typography>
-                  <Box sx={{ display: 'flex', alignItems: 'baseline', gap: '4px' }}>
-                    <Typography sx={{ fontSize: '26px', fontWeight: 800, color, lineHeight: 1.1, letterSpacing: '-0.5px', fontFamily: "'Space Grotesk', sans-serif" }}>
-                      {fmt1(cur)}{suf}
+                )}
+                <Button size="small" variant="outlined" disabled={bookingBusy}
+                  onClick={() => handleCancel(nextSession.slot.id)}
+                  sx={{ fontSize: '13px', borderColor: 'rgba(248,113,113,0.4)', color: '#F87171',
+                    '&:hover': { borderColor: '#F87171', background: 'rgba(248,113,113,0.08)' } }}>
+                  {t('cancelBtn')}
+                </Button>
+              </Paper>
+            ) : (
+              <Paper sx={{ p: 2.5, borderRadius: '20px', border: `1px solid ${C.border}` }}>
+                <Typography sx={{ fontSize: '11px', color: C.muted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.9px', mb: 1 }}>
+                  {t('nextSessionLbl')}
+                </Typography>
+                <Typography sx={{ fontSize: '16px', color: C.muted }}>{t('noUpcomingSessions')}</Typography>
+              </Paper>
+            )}
+
+            {/* ── Твоят план ── */}
+            <Paper sx={{
+              p: 2.5, borderRadius: '20px',
+              border: `1px solid ${planColor}33`,
+              background: `${planColor}08`,
+            }}>
+              <Typography sx={{ fontSize: '11px', color: C.muted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.9px', mb: 1.25 }}>
+                {t('yourPlanLbl')}
+              </Typography>
+              {!myPlan ? (
+                <Typography sx={{ fontSize: '17px', color: '#F87171', fontWeight: 700 }}>{t('noPlan')}</Typography>
+              ) : (
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+                  {/* Remaining sessions */}
+                  {myPlan.plan_type !== 'unlimited' ? (
+                    <Box>
+                      <Typography sx={{ fontSize: '52px', fontWeight: 800, color: planColor, fontFamily: "'Space Grotesk', sans-serif", lineHeight: 1, letterSpacing: '-2px' }}>
+                        {credits}
+                      </Typography>
+                      <Typography sx={{ fontSize: '13px', color: C.muted, fontWeight: 600 }}>{t('remainingSessionsLbl')}</Typography>
+                    </Box>
+                  ) : (
+                    <Box>
+                      <Typography sx={{ fontSize: '36px', fontWeight: 800, color: C.primary, fontFamily: "'Space Grotesk', sans-serif", lineHeight: 1 }}>∞</Typography>
+                      <Typography sx={{ fontSize: '13px', color: C.muted, fontWeight: 600 }}>{t('unlimitedPlan')}</Typography>
+                    </Box>
+                  )}
+                  {/* Divider */}
+                  <Box sx={{ width: '1px', height: 56, background: C.border, flexShrink: 0 }} />
+                  {/* Expiry */}
+                  <Box>
+                    <Typography sx={{ fontSize: '15px', fontWeight: 700, color: planColor, lineHeight: 1.3 }}>
+                      {fmtValidTo(myPlan)}
                     </Typography>
-                    <Typography sx={{ color: C.muted, fontSize: '13px', fontWeight: 600 }}>/ {tgt}{suf}</Typography>
+                    <Typography sx={{ fontSize: '12px', color: C.muted, mt: 0.25 }}>
+                      {daysLeft !== null
+                        ? daysLeft <= 0 ? t('planExpired') : `${t('expiresInLbl')} ${daysLeft} ${t('daysLbl')}`
+                        : t('validUntil')}
+                    </Typography>
                   </Box>
                 </Box>
+              )}
+            </Paper>
+
+            {/* ── Днес ── */}
+            <Box>
+              <Typography sx={{ fontSize: '11px', color: C.muted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.9px', mb: 1 }}>
+                {t('todayLbl')}
+              </Typography>
+              <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1.5 }}>
+                {/* Food button */}
+                <Paper onClick={() => setTab(progressTabIdx)}
+                  sx={{
+                    p: 2.25, borderRadius: '18px', cursor: 'pointer',
+                    border: `1px solid ${todayFoodLogged ? C.primaryA20 : C.border}`,
+                    background: todayFoodLogged ? 'rgba(196,233,191,0.08)' : 'rgba(255,255,255,0.03)',
+                    transition: 'transform 0.15s',
+                    '&:hover': { transform: 'translateY(-2px)' },
+                    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1, textAlign: 'center',
+                  }}>
+                  <Typography sx={{ fontSize: '30px', lineHeight: 1 }}>🍽</Typography>
+                  <Typography sx={{ fontSize: '15px', fontWeight: 700, color: todayFoodLogged ? C.primary : C.text }}>
+                    {todayFoodLogged ? `${Math.round(foodTotals.kcal)} kcal` : t('addFoodBtn')}
+                  </Typography>
+                  <Typography sx={{ fontSize: '12px', color: C.muted }}>
+                    {todayFoodLogged ? '✓ ' + t('loggedToday') : t('tapToLog')}
+                  </Typography>
+                </Paper>
+
+                {/* Weight button */}
+                <Paper onClick={() => setTab(progressTabIdx)}
+                  sx={{
+                    p: 2.25, borderRadius: '18px', cursor: 'pointer',
+                    border: `1px solid ${todayWeightLogged ? C.primaryA20 : C.border}`,
+                    background: todayWeightLogged ? 'rgba(196,233,191,0.08)' : 'rgba(255,255,255,0.03)',
+                    transition: 'transform 0.15s',
+                    '&:hover': { transform: 'translateY(-2px)' },
+                    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1, textAlign: 'center',
+                  }}>
+                  <Typography sx={{ fontSize: '30px', lineHeight: 1 }}>⚖️</Typography>
+                  <Typography sx={{ fontSize: '15px', fontWeight: 700, color: todayWeightLogged ? C.primary : C.text }}>
+                    {todayWeightLogged && latestWeight ? `${latestWeight} ${t('kgUnit')}` : t('addWeightBtn')}
+                  </Typography>
+                  <Typography sx={{ fontSize: '12px', color: C.muted }}>
+                    {todayWeightLogged ? '✓ ' + t('loggedToday') : t('tapToLog')}
+                  </Typography>
+                </Paper>
+              </Box>
+            </Box>
+
+            {/* ── Тази седмица ── */}
+            {(weekWorkouts.length > 0 || weekBookings.length > 0) && (
+              <Box>
+                <Typography sx={{ fontSize: '11px', color: C.muted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.9px', mb: 1 }}>
+                  {t('workoutsThisWeekLbl')}
+                </Typography>
+                <Paper sx={{ borderRadius: '16px', border: `1px solid ${C.border}`, overflow: 'hidden' }}>
+                  {weekBookings.map(({ booking, slot }, i) => (
+                    <Box key={slot.id} sx={{ display: 'flex', alignItems: 'center', gap: 1.5,
+                      px: 2, py: 1.25, borderBottom: `1px solid ${C.border}`, '&:last-child': { borderBottom: 'none' } }}>
+                      <Box sx={{ width: 8, height: 8, borderRadius: '50%', background: C.primary, flexShrink: 0 }} />
+                      <Typography sx={{ flex: 1, fontWeight: 600, fontSize: '14px', color: C.text }}>{slot.slot_date}</Typography>
+                      <Typography sx={{ fontSize: '14px', color: C.primary, fontWeight: 700 }}>
+                        {slot.start_time?.slice(0,5)}
+                      </Typography>
+                    </Box>
+                  ))}
+                  {weekWorkouts.map((w, i) => (
+                    <Box key={i} sx={{ display: 'flex', alignItems: 'center', gap: 1.5,
+                      px: 2, py: 1.25, borderBottom: `1px solid ${C.border}`, '&:last-child': { borderBottom: 'none' } }}>
+                      <Box sx={{ width: 8, height: 8, borderRadius: '50%', background: C.purple, flexShrink: 0 }} />
+                      <Typography sx={{ flex: 1, fontWeight: 600, fontSize: '14px', color: C.text }}>{w.date}</Typography>
+                      {w.category && <Chip label={t(w.category)} size="small" sx={{ fontSize: '11px', background: C.purpleSoft, color: C.purple }} />}
+                    </Box>
+                  ))}
+                </Paper>
+              </Box>
+            )}
+
+          </Box>
+        )
+      })()}
+
+      {/* ── Tab 0: Тренировки (coach view) ────────────── */}
+      {tab === 0 && isCoachView && (
+        <>
+          {/* Workouts this week */}
+          <Paper sx={{ p: 2.25, mb: 2.5, border: `1px solid ${C.border}`, borderRadius: '16px' }}>
+            <Typography variant="h3" sx={{ mb: 1.5 }}>{t('workoutsThisWeekLbl')}</Typography>
+            {weekWorkouts.length === 0 ? (
+              <Typography sx={{ color: C.muted, fontSize: '13px' }}>{t('noWorkoutsWeekLbl')}</Typography>
+            ) : weekWorkouts.map((w, i) => (
+              <Box key={i} sx={{ display: 'flex', alignItems: 'center', gap: 1.5, py: '8px',
+                borderBottom: i < weekWorkouts.length - 1 ? `1px solid ${C.border}` : 'none' }}>
+                <Typography sx={{ color: C.muted, fontSize: '13px', minWidth: '92px' }}>{w.date}</Typography>
+                {w.category && (
+                  <Chip label={t(w.category)} size="small" sx={{ background: C.purpleSoft, color: C.purple, fontSize: '11.5px', fontWeight: 600 }} />
+                )}
+                <Typography sx={{ color: C.muted, fontSize: '12px', ml: 'auto' }}>{w.items?.length || 0} {t('exercisesLbl')}</Typography>
               </Box>
             ))}
-          </Box>
-
-          {/* Workouts this week */}
-          <Paper sx={{ p: 2.25, mb: 2.5, border: `1px solid ${C.border}`, borderRadius: '16px', animation: `fadeInUp 0.26s ${EASE.decelerate} 0.1s both` }}>
-            <Typography variant="h3" sx={{ mb: 1.5 }}>{t('workoutsThisWeekLbl')}</Typography>
-            {weekWorkouts.length === 0 && weekBookings.length === 0 ? (
-              <Typography sx={{ color: C.muted, fontSize: '13px' }}>{t('noWorkoutsWeekLbl')}</Typography>
-            ) : (
-              <>
-                {/* Upcoming booked sessions */}
-                {weekBookings.map(({ booking, slot }, i) => (
-                  <Box key={slot.id} sx={{ display: 'flex', alignItems: 'center', gap: 1.5, py: '8px',
-                    borderBottom: (i < weekBookings.length - 1 || weekWorkouts.length > 0) ? `1px solid ${C.border}` : 'none' }}>
-                    <Typography sx={{ color: C.muted, fontSize: '13px', minWidth: '92px' }}>{slot.slot_date}</Typography>
-                    <Chip
-                      label={`${slot.start_time?.slice(0,5) || ''}${slot.end_time ? '–' + slot.end_time.slice(0,5) : ''}`}
-                      size="small"
-                      sx={{ background: C.accentSoft, color: C.primary, border: '1px solid rgba(196,233,191,0.25)', fontSize: '11.5px', fontWeight: 600 }}
-                    />
-                    <Chip label={t('upcomingTag')} size="small" sx={{ background: 'rgba(196,233,191,0.1)', color: C.primary, fontSize: '11px', fontWeight: 700 }} />
-                    <Button
-                      size="small"
-                      variant="outlined"
-                      disabled={bookingBusy}
-                      onClick={() => handleCancel(slot.id)}
-                      sx={{ ml: 'auto', fontSize: '12px', py: '2px', px: 1.5,
-                        borderColor: 'rgba(248,113,113,0.4)', color: '#F87171',
-                        '&:hover': { borderColor: '#F87171', background: 'rgba(248,113,113,0.08)' } }}
-                    >
-                      {t('cancelBtn')}
-                    </Button>
-                  </Box>
-                ))}
-                {/* Recorded workouts */}
-                {weekWorkouts.map((w, i) => (
-                  <Box key={i} sx={{ display: 'flex', alignItems: 'center', gap: 1.5, py: '8px',
-                    borderBottom: i < weekWorkouts.length - 1 ? `1px solid ${C.border}` : 'none' }}>
-                    <Typography sx={{ color: C.muted, fontSize: '13px', minWidth: '92px' }}>{w.date}</Typography>
-                    {w.category && (
-                      <Chip label={t(w.category)} size="small" sx={{ background: C.purpleSoft, color: C.purple, border: '1px solid rgba(200,197,255,0.2)', fontSize: '11.5px', fontWeight: 600 }} />
-                    )}
-                    <Typography sx={{ color: C.muted, fontSize: '12px', ml: 'auto' }}>{w.items?.length || 0} {t('exercisesLbl')}</Typography>
-                  </Box>
-                ))}
-              </>
-            )}
           </Paper>
-
-          {/* Ranking (clients only) */}
-          {!isCoachView && myData && (
-            <Paper sx={{ p: 2.75, animation: `fadeInUp 0.28s ${EASE.decelerate} 0.14s both` }}>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                <Typography variant="h3">{t('myRanking')}</Typography>
-                <Button variant="outlined" size="small" onClick={() => setView('ranking')} sx={{ fontSize: '13px' }}>{t('seeAll')}</Button>
-              </Box>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2.5,
-                background: 'linear-gradient(135deg, rgba(196,233,191,0.1) 0%, rgba(196,233,191,0.06) 100%)',
-                border: '1px solid rgba(196,233,191,0.2)', borderRadius: '16px', p: '16px 20px' }}>
-                <Typography sx={{ fontSize: '36px', fontWeight: 800, lineHeight: 1, minWidth: '56px', textAlign: 'center', color: C.primary, fontFamily: "'Space Grotesk', sans-serif" }}>
-                  #{myRank + 1}
-                </Typography>
-                <Box sx={{ flex: 1 }}>
-                  <Typography sx={{ fontWeight: 800, fontSize: '22px', color: C.primary, mb: 0.75, fontFamily: "'Space Grotesk', sans-serif", letterSpacing: '-0.4px' }}>
-                    {myData.points} {t('points')}
-                  </Typography>
-                  <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-                    {[
-                      [`${t('kgUnit')}`, myData.breakdown.weightPts],
-                      [t('rankWorkoutLbl'), myData.breakdown.workoutPts],
-                      ['kcal', myData.breakdown.calPts],
-                      [t('proteinShortLbl'), myData.breakdown.protPts],
-                    ].map(([ico, pts]) => (
-                      <Typography key={ico} sx={{ fontSize: '13px', color: C.muted }}>
-                        {ico} <span style={{ color: C.text, fontWeight: 700 }}>{pts}</span>
-                      </Typography>
-                    ))}
-                  </Box>
-                </Box>
-                <Box sx={{ textAlign: 'right', flexShrink: 0 }}>
-                  <Typography sx={{ fontSize: '13px', color: C.muted }}>{t('ofLbl')} {ranking.length} {t('ofClients')}</Typography>
-                  {myRank > 0 && (
-                    <Typography sx={{ fontSize: '13px', color: C.muted, mt: 0.5 }}>
-                      {t('toFirst')} <span style={{ color: C.primary, fontWeight: 700 }}>{ranking[0].points - myData.points} {t('points')}</span>
-                    </Typography>
-                  )}
-                </Box>
-              </Box>
-            </Paper>
-          )}
         </>
       )}
 
