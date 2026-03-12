@@ -818,9 +818,9 @@ function AnalyticsTab({ t }) {
         {label}
       </Typography>
       <Typography sx={{ fontSize: '48px', fontWeight: 800, color: positive ? C.primary : '#F87171',
-        fontFamily: "'Space Grotesk', sans-serif", lineHeight: 1, letterSpacing: '-1px' }}>
+        fontFamily: "'MontBlanc', sans-serif", lineHeight: 1, letterSpacing: '-1px' }}>
         {value} <Typography component="span" sx={{ fontSize: '22px', fontWeight: 600,
-          color: positive ? C.primary : '#F87171', fontFamily: "'Space Grotesk', sans-serif" }}>лв.</Typography>
+          color: positive ? C.primary : '#F87171', fontFamily: "'MontBlanc', sans-serif" }}>лв.</Typography>
       </Typography>
     </Paper>
   )
@@ -887,7 +887,7 @@ function ExpensesTab({ t }) {
             {t('totalExpensesLbl')}
           </Typography>
           <Typography sx={{ fontSize: '36px', fontWeight: 800, color: '#F87171',
-            fontFamily: "'Space Grotesk', sans-serif", lineHeight: 1, letterSpacing: '-1px' }}>
+            fontFamily: "'MontBlanc', sans-serif", lineHeight: 1, letterSpacing: '-1px' }}>
             {total} <Typography component="span" sx={{ fontSize: '18px', fontWeight: 600, color: '#F87171' }}>лв.</Typography>
           </Typography>
         </Box>
@@ -914,7 +914,7 @@ function ExpensesTab({ t }) {
               </Typography>
             </Box>
             <Typography sx={{ fontWeight: 700, fontSize: '15px', color: '#F87171',
-              fontFamily: "'Space Grotesk', sans-serif", minWidth: '64px', textAlign: 'right' }}>
+              fontFamily: "'MontBlanc', sans-serif", minWidth: '64px', textAlign: 'right' }}>
               {exp.amount} лв.
             </Typography>
             <IconButton size="small" onClick={() => handleDelete(exp.id)}
@@ -987,7 +987,7 @@ function CoachesTab({ t }) {
             px: 2, py: 1.5,
             borderBottom: `1px solid ${C.border}`, '&:last-child': { borderBottom: 'none' } }}>
             <Typography sx={{ fontSize: '18px', fontWeight: 800, color: i === 0 ? C.primary : C.muted,
-              minWidth: 28, fontFamily: "'Space Grotesk', sans-serif" }}>
+              minWidth: 28, fontFamily: "'MontBlanc', sans-serif" }}>
               #{i + 1}
             </Typography>
             <Box sx={{ width: 36, height: 36, borderRadius: '50%', flexShrink: 0,
@@ -1000,7 +1000,7 @@ function CoachesTab({ t }) {
             <Box sx={{ textAlign: 'right' }}>
               <Typography sx={{ fontSize: '22px', fontWeight: 800,
                 color: i === 0 ? C.primary : C.text,
-                fontFamily: "'Space Grotesk', sans-serif", lineHeight: 1 }}>
+                fontFamily: "'MontBlanc', sans-serif", lineHeight: 1 }}>
                 {count}
               </Typography>
               <Typography sx={{ fontSize: '10px', color: C.muted, textTransform: 'uppercase', letterSpacing: '0.5px' }}>

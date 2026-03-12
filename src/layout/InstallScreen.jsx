@@ -36,7 +36,7 @@ export default function InstallScreen({ onSkip }) {
       justifyContent: 'center',
       padding:        '32px 24px',
       gap:            0,
-      fontFamily:     "'DM Sans', sans-serif",
+      fontFamily:     "'MontBlanc', sans-serif",
       color:          C.text,
     }}>
       <Box sx={{ mb: 1 }}>
@@ -97,7 +97,7 @@ export default function InstallScreen({ onSkip }) {
           background:     'transparent',
           border:         'none',
           color:          C.muted,
-          fontFamily:     "'DM Sans', sans-serif",
+          fontFamily:     "'MontBlanc', sans-serif",
           fontSize:       '14px',
           fontWeight:     600,
           cursor:         'pointer',

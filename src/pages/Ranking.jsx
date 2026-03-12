@@ -127,7 +127,7 @@ export default function Ranking() {
                     fontSize:    isFirst ? '20px' : '16px',
                     color:       RANK_COLORS[rank],
                     lineHeight:  1,
-                    fontFamily:  "'Space Grotesk', sans-serif",
+                    fontFamily:  "'MontBlanc', sans-serif",
                   }}>
                     {RANK_LABELS[rank]}
                   </Typography>
@@ -171,7 +171,7 @@ export default function Ranking() {
                     color:         RANK_COLORS[rank],
                     lineHeight:    1,
                     letterSpacing: '-0.5px',
-                    fontFamily:    "'Space Grotesk', sans-serif",
+                    fontFamily:    "'MontBlanc', sans-serif",
                   }}>
                     {item?.points}
                   </Typography>
@@ -316,7 +316,7 @@ export default function Ranking() {
                     fontWeight:    800,
                     fontSize:      isFirst ? '18px' : '15px',
                     color:         isFirst ? C.primary : C.text,
-                    fontFamily:    "'Space Grotesk', sans-serif",
+                    fontFamily:    "'MontBlanc', sans-serif",
                     letterSpacing: '-0.3px',
                     filter:        isFirst ? 'drop-shadow(0 0 6px rgba(196,233,191,0.25))' : 'none',
                   }}>

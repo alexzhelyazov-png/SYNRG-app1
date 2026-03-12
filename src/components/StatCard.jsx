@@ -39,7 +39,7 @@ export default function StatCard({ label, value, accent, sub }) {
         color:      accent ? C.primary : C.text,
         lineHeight: 1.1,
         letterSpacing: '-0.5px',
-        fontFamily: "'Space Grotesk', sans-serif",
+        fontFamily: "'MontBlanc', sans-serif",
       }}>
         {value}
       </div>

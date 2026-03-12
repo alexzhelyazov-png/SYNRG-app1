@@ -11,10 +11,33 @@
   <link rel="apple-touch-icon" href="icon-192.png"/>
   <link rel="icon" type="image/png" href="icon-192.png"/>
   <title>SYNRG App</title>
-  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&family=Space+Grotesk:wght@700;800&display=swap" rel="stylesheet"/>
   <style>
+    @font-face {
+      font-family: 'MontBlanc';
+      src: url('/fonts/MontBlanc-Bold.woff2') format('woff2'),
+           url('/fonts/MontBlanc-Bold.woff')  format('woff');
+      font-weight: 700 900;
+      font-style: normal;
+      font-display: swap;
+    }
+    @font-face {
+      font-family: 'MontBlanc';
+      src: url('/fonts/MontBlanc-SemiBold.woff2') format('woff2'),
+           url('/fonts/MontBlanc-SemiBold.woff')  format('woff');
+      font-weight: 400 600;
+      font-style: normal;
+      font-display: swap;
+    }
+    @font-face {
+      font-family: 'MontBlanc';
+      src: url('/fonts/MontBlanc-BoldItalic.woff2') format('woff2'),
+           url('/fonts/MontBlanc-BoldItalic.woff')  format('woff');
+      font-weight: 700 900;
+      font-style: italic;
+      font-display: swap;
+    }
     *{box-sizing:border-box;margin:0;padding:0}
-    html,body{height:100%;width:100%;background:#1A1918;color:#F4F4F3;font-family:'DM Sans',sans-serif}
+    html,body{height:100%;width:100%;background:#1A1918;color:#F4F4F3;font-family:'MontBlanc',sans-serif}
     #root{height:100%}
     ::-webkit-scrollbar{width:4px}
     ::-webkit-scrollbar-thumb{background:#3D3A38;border-radius:99px}

@@ -346,7 +346,7 @@ function ClientProgressSection() {
           <Typography sx={{ fontSize: '11px', color: C.muted, mb: 0.3, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.7px' }}>
             {t('sevenDayAvg')}
           </Typography>
-          <Typography sx={{ fontSize: '22px', fontWeight: 800, color: C.purple, fontFamily: "'Space Grotesk', sans-serif", lineHeight: 1.1 }}>
+          <Typography sx={{ fontSize: '22px', fontWeight: 800, color: C.purple, fontFamily: "'MontBlanc', sans-serif", lineHeight: 1.1 }}>
             {latestAvg !== null ? `${fmt1(latestAvg)} кг` : '—'}
           </Typography>
         </Box>
@@ -355,7 +355,7 @@ function ClientProgressSection() {
             Weekly Rate
           </Typography>
           <Typography sx={{
-            fontSize: '22px', fontWeight: 800, fontFamily: "'Space Grotesk', sans-serif", lineHeight: 1.1,
+            fontSize: '22px', fontWeight: 800, fontFamily: "'MontBlanc', sans-serif", lineHeight: 1.1,
             color: weeklyRate === null ? C.muted : weeklyRate > 0 ? C.orange : C.primary,
           }}>
             {weeklyRate !== null ? `${weeklyRate > 0 ? '+' : ''}${fmt1(weeklyRate)} ${t('kgWeek')}` : '—'}
@@ -491,7 +491,7 @@ function ClientSessionSummary() {
             <Typography sx={{ fontSize: '11px', color: C.muted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.7px', mb: 0.3 }}>
               Remaining
             </Typography>
-            <Typography sx={{ fontSize: '22px', fontWeight: 800, color: C.primary, lineHeight: 1.1, fontFamily: "'Space Grotesk', sans-serif" }}>
+            <Typography sx={{ fontSize: '22px', fontWeight: 800, color: C.primary, lineHeight: 1.1, fontFamily: "'MontBlanc', sans-serif" }}>
               {plan.plan_type === 'unlimited' ? '∞' : `${remCred} / ${plan.credits_total}`}
             </Typography>
           </Box>
@@ -561,7 +561,7 @@ function TodayScheduleCard() {
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
                 <Typography sx={{
                   fontSize: '13.5px', fontWeight: 700, color: C.primary,
-                  minWidth: '50px', fontFamily: "'Space Grotesk', sans-serif",
+                  minWidth: '50px', fontFamily: "'MontBlanc', sans-serif",
                 }}>
                   {(s.start_time || '').slice(0, 5)}
                 </Typography>
@@ -605,10 +605,10 @@ function DashboardCoach() {
               }}>
                 <Typography sx={{
                   fontSize: '12px', fontWeight: 800, color: i === 0 ? C.primary : C.muted,
-                  minWidth: '22px', textAlign: 'right', fontFamily: "'Space Grotesk', sans-serif",
+                  minWidth: '22px', textAlign: 'right', fontFamily: "'MontBlanc', sans-serif",
                 }}>#{i + 1}</Typography>
                 <Typography sx={{ flex: 1, fontSize: '13.5px', fontWeight: i === 0 ? 700 : 500, color: C.text }}>{r.name}</Typography>
-                <Typography sx={{ fontSize: '13px', fontWeight: 700, color: i === 0 ? C.primary : C.muted, fontFamily: "'Space Grotesk', sans-serif" }}>
+                <Typography sx={{ fontSize: '13px', fontWeight: 700, color: i === 0 ? C.primary : C.muted, fontFamily: "'MontBlanc', sans-serif" }}>
                   {r.points} т.
                 </Typography>
               </Box>
@@ -1010,7 +1010,7 @@ function DashboardClient({ isCoachView = false }) {
                 <Typography sx={{ fontSize: '22px', fontWeight: 800, color: C.text, lineHeight: 1.2, mb: 0.5, textTransform: 'capitalize' }}>
                   {bgDate(nextSession.slot.slot_date)}
                 </Typography>
-                <Typography sx={{ fontSize: '28px', fontWeight: 800, color: C.primary, fontFamily: "'Space Grotesk', sans-serif", lineHeight: 1, mb: 1 }}>
+                <Typography sx={{ fontSize: '28px', fontWeight: 800, color: C.primary, fontFamily: "'MontBlanc', sans-serif", lineHeight: 1, mb: 1 }}>
                   {nextSession.slot.start_time?.slice(0,5)} – {nextSession.slot.end_time?.slice(0,5)}
                 </Typography>
                 {nextSession.slot.coach_name && (
@@ -1050,14 +1050,14 @@ function DashboardClient({ isCoachView = false }) {
                   {/* Remaining sessions */}
                   {myPlan.plan_type !== 'unlimited' ? (
                     <Box>
-                      <Typography sx={{ fontSize: '52px', fontWeight: 800, color: planColor, fontFamily: "'Space Grotesk', sans-serif", lineHeight: 1, letterSpacing: '-2px' }}>
+                      <Typography sx={{ fontSize: '52px', fontWeight: 800, color: planColor, fontFamily: "'MontBlanc', sans-serif", lineHeight: 1, letterSpacing: '-2px' }}>
                         {credits}
                       </Typography>
                       <Typography sx={{ fontSize: '13px', color: C.muted, fontWeight: 600 }}>{t('remainingSessionsLbl')}</Typography>
                     </Box>
                   ) : (
                     <Box>
-                      <Typography sx={{ fontSize: '36px', fontWeight: 800, color: C.primary, fontFamily: "'Space Grotesk', sans-serif", lineHeight: 1 }}>∞</Typography>
+                      <Typography sx={{ fontSize: '36px', fontWeight: 800, color: C.primary, fontFamily: "'MontBlanc', sans-serif", lineHeight: 1 }}>∞</Typography>
                       <Typography sx={{ fontSize: '13px', color: C.muted, fontWeight: 600 }}>{t('unlimitedPlan')}</Typography>
                     </Box>
                   )}
@@ -1263,7 +1263,7 @@ export function ClientSchedule() {
             <Typography sx={{ fontSize: '13px', fontWeight: 600, color: C.text }}>
               {t('remainingSessionsLbl')}
             </Typography>
-            <Typography sx={{ fontSize: '20px', fontWeight: 800, color: C.primary, fontFamily: "'Space Grotesk', sans-serif" }}>
+            <Typography sx={{ fontSize: '20px', fontWeight: 800, color: C.primary, fontFamily: "'MontBlanc', sans-serif" }}>
               {myPlan.plan_type === 'unlimited' ? '∞' : `${creditsRemaining(myPlan)} / ${myPlan.credits_total}`}
             </Typography>
           </Box>

@@ -244,7 +244,7 @@ export default function MobileNav() {
                 color: isSel ? C.primary : C.text,
                 border: `1px solid ${isSel ? 'rgba(196,233,191,0.3)' : 'rgba(255,255,255,0.06)'}`,
                 borderRadius: '14px', px: 1.75, py: 1.4, cursor: 'pointer',
-                fontFamily: "'DM Sans', sans-serif", mb: 0.75,
+                fontFamily: "'MontBlanc', sans-serif", mb: 0.75,
                 display: 'flex', alignItems: 'center', gap: '12px',
                 animation: `slideInLeft 0.2s ${EASE.standard} both`,
                 animationDelay: `${i * 0.05}s`,

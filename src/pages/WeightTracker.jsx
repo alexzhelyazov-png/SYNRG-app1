@@ -136,7 +136,7 @@ export default function WeightTracker() {
               <Typography sx={{
                 fontWeight:    700,
                 fontSize:      '16px',
-                fontFamily:    "'Space Grotesk', sans-serif",
+                fontFamily:    "'MontBlanc', sans-serif",
                 letterSpacing: '-0.2px',
               }}>
                 {fmt1(item.weight)} {t('kgUnit')}

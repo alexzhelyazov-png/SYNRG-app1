@@ -115,7 +115,7 @@ export default function FoodTracker() {
                 fontSize:       '13px',
                 fontWeight:     800,
                 color,
-                fontFamily:     "'Space Grotesk', sans-serif",
+                fontFamily:     "'MontBlanc', sans-serif",
               }}>
                 {Math.round(pct)}%
               </Box>
@@ -130,7 +130,7 @@ export default function FoodTracker() {
                 color,
                 lineHeight:    1,
                 letterSpacing: '-0.5px',
-                fontFamily:    "'Space Grotesk', sans-serif",
+                fontFamily:    "'MontBlanc', sans-serif",
               }}>
                 {fmt1(cur)}{suf}
               </Typography>
