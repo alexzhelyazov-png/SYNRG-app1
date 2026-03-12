@@ -1277,7 +1277,7 @@ export function ClientSchedule() {
       ) : dates.length === 0 ? (
         <Paper sx={{ p: 4, borderRadius: '16px', border: `1px solid ${C.border}`, textAlign: 'center' }}>
           <Typography sx={{ color: C.muted, fontSize: '14px' }}>
-            No upcoming sessions
+            {t('noUpcomingSessions')}
           </Typography>
         </Paper>
       ) : (
