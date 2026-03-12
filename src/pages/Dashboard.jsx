@@ -864,8 +864,27 @@ function DashboardClient({ isCoachView = false }) {
     kcalPct, protPct, foodTotals,
     setView, viewingCoach,
   } = useApp()
+  const {
+    slots, myBookings, bookingBusy,
+    loadSlots, loadMyBookings, cancelBookingForSlot,
+  } = useBooking()
 
   const [tab, setTab] = useState(0)
+  const [cancelErr, setCancelErr] = useState({})
+
+  // Load booking data for client (not in coach-viewing-own-tracker mode)
+  useEffect(() => {
+    if (!isCoachView && auth.id) {
+      loadSlots()
+      loadMyBookings(auth.id)
+    }
+  }, [isCoachView, auth.id]) // eslint-disable-line
+
+  async function handleCancel(slotId) {
+    setCancelErr({})
+    const res = await cancelBookingForSlot(slotId)
+    if (res?.error) setCancelErr(prev => ({ ...prev, [slotId]: res.error }))
+  }
 
   const myRank = isCoachView ? -1 : ranking.findIndex(r => r.name === client.name)
   const myData = ranking[myRank]
@@ -880,12 +899,25 @@ function DashboardClient({ isCoachView = false }) {
     : ['Workouts', 'Tasks', 'Progress']
   const progressTabIdx = isCoachView ? 1 : 2
 
-  // Workouts this week (Mon–Sun)
+  // Current week bounds (Mon–Sun)
   const now = new Date()
-  const dayOfWeek = now.getDay() === 0 ? 6 : now.getDay() - 1 // 0=Mon..6=Sun
+  const dayOfWeek = now.getDay() === 0 ? 6 : now.getDay() - 1
   const weekStart = new Date(now); weekStart.setDate(now.getDate() - dayOfWeek)
+  const weekEnd   = new Date(weekStart); weekEnd.setDate(weekStart.getDate() + 6)
   const weekStartStr = weekStart.toISOString().slice(0, 10)
-  const weekWorkouts = (client.workouts || []).filter(w => w.date >= weekStartStr)
+  const weekEndStr   = weekEnd.toISOString().slice(0, 10)
+
+  // Recorded workouts this week
+  const weekWorkouts = (client.workouts || []).filter(w => w.date >= weekStartStr && w.date <= weekEndStr)
+
+  // Booked sessions this week (client view only)
+  const weekBookings = !isCoachView
+    ? (myBookings || [])
+        .filter(b => b.status === 'active')
+        .map(b => ({ booking: b, slot: (slots || []).find(s => s.id === b.slot_id) }))
+        .filter(({ slot }) => slot && slot.slot_date >= weekStartStr && slot.slot_date <= weekEndStr && slot.status !== 'cancelled')
+        .sort((a, b) => (a.slot.slot_date + a.slot.start_time).localeCompare(b.slot.slot_date + b.slot.start_time))
+    : []
 
   return (
     <>
@@ -972,18 +1004,47 @@ function DashboardClient({ isCoachView = false }) {
           {/* Workouts this week */}
           <Paper sx={{ p: 2.25, mb: 2.5, border: `1px solid ${C.border}`, borderRadius: '16px', animation: `fadeInUp 0.26s ${EASE.decelerate} 0.1s both` }}>
             <Typography variant="h3" sx={{ mb: 1.5 }}>Workouts This Week</Typography>
-            {weekWorkouts.length === 0 ? (
+            {weekWorkouts.length === 0 && weekBookings.length === 0 ? (
               <Typography sx={{ color: C.muted, fontSize: '13px' }}>No workouts this week</Typography>
-            ) : weekWorkouts.map((w, i) => (
-              <Box key={i} sx={{ display: 'flex', alignItems: 'center', gap: 1.5, py: '8px',
-                borderBottom: i < weekWorkouts.length - 1 ? `1px solid ${C.border}` : 'none' }}>
-                <Typography sx={{ color: C.muted, fontSize: '13px', minWidth: '92px' }}>{w.date}</Typography>
-                {w.category && (
-                  <Chip label={t(w.category)} size="small" sx={{ background: C.purpleSoft, color: C.purple, border: '1px solid rgba(200,197,255,0.2)', fontSize: '11.5px', fontWeight: 600 }} />
-                )}
-                <Typography sx={{ color: C.muted, fontSize: '12px', ml: 'auto' }}>{w.items?.length || 0} {t('exercisesLbl')}</Typography>
-              </Box>
-            ))}
+            ) : (
+              <>
+                {/* Upcoming booked sessions */}
+                {weekBookings.map(({ booking, slot }, i) => (
+                  <Box key={slot.id} sx={{ display: 'flex', alignItems: 'center', gap: 1.5, py: '8px',
+                    borderBottom: (i < weekBookings.length - 1 || weekWorkouts.length > 0) ? `1px solid ${C.border}` : 'none' }}>
+                    <Typography sx={{ color: C.muted, fontSize: '13px', minWidth: '92px' }}>{slot.slot_date}</Typography>
+                    <Chip
+                      label={`${slot.start_time?.slice(0,5) || ''}${slot.end_time ? '–' + slot.end_time.slice(0,5) : ''}`}
+                      size="small"
+                      sx={{ background: C.accentSoft, color: C.primary, border: '1px solid rgba(196,233,191,0.25)', fontSize: '11.5px', fontWeight: 600 }}
+                    />
+                    <Chip label={t('upcomingTag') || 'Upcoming'} size="small" sx={{ background: 'rgba(196,233,191,0.1)', color: C.primary, fontSize: '11px', fontWeight: 700 }} />
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      disabled={bookingBusy}
+                      onClick={() => handleCancel(slot.id)}
+                      sx={{ ml: 'auto', fontSize: '12px', py: '2px', px: 1.5,
+                        borderColor: 'rgba(248,113,113,0.4)', color: '#F87171',
+                        '&:hover': { borderColor: '#F87171', background: 'rgba(248,113,113,0.08)' } }}
+                    >
+                      {t('cancelBtn') || 'Cancel'}
+                    </Button>
+                  </Box>
+                ))}
+                {/* Recorded workouts */}
+                {weekWorkouts.map((w, i) => (
+                  <Box key={i} sx={{ display: 'flex', alignItems: 'center', gap: 1.5, py: '8px',
+                    borderBottom: i < weekWorkouts.length - 1 ? `1px solid ${C.border}` : 'none' }}>
+                    <Typography sx={{ color: C.muted, fontSize: '13px', minWidth: '92px' }}>{w.date}</Typography>
+                    {w.category && (
+                      <Chip label={t(w.category)} size="small" sx={{ background: C.purpleSoft, color: C.purple, border: '1px solid rgba(200,197,255,0.2)', fontSize: '11.5px', fontWeight: 600 }} />
+                    )}
+                    <Typography sx={{ color: C.muted, fontSize: '12px', ml: 'auto' }}>{w.items?.length || 0} {t('exercisesLbl')}</Typography>
+                  </Box>
+                ))}
+              </>
+            )}
           </Paper>
 
           {/* Ranking (clients only) */}
