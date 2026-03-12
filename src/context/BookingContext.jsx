@@ -220,9 +220,13 @@ export function BookingProvider({ children }) {
   }, [loadSlots])
 
   // ── Admin: activate plan for client ──────────────────────
-  const activatePlan = useCallback(async (clientId, planType, validFrom, price = 0) => {
+  const activatePlan = useCallback(async (clientId, planType, validFrom, price = 0, startCredits = null) => {
     try {
       const creditsTotal = planType === '8' ? 8 : planType === '12' ? 12 : null
+      // If startCredits provided (migration), compute credits_used = total - remaining
+      const creditsUsed = (creditsTotal !== null && startCredits !== null)
+        ? Math.max(0, creditsTotal - Number(startCredits))
+        : 0
       const from = validFrom || isoToday()
       const toDate = new Date(from + 'T00:00:00')
       toDate.setDate(toDate.getDate() + 30)
@@ -235,7 +239,7 @@ export function BookingProvider({ children }) {
         client_id:     clientId,
         plan_type:     planType,
         credits_total: creditsTotal,
-        credits_used:  0,
+        credits_used:  creditsUsed,
         valid_from:    from,
         valid_to:      to,
         status:        'active',

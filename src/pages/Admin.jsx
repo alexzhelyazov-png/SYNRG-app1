@@ -217,13 +217,17 @@ function SlotDialog({ open, onClose, onSave, coaches, t }) {
 
 // ── Activate/manage plan dialog ──────────────────────────────
 function PlanDialog({ open, onClose, onActivate, onExtend, onAdjust, client, plan, t }) {
-  const [mode,        setMode]       = useState('activate') // 'activate' | 'extend' | 'adjust'
-  const [planType,    setPlanType]   = useState('8')
-  const [validFrom,   setValidFrom]  = useState(isoToday())
-  const [extendTo,    setExtendTo]   = useState('')
-  const [credUsed,    setCredUsed]   = useState(plan?.credits_used ?? 0)
-  const [price,       setPrice]      = useState(plan?.price ?? 0)
-  const [saving,      setSaving]     = useState(false)
+  const [mode,          setMode]         = useState('activate') // 'activate' | 'extend' | 'adjust'
+  const [planType,      setPlanType]     = useState('8')
+  const [validFrom,     setValidFrom]    = useState(isoToday())
+  const [extendTo,      setExtendTo]     = useState('')
+  const [credUsed,      setCredUsed]     = useState(plan?.credits_used ?? 0)
+  const [price,         setPrice]        = useState(plan?.price ?? 0)
+  const [startCredits,  setStartCredits] = useState('')   // migration: remaining from old platform
+  const [saving,        setSaving]       = useState(false)
+
+  // When planType changes, reset startCredits to full plan (no override)
+  useEffect(() => { setStartCredits('') }, [planType])
 
   useEffect(() => {
     if (plan) {
@@ -237,7 +241,8 @@ function PlanDialog({ open, onClose, onActivate, onExtend, onAdjust, client, pla
     setSaving(true)
     let res
     if (mode === 'activate') {
-      res = await onActivate(client.id, planType, validFrom, price)
+      const sc = startCredits !== '' ? Number(startCredits) : null
+      res = await onActivate(client.id, planType, validFrom, price, sc)
     } else if (mode === 'extend') {
       res = await onExtend(plan.id, extendTo)
     } else if (mode === 'adjust') {
@@ -312,6 +317,30 @@ function PlanDialog({ open, onClose, onActivate, onExtend, onAdjust, client, pla
               helperText={Number(price) === 0 ? t('freeLbl') : `${price} €`}
               FormHelperTextProps={{ sx: { color: Number(price) === 0 ? C.muted : C.primary } }}
             />
+            {/* Migration override: remaining sessions from old platform */}
+            {planType !== 'unlimited' && (() => {
+              const total = planType === '8' ? 8 : 12
+              const remaining = startCredits !== '' ? Number(startCredits) : total
+              return (
+                <Box sx={{ p: 1.5, borderRadius: '12px', background: 'rgba(255,255,255,0.04)', border: `1px solid ${C.border}` }}>
+                  <Typography sx={{ fontSize: '11px', color: C.muted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.7px', mb: 1 }}>
+                    {t('migrationLbl')}
+                  </Typography>
+                  <TextField label={t('startingCreditsLbl')} type="number" size="small" fullWidth
+                    value={startCredits}
+                    onChange={e => setStartCredits(e.target.value)}
+                    placeholder={String(total)}
+                    inputProps={{ min: 0, max: total }}
+                    sx={inputSx}
+                    helperText={startCredits === ''
+                      ? t('startingCreditsHint')
+                      : `${t('creditsLeft')}: ${remaining} / ${total}`}
+                    FormHelperTextProps={{ sx: { color: startCredits !== '' ? C.primary : C.muted } }}
+                  />
+                </Box>
+              )
+            })()}
+
             <Typography sx={{ fontSize: '12px', color: C.muted }}>
               {t('validUntil')}: {(() => {
                 const d = new Date(validFrom + 'T00:00:00'); d.setDate(d.getDate() + 30)
@@ -643,8 +672,8 @@ function PlansTab({ t }) {
     return allPlans.find(p => p.client_id === clientId && p.status === 'active') || null
   }
 
-  async function handleActivate(clientId, planType, from, price) {
-    const res = await activatePlan(clientId, planType, from, price)
+  async function handleActivate(clientId, planType, from, price, startCredits) {
+    const res = await activatePlan(clientId, planType, from, price, startCredits)
     if (res?.error) { showSnackbar('Грешка: ' + res.error); return res }
     showSnackbar(t('planActivatedMsg'))
     return { ok: true }
@@ -725,8 +754,8 @@ function ClientsTab({ t }) {
   const pending = realClients.filter(c => !getClientPlan(c.id))
   const active  = realClients.filter(c => !!getClientPlan(c.id))
 
-  async function handleActivate(clientId, planType, from, price) {
-    const res = await activatePlan(clientId, planType, from, price)
+  async function handleActivate(clientId, planType, from, price, startCredits) {
+    const res = await activatePlan(clientId, planType, from, price, startCredits)
     if (res?.error) { showSnackbar('Грешка: ' + res.error); return res }
     showSnackbar(t('planActivatedMsg'))
     return { ok: true }
