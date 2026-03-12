@@ -12,7 +12,10 @@ import FoodTracker from './FoodTracker'
 import WeightTracker from './WeightTracker'
 import { todayDate, fmt1 } from '../lib/utils'
 import { computeReminders } from '../lib/reminders'
-import { creditsRemaining, isoToday, daysUntilExpiry, fmtValidTo } from '../lib/bookingUtils'
+import {
+  creditsRemaining, isoToday, isoDatePlusDays, daysUntilExpiry, fmtValidTo,
+  groupByDate, dayLabel, fmtTime, canClientBook, canClientCancel, isPlanActive,
+} from '../lib/bookingUtils'
 
 // ─── Reminder banners (client) ───────────────────────────────────
 function ReminderBanners() {
@@ -1208,17 +1211,17 @@ export default function Dashboard() {
   return <DashboardClient isCoachView={isCoachView} />
 }
 
-// ─── Client Schedule: upcoming bookings + cancel ──────────────────
+// ─── Client Schedule: 3-day booking calendar ─────────────────────
 export function ClientSchedule() {
-  const { auth, t } = useApp()
+  const { auth, t, lang } = useApp()
   const {
     slots, myBookings, myPlan, bookingBusy,
     loadSlots, loadMyBookings, loadMyPlan,
-    cancelBookingForSlot,
+    bookSlot, cancelBookingForSlot,
   } = useBooking()
 
-  const [loaded, setLoaded] = useState(false)
-  const [cancelErr, setCancelErr] = useState({})
+  const [loaded,    setLoaded]    = useState(false)
+  const [dayOffset, setDayOffset] = useState(0) // first day offset from today
 
   useEffect(() => {
     if (!auth.id) return
@@ -1228,102 +1231,247 @@ export function ClientSchedule() {
 
   const today = isoToday()
 
-  // Join active future bookings with slot details
-  const upcoming = (myBookings || [])
+  // ── Compact header data ───────────────────────────────────────
+  const rem      = myPlan ? creditsRemaining(myPlan) : 0
+  const isUnlim  = myPlan?.plan_type === 'unlimited'
+
+  const nextBooked = (myBookings || [])
     .filter(b => b.status === 'active')
     .map(b => ({ booking: b, slot: (slots || []).find(s => s.id === b.slot_id) }))
     .filter(({ slot }) => slot && slot.slot_date >= today && slot.status !== 'cancelled')
-    .sort((a, b) => (a.slot.slot_date + a.slot.start_time).localeCompare(b.slot.slot_date + b.slot.start_time))
+    .sort((a, b) => (a.slot.slot_date + a.slot.start_time).localeCompare(b.slot.slot_date + b.slot.start_time))[0]
 
-  async function handleCancel(slotId) {
-    setCancelErr({})
-    const res = await cancelBookingForSlot(slotId)
-    if (res?.error) setCancelErr(prev => ({ ...prev, [slotId]: res.error }))
+  // ── 3-day grid ────────────────────────────────────────────────
+  const dayDates = [
+    isoDatePlusDays(dayOffset),
+    isoDatePlusDays(dayOffset + 1),
+    isoDatePlusDays(dayOffset + 2),
+  ]
+
+  const activeSlots = (slots || []).filter(s => s.status !== 'cancelled')
+  const grouped     = groupByDate(activeSlots)
+
+  async function handleBook(slotId) {
+    return await bookSlot(slotId)
   }
 
-  // Group by date
-  const grouped = {}
-  upcoming.forEach(({ booking, slot }) => {
-    if (!grouped[slot.slot_date]) grouped[slot.slot_date] = []
-    grouped[slot.slot_date].push({ booking, slot })
-  })
-  const dates = Object.keys(grouped).sort()
+  async function handleCancel(slotId) {
+    return await cancelBookingForSlot(slotId)
+  }
 
   return (
-    <Box sx={{ maxWidth: 640, mx: 'auto' }}>
-      <Typography variant="h5" sx={{ fontWeight: 800, mb: 2, color: C.text }}>
+    <Box>
+      <Typography variant="h2" sx={{ mb: 2.5 }}>
         {t('navBookSlot')}
       </Typography>
 
-      {/* Credits summary */}
+      {/* ── Compact header: Credits + Next session ─────────────── */}
       {myPlan && (
-        <Paper sx={{ p: 2, mb: 2, borderRadius: '14px', border: `1px solid ${C.primaryA20}`,
-          background: 'linear-gradient(135deg, rgba(196,233,191,0.08) 0%, rgba(196,233,191,0.04) 100%)' }}>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <Typography sx={{ fontSize: '13px', fontWeight: 600, color: C.text }}>
+        <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1.5, mb: 2.5 }}>
+          {/* Remaining credits */}
+          <Paper sx={{
+            p: 1.75, borderRadius: '14px',
+            border: `1px solid ${C.primaryA20}`,
+            background: 'linear-gradient(135deg, rgba(196,233,191,0.08) 0%, rgba(196,233,191,0.04) 100%)',
+          }}>
+            <Typography sx={{ fontSize: '11px', color: C.muted, textTransform: 'uppercase', letterSpacing: '0.5px', mb: 0.5 }}>
               {t('remainingSessionsLbl')}
             </Typography>
-            <Typography sx={{ fontSize: '20px', fontWeight: 800, color: C.primary, fontFamily: "'MontBlanc', sans-serif" }}>
-              {myPlan.plan_type === 'unlimited' ? '∞' : `${creditsRemaining(myPlan)} / ${myPlan.credits_total}`}
+            <Typography sx={{ fontSize: '30px', fontWeight: 800, color: C.primary, lineHeight: 1 }}>
+              {isUnlim ? '∞' : rem}
+              {!isUnlim && (
+                <Box component="span" sx={{ fontSize: '13px', color: C.muted, fontWeight: 400, ml: 0.75 }}>
+                  / {myPlan.credits_total}
+                </Box>
+              )}
             </Typography>
-          </Box>
-        </Paper>
+          </Paper>
+
+          {/* Next booked session */}
+          <Paper sx={{
+            p: 1.75, borderRadius: '14px',
+            border: `1px solid ${C.border}`,
+            background: 'rgba(255,255,255,0.03)',
+          }}>
+            <Typography sx={{ fontSize: '11px', color: C.muted, textTransform: 'uppercase', letterSpacing: '0.5px', mb: 0.5 }}>
+              {t('nextTraining')}
+            </Typography>
+            {nextBooked ? (
+              <>
+                <Typography sx={{ fontSize: '14px', fontWeight: 700, color: C.text, lineHeight: 1.3 }}>
+                  {dayLabel(nextBooked.slot.slot_date, lang)}
+                </Typography>
+                <Typography sx={{ fontSize: '12px', color: C.muted, mt: 0.25 }}>
+                  {fmtTime(nextBooked.slot.start_time)} · {nextBooked.slot.coach_name}
+                </Typography>
+              </>
+            ) : (
+              <Typography sx={{ fontSize: '13px', color: C.muted }}>—</Typography>
+            )}
+          </Paper>
+        </Box>
       )}
 
+      {/* ── 3-day booking calendar ─────────────────────────────── */}
       {!loaded ? (
         <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}>
           <Box sx={{ width: 28, height: 28, borderRadius: '50%', border: `3px solid ${C.primary}`, borderTopColor: 'transparent', animation: 'spin 0.8s linear infinite' }} />
         </Box>
-      ) : dates.length === 0 ? (
-        <Paper sx={{ p: 4, borderRadius: '16px', border: `1px solid ${C.border}`, textAlign: 'center' }}>
-          <Typography sx={{ color: C.muted, fontSize: '14px' }}>
-            {t('noUpcomingSessions')}
-          </Typography>
-        </Paper>
       ) : (
-        dates.map((date, di) => (
-          <Paper key={date} sx={{ mb: 2, borderRadius: '16px', border: `1px solid ${di === 0 ? C.primaryA20 : C.border}`, overflow: 'hidden' }}>
-            <Box sx={{
-              px: 2, py: 1.25,
-              background: di === 0
-                ? 'linear-gradient(135deg, rgba(196,233,191,0.18) 0%, rgba(196,233,191,0.10) 100%)'
-                : 'rgba(255,255,255,0.04)',
-              borderBottom: `1px solid ${di === 0 ? C.primaryA20 : C.border}`,
-              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-            }}>
-              <Typography sx={{ fontWeight: 800, fontSize: '13px', color: di === 0 ? C.primary : C.muted, textTransform: 'uppercase', letterSpacing: '0.6px' }}>
-                {di === 0 ? t('nextSessionLbl') : t('laterSessionsLbl')}
-              </Typography>
-              <Typography sx={{ fontWeight: 600, fontSize: '12px', color: di === 0 ? C.primary : C.muted }}>
-                {date}
-              </Typography>
-            </Box>
-            {grouped[date].map(({ booking, slot }) => (
-              <Box key={slot.id} sx={{ display: 'flex', alignItems: 'center', gap: 1.5, px: 2, py: 1.5,
-                borderBottom: `1px solid ${C.border}`, '&:last-child': { borderBottom: 'none' } }}>
-                <Box sx={{ flex: 1 }}>
-                  <Typography sx={{ fontWeight: 700, fontSize: '15px', color: C.text }}>
-                    {slot.start_time?.slice(0, 5)} – {slot.end_time?.slice(0, 5)}
-                  </Typography>
-                  <Typography sx={{ fontSize: '12px', color: C.muted }}>
-                    {slot.coach_name}
-                  </Typography>
-                  {cancelErr[slot.id] && (
-                    <Typography sx={{ fontSize: '11px', color: '#F87171', mt: 0.25 }}>{cancelErr[slot.id]}</Typography>
+        <>
+          {/* Navigation row */}
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
+            <Button
+              size="small" variant="outlined"
+              disabled={dayOffset === 0}
+              onClick={() => setDayOffset(p => Math.max(0, p - 3))}
+              sx={{
+                fontSize: '12px', fontWeight: 700, borderColor: C.border, color: C.muted,
+                '&:hover': { borderColor: C.primary, color: C.primary },
+                '&.Mui-disabled': { borderColor: C.border, color: C.border },
+                minWidth: 0, px: 1.5,
+              }}
+            >
+              ← {lang === 'bg' ? 'Назад' : 'Back'}
+            </Button>
+            <Typography sx={{ fontSize: '12px', color: C.muted }}>
+              {dayDates[0].slice(5).replace('-', '/')} – {dayDates[2].slice(5).replace('-', '/')}
+            </Typography>
+            <Button
+              size="small" variant="outlined"
+              onClick={() => setDayOffset(p => p + 3)}
+              sx={{
+                fontSize: '12px', fontWeight: 700, borderColor: C.border, color: C.muted,
+                '&:hover': { borderColor: C.primary, color: C.primary },
+                minWidth: 0, px: 1.5,
+              }}
+            >
+              {lang === 'bg' ? 'Напред' : 'Next'} →
+            </Button>
+          </Box>
+
+          {/* 3 columns */}
+          <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 1.25 }}>
+            {dayDates.map(date => {
+              const daySlots = (grouped[date] || [])
+              const isTdy    = date === today
+
+              return (
+                <Box key={date}>
+                  {/* Day header */}
+                  <Box sx={{
+                    px: 1, py: 0.875, mb: 1,
+                    borderRadius: '10px',
+                    background: isTdy ? C.accentSoft : 'rgba(255,255,255,0.04)',
+                    border: `1px solid ${isTdy ? C.primaryA20 : C.border}`,
+                    textAlign: 'center',
+                  }}>
+                    <Typography sx={{ fontSize: '11px', fontWeight: 800, color: isTdy ? C.primary : C.text, textTransform: 'capitalize' }}>
+                      {dayLabel(date, lang)}
+                    </Typography>
+                    <Typography sx={{ fontSize: '10px', color: C.muted }}>
+                      {date.slice(5).replace('-', '/')}
+                    </Typography>
+                  </Box>
+
+                  {/* Slot bubbles */}
+                  {daySlots.length === 0 ? (
+                    <Box sx={{ textAlign: 'center', py: 2.5 }}>
+                      <Typography sx={{ fontSize: '11px', color: C.muted }}>
+                        {lang === 'bg' ? 'Няма часове' : 'No slots'}
+                      </Typography>
+                    </Box>
+                  ) : (
+                    daySlots.map(slot => {
+                      const isBooked    = (myBookings || []).some(b => b.slot_id === slot.id && b.status === 'active')
+                      const bookCheck   = !isBooked ? canClientBook(slot, myPlan, myBookings || []) : { ok: false }
+                      const cancelCheck = isBooked  ? canClientCancel(slot) : { ok: false }
+                      const isFull      = (slot.booked_count || 0) >= slot.capacity
+                      const freeCount   = slot.capacity - (slot.booked_count || 0)
+
+                      return (
+                        <Box key={slot.id} sx={{
+                          mb: 1, p: '10px 12px',
+                          borderRadius: '12px',
+                          border: `1px solid ${isBooked ? C.primaryA20 : C.border}`,
+                          background: isBooked
+                            ? 'linear-gradient(135deg, rgba(196,233,191,0.12) 0%, rgba(196,233,191,0.06) 100%)'
+                            : 'rgba(255,255,255,0.03)',
+                          transition: 'border-color 0.15s',
+                        }}>
+                          {/* Time */}
+                          <Typography sx={{ fontWeight: 800, fontSize: '15px', color: C.text, lineHeight: 1.2 }}>
+                            {fmtTime(slot.start_time)}
+                          </Typography>
+                          <Typography sx={{ fontSize: '10px', color: C.muted, mb: 0.625 }}>
+                            – {fmtTime(slot.end_time)}
+                          </Typography>
+
+                          {/* Coach */}
+                          <Typography sx={{ fontSize: '11px', color: C.muted, mb: 0.625, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {slot.coach_name}
+                          </Typography>
+
+                          {/* Places badge */}
+                          <Box sx={{
+                            display: 'inline-block', px: 0.75, py: '2px', mb: 1,
+                            borderRadius: '6px',
+                            background: isFull ? 'rgba(248,113,113,0.12)' : 'rgba(255,255,255,0.06)',
+                            border: `1px solid ${isFull ? 'rgba(248,113,113,0.35)' : C.border}`,
+                          }}>
+                            <Typography sx={{ fontSize: '10px', fontWeight: 700, color: isFull ? '#F87171' : C.muted }}>
+                              {isFull
+                                ? (lang === 'bg' ? 'Запълнен' : 'Full')
+                                : (lang === 'bg' ? `${freeCount} св. места` : `${freeCount} free`)}
+                            </Typography>
+                          </Box>
+
+                          {/* Action */}
+                          {isBooked ? (
+                            <Box>
+                              <Typography sx={{ fontSize: '10px', color: C.primary, fontWeight: 700, mb: 0.5 }}>
+                                ✓ {t('bookedLabel')}
+                              </Typography>
+                              {cancelCheck.ok && (
+                                <Button size="small" fullWidth disabled={bookingBusy}
+                                  onClick={() => handleCancel(slot.id)}
+                                  sx={{
+                                    fontSize: '10px', py: 0.4,
+                                    border: `1px solid rgba(248,113,113,0.3)`, color: '#F87171',
+                                    borderRadius: '8px',
+                                    '&:hover': { border: '1px solid #F87171', background: 'rgba(248,113,113,0.08)' },
+                                    '&.Mui-disabled': { opacity: 0.5 },
+                                  }}>
+                                  {t('cancelBookingBtn')}
+                                </Button>
+                              )}
+                            </Box>
+                          ) : isFull ? null : bookCheck.ok ? (
+                            <Button size="small" fullWidth variant="contained" disabled={bookingBusy}
+                              onClick={() => handleBook(slot.id)}
+                              sx={{
+                                fontSize: '11px', py: 0.5,
+                                background: C.primary, color: '#0f1c11', fontWeight: 700,
+                                borderRadius: '8px',
+                                '&:hover': { background: '#a8e6a3' },
+                                '&.Mui-disabled': { opacity: 0.5 },
+                              }}>
+                              {t('bookBtn')}
+                            </Button>
+                          ) : (
+                            <Typography sx={{ fontSize: '10px', color: C.muted, fontStyle: 'italic', lineHeight: 1.3 }}>
+                              {bookCheck.reason}
+                            </Typography>
+                          )}
+                        </Box>
+                      )
+                    })
                   )}
                 </Box>
-                <Button size="small" variant="outlined" disabled={bookingBusy}
-                  onClick={() => handleCancel(slot.id)}
-                  sx={{ fontSize: '11px', py: 0.5, px: 1.5,
-                    borderColor: 'rgba(248,113,113,0.4)', color: '#F87171',
-                    '&:hover': { borderColor: '#F87171', background: 'rgba(248,113,113,0.12)' },
-                    '&:disabled': { borderColor: C.border, color: C.muted } }}>
-                  Cancel
-                </Button>
-              </Box>
-            ))}
-          </Paper>
-        ))
+              )
+            })}
+          </Box>
+        </>
       )}
     </Box>
   )
