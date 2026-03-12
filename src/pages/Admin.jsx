@@ -794,7 +794,6 @@ function ClientsTab({ t }) {
 
 // ── Analytics Tab ─────────────────────────────────────────────
 function AnalyticsTab({ t }) {
-  const { realClients } = useApp()
   const { allPlans, loadAllPlans } = useBooking()
 
   useEffect(() => { loadAllPlans() }, []) // eslint-disable-line
@@ -804,12 +803,9 @@ function AnalyticsTab({ t }) {
   const payingCount  = activePlans.filter(p => Number(p.price) > 0).length
   const freeCount    = activePlans.filter(p => !(Number(p.price) > 0)).length
 
-  const sorted = [...activePlans].sort((a, b) => (Number(b.price) || 0) - (Number(a.price) || 0))
-
   return (
     <Box>
-      {/* Revenue summary cards */}
-      <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 1.5, mb: 3 }}>
+      <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 1.5 }}>
         <Paper sx={{ p: 2.5, borderRadius: '16px',
           border: `1px solid ${C.primaryA20}`,
           background: 'linear-gradient(135deg, rgba(196,233,191,0.1) 0%, rgba(196,233,191,0.05) 100%)' }}>
@@ -837,38 +833,6 @@ function AnalyticsTab({ t }) {
           </Typography>
         </Paper>
       </Box>
-
-      {/* Per-client breakdown */}
-      <Typography variant="h3" sx={{ mb: 1.5 }}>{t('allActivePlans')}</Typography>
-      <Paper sx={{ borderRadius: '16px', border: `1px solid ${C.border}`, overflow: 'hidden' }}>
-        {sorted.length === 0 ? (
-          <Typography sx={{ color: C.muted, p: 3, textAlign: 'center' }}>{t('noActivePlans')}</Typography>
-        ) : sorted.map(plan => {
-          const client = realClients.find(c => c.id === plan.client_id)
-          if (!client) return null
-          const fee = Number(plan.price) || 0
-          return (
-            <Box key={plan.id} sx={{ display: 'flex', alignItems: 'center', gap: 1.5,
-              px: 2, py: 1.25,
-              borderBottom: `1px solid ${C.border}`, '&:last-child': { borderBottom: 'none' } }}>
-              <Box sx={{ width: 34, height: 34, borderRadius: '50%', flexShrink: 0,
-                background: C.primaryContainer,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: '13px', fontWeight: 800, color: C.primary }}>
-                {client.name.charAt(0).toUpperCase()}
-              </Box>
-              <Typography sx={{ flex: 1, fontWeight: 600, fontSize: '14px', color: C.text }}>{client.name}</Typography>
-              <Chip label={planLabel(plan.plan_type, t)} size="small"
-                sx={{ fontSize: '10px', background: C.primaryContainer, color: C.primary }} />
-              <Typography sx={{ fontWeight: 700, fontSize: '15px', minWidth: '72px', textAlign: 'right',
-                color: fee > 0 ? C.primary : C.muted,
-                fontFamily: "'Space Grotesk', sans-serif" }}>
-                {fee > 0 ? `${fee} лв.` : t('freeLbl')}
-              </Typography>
-            </Box>
-          )
-        })}
-      </Paper>
     </Box>
   )
 }
@@ -958,7 +922,7 @@ function DashboardTab({ t, lang, setTab }) {
     <Box>
       {/* Summary cards */}
       <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', mb: 3 }}>
-        <StatCard icon={PeopleIcon}       label={t('pendingCard')}  value={pending.length}   color="#F87171" onClick={() => setTab(2)} />
+        <StatCard icon={PeopleIcon}       label={t('pendingCard')}  value={pending.length}   color="#F87171" onClick={() => setTab(1)} />
         <StatCard icon={WarningAmberIcon} label={t('expiringCard')} value={expiring.length}  color="#FB923C" onClick={() => setTab(1)} />
         <StatCard icon={CreditCardIcon}   label={t('lowCredCard')}  value={lowCred.length}   color="#FBBF24" onClick={() => setTab(1)} />
       </Box>
@@ -1014,10 +978,9 @@ export default function Admin() {
 
   const TABS = [
     { label: t('adminDashboard'),  key: 0 },
-    { label: t('plansManagement'), key: 1 },
-    { label: t('clientsMgmt'),     key: 2 },
-    { label: t('analyticsTab'),    key: 3 },
-    { label: t('coachesTab'),      key: 4 },
+    { label: t('clientsMgmt'),     key: 1 },
+    { label: t('analyticsTab'),    key: 2 },
+    { label: t('coachesTab'),      key: 3 },
   ]
 
   return (
@@ -1050,10 +1013,9 @@ export default function Admin() {
 
       {/* Tab content */}
       {tab === 0 && <DashboardTab t={t} lang={lang} setTab={setTab} />}
-      {tab === 1 && <PlansTab t={t} />}
-      {tab === 2 && <ClientsTab t={t} />}
-      {tab === 3 && <AnalyticsTab t={t} />}
-      {tab === 4 && <CoachesTab t={t} />}
+      {tab === 1 && <ClientsTab t={t} />}
+      {tab === 2 && <AnalyticsTab t={t} />}
+      {tab === 3 && <CoachesTab t={t} />}
     </Box>
   )
 }
