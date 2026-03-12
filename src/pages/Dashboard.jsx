@@ -1132,10 +1132,22 @@ export function ClientSchedule() {
           </Typography>
         </Paper>
       ) : (
-        dates.map(date => (
-          <Paper key={date} sx={{ mb: 2, borderRadius: '16px', border: `1px solid ${C.border}`, overflow: 'hidden' }}>
-            <Box sx={{ px: 2, py: 1.25, background: 'rgba(255,255,255,0.04)', borderBottom: `1px solid ${C.border}` }}>
-              <Typography sx={{ fontWeight: 700, fontSize: '13.5px', color: C.text }}>{date}</Typography>
+        dates.map((date, di) => (
+          <Paper key={date} sx={{ mb: 2, borderRadius: '16px', border: `1px solid ${di === 0 ? C.primaryA20 : C.border}`, overflow: 'hidden' }}>
+            <Box sx={{
+              px: 2, py: 1.25,
+              background: di === 0
+                ? 'linear-gradient(135deg, rgba(196,233,191,0.18) 0%, rgba(196,233,191,0.10) 100%)'
+                : 'rgba(255,255,255,0.04)',
+              borderBottom: `1px solid ${di === 0 ? C.primaryA20 : C.border}`,
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+            }}>
+              <Typography sx={{ fontWeight: 800, fontSize: '13px', color: di === 0 ? C.primary : C.muted, textTransform: 'uppercase', letterSpacing: '0.6px' }}>
+                {di === 0 ? t('nextSessionLbl') : t('laterSessionsLbl')}
+              </Typography>
+              <Typography sx={{ fontWeight: 600, fontSize: '12px', color: di === 0 ? C.primary : C.muted }}>
+                {date}
+              </Typography>
             </Box>
             {grouped[date].map(({ booking, slot }) => (
               <Box key={slot.id} sx={{ display: 'flex', alignItems: 'center', gap: 1.5, px: 2, py: 1.5,
@@ -1153,8 +1165,10 @@ export function ClientSchedule() {
                 </Box>
                 <Button size="small" variant="outlined" disabled={bookingBusy}
                   onClick={() => handleCancel(slot.id)}
-                  sx={{ fontSize: '11px', py: 0.5, px: 1.5, borderColor: C.border, color: C.muted,
-                    '&:hover': { borderColor: '#F87171', color: '#F87171', background: 'rgba(248,113,113,0.08)' } }}>
+                  sx={{ fontSize: '11px', py: 0.5, px: 1.5,
+                    borderColor: 'rgba(248,113,113,0.4)', color: '#F87171',
+                    '&:hover': { borderColor: '#F87171', background: 'rgba(248,113,113,0.12)' },
+                    '&:disabled': { borderColor: C.border, color: C.muted } }}>
                   Cancel
                 </Button>
               </Box>
