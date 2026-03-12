@@ -500,7 +500,7 @@ function ClientSessionSummary() {
       {upcoming.length > 0 && (
         <>
           <Typography sx={{ fontSize: '11px', color: C.muted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.7px', mb: 0.75 }}>
-            Upcoming Sessions
+            {t('upcomingSessionsLbl')}
           </Typography>
           {upcoming.map(({ slot, booking }) => (
             <Box key={slot.id} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center',
@@ -895,8 +895,8 @@ function DashboardClient({ isCoachView = false }) {
 
   // 3-tab structure: [Workouts, Tasks (clients only), Progress]
   const tabLabels = isCoachView
-    ? ['Workouts', 'Progress']
-    : ['Workouts', 'Tasks', 'Progress']
+    ? [t('tabWorkouts'), t('tabProgress')]
+    : [t('tabWorkouts'), t('tabTasks'), t('tabProgress')]
   const progressTabIdx = isCoachView ? 1 : 2
 
   // Current week bounds (Mon–Sun)
@@ -1003,9 +1003,9 @@ function DashboardClient({ isCoachView = false }) {
 
           {/* Workouts this week */}
           <Paper sx={{ p: 2.25, mb: 2.5, border: `1px solid ${C.border}`, borderRadius: '16px', animation: `fadeInUp 0.26s ${EASE.decelerate} 0.1s both` }}>
-            <Typography variant="h3" sx={{ mb: 1.5 }}>Workouts This Week</Typography>
+            <Typography variant="h3" sx={{ mb: 1.5 }}>{t('workoutsThisWeekLbl')}</Typography>
             {weekWorkouts.length === 0 && weekBookings.length === 0 ? (
-              <Typography sx={{ color: C.muted, fontSize: '13px' }}>No workouts this week</Typography>
+              <Typography sx={{ color: C.muted, fontSize: '13px' }}>{t('noWorkoutsWeekLbl')}</Typography>
             ) : (
               <>
                 {/* Upcoming booked sessions */}
@@ -1018,7 +1018,7 @@ function DashboardClient({ isCoachView = false }) {
                       size="small"
                       sx={{ background: C.accentSoft, color: C.primary, border: '1px solid rgba(196,233,191,0.25)', fontSize: '11.5px', fontWeight: 600 }}
                     />
-                    <Chip label={t('upcomingTag') || 'Upcoming'} size="small" sx={{ background: 'rgba(196,233,191,0.1)', color: C.primary, fontSize: '11px', fontWeight: 700 }} />
+                    <Chip label={t('upcomingTag')} size="small" sx={{ background: 'rgba(196,233,191,0.1)', color: C.primary, fontSize: '11px', fontWeight: 700 }} />
                     <Button
                       size="small"
                       variant="outlined"
@@ -1028,7 +1028,7 @@ function DashboardClient({ isCoachView = false }) {
                         borderColor: 'rgba(248,113,113,0.4)', color: '#F87171',
                         '&:hover': { borderColor: '#F87171', background: 'rgba(248,113,113,0.08)' } }}
                     >
-                      {t('cancelBtn') || 'Cancel'}
+                      {t('cancelBtn')}
                     </Button>
                   </Box>
                 ))}
@@ -1173,7 +1173,7 @@ export function ClientSchedule() {
           background: 'linear-gradient(135deg, rgba(196,233,191,0.08) 0%, rgba(196,233,191,0.04) 100%)' }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <Typography sx={{ fontSize: '13px', fontWeight: 600, color: C.text }}>
-              Remaining Sessions
+              {t('remainingSessionsLbl')}
             </Typography>
             <Typography sx={{ fontSize: '20px', fontWeight: 800, color: C.primary, fontFamily: "'Space Grotesk', sans-serif" }}>
               {myPlan.plan_type === 'unlimited' ? '∞' : `${creditsRemaining(myPlan)} / ${myPlan.credits_total}`}
