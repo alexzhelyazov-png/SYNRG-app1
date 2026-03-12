@@ -40,8 +40,8 @@ function getNavItems(auth, admin) {
   if (auth.role === 'client') {
     return [
       ...base.filter(i => i.view !== 'tasks'),
-      { view: 'booking', labelKey: 'navBooking', Icon: EventIcon },
-      { view: 'tasks',   labelKey: 'navTasks',   Icon: AssignmentIcon },
+      { view: 'schedule', labelKey: 'navBookSlot', Icon: EventIcon },
+      { view: 'tasks',    labelKey: 'navTasks',    Icon: AssignmentIcon },
     ]
   }
   // Coaches — dashboard, schedule, tasks [, admin]
