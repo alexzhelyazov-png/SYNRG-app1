@@ -798,41 +798,22 @@ function AnalyticsTab({ t }) {
 
   useEffect(() => { loadAllPlans() }, []) // eslint-disable-line
 
-  const activePlans  = allPlans.filter(p => p.status === 'active')
-  const allRevenue   = allPlans.reduce((sum, p) => sum + (Number(p.price) || 0), 0)
-  const payingCount  = activePlans.filter(p => Number(p.price) > 0).length
-  const freeCount    = activePlans.filter(p => !(Number(p.price) > 0)).length
+  const allRevenue = allPlans.reduce((sum, p) => sum + (Number(p.price) || 0), 0)
 
   return (
     <Box>
-      <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 1.5 }}>
-        <Paper sx={{ p: 2.5, borderRadius: '16px',
-          border: `1px solid ${C.primaryA20}`,
-          background: 'linear-gradient(135deg, rgba(196,233,191,0.1) 0%, rgba(196,233,191,0.05) 100%)' }}>
-          <Typography sx={{ fontSize: '10.5px', color: C.muted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.8px', mb: 0.75 }}>
-            {t('totalRevenueLbl')}
-          </Typography>
-          <Typography sx={{ fontSize: '30px', fontWeight: 800, color: C.primary, fontFamily: "'Space Grotesk', sans-serif", lineHeight: 1.1 }}>
-            {allRevenue} лв.
-          </Typography>
-        </Paper>
-        <Paper sx={{ p: 2.5, borderRadius: '16px', border: `1px solid ${C.border}` }}>
-          <Typography sx={{ fontSize: '10.5px', color: C.muted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.8px', mb: 0.75 }}>
-            {t('payingClientsLbl')}
-          </Typography>
-          <Typography sx={{ fontSize: '30px', fontWeight: 800, color: C.text, fontFamily: "'Space Grotesk', sans-serif", lineHeight: 1.1 }}>
-            {payingCount}
-          </Typography>
-        </Paper>
-        <Paper sx={{ p: 2.5, borderRadius: '16px', border: `1px solid ${C.border}` }}>
-          <Typography sx={{ fontSize: '10.5px', color: C.muted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.8px', mb: 0.75 }}>
-            {t('freeClientsLbl')}
-          </Typography>
-          <Typography sx={{ fontSize: '30px', fontWeight: 800, color: C.muted, fontFamily: "'Space Grotesk', sans-serif", lineHeight: 1.1 }}>
-            {freeCount}
-          </Typography>
-        </Paper>
-      </Box>
+      <Paper sx={{
+        p: 3.5, borderRadius: '20px',
+        border: `1px solid ${C.primaryA20}`,
+        background: 'linear-gradient(135deg, rgba(196,233,191,0.12) 0%, rgba(196,233,191,0.05) 100%)',
+      }}>
+        <Typography sx={{ fontSize: '11px', color: C.muted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.9px', mb: 1.25 }}>
+          {t('totalRevenueLbl')}
+        </Typography>
+        <Typography sx={{ fontSize: '48px', fontWeight: 800, color: C.primary, fontFamily: "'Space Grotesk', sans-serif", lineHeight: 1, letterSpacing: '-1px' }}>
+          {allRevenue} <Typography component="span" sx={{ fontSize: '22px', fontWeight: 600, color: C.primary, fontFamily: "'Space Grotesk', sans-serif" }}>лв.</Typography>
+        </Typography>
+      </Paper>
     </Box>
   )
 }
@@ -840,6 +821,15 @@ function AnalyticsTab({ t }) {
 // ── Coaches Tab ───────────────────────────────────────────────
 function CoachesTab({ t }) {
   const { realClients } = useApp()
+  const { allPlans, loadAllPlans } = useBooking()
+
+  useEffect(() => { loadAllPlans() }, []) // eslint-disable-line
+
+  const activePlans = useMemo(
+    () => [...allPlans.filter(p => p.status === 'active')]
+      .sort((a, b) => (Number(b.price) || 0) - (Number(a.price) || 0)),
+    [allPlans]
+  )
 
   const coachStats = useMemo(() => {
     const counts = {}
@@ -856,7 +846,8 @@ function CoachesTab({ t }) {
 
   return (
     <Box>
-      <Paper sx={{ borderRadius: '16px', border: `1px solid ${C.border}`, overflow: 'hidden' }}>
+      {/* Coach workout counts */}
+      <Paper sx={{ borderRadius: '16px', border: `1px solid ${C.border}`, overflow: 'hidden', mb: 3 }}>
         {coachStats.length === 0 ? (
           <Typography sx={{ color: C.muted, p: 3, textAlign: 'center' }}>{t('noDataLbl')}</Typography>
         ) : coachStats.map(({ name, count }, i) => (
@@ -886,6 +877,38 @@ function CoachesTab({ t }) {
             </Box>
           </Box>
         ))}
+      </Paper>
+
+      {/* Client plan fees */}
+      <Typography variant="h3" sx={{ mb: 1.5 }}>{t('allActivePlans')}</Typography>
+      <Paper sx={{ borderRadius: '16px', border: `1px solid ${C.border}`, overflow: 'hidden' }}>
+        {activePlans.length === 0 ? (
+          <Typography sx={{ color: C.muted, p: 3, textAlign: 'center' }}>{t('noActivePlans')}</Typography>
+        ) : activePlans.map(plan => {
+          const client = realClients.find(c => c.id === plan.client_id)
+          if (!client) return null
+          const fee = Number(plan.price) || 0
+          return (
+            <Box key={plan.id} sx={{ display: 'flex', alignItems: 'center', gap: 1.5,
+              px: 2, py: 1.25,
+              borderBottom: `1px solid ${C.border}`, '&:last-child': { borderBottom: 'none' } }}>
+              <Box sx={{ width: 34, height: 34, borderRadius: '50%', flexShrink: 0,
+                background: C.primaryContainer,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: '13px', fontWeight: 800, color: C.primary }}>
+                {client.name.charAt(0).toUpperCase()}
+              </Box>
+              <Typography sx={{ flex: 1, fontWeight: 600, fontSize: '14px', color: C.text }}>{client.name}</Typography>
+              <Chip label={planLabel(plan.plan_type, t)} size="small"
+                sx={{ fontSize: '10px', background: C.primaryContainer, color: C.primary }} />
+              <Typography sx={{ fontWeight: 700, fontSize: '15px', minWidth: '72px', textAlign: 'right',
+                color: fee > 0 ? C.primary : C.muted,
+                fontFamily: "'Space Grotesk', sans-serif" }}>
+                {fee > 0 ? `${fee} лв.` : t('freeLbl')}
+              </Typography>
+            </Box>
+          )
+        })}
       </Paper>
     </Box>
   )
