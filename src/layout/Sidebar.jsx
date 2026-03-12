@@ -44,11 +44,12 @@ function getNavItems(auth, admin) {
       { view: 'tasks',    labelKey: 'navTasks',    Icon: AssignmentIcon },
     ]
   }
-  // Coaches — dashboard, schedule, tasks [, admin]
+  // Coaches — dashboard, schedule, ranking, tasks [, admin]
   const coachItems = [
     { view: 'dashboard', labelKey: 'navDashboard', Icon: DashboardIcon },
     { view: 'schedule',  labelKey: 'navSchedule',  Icon: CalendarMonthIcon },
-    { view: 'tasks',     labelKey: 'navTasks',      Icon: AssignmentIcon },
+    { view: 'ranking',   labelKey: 'navRanking',   Icon: LeaderboardIcon },
+    { view: 'tasks',     labelKey: 'navTasks',     Icon: AssignmentIcon },
   ]
   if (admin) {
     coachItems.push({ view: 'admin', labelKey: 'navAdmin', Icon: AdminPanelSettingsIcon })

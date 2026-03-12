@@ -35,10 +35,11 @@ function getNavItems(auth, admin) {
       { view: 'schedule', Icon: CalendarMonthIcon, labelKey: 'navBookSlot' },
     ]
   }
-  // Coach / Admin — dashboard, schedule, tasks [, admin]
+  // Coach / Admin — dashboard, schedule, ranking, tasks [, admin]
   const items = [
     { view: 'dashboard', Icon: DashboardIcon,     labelKey: 'navDashboard' },
     { view: 'schedule',  Icon: CalendarMonthIcon, labelKey: 'navSchedule'  },
+    { view: 'ranking',   Icon: LeaderboardIcon,   labelKey: 'navRanking'   },
     { view: 'tasks',     Icon: AssignmentIcon,    labelKey: 'navTasks'     },
   ]
   if (admin) {
