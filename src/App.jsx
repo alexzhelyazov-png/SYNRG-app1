@@ -8,7 +8,7 @@ import { BookingProvider }     from './context/BookingContext'
 import { C, EASE, makeTheme }  from './theme'
 import { isAdmin }             from './lib/bookingUtils'
 
-import InstallScreen  from './layout/InstallScreen'
+import SiteHeader     from './layout/SiteHeader'
 import Sidebar        from './layout/Sidebar'
 import MobileHeader   from './layout/MobileHeader'
 import MobileNav      from './layout/MobileNav'
@@ -30,7 +30,7 @@ const isStandalone = window.navigator.standalone || window.matchMedia('(display-
 function LoadingScreen({ t }) {
   return (
     <Box sx={{
-      minHeight:      '100vh',
+      flex:           1,
       background:     C.bg,
       display:        'flex',
       alignItems:     'center',
@@ -50,7 +50,7 @@ function LoadingScreen({ t }) {
 function ErrorScreen({ error, onRetry, t }) {
   return (
     <Box sx={{
-      minHeight:      '100vh',
+      flex:           1,
       background:     C.bg,
       display:        'flex',
       alignItems:     'center',
@@ -125,7 +125,8 @@ function AppShell() {
   return (
     <Box sx={{
       display:   'flex',
-      minHeight: '100vh',
+      flex:      1,
+      minHeight: 0,
       height:    isMobile ? '100dvh' : 'auto',
       background: C.bg,
       color:      C.text,
@@ -203,13 +204,18 @@ function AppShell() {
 
 // ── Root: AppProvider wraps everything so InstallScreen can use t ─
 function AppContent() {
-  const [installDone, setInstallDone] = useState(isStandalone)
+  const theme            = useTheme()
+  const isMobile         = useMediaQuery(theme.breakpoints.down('sm'))
+  const showSiteHeader   = !isStandalone && !isMobile
 
-  if (!installDone) {
-    return <InstallScreen onSkip={() => setInstallDone(true)} />
-  }
-
-  return <AppShell />
+  return (
+    <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
+      {showSiteHeader && <SiteHeader />}
+      <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+        <AppShell />
+      </Box>
+    </Box>
+  )
 }
 
 function ThemedWrapper({ children }) {

@@ -1,11 +1,18 @@
-import { useState } from 'react'
-import { Box, Paper, Typography, TextField, Button, Alert } from '@mui/material'
+import { useState, useEffect } from 'react'
+import { Box, Paper, Typography, TextField, Button, Alert, useMediaQuery, useTheme } from '@mui/material'
+import ArrowBackIcon from '@mui/icons-material/ArrowBack'
+import GetAppIcon from '@mui/icons-material/GetApp'
 import { useApp } from '../context/AppContext'
 import { C, EASE } from '../theme'
 import SynrgLogomark from '../layout/SynrgLogomark'
 
+const isStandalone = window.navigator.standalone || window.matchMedia('(display-mode: standalone)').matches
+const SITE_BASE = '../'
+
 export default function Auth() {
   const { handleLogin, handleRegisterClient, t, lang, setLang, isDark, setIsDark } = useApp()
+  const theme    = useTheme()
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'))
 
   const [mode,    setMode]    = useState('login')   // 'login' | 'register'
   const [name,    setName]    = useState('')
@@ -13,6 +20,14 @@ export default function Auth() {
   const [pass2,   setPass2]   = useState('')
   const [error,   setError]   = useState('')
   const [loading, setLoading] = useState(false)
+
+  // PWA install prompt
+  const [deferredPrompt, setDeferredPrompt] = useState(null)
+  useEffect(() => {
+    const handler = e => { e.preventDefault(); setDeferredPrompt(e) }
+    window.addEventListener('beforeinstallprompt', handler)
+    return () => window.removeEventListener('beforeinstallprompt', handler)
+  }, [])
 
   function switchMode(m) {
     setMode(m)
@@ -46,7 +61,8 @@ export default function Auth() {
 
   return (
     <Box sx={{
-      minHeight:      '100vh',
+      flex:           1,
+      minHeight:      0,
       background:     `radial-gradient(ellipse at 50% 0%, rgba(196,233,191,0.05) 0%, ${C.bg} 60%)`,
       display:        'flex',
       flexDirection:  'column',
@@ -56,6 +72,31 @@ export default function Auth() {
       color:          C.text,
       animation:      'fadeIn 0.3s ease',
     }}>
+
+      {/* ── Back to site (mobile only, not in standalone PWA) ── */}
+      {isMobile && !isStandalone && (
+        <Box
+          component="a"
+          href={`${SITE_BASE}index.html`}
+          sx={{
+            position:       'absolute',
+            top:            'calc(12px + env(safe-area-inset-top, 0px))',
+            left:           16,
+            display:        'flex',
+            alignItems:     'center',
+            gap:            0.5,
+            color:          C.muted,
+            textDecoration: 'none',
+            fontSize:       '13px',
+            fontWeight:     700,
+            transition:     `color 0.18s ${EASE.standard}`,
+            '&:hover':      { color: C.text },
+          }}
+        >
+          <ArrowBackIcon sx={{ fontSize: 18 }} />
+          {t('siteHome')}
+        </Box>
+      )}
 
       {/* ── Logo ────────────────────────────────────────── */}
       <Box sx={{
@@ -207,6 +248,35 @@ export default function Auth() {
       <Typography variant="body2" sx={{ color: C.muted, mt: 2.5, letterSpacing: '0.3px', fontSize: '12.5px' }}>
         {t('tagline')}
       </Typography>
+
+      {/* Install on phone button — only in browser, not standalone */}
+      {!isStandalone && (
+        <Button
+          startIcon={<GetAppIcon sx={{ fontSize: '18px' }} />}
+          onClick={async () => {
+            if (deferredPrompt) {
+              deferredPrompt.prompt()
+              await deferredPrompt.userChoice
+              setDeferredPrompt(null)
+            }
+          }}
+          sx={{
+            mt: 2,
+            color: C.muted,
+            fontSize: '12px',
+            fontWeight: 600,
+            textTransform: 'none',
+            borderRadius: '99px',
+            border: `1px solid ${C.border}`,
+            px: 2,
+            py: 0.75,
+            transition: `all 0.18s ${EASE.standard}`,
+            '&:hover': { color: C.primary, borderColor: C.primaryA20, background: C.accentSoft },
+          }}
+        >
+          {t('installOnPhone')}
+        </Button>
+      )}
     </Box>
   )
 }

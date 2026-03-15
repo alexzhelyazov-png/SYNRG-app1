@@ -28,7 +28,8 @@ export default function InstallScreen({ onSkip }) {
 
   return (
     <Box sx={{
-      minHeight:      '100vh',
+      flex:           1,
+      minHeight:      0,
       background:     C.bg,
       display:        'flex',
       flexDirection:  'column',

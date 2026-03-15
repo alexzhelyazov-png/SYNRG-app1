@@ -23,10 +23,11 @@ import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings'
 import { useApp }            from '../context/AppContext'
 import { C, EASE }           from '../theme'
 import { isAdmin }           from '../lib/bookingUtils'
-import SynrgLogo             from './SynrgLogo'
-
 const DRAWER_WIDTH = 272
 const RAIL_WIDTH   = 72
+
+const isStandalone = window.navigator.standalone || window.matchMedia('(display-mode: standalone)').matches
+const SITE_HEADER_H = 48
 
 // ── Nav items — adjust per role ──────────────────────────────
 function getNavItems(auth, admin) {
@@ -106,23 +107,22 @@ export default function Sidebar() {
           overflowY:     'hidden',
           display:       'flex',
           flexDirection: 'column',
+          ...(!isStandalone && {
+            top:    SITE_HEADER_H,
+            height: `calc(100vh - ${SITE_HEADER_H}px)`,
+          }),
         },
       }}
     >
-      {/* ── Header ──────────────────────────────────────── */}
+      {/* ── Header (collapse toggle only) ────────────────── */}
       <Box sx={{
         display:        'flex',
         alignItems:     'center',
-        justifyContent: open ? 'space-between' : 'center',
+        justifyContent: open ? 'flex-end' : 'center',
         px:             open ? 2.5 : 1,
-        minHeight:      64,
+        minHeight:      48,
         flexShrink:     0,
       }}>
-        {open && (
-          <Box sx={{ animation: 'fadeIn 0.2s ease' }}>
-            <SynrgLogo width={96} />
-          </Box>
-        )}
         <Tooltip title={open ? t('navHide') : t('navExpand')} placement="right" arrow>
           <IconButton onClick={() => setSidebarOpen(p => !p)} size="small"
             sx={{ color: C.muted, width: 32, height: 32, '&:hover': { color: C.text } }}>

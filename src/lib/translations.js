@@ -437,6 +437,15 @@ export const T = {
     slotCapacityEdit:   'Промени капацитет',
     currentCapacity:    'Текущ капацитет',
     newCapacity:        'Нов капацитет',
+
+    // ── Site Header (gateway nav) ────────────────────
+    siteHome:           'Начало',
+    siteStudio:         'Студио',
+    sitePrograms:       'Програми',
+    siteContact:        'Контакт',
+    siteCTA:            'Консултация →',
+    siteAccount:        'Акаунт',
+    installOnPhone:     'Свали на телефона си',
   },
 
   en: {
@@ -877,5 +886,14 @@ export const T = {
     slotCapacityEdit:   'Edit capacity',
     currentCapacity:    'Current capacity',
     newCapacity:        'New capacity',
+
+    // ── Site Header (gateway nav) ────────────────────
+    siteHome:           'Home',
+    siteStudio:         'Studio',
+    sitePrograms:       'Programs',
+    siteContact:        'Contact',
+    siteCTA:            'Book now →',
+    siteAccount:        'Account',
+    installOnPhone:     'Download on your phone',
   },
 }
