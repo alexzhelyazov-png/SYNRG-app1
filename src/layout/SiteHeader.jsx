@@ -36,7 +36,7 @@ export default function SiteHeader() {
     <Box
       component="header"
       sx={{
-        height:         76,
+        height:         96,
         display:        'flex',
         alignItems:     'center',
         px:             4,
@@ -71,7 +71,7 @@ export default function SiteHeader() {
             '&:hover':  { opacity: 0.8 },
           }}
         >
-          <SynrgLogo width={164} />
+          <SynrgLogo width={200} />
         </Box>
 
         {/* ── Center nav links ── */}
