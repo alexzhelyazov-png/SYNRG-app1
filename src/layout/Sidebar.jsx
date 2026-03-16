@@ -23,39 +23,36 @@ import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings'
 import { useApp }            from '../context/AppContext'
 import { C, EASE }           from '../theme'
 import { isAdmin }           from '../lib/bookingUtils'
+import { hasModule }         from '../lib/modules'
 const DRAWER_WIDTH = 272
 const RAIL_WIDTH   = 72
 
 const isStandalone = window.navigator.standalone || window.matchMedia('(display-mode: standalone)').matches
 const SITE_HEADER_H = 48
 
-// ── Nav items — adjust per role ──────────────────────────────
+// ── Nav items — adjust per role + modules ─────────────────────
 function getNavItems(auth, admin) {
-  const base = [
-    { view: 'dashboard', labelKey: 'navDashboard', Icon: DashboardIcon },
-    { view: 'food',      labelKey: 'navFood',      Icon: RestaurantIcon },
-    { view: 'weight',    labelKey: 'navWeight',    Icon: MonitorWeightIcon },
-    { view: 'ranking',   labelKey: 'navRanking',   Icon: LeaderboardIcon },
-    { view: 'tasks',     labelKey: 'navTasks',     Icon: AssignmentIcon },
-  ]
-  if (auth.role === 'client') {
-    return [
-      ...base.filter(i => i.view !== 'tasks'),
-      { view: 'schedule', labelKey: 'navBookSlot', Icon: EventIcon },
-      { view: 'tasks',    labelKey: 'navTasks',    Icon: AssignmentIcon },
+  // Coach/admin nav — unchanged
+  if (auth.role !== 'client') {
+    const coachItems = [
+      { view: 'dashboard', labelKey: 'navDashboard', Icon: DashboardIcon },
+      { view: 'schedule',  labelKey: 'navSchedule',  Icon: CalendarMonthIcon },
+      { view: 'ranking',   labelKey: 'navRanking',   Icon: LeaderboardIcon },
+      { view: 'tasks',     labelKey: 'navTasks',     Icon: AssignmentIcon },
     ]
+    if (admin) coachItems.push({ view: 'admin', labelKey: 'navAdmin', Icon: AdminPanelSettingsIcon })
+    return coachItems
   }
-  // Coaches — dashboard, schedule, ranking, tasks [, admin]
-  const coachItems = [
-    { view: 'dashboard', labelKey: 'navDashboard', Icon: DashboardIcon },
-    { view: 'schedule',  labelKey: 'navSchedule',  Icon: CalendarMonthIcon },
-    { view: 'ranking',   labelKey: 'navRanking',   Icon: LeaderboardIcon },
-    { view: 'tasks',     labelKey: 'navTasks',     Icon: AssignmentIcon },
-  ]
-  if (admin) {
-    coachItems.push({ view: 'admin', labelKey: 'navAdmin', Icon: AdminPanelSettingsIcon })
-  }
-  return coachItems
+  // Client nav — module-aware
+  const modules = auth.modules || []
+  const items = [{ view: 'dashboard', labelKey: 'navDashboard', Icon: DashboardIcon }]
+  if (hasModule(modules, 'nutrition_tracking'))  items.push({ view: 'food',   labelKey: 'navFood',   Icon: RestaurantIcon })
+  if (hasModule(modules, 'weight_tracking'))     items.push({ view: 'weight', labelKey: 'navWeight', Icon: MonitorWeightIcon })
+  if (hasModule(modules, 'weight_tracking') || hasModule(modules, 'nutrition_tracking'))
+    items.push({ view: 'ranking', labelKey: 'navRanking', Icon: LeaderboardIcon })
+  if (hasModule(modules, 'booking_access'))      items.push({ view: 'schedule', labelKey: 'navBookSlot', Icon: EventIcon })
+  if (modules.length > 0)                        items.push({ view: 'tasks', labelKey: 'navTasks', Icon: AssignmentIcon })
+  return items
 }
 
 export default function Sidebar() {

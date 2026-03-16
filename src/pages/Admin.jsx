@@ -21,11 +21,13 @@ import FitnessCenterIcon     from '@mui/icons-material/FitnessCenter'
 import ExpandMoreIcon        from '@mui/icons-material/ExpandMore'
 import ExpandLessIcon        from '@mui/icons-material/ExpandLess'
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings'
+import Switch                from '@mui/material/Switch'
 import { useApp }            from '../context/AppContext'
 import SiteTab               from './AdminSiteTab'
 import { useBooking }        from '../context/BookingContext'
 import { C }                 from '../theme'
 import { DB }                from '../lib/db'
+import { MODULE_DEFS, MODULE_PRESETS } from '../lib/modules'
 import {
   isoToday, isoDatePlusDays, groupByDate, dayLabel, fmtTime,
   occupancyStr, planLabel, fmtValidTo, isPlanActive, creditsRemaining,
@@ -383,7 +385,7 @@ function PlanDialog({ open, onClose, onActivate, onExtend, onAdjust, client, pla
 }
 
 // ── Client Plan Row ──────────────────────────────────────────
-function ClientPlanRow({ client, plan, onManage, t }) {
+function ClientPlanRow({ client, plan, onManage, t, lang }) {
   const active   = isPlanActive(plan)
   const daysLeft = plan ? daysUntilExpiry(plan) : null
   const credits  = plan ? creditsRemaining(plan) : null
@@ -431,6 +433,9 @@ function ClientPlanRow({ client, plan, onManage, t }) {
         ) : (
           <Typography sx={{ fontSize: '11px', color: '#F87171' }}>{t('noPlanLbl')}</Typography>
         )}
+        <Box sx={{ mt: 0.5 }}>
+          <ClientModuleEditor clientId={client.id} currentModules={client.modules} t={t} lang={lang} />
+        </Box>
       </Box>
       <Button size="small" variant="outlined" onClick={() => onManage(client, plan)}
         sx={{ fontSize: '11px', borderColor: C.border, color: C.muted,
@@ -740,8 +745,85 @@ function PlansTab({ t }) {
 }
 
 // ── Clients Tab ──────────────────────────────────────────────
+// ── Client Module Editor ──────────────────────────────────────
+function ClientModuleEditor({ clientId, currentModules, t, lang }) {
+  const { updateClientModules, showSnackbar } = useApp()
+  const [modules, setModules] = useState(currentModules || [])
+  const [open, setOpen] = useState(false)
+
+  function toggleModule(key) {
+    setModules(prev => prev.includes(key) ? prev.filter(m => m !== key) : [...prev, key])
+  }
+  function applyPreset(key) { setModules([...MODULE_PRESETS[key]]) }
+
+  async function handleSave() {
+    await updateClientModules(clientId, modules)
+    showSnackbar(t('modulesSavedMsg'))
+    setOpen(false)
+  }
+
+  return (
+    <>
+      <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', alignItems: 'center' }}>
+        {(currentModules || []).length > 0 ? (currentModules || []).map(m => (
+          <Chip key={m} label={MODULE_DEFS[m]?.[lang === 'bg' ? 'labelBg' : 'labelEn'] || m}
+            size="small"
+            sx={{ fontSize: '9px', height: '20px', background: C.primaryContainer, color: C.primary }} />
+        )) : (
+          <Chip label={t('noModules')} size="small" variant="outlined"
+            sx={{ fontSize: '9px', height: '20px', borderColor: C.border, color: C.muted }} />
+        )}
+        <IconButton size="small" onClick={() => { setModules(currentModules || []); setOpen(true) }}
+          sx={{ width: 20, height: 20 }}>
+          <EditIcon sx={{ fontSize: 12, color: C.muted }} />
+        </IconButton>
+      </Box>
+      <Dialog open={open} onClose={() => setOpen(false)} maxWidth="xs" fullWidth
+        PaperProps={{ sx: { background: C.card, border: `1px solid ${C.border}`, borderRadius: '20px' } }}>
+        <DialogTitle sx={{ color: C.text, fontWeight: 700 }}>{t('editModules')}</DialogTitle>
+        <DialogContent>
+          <Box sx={{ display: 'flex', gap: 0.75, mb: 2, flexWrap: 'wrap' }}>
+            {Object.entries(MODULE_PRESETS).map(([key]) => (
+              <Button key={key} size="small" variant="outlined" onClick={() => applyPreset(key)}
+                sx={{ fontSize: '11px', textTransform: 'none', borderColor: C.border, color: C.text,
+                  '&:hover': { borderColor: C.primary, color: C.primary } }}>
+                {t(`preset_${key}`)}
+              </Button>
+            ))}
+            <Button size="small" variant="outlined" onClick={() => setModules([])}
+              sx={{ fontSize: '11px', textTransform: 'none', color: '#F87171', borderColor: 'rgba(248,113,113,0.4)' }}>
+              {t('clearAll')}
+            </Button>
+          </Box>
+          {Object.entries(MODULE_DEFS).map(([key, def]) => (
+            <Box key={key} sx={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              py: 0.75, borderBottom: `1px solid ${C.border}`,
+            }}>
+              <Typography sx={{ fontSize: '13px', color: C.text }}>
+                {lang === 'bg' ? def.labelBg : def.labelEn}
+              </Typography>
+              <Switch size="small" checked={modules.includes(key)}
+                onChange={() => toggleModule(key)}
+                sx={{ '& .MuiSwitch-switchBase.Mui-checked': { color: C.primary },
+                  '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': { backgroundColor: C.primary } }} />
+            </Box>
+          ))}
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setOpen(false)} sx={{ color: C.muted }}>{t('cancelBtn')}</Button>
+          <Button variant="contained" onClick={handleSave}
+            sx={{ background: C.primary, color: '#0f1c11', fontWeight: 700 }}>
+            {t('saveBtn')}
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </>
+  )
+}
+
 function ClientsTab({ t }) {
-  const { realClients, showSnackbar } = useApp()
+  const { realClients, showSnackbar, lang } = useApp()
   const { allPlans, loadAllPlans, activatePlan, extendPlan, adjustCredits } = useBooking()
   const [planDlg, setPlanDlg] = useState(null)
   const [loaded, setLoaded]   = useState(false)
@@ -783,14 +865,15 @@ function ClientsTab({ t }) {
                   fontSize: '13px', fontWeight: 800, color: '#F87171' }}>
                   {client.name.charAt(0).toUpperCase()}
                 </Box>
-                <Box>
+                <Box sx={{ flex: 1, minWidth: 0 }}>
                   <Typography sx={{ fontWeight: 700, fontSize: '14px', color: C.text }}>{client.name}</Typography>
-                  <Typography sx={{ fontSize: '11px', color: '#F87171' }}>{t('hasNoPlan')}</Typography>
+                  <Typography sx={{ fontSize: '11px', color: '#F87171', mb: 0.5 }}>{t('hasNoPlan')}</Typography>
+                  <ClientModuleEditor clientId={client.id} currentModules={client.modules} t={t} lang={lang} />
                 </Box>
               </Box>
               <Button size="small" variant="contained"
                 onClick={() => setPlanDlg({ client, plan: null })}
-                sx={{ background: C.primary, color: '#0f1c11', fontWeight: 700, fontSize: '11px' }}>
+                sx={{ background: C.primary, color: '#0f1c11', fontWeight: 700, fontSize: '11px', flexShrink: 0 }}>
                 {t('activatePlanBtn')}
               </Button>
             </Box>
@@ -806,7 +889,7 @@ function ClientsTab({ t }) {
         {active.map(client => {
           const plan = getClientPlan(client.id)
           return (
-            <ClientPlanRow key={client.id} client={client} plan={plan} t={t}
+            <ClientPlanRow key={client.id} client={client} plan={plan} t={t} lang={lang}
               onManage={(c, p) => setPlanDlg({ client: c, plan: p })} />
           )
         })}

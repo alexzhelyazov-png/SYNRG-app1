@@ -7,6 +7,7 @@ import { AppProvider, useApp } from './context/AppContext'
 import { BookingProvider }     from './context/BookingContext'
 import { C, EASE, makeTheme }  from './theme'
 import { isAdmin }             from './lib/bookingUtils'
+import { hasModule }           from './lib/modules'
 
 import SiteHeader     from './layout/SiteHeader'
 import Sidebar        from './layout/Sidebar'
@@ -164,13 +165,13 @@ function AppShell() {
             ) : (
               <>
                 {view === 'dashboard' && <Dashboard />}
-                {view === 'food'      && <FoodTracker />}
-                {view === 'weight'    && <WeightTracker />}
+                {view === 'food'      && (auth.role !== 'client' || hasModule(auth.modules, 'nutrition_tracking')) && <FoodTracker />}
+                {view === 'weight'    && (auth.role !== 'client' || hasModule(auth.modules, 'weight_tracking'))    && <WeightTracker />}
                 {view === 'ranking'   && <Ranking />}
                 {view === 'tasks'     && (auth.role === 'coach' || auth.role === 'admin') && <AllClientsTasks />}
                 {view === 'tasks'     && auth.role === 'client' && <Tasks />}
-                {view === 'booking'   && <Booking />}
-                {view === 'schedule'  && auth.role === 'client' && <ClientSchedule />}
+                {view === 'booking'   && (auth.role !== 'client' || hasModule(auth.modules, 'booking_access'))     && <Booking />}
+                {view === 'schedule'  && auth.role === 'client' && hasModule(auth.modules, 'booking_access')       && <ClientSchedule />}
                 {view === 'schedule'  && auth.role !== 'client' && <Schedule />}
                 {view === 'admin'     && admin && <Admin />}
               </>

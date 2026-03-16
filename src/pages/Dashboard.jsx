@@ -16,6 +16,7 @@ import {
   creditsRemaining, isoToday, isoDatePlusDays, daysUntilExpiry, fmtValidTo,
   groupByDate, dayLabel, fmtTime, canClientBook, canClientCancel, isPlanActive,
 } from '../lib/bookingUtils'
+import { hasModule, hasAnyModule } from '../lib/modules'
 
 // ─── Reminder banners (client) ───────────────────────────────────
 function ReminderBanners() {
@@ -972,13 +973,15 @@ function DashboardClient({ isCoachView = false }) {
       {/* ── Tab 0: Начало ─────────────────────────────── */}
       {tab === 0 && !isCoachView && (() => {
         const today = isoToday()
+        const showBooking = hasModule(auth.modules, 'booking_access')
 
         // Next upcoming session
-        const nextSession = (myBookings || [])
+        const nextSession = showBooking ? (myBookings || [])
           .filter(b => b.status === 'active')
           .map(b => ({ booking: b, slot: (slots || []).find(s => s.id === b.slot_id) }))
           .filter(({ slot }) => slot && slot.slot_date >= today && slot.status !== 'cancelled')
           .sort((a, b) => (a.slot.slot_date + a.slot.start_time).localeCompare(b.slot.slot_date + b.slot.start_time))[0] || null
+          : null
 
         // Plan status
         const credits  = myPlan ? (myPlan.plan_type === 'unlimited' ? null : creditsRemaining(myPlan)) : null
@@ -1000,8 +1003,8 @@ function DashboardClient({ isCoachView = false }) {
         return (
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
 
-            {/* ── Следваща тренировка ── */}
-            {nextSession ? (
+            {/* ── Следваща тренировка (only with booking_access) ── */}
+            {showBooking && (nextSession ? (
               <Paper sx={{
                 p: 2.5, borderRadius: '20px',
                 background: 'linear-gradient(135deg, rgba(196,233,191,0.12) 0%, rgba(196,233,191,0.05) 100%)',
@@ -1035,10 +1038,10 @@ function DashboardClient({ isCoachView = false }) {
                 </Typography>
                 <Typography sx={{ fontSize: '16px', color: C.muted }}>{t('noUpcomingSessions')}</Typography>
               </Paper>
-            )}
+            ))}
 
-            {/* ── Твоят план ── */}
-            <Paper sx={{
+            {/* ── Твоят план (only with booking_access) ── */}
+            {showBooking && <Paper sx={{
               p: 2.5, borderRadius: '20px',
               border: `1px solid ${planColor}33`,
               background: `${planColor}08`,
@@ -1079,7 +1082,7 @@ function DashboardClient({ isCoachView = false }) {
                   </Box>
                 </Box>
               )}
-            </Paper>
+            </Paper>}
 
             {/* ── Днес ── */}
             <Box>
@@ -1087,8 +1090,8 @@ function DashboardClient({ isCoachView = false }) {
                 {t('todayLbl')}
               </Typography>
               <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1.5 }}>
-                {/* Food button */}
-                <Paper onClick={() => setTab(progressTabIdx)}
+                {/* Food button (only with nutrition_tracking) */}
+                {hasModule(auth.modules, 'nutrition_tracking') && <Paper onClick={() => setTab(progressTabIdx)}
                   sx={{
                     p: 2.25, borderRadius: '18px', cursor: 'pointer',
                     border: `1px solid ${todayFoodLogged ? C.primaryA20 : C.border}`,
@@ -1104,10 +1107,10 @@ function DashboardClient({ isCoachView = false }) {
                   <Typography sx={{ fontSize: '12px', color: C.muted }}>
                     {todayFoodLogged ? '✓ ' + t('loggedToday') : t('tapToLog')}
                   </Typography>
-                </Paper>
+                </Paper>}
 
-                {/* Weight button */}
-                <Paper onClick={() => setTab(progressTabIdx)}
+                {/* Weight button (only with weight_tracking) */}
+                {hasModule(auth.modules, 'weight_tracking') && <Paper onClick={() => setTab(progressTabIdx)}
                   sx={{
                     p: 2.25, borderRadius: '18px', cursor: 'pointer',
                     border: `1px solid ${todayWeightLogged ? C.primaryA20 : C.border}`,
@@ -1123,7 +1126,7 @@ function DashboardClient({ isCoachView = false }) {
                   <Typography sx={{ fontSize: '12px', color: C.muted }}>
                     {todayWeightLogged ? '✓ ' + t('loggedToday') : t('tapToLog')}
                   </Typography>
-                </Paper>
+                </Paper>}
               </Box>
             </Box>
 
@@ -1198,6 +1201,75 @@ function DashboardClient({ isCoachView = false }) {
   )
 }
 
+// ─── Portal Home (empty state — no active modules) ────────────────
+function PortalHome() {
+  const { auth, t } = useApp()
+
+  const cards = [
+    {
+      href: '../studio.html',
+      titleKey: 'portalStudioTitle',
+      descKey:  'portalStudioDesc',
+      gradient: 'rgba(196,233,191,0.08)',
+      border:   'rgba(196,233,191,0.2)',
+      color:    C.primary,
+    },
+    {
+      href: '../remote.html',
+      titleKey: 'portalRemoteTitle',
+      descKey:  'portalRemoteDesc',
+      gradient: 'rgba(200,197,255,0.08)',
+      border:   'rgba(200,197,255,0.2)',
+      color:    '#C8C5FF',
+    },
+    {
+      href: '../index.html#cta',
+      titleKey: 'portalContactTitle',
+      descKey:  'portalContactDesc',
+      gradient: 'rgba(255,255,255,0.04)',
+      border:   C.border,
+      color:    C.text,
+    },
+  ]
+
+  return (
+    <Box sx={{ maxWidth: 520, mx: 'auto', animation: `fadeInUp 0.22s ${EASE.decelerate} both` }}>
+      <Box sx={{ mb: 3 }}>
+        <Typography variant="h2" sx={{ mb: 0.5 }}>
+          {t('greeting')}, {auth.name}
+        </Typography>
+        <Typography sx={{ color: C.muted, fontSize: '14px' }}>
+          {t('portalWelcome')}
+        </Typography>
+      </Box>
+
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+        {cards.map(card => (
+          <Paper
+            key={card.titleKey}
+            component="a"
+            href={card.href}
+            sx={{
+              p: 2.5, borderRadius: '20px', textDecoration: 'none',
+              border: `1px solid ${card.border}`,
+              background: `linear-gradient(135deg, ${card.gradient} 0%, transparent 100%)`,
+              cursor: 'pointer', transition: 'transform 0.15s',
+              '&:hover': { transform: 'translateY(-2px)' },
+            }}
+          >
+            <Typography sx={{ fontWeight: 700, fontSize: '16px', color: card.color, mb: 0.5 }}>
+              {t(card.titleKey)}
+            </Typography>
+            <Typography sx={{ fontSize: '13px', color: C.muted }}>
+              {t(card.descKey)}
+            </Typography>
+          </Paper>
+        ))}
+      </Box>
+    </Box>
+  )
+}
+
 // ─── Dashboard router ─────────────────────────────────────────────
 export default function Dashboard() {
   const { auth, viewingCoach } = useApp()
@@ -1206,9 +1278,16 @@ export default function Dashboard() {
   if ((auth.role === 'coach' || auth.role === 'admin') && !viewingCoach) {
     return <DashboardCoach />
   }
-  // Coach/Admin viewing own tracker, or client view
-  const isCoachView = (auth.role === 'coach' || auth.role === 'admin') && viewingCoach !== null
-  return <DashboardClient isCoachView={isCoachView} />
+  // Coach/Admin viewing own tracker
+  if ((auth.role === 'coach' || auth.role === 'admin') && viewingCoach !== null) {
+    return <DashboardClient isCoachView />
+  }
+  // Client with no modules → portal home
+  if (!hasAnyModule(auth.modules || [])) {
+    return <PortalHome />
+  }
+  // Client with modules → regular dashboard
+  return <DashboardClient />
 }
 
 // ─── Client Schedule: 3-day booking calendar ─────────────────────

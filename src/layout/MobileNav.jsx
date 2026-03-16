@@ -16,35 +16,31 @@ import AssignmentIcon         from '@mui/icons-material/Assignment'
 import DeleteOutlineIcon      from '@mui/icons-material/DeleteOutline'
 import { useApp }             from '../context/AppContext'
 import { isAdmin }            from '../lib/bookingUtils'
+import { hasModule }          from '../lib/modules'
 import { C, EASE }            from '../theme'
 
-// Base nav items shared by all roles
-const BASE_NAV = [
-  { view: 'dashboard', Icon: DashboardIcon,     labelKey: 'navDashboard' },
-  { view: 'food',      Icon: RestaurantIcon,    labelKey: 'navFood'      },
-  { view: 'weight',    Icon: MonitorWeightIcon, labelKey: 'navWeight'    },
-  { view: 'ranking',   Icon: LeaderboardIcon,   labelKey: 'navRanking'   },
-]
-
-// Build role-specific nav item list
+// Build role-specific nav item list (module-aware for clients)
 function getNavItems(auth, admin) {
-  if (auth.role === 'client') {
-    return [
-      ...BASE_NAV,
-      { view: 'tasks',    Icon: AssignmentIcon,    labelKey: 'navTasks'    },
-      { view: 'schedule', Icon: CalendarMonthIcon, labelKey: 'navBookSlot' },
+  // Coach/admin nav — unchanged
+  if (auth.role !== 'client') {
+    const items = [
+      { view: 'dashboard', Icon: DashboardIcon,     labelKey: 'navDashboard' },
+      { view: 'schedule',  Icon: CalendarMonthIcon, labelKey: 'navSchedule'  },
+      { view: 'ranking',   Icon: LeaderboardIcon,   labelKey: 'navRanking'   },
+      { view: 'tasks',     Icon: AssignmentIcon,    labelKey: 'navTasks'     },
     ]
+    if (admin) items.push({ view: 'admin', Icon: AdminPanelSettingsIcon, labelKey: 'navAdmin' })
+    return items
   }
-  // Coach / Admin — dashboard, schedule, ranking, tasks [, admin]
-  const items = [
-    { view: 'dashboard', Icon: DashboardIcon,     labelKey: 'navDashboard' },
-    { view: 'schedule',  Icon: CalendarMonthIcon, labelKey: 'navSchedule'  },
-    { view: 'ranking',   Icon: LeaderboardIcon,   labelKey: 'navRanking'   },
-    { view: 'tasks',     Icon: AssignmentIcon,    labelKey: 'navTasks'     },
-  ]
-  if (admin) {
-    items.push({ view: 'admin', Icon: AdminPanelSettingsIcon, labelKey: 'navAdmin' })
-  }
+  // Client nav — module-aware
+  const modules = auth.modules || []
+  const items = [{ view: 'dashboard', Icon: DashboardIcon, labelKey: 'navDashboard' }]
+  if (hasModule(modules, 'nutrition_tracking'))  items.push({ view: 'food',   Icon: RestaurantIcon,   labelKey: 'navFood' })
+  if (hasModule(modules, 'weight_tracking'))     items.push({ view: 'weight', Icon: MonitorWeightIcon, labelKey: 'navWeight' })
+  if (hasModule(modules, 'weight_tracking') || hasModule(modules, 'nutrition_tracking'))
+    items.push({ view: 'ranking', Icon: LeaderboardIcon, labelKey: 'navRanking' })
+  if (modules.length > 0)                        items.push({ view: 'tasks', Icon: AssignmentIcon, labelKey: 'navTasks' })
+  if (hasModule(modules, 'booking_access'))       items.push({ view: 'schedule', Icon: CalendarMonthIcon, labelKey: 'navBookSlot' })
   return items
 }
 

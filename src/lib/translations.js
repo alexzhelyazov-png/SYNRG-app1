@@ -447,6 +447,25 @@ export const T = {
     siteAccount:        'Акаунт',
     installOnPhone:     'Свали на телефона си',
 
+    // ── Portal Home (empty state) ─────────────────────
+    portalWelcome:       'Все още нямаш активирани услуги. Разгледай какво предлагаме.',
+    portalStudioTitle:   'Тренировки в студио',
+    portalStudioDesc:    'Персонални и групови тренировки с професионален треньор.',
+    portalRemoteTitle:   'Онлайн програми',
+    portalRemoteDesc:    'Тренировъчни планове и хранителни режими за вкъщи.',
+    portalContactTitle:  'Свържи се с нас',
+    portalContactDesc:   'Безплатна консултация за да разберем какво ти подхожда.',
+
+    // ── Module Management (Admin) ───────────────────
+    noModules:           'Без достъп',
+    editModules:         'Редактирай модули',
+    modulesLbl:          'Модули',
+    preset_studio_client:'Студио клиент',
+    preset_remote_client:'Онлайн клиент',
+    preset_full_access:  'Пълен достъп',
+    clearAll:            'Изчисти всички',
+    modulesSavedMsg:     'Модулите са обновени',
+
     // ── Website CMS (Admin Site Tab) ─────────────────
     siteTab:            'Сайт',
     siteProducts:       'Продукти',
@@ -965,6 +984,25 @@ export const T = {
     siteCTA:            'Book now →',
     siteAccount:        'Account',
     installOnPhone:     'Download on your phone',
+
+    // ── Portal Home (empty state) ─────────────────────
+    portalWelcome:       'You don\'t have any active services yet. Explore what we offer.',
+    portalStudioTitle:   'Studio Training',
+    portalStudioDesc:    'Personal and group training with a professional coach.',
+    portalRemoteTitle:   'Online Programs',
+    portalRemoteDesc:    'Training plans and meal plans for at home.',
+    portalContactTitle:  'Get in Touch',
+    portalContactDesc:   'Free consultation to find what works for you.',
+
+    // ── Module Management (Admin) ───────────────────
+    noModules:           'No access',
+    editModules:         'Edit modules',
+    modulesLbl:          'Modules',
+    preset_studio_client:'Studio client',
+    preset_remote_client:'Remote client',
+    preset_full_access:  'Full access',
+    clearAll:            'Clear all',
+    modulesSavedMsg:     'Modules updated',
 
     // ── Website CMS (Admin Site Tab) ─────────────────
     siteTab:            'Website',

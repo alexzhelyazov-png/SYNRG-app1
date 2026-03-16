@@ -123,6 +123,7 @@ export function AppProvider({ children }) {
         reactions: reactions
           .filter(r => r.client_id === c.id)
           .sort((a, b) => (b.created_at || '').localeCompare(a.created_at || '')),
+        modules: Array.isArray(c.modules) ? c.modules : (c.modules ? JSON.parse(c.modules) : []),
         reminderSettings: c.reminder_settings
           ? (typeof c.reminder_settings === 'string'
               ? JSON.parse(c.reminder_settings)
@@ -170,7 +171,7 @@ export function AppProvider({ children }) {
       const i = clients.findIndex(x => x.name === c.name)
       setSelIdx(i)
       localStorage.setItem('synrg_selidx', String(i))
-      const a = { isLoggedIn: true, role: 'client', name: c.name, id: c.id }
+      const a = { isLoggedIn: true, role: 'client', name: c.name, id: c.id, modules: c.modules || [] }
       setAuth(a)
       localStorage.setItem('synrg_auth', JSON.stringify(a))
       return null
@@ -182,11 +183,11 @@ export function AppProvider({ children }) {
     const exists = clients.find(c => !c.is_coach && c.name.toLowerCase() === name.toLowerCase())
     if (exists) return t('errClientExists')
     const data = await DB.insert('clients', {
-      name, password: pass, calorie_target: 2000, protein_target: 140, is_coach: false,
+      name, password: pass, calorie_target: 2000, protein_target: 140, is_coach: false, modules: [],
     })
     const newClient = {
       id: data.id, name, password: pass, is_coach: false,
-      calorieTarget: 2000, proteinTarget: 140,
+      calorieTarget: 2000, proteinTarget: 140, modules: [],
       meals: [], workouts: [], weightLogs: [], tasks: [], reactions: [],
       reminderSettings: { protein: true, weight: true, foodLog: true, coach: true },
     }
@@ -196,7 +197,7 @@ export function AppProvider({ children }) {
       setSelIdx(newRealIdx)
       return updated
     })
-    setAuth({ isLoggedIn: true, role: 'client', name, id: data.id })
+    setAuth({ isLoggedIn: true, role: 'client', name, id: data.id, modules: [] })
     return null
   }
 
@@ -221,6 +222,13 @@ export function AppProvider({ children }) {
     } else if (auth.role === 'client') {
       const valid = clients.find(c => c.id === auth.id && !c.is_coach)
       if (!valid) { logout(); return }
+      // Refresh modules from DB data (catches admin changes)
+      const freshModules = valid.modules || []
+      if (JSON.stringify(freshModules) !== JSON.stringify(auth.modules || [])) {
+        const updatedAuth = { ...auth, modules: freshModules }
+        setAuth(updatedAuth)
+        localStorage.setItem('synrg_auth', JSON.stringify(updatedAuth))
+      }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading])
@@ -604,6 +612,18 @@ export function AppProvider({ children }) {
     showSnackbar(t('workoutSavedMsg'))
   }
 
+  // ── Module management (admin) ─────────────────────────────────
+  async function updateClientModules(clientId, newModules) {
+    await DB.update('clients', clientId, { modules: newModules })
+    setClients(prev => prev.map(c => c.id === clientId ? { ...c, modules: newModules } : c))
+    // If the currently logged-in client's modules changed, update auth too
+    if (auth.id === clientId) {
+      const updatedAuth = { ...auth, modules: newModules }
+      setAuth(updatedAuth)
+      localStorage.setItem('synrg_auth', JSON.stringify(updatedAuth))
+    }
+  }
+
   const value = {
     // Theme
     isDark, setIsDark,
@@ -663,6 +683,7 @@ export function AppProvider({ children }) {
     addTask, addTaskForClient, toggleTaskDone, deleteTask, addTaskComment,
     sendReaction, dismissReaction,
     updateReminderSettings,
+    updateClientModules,
   }
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>
