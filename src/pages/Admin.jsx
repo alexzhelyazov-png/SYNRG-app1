@@ -22,6 +22,7 @@ import ExpandMoreIcon        from '@mui/icons-material/ExpandMore'
 import ExpandLessIcon        from '@mui/icons-material/ExpandLess'
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings'
 import { useApp }            from '../context/AppContext'
+import SiteTab               from './AdminSiteTab'
 import { useBooking }        from '../context/BookingContext'
 import { C }                 from '../theme'
 import { DB }                from '../lib/db'
@@ -1134,6 +1135,7 @@ export default function Admin() {
     { label: t('analyticsTab'),    key: 2 },
     { label: t('coachesTab'),      key: 3 },
     { label: t('expensesTab'),     key: 4 },
+    { label: t('siteTab'),         key: 5 },
   ]
 
   return (
@@ -1170,6 +1172,7 @@ export default function Admin() {
       {tab === 2 && <AnalyticsTab t={t} />}
       {tab === 3 && <CoachesTab t={t} />}
       {tab === 4 && <ExpensesTab t={t} />}
+      {tab === 5 && <SiteTab />}
     </Box>
   )
 }

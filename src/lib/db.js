@@ -338,6 +338,49 @@ export const DB = {
     return { error: `Unknown RPC: ${funcName}` }
   },
 
+  // ── Website CMS ────────────────────────────────────────────
+  async getSiteItems(table) {
+    if (isUsingSupabase) {
+      return (await sbFetchSafe(
+        sbUrl(table, '?select=*&order=display_order.asc'),
+        { headers: sbHeaders() }
+      )) || []
+    }
+    const all = await LS.selectAll(table)
+    return all.sort((a, b) => (a.display_order || 0) - (b.display_order || 0))
+  },
+
+  async getContentBlocks(page) {
+    if (isUsingSupabase) {
+      return (await sbFetchSafe(
+        sbUrl('site_content_blocks', `?select=*&page=eq.${encodeURIComponent(page)}`),
+        { headers: sbHeaders() }
+      )) || []
+    }
+    const all = await LS.selectAll('site_content_blocks')
+    return all.filter(r => r.page === page)
+  },
+
+  async upsertContentBlock(page, section, key, valueBg, valueEn) {
+    return this.upsertByFields('site_content_blocks', {
+      page, section, block_key: key,
+      value_bg: valueBg, value_en: valueEn,
+      updated_at: new Date().toISOString(),
+    }, ['page', 'section', 'block_key'])
+  },
+
+  async getInquiries(status = null) {
+    if (isUsingSupabase) {
+      const params = status
+        ? `?select=*&status=eq.${status}&order=created_at.desc&limit=100`
+        : '?select=*&order=created_at.desc&limit=100'
+      return (await sbFetchSafe(sbUrl('inquiries', params), { headers: sbHeaders() })) || []
+    }
+    const all = await LS.selectAll('inquiries')
+    const filtered = status ? all.filter(r => r.status === status) : all
+    return filtered.sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))
+  },
+
   // ── Seed coaches & their shadow profiles ──────────────────
   async seedIfEmpty() {
     const COACHES = [
