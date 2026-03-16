@@ -11,7 +11,7 @@ import DirectionsRunIcon    from '@mui/icons-material/DirectionsRun'
 import HomeIcon             from '@mui/icons-material/Home'
 import StorefrontIcon       from '@mui/icons-material/Storefront'
 import OndemandVideoIcon    from '@mui/icons-material/OndemandVideo'
-import ContactMailIcon      from '@mui/icons-material/ContactMail'
+import AttachMoneyIcon      from '@mui/icons-material/AttachMoney'
 import { useApp } from '../context/AppContext'
 import { C, EASE } from '../theme'
 import SynrgLogo from './SynrgLogo'
@@ -25,8 +25,8 @@ function getSiteLinks(t) {
   return [
     { href: `${SITE_BASE}index.html`,      label: t('siteHome'),     Icon: HomeIcon },
     { href: `${SITE_BASE}studio.html`,      label: t('siteStudio'),   Icon: StorefrontIcon },
-    { href: `${SITE_BASE}remote.html`,      label: t('sitePrograms'), Icon: OndemandVideoIcon },
-    { href: `${SITE_BASE}index.html#cta`,   label: t('siteContact'),  Icon: ContactMailIcon },
+    { href: `${SITE_BASE}remote.html`,      label: t('siteRemote'),   Icon: OndemandVideoIcon },
+    { href: `${SITE_BASE}pricing.html`,     label: t('sitePricing'),  Icon: AttachMoneyIcon },
   ]
 }
 
@@ -167,7 +167,7 @@ export default function MobileHeader() {
               mb:             3,
             }}>
               <Box component="a" href={`${SITE_BASE}index.html`} sx={{ display: 'flex', alignItems: 'center' }}>
-                <SynrgLogo width={90} />
+                <SynrgLogo width={120} />
               </Box>
               <IconButton
                 onClick={() => setSiteMenuOpen(false)}
