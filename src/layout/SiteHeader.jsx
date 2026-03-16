@@ -71,7 +71,7 @@ export default function SiteHeader() {
             '&:hover':  { opacity: 0.8 },
           }}
         >
-          <SynrgLogo width={200} />
+          <SynrgLogo width={172} />
         </Box>
 
         {/* ── Center nav links ── */}
