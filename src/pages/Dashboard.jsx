@@ -388,7 +388,7 @@ export function ClientDetail() {
         </Box>
       </Box>
 
-      {/* ── 3 Tabs ── */}
+      {/* ── 2 Tabs ── */}
       <Tabs
         value={tab}
         onChange={(_, v) => setTab(v)}
@@ -401,165 +401,157 @@ export function ClientDetail() {
         }}
       >
         <Tab label={t('todayWorkoutTab')} />
-        <Tab label={t('historyTab')} />
         <Tab label={t('profileTab')} />
       </Tabs>
 
-      {/* ══════ Tab 0: Тренировка днес ══════ */}
+      {/* ══════ Tab 0: Тренировка днес + История ══════ */}
       {tab === 0 && (
-        <Paper sx={{
-          border:       `1px solid rgba(196,233,191,0.25)`,
-          borderRadius: '20px',
-          p:            3,
-          background:   'linear-gradient(145deg, rgba(196,233,191,0.04) 0%, #1C1A19 100%)',
-          boxShadow:    '0 0 0 1px rgba(196,233,191,0.08), 0 8px 32px rgba(0,0,0,0.3)',
-          animation:    `fadeInUp 0.22s ${EASE.decelerate} both`,
-        }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, mb: 2.25 }}>
-            <Box sx={{
-              width: 8, height: 8, borderRadius: '99px',
-              background: C.primary, boxShadow: `0 0 10px ${C.primaryGlow}`,
-              flexShrink: 0, animation: `pulse 2.5s ${EASE.standard} infinite`,
-            }} />
-            <Typography variant="h3">{t('workout')} — {todayDate()}</Typography>
-          </Box>
-
-          {/* Category chips */}
-          <Box sx={{ display: 'flex', gap: 0.75, flexWrap: 'wrap', mb: 2.5 }}>
-            {WORKOUT_CATEGORIES.map(({ key }) => {
-              const active = workoutCategory === key
-              return (
-                <Chip
-                  key={key}
-                  label={t(key)}
-                  onClick={() => setWorkoutCategory(key)}
-                  sx={{
-                    background: active ? C.primary : 'rgba(255,255,255,0.04)',
-                    color:      active ? '#0A2E0F' : C.text,
-                    border:     `1px solid ${active ? C.primary : C.border}`,
-                    fontWeight: active ? 800 : 500,
-                    fontSize:   '13px',
-                    cursor:     'pointer',
-                    transition: `all 0.18s ${EASE.spring}`,
-                    '&:hover':  { background: active ? C.primaryHover : C.accentSoft, transform: 'translateY(-1px)' },
-                    '& .MuiChip-label': { px: 1.5 },
-                  }}
-                />
-              )
-            })}
-          </Box>
-
-          {/* Exercise inputs */}
-          <Box sx={{
-            display: 'grid',
-            gridTemplateColumns: isMobile ? '1fr' : '2fr 1fr 1fr auto',
-            gap: 1.25, mb: 1.75, alignItems: 'end',
+        <Box sx={{ animation: `fadeInUp 0.22s ${EASE.decelerate} both` }}>
+          {/* ── Workout builder ── */}
+          <Paper sx={{
+            border:       `1px solid rgba(196,233,191,0.25)`,
+            borderRadius: '20px',
+            p:            3,
+            background:   'linear-gradient(145deg, rgba(196,233,191,0.04) 0%, #1C1A19 100%)',
+            boxShadow:    '0 0 0 1px rgba(196,233,191,0.08), 0 8px 32px rgba(0,0,0,0.3)',
           }}>
-            {[
-              { labelKey: 'exerciseLbl', placeholder: t('exPlaceholder'), value: exName,   onChange: e => setExName(e.target.value) },
-              { labelKey: 'setsReps',    placeholder: '4×8',              value: exScheme, onChange: e => setExScheme(e.target.value) },
-              { labelKey: 'kgLbl',       placeholder: '80',               value: exWeight, onChange: e => setExWeight(e.target.value) },
-            ].map(({ labelKey, placeholder, value, onChange }) => (
-              <Box key={labelKey}>
-                <Typography sx={{ fontSize: '11px', color: C.muted, mb: 0.6, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.8px' }}>
-                  {t(labelKey)}
-                </Typography>
-                <TextField
-                  fullWidth
-                  placeholder={placeholder}
-                  value={value}
-                  onChange={onChange}
-                  onKeyDown={e => e.key === 'Enter' && addExercise()}
-                  inputProps={{ style: { fontSize: '15px', padding: '12px 14px' } }}
-                />
-              </Box>
-            ))}
-            <Button
-              variant="contained" color="primary" onClick={addExercise}
-              sx={{ py: '13px', px: 2.5, fontSize: '22px', alignSelf: 'flex-end', minWidth: '48px' }}
-            >+</Button>
-          </Box>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, mb: 2.25 }}>
+              <Box sx={{
+                width: 8, height: 8, borderRadius: '99px',
+                background: C.primary, boxShadow: `0 0 10px ${C.primaryGlow}`,
+                flexShrink: 0, animation: `pulse 2.5s ${EASE.standard} infinite`,
+              }} />
+              <Typography variant="h3">{t('workout')} — {todayDate()}</Typography>
+            </Box>
 
-          {/* Current exercises list */}
-          {currentWorkout.length > 0 && (
-            <Box sx={{ background: 'rgba(0,0,0,0.3)', border: `1px solid ${C.border}`, borderRadius: '14px', p: 1.75, mb: 2 }}>
-              <Typography sx={{ fontSize: '11px', color: C.muted, mb: 1.25, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.7px' }}>
-                {t(workoutCategory)} · {currentWorkout.length} {t('exercisesLbl')}
-              </Typography>
-              {currentWorkout.map((ex, i) => (
-                <Box key={i} sx={{
-                  display: 'grid',
-                  gridTemplateColumns: isMobile ? '1fr 80px auto' : '1fr 110px 80px auto',
-                  gap: 1, py: 1.1,
-                  borderBottom: i < currentWorkout.length - 1 ? `1px solid ${C.border}` : 'none',
-                  alignItems: 'center',
-                }}>
-                  <Typography sx={{ fontWeight: 600, fontSize: '14.5px' }}>{ex.exercise}</Typography>
-                  <Typography sx={{ color: C.muted, fontSize: '13.5px' }}>{ex.scheme}</Typography>
-                  <Typography sx={{ color: C.muted, fontSize: '13.5px' }}>{ex.weight} {t('kgUnit')}</Typography>
-                  <Button
-                    size="small"
-                    onClick={() => setCurrentWorkout(prev => prev.filter((_, j) => j !== i))}
-                    sx={{ minWidth: 'auto', background: C.dangerSoft, color: C.danger, border: '1px solid rgba(255,107,157,0.2)', borderRadius: '10px', px: 1.25, py: '4px', fontSize: '13px' }}
-                  >×</Button>
+            {/* Category chips */}
+            <Box sx={{ display: 'flex', gap: 0.75, flexWrap: 'wrap', mb: 2.5 }}>
+              {WORKOUT_CATEGORIES.map(({ key }) => {
+                const active = workoutCategory === key
+                return (
+                  <Chip
+                    key={key}
+                    label={t(key)}
+                    onClick={() => setWorkoutCategory(key)}
+                    sx={{
+                      background: active ? C.primary : 'rgba(255,255,255,0.04)',
+                      color:      active ? '#0A2E0F' : C.text,
+                      border:     `1px solid ${active ? C.primary : C.border}`,
+                      fontWeight: active ? 800 : 500,
+                      fontSize:   '13px',
+                      cursor:     'pointer',
+                      transition: `all 0.18s ${EASE.spring}`,
+                      '&:hover':  { background: active ? C.primaryHover : C.accentSoft, transform: 'translateY(-1px)' },
+                      '& .MuiChip-label': { px: 1.5 },
+                    }}
+                  />
+                )
+              })}
+            </Box>
+
+            {/* Exercise inputs */}
+            <Box sx={{
+              display: 'grid',
+              gridTemplateColumns: isMobile ? '1fr' : '2fr 1fr 1fr auto',
+              gap: 1.25, mb: 1.75, alignItems: 'end',
+            }}>
+              {[
+                { labelKey: 'exerciseLbl', placeholder: t('exPlaceholder'), value: exName,   onChange: e => setExName(e.target.value) },
+                { labelKey: 'setsReps',    placeholder: '4×8',              value: exScheme, onChange: e => setExScheme(e.target.value) },
+                { labelKey: 'kgLbl',       placeholder: '80',               value: exWeight, onChange: e => setExWeight(e.target.value) },
+              ].map(({ labelKey, placeholder, value, onChange }) => (
+                <Box key={labelKey}>
+                  <Typography sx={{ fontSize: '11px', color: C.muted, mb: 0.6, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.8px' }}>
+                    {t(labelKey)}
+                  </Typography>
+                  <TextField
+                    fullWidth
+                    placeholder={placeholder}
+                    value={value}
+                    onChange={onChange}
+                    onKeyDown={e => e.key === 'Enter' && addExercise()}
+                    inputProps={{ style: { fontSize: '15px', padding: '12px 14px' } }}
+                  />
                 </Box>
+              ))}
+              <Button
+                variant="contained" color="primary" onClick={addExercise}
+                sx={{ py: '13px', px: 2.5, fontSize: '22px', alignSelf: 'flex-end', minWidth: '48px' }}
+              >+</Button>
+            </Box>
+
+            {/* Current exercises list */}
+            {currentWorkout.length > 0 && (
+              <Box sx={{ background: 'rgba(0,0,0,0.3)', border: `1px solid ${C.border}`, borderRadius: '14px', p: 1.75, mb: 2 }}>
+                <Typography sx={{ fontSize: '11px', color: C.muted, mb: 1.25, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.7px' }}>
+                  {t(workoutCategory)} · {currentWorkout.length} {t('exercisesLbl')}
+                </Typography>
+                {currentWorkout.map((ex, i) => (
+                  <Box key={i} sx={{
+                    display: 'grid',
+                    gridTemplateColumns: isMobile ? '1fr 80px auto' : '1fr 110px 80px auto',
+                    gap: 1, py: 1.1,
+                    borderBottom: i < currentWorkout.length - 1 ? `1px solid ${C.border}` : 'none',
+                    alignItems: 'center',
+                  }}>
+                    <Typography sx={{ fontWeight: 600, fontSize: '14.5px' }}>{ex.exercise}</Typography>
+                    <Typography sx={{ color: C.muted, fontSize: '13.5px' }}>{ex.scheme}</Typography>
+                    <Typography sx={{ color: C.muted, fontSize: '13.5px' }}>{ex.weight} {t('kgUnit')}</Typography>
+                    <Button
+                      size="small"
+                      onClick={() => setCurrentWorkout(prev => prev.filter((_, j) => j !== i))}
+                      sx={{ minWidth: 'auto', background: C.dangerSoft, color: C.danger, border: '1px solid rgba(255,107,157,0.2)', borderRadius: '10px', px: 1.25, py: '4px', fontSize: '13px' }}
+                    >×</Button>
+                  </Box>
+                ))}
+              </Box>
+            )}
+
+            {/* Save button */}
+            <Button
+              variant="contained" fullWidth disabled={!currentWorkout.length} onClick={saveWorkout}
+              sx={{
+                py: 1.875, fontSize: '15px', fontWeight: 800, letterSpacing: '0.3px',
+                background: currentWorkout.length ? `linear-gradient(135deg, ${C.primary}, ${C.primaryDeep})` : 'rgba(255,255,255,0.06)',
+                color: currentWorkout.length ? C.primaryOn : 'rgba(255,255,255,0.3)',
+                '&.Mui-disabled': { background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.3)' },
+              }}
+            >
+              {t('saveWorkout')} ({currentWorkout.length} {t('exercisesLbl')})
+            </Button>
+          </Paper>
+
+          {/* ── Workout history (inline below) ── */}
+          {(client.workouts || []).length > 0 && (
+            <Box sx={{ mt: 3 }}>
+              <Typography variant="h3" sx={{ mb: 1.5, px: 0.5 }}>{t('workoutHistory')}</Typography>
+              {client.workouts.map((w, i) => (
+                <Paper key={i} sx={{ mb: 1.5, p: 2, border: `1px solid ${C.border}`, borderRadius: '14px' }}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1, alignItems: 'center', flexWrap: 'wrap', gap: 1 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                      <Typography sx={{ fontWeight: 700, fontSize: '14px', color: i === 0 ? C.primary : C.text }}>{w.date}</Typography>
+                      {w.category && (
+                        <Chip label={t(w.category)} size="small" sx={{ background: C.purpleSoft, color: C.purple, border: '1px solid rgba(200,197,255,0.2)', fontSize: '11px', fontWeight: 600 }} />
+                      )}
+                    </Box>
+                    <Typography sx={{ color: C.muted, fontSize: '12px' }}>{w.coach || '—'}</Typography>
+                  </Box>
+                  {w.items.map((ex, j) => (
+                    <Box key={j} sx={{ display: 'grid', gridTemplateColumns: '1fr 90px 60px', gap: 1, py: 0.6, borderBottom: j < w.items.length - 1 ? `1px solid ${C.border}` : 'none' }}>
+                      <Typography sx={{ color: C.text, fontWeight: 600, fontSize: '13px' }}>{ex.exercise}</Typography>
+                      <Typography sx={{ color: C.muted, fontSize: '12.5px' }}>{ex.scheme}</Typography>
+                      <Typography sx={{ color: C.muted, fontSize: '12.5px', textAlign: 'right' }}>{ex.weight} {t('kgUnit')}</Typography>
+                    </Box>
+                  ))}
+                </Paper>
               ))}
             </Box>
           )}
-
-          {/* Save button */}
-          <Button
-            variant="contained" fullWidth disabled={!currentWorkout.length} onClick={saveWorkout}
-            sx={{
-              py: 1.875, fontSize: '15px', fontWeight: 800, letterSpacing: '0.3px',
-              background: currentWorkout.length ? `linear-gradient(135deg, ${C.primary}, ${C.primaryDeep})` : 'rgba(255,255,255,0.06)',
-              color: currentWorkout.length ? C.primaryOn : 'rgba(255,255,255,0.3)',
-              '&.Mui-disabled': { background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.3)' },
-            }}
-          >
-            {t('saveWorkout')} ({currentWorkout.length} {t('exercisesLbl')})
-          </Button>
-        </Paper>
+        </Box>
       )}
 
-      {/* ══════ Tab 1: История ══════ */}
+      {/* ══════ Tab 1: Профил ══════ */}
       {tab === 1 && (
-        <Paper sx={{ p: 2.75, animation: `fadeInUp 0.22s ${EASE.decelerate} both` }}>
-          <Typography variant="h3" sx={{ mb: 2 }}>{t('workoutHistory')}</Typography>
-          {(client.workouts || []).length === 0 ? (
-            <Typography sx={{ color: C.muted, py: 1 }}>{t('noWorkouts')}</Typography>
-          ) : (
-            client.workouts.map((w, i) => (
-              <Box key={i} sx={{ mb: 2, pb: 1.75, borderBottom: i < client.workouts.length - 1 ? `1px solid ${C.border}` : 'none' }}>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1, alignItems: 'center', flexWrap: 'wrap', gap: 1 }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
-                    <Typography sx={{ fontWeight: 700, color: i === 0 ? C.primary : C.text }}>{w.date}</Typography>
-                    {w.category && (
-                      <Chip label={t(w.category)} size="small" sx={{ background: C.purpleSoft, color: C.purple, border: '1px solid rgba(200,197,255,0.2)', fontSize: '11.5px', fontWeight: 600 }} />
-                    )}
-                    {i === 0 && (
-                      <Chip label={t('latestTag')} size="small" sx={{ background: C.accentSoft, color: C.primary, border: '1px solid rgba(196,233,191,0.3)', fontSize: '11px', fontWeight: 700 }} />
-                    )}
-                  </Box>
-                  <Typography sx={{ color: C.muted, fontSize: '13px' }}>{t('coachByLbl')}: {w.coach || '—'}</Typography>
-                </Box>
-                <Box sx={{ background: 'rgba(0,0,0,0.15)', borderRadius: '10px', p: '10px 14px' }}>
-                  {w.items.map((ex, j) => (
-                    <Box key={j} sx={{ display: 'grid', gridTemplateColumns: '1fr 110px 80px', gap: 1.25, py: 0.75, borderBottom: j < w.items.length - 1 ? `1px solid ${C.border}` : 'none' }}>
-                      <Typography sx={{ color: C.text, fontWeight: 600, fontSize: '13.5px' }}>{ex.exercise}</Typography>
-                      <Typography sx={{ color: C.muted, fontSize: '13px' }}>{ex.scheme}</Typography>
-                      <Typography sx={{ color: C.muted, fontSize: '13px' }}>{ex.weight} {t('kgUnit')}</Typography>
-                    </Box>
-                  ))}
-                </Box>
-              </Box>
-            ))
-          )}
-        </Paper>
-      )}
-
-      {/* ══════ Tab 2: Профил ══════ */}
-      {tab === 2 && (
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, animation: `fadeInUp 0.22s ${EASE.decelerate} both` }}>
 
           {/* ── Food diary (last 7 days) ── */}
