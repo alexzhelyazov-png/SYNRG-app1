@@ -18,11 +18,14 @@ import Auth           from './pages/Auth'
 import Dashboard, { ClientDetail, ClientSchedule } from './pages/Dashboard'
 import FoodTracker    from './pages/FoodTracker'
 import WeightTracker  from './pages/WeightTracker'
+import Progress       from './pages/Progress'
 import Ranking        from './pages/Ranking'
 import Tasks, { AllClientsTasks } from './pages/Tasks'
 import Booking        from './pages/Booking'
 import Schedule       from './pages/Schedule'
 import Admin          from './pages/Admin'
+import Programs       from './pages/Programs'
+import StepsTracker   from './pages/StepsTracker'
 
 import ConfirmDeleteModal from './components/ConfirmDeleteModal'
 
@@ -165,6 +168,7 @@ function AppShell() {
             ) : (
               <>
                 {view === 'dashboard' && <Dashboard />}
+                {view === 'progress'  && (auth.role !== 'client' || hasModule(auth.modules, 'nutrition_tracking') || hasModule(auth.modules, 'weight_tracking')) && <Progress />}
                 {view === 'food'      && (auth.role !== 'client' || hasModule(auth.modules, 'nutrition_tracking')) && <FoodTracker />}
                 {view === 'weight'    && (auth.role !== 'client' || hasModule(auth.modules, 'weight_tracking'))    && <WeightTracker />}
                 {view === 'ranking'   && <Ranking />}
@@ -173,6 +177,8 @@ function AppShell() {
                 {view === 'booking'   && (auth.role !== 'client' || hasModule(auth.modules, 'booking_access'))     && <Booking />}
                 {view === 'schedule'  && auth.role === 'client' && hasModule(auth.modules, 'booking_access')       && <ClientSchedule />}
                 {view === 'schedule'  && auth.role !== 'client' && <Schedule />}
+                {view === 'steps'     && (auth.role !== 'client' || hasModule(auth.modules, 'nutrition_tracking') || hasModule(auth.modules, 'weight_tracking')) && <StepsTracker />}
+                {view === 'programs'  && (auth.role !== 'client' || hasModule(auth.modules, 'program_access')) && <Programs />}
                 {view === 'admin'     && admin && <Admin />}
               </>
             )}
@@ -220,8 +226,7 @@ function AppContent() {
 }
 
 function ThemedWrapper({ children }) {
-  const { isDark } = useApp()
-  const muiTheme = useMemo(() => makeTheme(isDark), [isDark])
+  const muiTheme = useMemo(() => makeTheme(), [])
   return (
     <ThemeProvider theme={muiTheme}>
       <CssBaseline />

@@ -22,9 +22,13 @@ export const MODULE_DEFS = {
 
 export const MODULE_PRESETS = {
   studio_client: ['studio_access', 'booking_access', 'weight_tracking', 'nutrition_tracking'],
-  remote_client: ['weight_tracking', 'nutrition_tracking', 'training_plan_access'],
   full_access:   ['studio_access', 'booking_access', 'weight_tracking', 'nutrition_tracking', 'training_plan_access'],
 }
+
+// Modules the admin can toggle per client
+export const ADMIN_MANAGEABLE_MODULES = [
+  'studio_access', 'booking_access', 'weight_tracking', 'nutrition_tracking', 'training_plan_access', 'program_access',
+]
 
 /** Check if a client (or modules array) has a specific module */
 export function hasModule(clientOrModules, moduleKey) {

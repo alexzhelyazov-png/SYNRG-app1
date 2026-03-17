@@ -4,8 +4,9 @@ import { foodDB, quickFoods } from '../lib/constants'
 import { T } from '../lib/translations'
 import {
   todayDate, dateToInput, inputToDate, parseDate,
-  fmt1, avgArr, sameDateStr, computeRanking,
+  fmt1, avgArr, sameDateStr,
 } from '../lib/utils'
+import { computeXPRanking } from '../lib/gamification'
 import { applyColors } from '../theme'
 
 const AppContext = createContext(null)
@@ -24,13 +25,8 @@ export function AppProvider({ children }) {
   const [notifications, setNotifications] = useState([])
   const [viewingCoach, setViewingCoach] = useState(null) // coach name being viewed, or null
 
-  // ── Theme mode ────────────────────────────────────────────────
-  const [isDark, setIsDarkState] = useState(() => localStorage.getItem('themeMode') !== 'light')
-  const setIsDark = useCallback((val) => {
-    setIsDarkState(val)
-    localStorage.setItem('themeMode', val ? 'dark' : 'light')
-  }, [])
-  useEffect(() => { applyColors(isDark) }, [isDark])
+  // ── Theme — always dark ──────────────────────────────────────
+  useEffect(() => { applyColors() }, [])
 
   // ── Language ──────────────────────────────────────────────────
   const [lang, setLangState] = useState(() => localStorage.getItem('lang') || 'bg')
@@ -75,13 +71,17 @@ export function AppProvider({ children }) {
   const [weightInput, setWeightInput] = useState('')
   const [weightDate,  setWeightDate]  = useState(dateToInput(todayDate()))
 
+  // ── Steps state ─────────────────────────────────────────────
+  const [stepsInput, setStepsInput] = useState('')
+  const [stepsDate,  setStepsDate]  = useState(dateToInput(todayDate()))
+
   // ── Load all data ─────────────────────────────────────────────
   const loadAll = useCallback(async () => {
     setLoading(true)
     setLoadError('')
     try {
       await DB.seedIfEmpty()
-      const [rawCoaches, rawClients, meals, workouts, weights, tasks, taskComments, reactions] = await Promise.all([
+      const [rawCoaches, rawClients, meals, workouts, weights, tasks, taskComments, reactions, stepsRaw] = await Promise.all([
         DB.selectAll('coaches'),
         DB.selectAll('clients'),
         DB.selectAll('meals'),
@@ -90,6 +90,7 @@ export function AppProvider({ children }) {
         DB.selectAll('tasks'),
         DB.selectAll('task_comments'),
         DB.selectAll('reactions'),
+        DB.selectAll('steps_logs').catch(() => []),
       ])
 
       setCoaches(rawCoaches.map(c => ({ name: c.name, password: c.password, id: c.id })))
@@ -111,6 +112,9 @@ export function AppProvider({ children }) {
         weightLogs: weights.filter(w => w.client_id === c.id)
           .sort((a, b) => a.date.localeCompare(b.date))
           .map(w => ({ id: w.id, date: w.date, weight: Number(w.weight) })),
+        stepsLogs: stepsRaw.filter(s => s.client_id === c.id)
+          .sort((a, b) => a.date.localeCompare(b.date))
+          .map(s => ({ id: s.id, date: s.date, steps: Number(s.steps) })),
         tasks: tasks
           .filter(tk => tk.client_id === c.id)
           .sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))
@@ -324,8 +328,13 @@ export function AppProvider({ children }) {
     return null
   }, [sortedWeightLogs])
 
+  const sortedStepsLogs = useMemo(
+    () => [...(client.stepsLogs || [])].sort((a, b) => parseDate(a.date) - parseDate(b.date)),
+    [client.stepsLogs]
+  )
+
   // ── Ranking excludes coach profiles ───────────────────────────
-  const ranking  = useMemo(() => computeRanking(realClients), [realClients])
+  const ranking  = useMemo(() => computeXPRanking(realClients), [realClients])
   const kcalPct  = Math.min((foodTotals.kcal    / (client.calorieTarget || 1)) * 100, 100)
   const protPct  = Math.min((foodTotals.protein / (client.proteinTarget || 1)) * 100, 100)
 
@@ -413,6 +422,25 @@ export function AppProvider({ children }) {
     await DB.deleteById('weight_logs', logId)
     setClients(prev => prev.map(c => c.id === clientId
       ? { ...c, weightLogs: c.weightLogs.filter(l => l.id !== logId) }
+      : c
+    ))
+  }
+
+  async function saveStepsLog(clientId, date, steps) {
+    if (isTrackerReadOnly) return
+    const data = await DB.upsertByFields('steps_logs', { client_id: clientId, date, steps }, ['client_id', 'date'])
+    setClients(prev => prev.map(c => {
+      if (c.id !== clientId) return c
+      const logs = (c.stepsLogs || []).filter(l => l.date !== date)
+      return { ...c, stepsLogs: [...logs, { id: data.id, date, steps: Number(steps) }].sort((a, b) => a.date.localeCompare(b.date)) }
+    }))
+  }
+
+  async function deleteStepsLog(clientId, logId) {
+    if (isTrackerReadOnly) return
+    await DB.deleteById('steps_logs', logId)
+    setClients(prev => prev.map(c => c.id === clientId
+      ? { ...c, stepsLogs: (c.stepsLogs || []).filter(l => l.id !== logId) }
       : c
     ))
   }
@@ -591,6 +619,15 @@ export function AppProvider({ children }) {
     showSnackbar(t('weightSavedMsg'))
   }
 
+  function saveSteps() {
+    const s = parseInt(String(stepsInput).replace(/\s/g, ''), 10)
+    if (!s || isNaN(s) || s <= 0) { showSnackbar(t('warningSteps'), 'warning'); return }
+    const date = inputToDate(stepsDate)
+    saveStepsLog(client.id, date, s)
+    setStepsInput('')
+    showSnackbar(t('stepsSavedMsg'))
+  }
+
   // ── Workout actions ───────────────────────────────────────────
   function addExercise() {
     if (!exName.trim() || !exScheme.trim() || !exWeight.trim()) {
@@ -635,8 +672,6 @@ export function AppProvider({ children }) {
   }
 
   const value = {
-    // Theme
-    isDark, setIsDark,
     // Language
     lang, setLang, t,
     // Data
@@ -672,11 +707,15 @@ export function AppProvider({ children }) {
     // Weight
     weightInput, setWeightInput,
     weightDate, setWeightDate,
+    // Steps
+    stepsInput, setStepsInput,
+    stepsDate, setStepsDate,
     // Computed
     client, actualIdx, selFoodDate,
     mealsForDate, foodTotals, foodSuggestions,
     sortedWeightLogs, weightChartData,
     latestWeight, latestAvg, weeklyRate,
+    sortedStepsLogs,
     ranking, kcalPct, protPct, visibleClients,
     // Actions
     loadAll,
@@ -687,9 +726,10 @@ export function AppProvider({ children }) {
     addMealToClient, deleteMealFromClient,
     saveWorkoutToClient,
     saveWeightLog, deleteWeightLog,
+    saveStepsLog, deleteStepsLog,
     deleteClient,
     addFoodFromModal, addQuickFood,
-    saveWeight, addExercise, saveWorkout,
+    saveWeight, saveSteps, addExercise, saveWorkout,
     addTask, addTaskForClient, toggleTaskDone, deleteTask, addTaskComment,
     sendReaction, dismissReaction,
     updateReminderSettings,

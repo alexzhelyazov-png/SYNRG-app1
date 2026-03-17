@@ -10,7 +10,7 @@ const isStandalone = window.navigator.standalone || window.matchMedia('(display-
 const SITE_BASE = '../'
 
 export default function Auth() {
-  const { handleLogin, handleRegisterClient, t, lang, setLang, isDark, setIsDark } = useApp()
+  const { handleLogin, handleRegisterClient, t, lang, setLang } = useApp()
   const theme    = useTheme()
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'))
 
@@ -101,11 +101,9 @@ export default function Auth() {
       {/* ── Logo ────────────────────────────────────────── */}
       <Box sx={{
         mb:     3,
-        filter: isDark
-          ? 'drop-shadow(0 0 28px rgba(196,233,191,0.18))'
-          : 'drop-shadow(0 0 12px rgba(42,125,56,0.15))',
+        filter: 'drop-shadow(0 0 28px rgba(196,233,191,0.18))',
       }}>
-        <SynrgLogomark size={120} isDark={isDark} />
+        <SynrgLogomark size={120} />
       </Box>
 
       {/* ── Lang + theme row ─────────────────────────────── */}
@@ -130,23 +128,6 @@ export default function Auth() {
             {l.toUpperCase()}
           </Button>
         ))}
-        <Button
-          onClick={() => setIsDark(!isDark)}
-          size="small"
-          sx={{
-            minWidth:    '46px',
-            py:          '4px',
-            fontSize:    '12px',
-            fontWeight:  700,
-            borderRadius:'99px',
-            background:  'transparent',
-            color:       C.muted,
-            border:      `1px solid ${C.border}`,
-            '&:hover':   { background: C.accentSoft, color: C.primary },
-          }}
-        >
-          {isDark ? t('lightMode') : t('darkMode')}
-        </Button>
       </Box>
 
       {/* ── Card ─────────────────────────────────────────── */}

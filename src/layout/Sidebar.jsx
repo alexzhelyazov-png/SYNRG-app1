@@ -8,17 +8,15 @@ import ChevronLeftIcon       from '@mui/icons-material/ChevronLeft'
 import DeleteOutlineIcon     from '@mui/icons-material/DeleteOutline'
 import LogoutIcon            from '@mui/icons-material/Logout'
 import DashboardIcon         from '@mui/icons-material/Dashboard'
-import RestaurantIcon        from '@mui/icons-material/Restaurant'
-import MonitorWeightIcon     from '@mui/icons-material/MonitorWeight'
+import TrendingUpIcon        from '@mui/icons-material/TrendingUp'
 import LeaderboardIcon       from '@mui/icons-material/Leaderboard'
 import AssignmentIcon        from '@mui/icons-material/Assignment'
 import PeopleIcon            from '@mui/icons-material/People'
 import NotificationsNoneIcon from '@mui/icons-material/NotificationsNone'
 import PersonIcon            from '@mui/icons-material/Person'
-import LightModeIcon         from '@mui/icons-material/LightMode'
-import DarkModeIcon          from '@mui/icons-material/DarkMode'
 import CalendarMonthIcon     from '@mui/icons-material/CalendarMonth'
 import EventIcon             from '@mui/icons-material/Event'
+import PlayCircleOutlineIcon from '@mui/icons-material/PlayCircleOutline'
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings'
 import { useApp }            from '../context/AppContext'
 import { C, EASE }           from '../theme'
@@ -28,7 +26,7 @@ const DRAWER_WIDTH = 272
 const RAIL_WIDTH   = 72
 
 const isStandalone = window.navigator.standalone || window.matchMedia('(display-mode: standalone)').matches
-const SITE_HEADER_H = 48
+const SITE_HEADER_H = 96
 
 // ── Nav items — adjust per role + modules ─────────────────────
 function getNavItems(auth, admin) {
@@ -46,10 +44,11 @@ function getNavItems(auth, admin) {
   // Client nav — module-aware
   const modules = auth.modules || []
   const items = [{ view: 'dashboard', labelKey: 'navDashboard', Icon: DashboardIcon }]
-  if (hasModule(modules, 'nutrition_tracking'))  items.push({ view: 'food',   labelKey: 'navFood',   Icon: RestaurantIcon })
-  if (hasModule(modules, 'weight_tracking'))     items.push({ view: 'weight', labelKey: 'navWeight', Icon: MonitorWeightIcon })
+  if (hasModule(modules, 'nutrition_tracking') || hasModule(modules, 'weight_tracking'))
+    items.push({ view: 'progress', labelKey: 'navProgress', Icon: TrendingUpIcon })
   if (hasModule(modules, 'weight_tracking') || hasModule(modules, 'nutrition_tracking'))
     items.push({ view: 'ranking', labelKey: 'navRanking', Icon: LeaderboardIcon })
+  if (hasModule(modules, 'program_access'))       items.push({ view: 'programs', labelKey: 'navPrograms', Icon: PlayCircleOutlineIcon })
   if (hasModule(modules, 'booking_access'))      items.push({ view: 'schedule', labelKey: 'navBookSlot', Icon: EventIcon })
   if (modules.length > 0)                        items.push({ view: 'tasks', labelKey: 'navTasks', Icon: AssignmentIcon })
   return items
@@ -66,7 +65,6 @@ export default function Sidebar() {
     coachClientMode, setCoachClientMode,
     notifications, unreadNotifCount,
     lang, setLang, t,
-    isDark, setIsDark,
   } = useApp()
 
   const admin = isAdmin(auth)
@@ -244,15 +242,6 @@ export default function Sidebar() {
                 {l.toUpperCase()}
               </Button>
             ))}
-            <Tooltip title={isDark ? t('lightMode') : t('darkMode')} placement="right" arrow>
-              <IconButton onClick={() => setIsDark(!isDark)} size="small" sx={{
-                color: C.muted, border: `1px solid ${C.border}`, borderRadius: '8px',
-                width: 36, height: 36,
-                '&:hover': { background: C.accentSoft, color: C.primary, borderColor: C.primaryA20 },
-              }}>
-                {isDark ? <LightModeIcon fontSize="small" /> : <DarkModeIcon fontSize="small" />}
-              </IconButton>
-            </Tooltip>
           </Box>
         ) : (
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
@@ -262,15 +251,6 @@ export default function Sidebar() {
                 <Typography sx={{ fontSize: '10px', fontWeight: 700, color: C.muted }}>
                   {lang === 'bg' ? 'EN' : 'BG'}
                 </Typography>
-              </ListItemButton>
-            </Tooltip>
-            <Tooltip title={isDark ? t('lightMode') : t('darkMode')} placement="right" arrow>
-              <ListItemButton onClick={() => setIsDark(!isDark)}
-                sx={{ justifyContent: 'center', px: 0, mx: 1, my: '1px', minHeight: 36 }}>
-                {isDark
-                  ? <LightModeIcon sx={{ fontSize: '18px', color: C.muted }} />
-                  : <DarkModeIcon  sx={{ fontSize: '18px', color: C.muted }} />
-                }
               </ListItemButton>
             </Tooltip>
           </Box>

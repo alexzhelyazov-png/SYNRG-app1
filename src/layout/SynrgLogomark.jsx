@@ -1,6 +1,6 @@
-export default function SynrgLogomark({ size = 160, isDark = true }) {
-  const globeColor = isDark ? '#c4e9bf' : '#2A7D38'
-  const textColor  = isDark ? '#f0eded' : '#2A7D38'
+export default function SynrgLogomark({ size = 160 }) {
+  const globeColor = '#c4e9bf'
+  const textColor  = '#f0eded'
 
   return (
     <svg

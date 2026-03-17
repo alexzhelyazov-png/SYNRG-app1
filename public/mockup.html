@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="bg">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>SYNRG — Mockup</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #0d1510; color: #f0eded; font-family: system-ui, sans-serif; }
+
+  /* ─── TABS ─── */
+  .tabs { display: flex; gap: 8px; padding: 24px 32px 0; background: #0d1510; position: sticky; top: 0; z-index: 100; border-bottom: 1px solid rgba(255,255,255,0.08); }
+  .tab { padding: 10px 20px; border-radius: 10px 10px 0 0; cursor: pointer; font-size: 13px; font-weight: 600; color: #6b7a6b; background: transparent; border: none; transition: all .2s; }
+  .tab.active { background: #c4e9bf; color: #0d1510; }
+  .tab:hover:not(.active) { color: #c4e9bf; }
+
+  /* ─── SCREENS ─── */
+  .screen { display: none; }
+  .screen.active { display: block; }
+
+  /* ─── HOMEPAGE ─── */
+  nav { display: flex; align-items: center; justify-content: space-between; padding: 20px 48px; border-bottom: 1px solid rgba(255,255,255,0.06); }
+  .nav-logo { font-size: 22px; font-weight: 900; color: #c4e9bf; letter-spacing: -1px; }
+  .nav-links { display: flex; gap: 32px; }
+  .nav-links a { color: #8a9e8a; font-size: 14px; text-decoration: none; transition: color .2s; }
+  .nav-links a:hover { color: #f0eded; }
+  .nav-cta { background: #c4e9bf; color: #0d1510; padding: 9px 22px; border-radius: 10px; font-size: 13px; font-weight: 700; text-decoration: none; }
+
+  /* Hero */
+  .hero { min-height: 92vh; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 80px 48px; position: relative; overflow: hidden; }
+  .hero::before { content: ''; position: absolute; inset: 0; background: radial-gradient(ellipse 60% 50% at 50% 50%, rgba(196,233,191,0.07) 0%, transparent 70%); }
+  .hero-tag { display: inline-block; background: rgba(196,233,191,0.12); border: 1px solid rgba(196,233,191,0.25); color: #c4e9bf; font-size: 11px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; padding: 6px 14px; border-radius: 99px; margin-bottom: 28px; }
+  .hero h1 { font-size: clamp(48px, 8vw, 96px); font-weight: 900; line-height: 0.95; letter-spacing: -3px; color: #f0eded; margin-bottom: 24px; position: relative; }
+  .hero h1 span { color: #c4e9bf; }
+  .hero p { font-size: 18px; color: #6b7a6b; max-width: 520px; line-height: 1.6; margin-bottom: 40px; position: relative; }
+  .hero-btns { display: flex; gap: 12px; position: relative; }
+  .btn-primary { background: #c4e9bf; color: #0d1510; padding: 14px 32px; border-radius: 12px; font-size: 15px; font-weight: 700; text-decoration: none; }
+  .btn-ghost { border: 1px solid rgba(255,255,255,0.15); color: #f0eded; padding: 14px 32px; border-radius: 12px; font-size: 15px; font-weight: 600; text-decoration: none; }
+
+  /* Products */
+  .section { padding: 96px 48px; }
+  .section-label { font-size: 11px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: #c4e9bf; margin-bottom: 12px; }
+  .section-title { font-size: 40px; font-weight: 900; letter-spacing: -1.5px; color: #f0eded; margin-bottom: 48px; }
+  .products-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+  .product-card { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 20px; padding: 36px 28px; transition: border-color .2s; cursor: pointer; }
+  .product-card:hover { border-color: rgba(196,233,191,0.3); }
+  .product-card.featured { background: linear-gradient(135deg, rgba(196,233,191,0.1) 0%, rgba(196,233,191,0.04) 100%); border-color: rgba(196,233,191,0.25); }
+  .product-icon { font-size: 32px; margin-bottom: 20px; }
+  .product-name { font-size: 22px; font-weight: 800; color: #f0eded; margin-bottom: 8px; }
+  .product-desc { font-size: 14px; color: #6b7a6b; line-height: 1.6; margin-bottom: 24px; }
+  .product-price { font-size: 13px; font-weight: 700; color: #c4e9bf; }
+  .product-cta { display: inline-block; margin-top: 20px; background: #c4e9bf; color: #0d1510; padding: 10px 20px; border-radius: 10px; font-size: 13px; font-weight: 700; text-decoration: none; }
+
+  /* Team */
+  .team-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  .team-card { border-radius: 16px; overflow: hidden; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); }
+  .team-photo { width: 100%; aspect-ratio: 3/4; object-fit: cover; display: block; }
+  .team-photo-placeholder { width: 100%; aspect-ratio: 3/4; background: linear-gradient(135deg, #1a2e1a, #0d1510); display: flex; align-items: center; justify-content: center; font-size: 48px; }
+  .team-info { padding: 16px; }
+  .team-name { font-size: 16px; font-weight: 700; color: #f0eded; margin-bottom: 4px; }
+  .team-role { font-size: 12px; color: #6b7a6b; }
+  .team-badge { display: inline-block; background: rgba(196,233,191,0.12); color: #c4e9bf; font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 99px; margin-top: 6px; }
+
+  /* CTA */
+  .cta-section { margin: 0 48px 96px; background: linear-gradient(135deg, rgba(196,233,191,0.1) 0%, rgba(196,233,191,0.04) 100%); border: 1px solid rgba(196,233,191,0.2); border-radius: 24px; padding: 80px 48px; text-align: center; }
+  .cta-section h2 { font-size: 48px; font-weight: 900; letter-spacing: -2px; color: #f0eded; margin-bottom: 16px; }
+  .cta-section p { font-size: 16px; color: #6b7a6b; margin-bottom: 36px; }
+
+  footer { padding: 40px 48px; border-top: 1px solid rgba(255,255,255,0.06); display: flex; justify-content: space-between; align-items: center; }
+  .footer-logo { font-size: 18px; font-weight: 900; color: #c4e9bf; }
+  .footer-copy { font-size: 12px; color: #3a4a3a; }
+
+  /* ─── APP MOCKUP ─── */
+  .app-demo { display: flex; gap: 32px; padding: 32px 48px; }
+  .phone { width: 300px; flex-shrink: 0; background: #111c13; border: 2px solid rgba(255,255,255,0.1); border-radius: 28px; overflow: hidden; }
+  .phone-header { background: #0d1510; padding: 16px 20px 12px; border-bottom: 1px solid rgba(255,255,255,0.06); }
+  .phone-role-badge { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
+  .phone-role-badge.studio { color: #c4e9bf; }
+  .phone-role-badge.online { color: #a78bfa; }
+  .phone-title { font-size: 18px; font-weight: 800; color: #f0eded; }
+  .phone-content { padding: 16px 20px; }
+  .phone-section { margin-bottom: 16px; }
+  .phone-section-title { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #4a5a4a; margin-bottom: 8px; }
+  .phone-card { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 12px 14px; margin-bottom: 8px; display: flex; align-items: center; gap: 10px; }
+  .phone-card.active { background: rgba(196,233,191,0.1); border-color: rgba(196,233,191,0.25); }
+  .phone-card.active-purple { background: rgba(167,139,250,0.1); border-color: rgba(167,139,250,0.25); }
+  .card-icon { font-size: 18px; }
+  .card-text { font-size: 13px; font-weight: 600; color: #f0eded; }
+  .card-sub { font-size: 11px; color: #6b7a6b; }
+  .phone-nav { display: flex; border-top: 1px solid rgba(255,255,255,0.06); background: #0d1510; }
+  .nav-item { flex: 1; padding: 10px 0; text-align: center; font-size: 9px; color: #4a5a4a; font-weight: 600; }
+  .nav-item.active { color: #c4e9bf; }
+  .nav-item .nav-icon { font-size: 16px; display: block; margin-bottom: 2px; }
+  .nav-item.active-purple { color: #a78bfa; }
+
+  .comparison { flex: 1; display: flex; flex-direction: column; gap: 24px; }
+  .comp-block { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 16px; padding: 24px; }
+  .comp-title { font-size: 14px; font-weight: 800; margin-bottom: 16px; }
+  .comp-title.studio { color: #c4e9bf; }
+  .comp-title.online { color: #a78bfa; }
+  .comp-rows { display: flex; flex-direction: column; gap: 8px; }
+  .comp-row { display: flex; align-items: center; gap: 10px; font-size: 13px; color: #8a9e8a; }
+  .comp-row .check { font-size: 14px; }
+  .comp-row .no { font-size: 14px; opacity: 0.3; }
+
+  /* ─── FLOW ─── */
+  .flow { padding: 32px 48px; }
+  .flow-title { font-size: 28px; font-weight: 800; color: #f0eded; margin-bottom: 32px; letter-spacing: -1px; }
+  .flow-steps { display: flex; gap: 0; align-items: stretch; }
+  .flow-step { flex: 1; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 16px; padding: 24px; position: relative; }
+  .flow-step:not(:last-child)::after { content: '→'; position: absolute; right: -20px; top: 50%; transform: translateY(-50%); font-size: 20px; color: #c4e9bf; z-index: 10; }
+  .flow-step + .flow-step { margin-left: 32px; }
+  .step-num { width: 28px; height: 28px; background: rgba(196,233,191,0.15); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 800; color: #c4e9bf; margin-bottom: 12px; }
+  .step-title { font-size: 15px; font-weight: 700; color: #f0eded; margin-bottom: 6px; }
+  .step-desc { font-size: 12px; color: #6b7a6b; line-height: 1.5; }
+
+  .badge { display: inline-block; font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: 99px; margin-top: 8px; }
+  .badge.green { background: rgba(196,233,191,0.15); color: #c4e9bf; }
+  .badge.purple { background: rgba(167,139,250,0.15); color: #a78bfa; }
+
+  .divider { width: 1px; background: rgba(255,255,255,0.06); margin: 0 16px; }
+</style>
+</head>
+<body>
+
+<!-- TABS -->
+<div class="tabs">
+  <button class="tab active" onclick="showTab('homepage')">🌐 Homepage (публичен)</button>
+  <button class="tab" onclick="showTab('app')">📱 App — Studio vs Online</button>
+  <button class="tab" onclick="showTab('flow')">🔄 User Flow</button>
+</div>
+
+<!-- ══════════════════════════════════════════════ -->
+<!-- SCREEN 1: HOMEPAGE                             -->
+<!-- ══════════════════════════════════════════════ -->
+<div class="screen active" id="tab-homepage">
+
+  <!-- Navbar -->
+  <nav>
+    <div class="nav-logo">SYNRG</div>
+    <div class="nav-links">
+      <a href="#">Студио</a>
+      <a href="#">Онлайн програма</a>
+      <a href="#">Планер</a>
+      <a href="#">Екип</a>
+    </div>
+    <a href="#" class="nav-cta">Влез →</a>
+  </nav>
+
+  <!-- Hero -->
+  <div class="hero">
+    <div class="hero-tag">Beyond Fitness · Варна</div>
+    <h1>Фитнес студио.<br><span>Без компромиси.</span></h1>
+    <p>Персонализирани тренировки, онлайн програми и инструменти за хора, които искат реални резултати.</p>
+    <div class="hero-btns">
+      <a href="#" class="btn-primary">Разгледай програмите</a>
+      <a href="#" class="btn-ghost">Влез в app-а</a>
+    </div>
+  </div>
+
+  <!-- Products -->
+  <div class="section">
+    <div class="section-label">Какво предлагаме</div>
+    <div class="section-title">Избери своя път</div>
+    <div class="products-grid">
+      <div class="product-card featured">
+        <div class="product-icon">🏋️</div>
+        <div class="product-name">SYNRG Studio</div>
+        <div class="product-desc">Персонализирани тренировки в зала. Малки групи, индивидуален подход, реални резултати.</div>
+        <div class="product-price">от 120 лв / месец</div>
+        <a href="#" class="product-cta">Запиши се</a>
+      </div>
+      <div class="product-card">
+        <div class="product-icon">💻</div>
+        <div class="product-name">Онлайн програма</div>
+        <div class="product-desc">Тренировъчна и рехабилитационна програма от Кари и Виви. Работи от всяка точка на света.</div>
+        <div class="product-price">от 80 лв / месец</div>
+        <a href="#" class="product-cta">Научи повече</a>
+      </div>
+      <div class="product-card">
+        <div class="product-icon">📓</div>
+        <div class="product-name">SYNRG Планер</div>
+        <div class="product-desc">Физически планер за хора, които искат структура в тренировките, храненето и ежедневието.</div>
+        <div class="product-price">35 лв</div>
+        <a href="#" class="product-cta">Купи</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Team -->
+  <div class="section" style="padding-top:0">
+    <div class="section-label">Екипът</div>
+    <div class="section-title">Хората зад SYNRG</div>
+    <div class="team-grid">
+      <div class="team-card">
+        <div class="team-photo-placeholder">👤</div>
+        <div class="team-info">
+          <div class="team-name">Александър</div>
+          <div class="team-role">Основател · Треньор</div>
+          <div class="team-badge">COACH</div>
+        </div>
+      </div>
+      <div class="team-card">
+        <div class="team-photo-placeholder">👤</div>
+        <div class="team-info">
+          <div class="team-name">Кари</div>
+          <div class="team-role">Треньор · Онлайн програми</div>
+          <div class="team-badge">COACH</div>
+        </div>
+      </div>
+      <div class="team-card">
+        <div class="team-photo-placeholder">👤</div>
+        <div class="team-info">
+          <div class="team-name">Виви</div>
+          <div class="team-role">Физиотерапевт</div>
+          <div class="team-badge">MENTOR</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CTA -->
+  <div class="cta-section">
+    <h2>Готов ли си?</h2>
+    <p>Започни днес — в залата или от вкъщи.</p>
+    <a href="#" class="btn-primary" style="font-size:16px; padding:16px 40px">Започни сега →</a>
+  </div>
+
+  <!-- Footer -->
+  <footer>
+    <div class="footer-logo">SYNRG</div>
+    <div class="footer-copy">© 2025 SYNRG Beyond Fitness · Варна</div>
+  </footer>
+
+</div>
+
+<!-- ══════════════════════════════════════════════ -->
+<!-- SCREEN 2: APP COMPARISON                       -->
+<!-- ══════════════════════════════════════════════ -->
+<div class="screen" id="tab-app">
+  <div class="app-demo">
+
+    <!-- Studio Phone -->
+    <div class="phone">
+      <div class="phone-header">
+        <div class="phone-role-badge studio">🏋️ Studio Client</div>
+        <div class="phone-title">Здравей, Мария!</div>
+      </div>
+      <div class="phone-content">
+        <div class="phone-section">
+          <div class="phone-section-title">Следваща тренировка</div>
+          <div class="phone-card active">
+            <div class="card-icon">📅</div>
+            <div>
+              <div class="card-text">Утре · 09:00</div>
+              <div class="card-sub">Кари · 2 свободни места</div>
+            </div>
+          </div>
+        </div>
+        <div class="phone-section">
+          <div class="phone-section-title">Оставащи сесии</div>
+          <div class="phone-card active">
+            <div class="card-icon">🎯</div>
+            <div>
+              <div class="card-text">5 / 8 тренировки</div>
+              <div class="card-sub">Валиден до 15 Май</div>
+            </div>
+          </div>
+        </div>
+        <div class="phone-section">
+          <div class="phone-section-title">Дневен напредък</div>
+          <div class="phone-card">
+            <div class="card-icon">🥗</div>
+            <div>
+              <div class="card-text">1 840 / 2 100 kcal</div>
+              <div class="card-sub">112г протеин</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="phone-nav">
+        <div class="nav-item active"><span class="nav-icon">🏠</span>Табло</div>
+        <div class="nav-item"><span class="nav-icon">📅</span>Запази час</div>
+        <div class="nav-item"><span class="nav-icon">🥗</span>Храна</div>
+        <div class="nav-item"><span class="nav-icon">📋</span>Задачи</div>
+      </div>
+    </div>
+
+    <!-- Comparison -->
+    <div class="comparison">
+      <div style="padding: 8px 0 16px;">
+        <div style="font-size:24px; font-weight:800; color:#f0eded; letter-spacing:-1px; margin-bottom:8px">Един app, два вида достъп</div>
+        <div style="font-size:14px; color:#6b7a6b">Един логин. Ролята определя какво виждаш.</div>
+      </div>
+
+      <div class="comp-block">
+        <div class="comp-title studio">🏋️ Studio Client</div>
+        <div class="comp-rows">
+          <div class="comp-row"><span class="check">✅</span> Табло с оставащи сесии и следваща тренировка</div>
+          <div class="comp-row"><span class="check">✅</span> Запази час — 3-дневен календар</div>
+          <div class="comp-row"><span class="check">✅</span> Хранителен тракер</div>
+          <div class="comp-row"><span class="check">✅</span> Тегло тракер</div>
+          <div class="comp-row"><span class="check">✅</span> Задачи от треньора</div>
+          <div class="comp-row"><span class="check">✅</span> Класация</div>
+          <div class="comp-row"><span class="no">➕</span> <span style="color:#4a5a4a">Онлайн програми (upsell)</span></div>
+        </div>
+      </div>
+
+      <div class="comp-block">
+        <div class="comp-title online">💻 Online Client</div>
+        <div class="comp-rows">
+          <div class="comp-row"><span class="check">✅</span> Табло (без booking секция)</div>
+          <div class="comp-row"><span class="no" style="filter:none; opacity:1; color:#3a4a3a">❌</span> <span style="color:#3a4a3a">Запази час (скрито)</span></div>
+          <div class="comp-row"><span class="check" style="color:#a78bfa">✅</span> Програми — видеа по седмици</div>
+          <div class="comp-row"><span class="check">✅</span> Хранителен тракер</div>
+          <div class="comp-row"><span class="check">✅</span> Тегло тракер</div>
+          <div class="comp-row"><span class="check">✅</span> Задачи от треньора</div>
+          <div class="comp-row"><span class="check">✅</span> Класация</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Online Phone -->
+    <div class="phone">
+      <div class="phone-header">
+        <div class="phone-role-badge online">💻 Online Client</div>
+        <div class="phone-title">Здравей, Иван!</div>
+      </div>
+      <div class="phone-content">
+        <div class="phone-section">
+          <div class="phone-section-title">Твоята програма</div>
+          <div class="phone-card active-purple">
+            <div class="card-icon">📹</div>
+            <div>
+              <div class="card-text">Седмица 3 · Ден 2</div>
+              <div class="card-sub">Горна част на тялото</div>
+            </div>
+          </div>
+          <div class="phone-card">
+            <div class="card-icon">🦴</div>
+            <div>
+              <div class="card-text">Рехабилитация · Виви</div>
+              <div class="card-sub">4 упражнения</div>
+            </div>
+          </div>
+        </div>
+        <div class="phone-section">
+          <div class="phone-section-title">Дневен напредък</div>
+          <div class="phone-card">
+            <div class="card-icon">🥗</div>
+            <div>
+              <div class="card-text">1 640 / 1 900 kcal</div>
+              <div class="card-sub">98г протеин</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="phone-nav">
+        <div class="nav-item active-purple"><span class="nav-icon">🏠</span>Табло</div>
+        <div class="nav-item"><span class="nav-icon">📹</span>Програми</div>
+        <div class="nav-item"><span class="nav-icon">🥗</span>Храна</div>
+        <div class="nav-item"><span class="nav-icon">📋</span>Задачи</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════ -->
+<!-- SCREEN 3: FLOW                                 -->
+<!-- ══════════════════════════════════════════════ -->
+<div class="screen" id="tab-flow">
+  <div class="flow">
+    <div class="flow-title">Как работи за клиента</div>
+
+    <div style="margin-bottom:48px;">
+      <div style="font-size:13px; font-weight:700; color:#c4e9bf; margin-bottom:20px; text-transform:uppercase; letter-spacing:1px;">🏋️ Studio Client</div>
+      <div class="flow-steps">
+        <div class="flow-step">
+          <div class="step-num">1</div>
+          <div class="step-title">Открива сайта</div>
+          <div class="step-desc">synrg-beyondfitness.com — вижда студиото, екипа, цените</div>
+        </div>
+        <div class="flow-step">
+          <div class="step-num">2</div>
+          <div class="step-title">Среща / разговор</div>
+          <div class="step-desc">Контактна форма или директно — треньорът го добавя ръчно в app-а</div>
+        </div>
+        <div class="flow-step">
+          <div class="step-num">3</div>
+          <div class="step-title">Получава акаунт</div>
+          <div class="step-desc">Треньорът активира план в Admin панела — клиентът получава достъп</div>
+        </div>
+        <div class="flow-step">
+          <div class="step-num">4</div>
+          <div class="step-title">Влиза в app-а</div>
+          <div class="step-desc">Записва часове, следи храна, вижда задачи от треньора</div>
+        </div>
+      </div>
+    </div>
+
+    <div style="margin-bottom:48px;">
+      <div style="font-size:13px; font-weight:700; color:#a78bfa; margin-bottom:20px; text-transform:uppercase; letter-spacing:1px;">💻 Online Client</div>
+      <div class="flow-steps">
+        <div class="flow-step">
+          <div class="step-num">1</div>
+          <div class="step-title">Landing page</div>
+          <div class="step-desc">synrg-beyondfitness.com/program — вижда програмата, цената, детайли</div>
+        </div>
+        <div class="flow-step">
+          <div class="step-num">2</div>
+          <div class="step-title">Stripe Checkout</div>
+          <div class="step-desc">Плаща онлайн — веднага получава email с достъп</div>
+          <span class="badge purple">Автоматично</span>
+        </div>
+        <div class="flow-step">
+          <div class="step-num">3</div>
+          <div class="step-title">Акаунт в app-а</div>
+          <div class="step-desc">Регистрира се или влиза — ролята е online_client автоматично</div>
+          <span class="badge purple">Без ръчна работа</span>
+        </div>
+        <div class="flow-step">
+          <div class="step-num">4</div>
+          <div class="step-title">Програмата</div>
+          <div class="step-desc">Вижда видеата, тракера, задачите от Кари/Виви</div>
+        </div>
+      </div>
+    </div>
+
+    <div style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.08); border-radius:16px; padding:24px;">
+      <div style="font-size:14px; font-weight:700; color:#f0eded; margin-bottom:16px;">Какво се строи и в какъв ред</div>
+      <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:16px;">
+        <div style="background:rgba(196,233,191,0.08); border:1px solid rgba(196,233,191,0.2); border-radius:12px; padding:16px;">
+          <div style="font-size:20px; margin-bottom:8px;">1️⃣</div>
+          <div style="font-size:13px; font-weight:700; color:#c4e9bf;">Homepage</div>
+          <div style="font-size:12px; color:#6b7a6b; margin-top:4px;">Публичното лице на бранда</div>
+        </div>
+        <div style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.06); border-radius:12px; padding:16px;">
+          <div style="font-size:20px; margin-bottom:8px;">2️⃣</div>
+          <div style="font-size:13px; font-weight:700; color:#f0eded;">online_client роля</div>
+          <div style="font-size:12px; color:#6b7a6b; margin-top:4px;">Нова навигация без booking</div>
+        </div>
+        <div style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.06); border-radius:12px; padding:16px;">
+          <div style="font-size:20px; margin-bottom:8px;">3️⃣</div>
+          <div style="font-size:13px; font-weight:700; color:#f0eded;">Програми таб</div>
+          <div style="font-size:12px; color:#6b7a6b; margin-top:4px;">Видео съдържание по седмици</div>
+        </div>
+        <div style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.06); border-radius:12px; padding:16px;">
+          <div style="font-size:20px; margin-bottom:8px;">4️⃣</div>
+          <div style="font-size:13px; font-weight:700; color:#f0eded;">Stripe + автомация</div>
+          <div style="font-size:12px; color:#6b7a6b; margin-top:4px;">Плащане → автоматичен достъп</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+function showTab(name) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'))
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'))
+  document.getElementById('tab-' + name).classList.add('active')
+  event.target.classList.add('active')
+}
+</script>
+</body>
+</html>

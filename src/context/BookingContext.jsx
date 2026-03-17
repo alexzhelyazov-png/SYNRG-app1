@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useCallback } from 'react'
 import { DB } from '../lib/db'
 import { isoToday, isoDatePlusDays } from '../lib/bookingUtils'
-import { MODULE_PRESETS } from '../lib/modules'
+import { ADMIN_MANAGEABLE_MODULES } from '../lib/modules'
 import { useApp } from './AppContext'
 
 const BookingCtx = createContext(null)
@@ -247,12 +247,11 @@ export function BookingProvider({ children }) {
         activated_by:  auth.name,
         price:         Number(price) || 0,
       })
-      // Auto-enable studio modules when activating a plan
+      // Auto-enable ALL modules when activating a plan
       const targetClient = realClients.find(c => c.id === clientId)
       if (targetClient) {
         const currentModules = targetClient.modules || []
-        const studioModules = MODULE_PRESETS.studio_client
-        const merged = [...new Set([...currentModules, ...studioModules])]
+        const merged = [...new Set([...currentModules, ...ADMIN_MANAGEABLE_MODULES])]
         if (merged.length !== currentModules.length || !merged.every(m => currentModules.includes(m))) {
           await DB.update('clients', clientId, { modules: merged })
         }

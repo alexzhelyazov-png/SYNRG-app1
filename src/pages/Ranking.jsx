@@ -1,25 +1,17 @@
 import { Box, Typography, Paper, Chip } from '@mui/material'
 import { useApp } from '../context/AppContext'
 import { C, EASE } from '../theme'
+import { getLevelName } from '../lib/gamification'
 
-// Styled rank labels for podium
+// Podium medal colors
 const RANK_LABELS  = ['1', '2', '3']
 const RANK_COLORS  = [C.primary, '#94A3B8', '#CD7F32']
-
-// Podium heights
 const PODIUM_H     = [130, 110, 90]
 const PODIUM_ORDER = [1, 0, 2] // 2nd, 1st, 3rd in display order
 
 export default function Ranking() {
-  const { auth, ranking, t } = useApp()
+  const { auth, ranking, t, lang } = useApp()
   const isMobile = window.innerWidth < 640
-
-  const POINT_TYPES = [
-    { id: 'weight',   abbr: 'KG', label: t('rankWeightLbl'),  desc: `2 ${t('ptsPerDay')}`,    color: C.purple  },
-    { id: 'workout',  abbr: 'WO', label: t('rankWorkoutLbl'), desc: `5 ${t('ptsPerSession')}`, color: C.primary },
-    { id: 'calories', abbr: 'KC', label: t('rankCalLbl'),     desc: `3 ${t('ptsPerDay')}`,     color: C.orange  },
-    { id: 'protein',  abbr: 'PR', label: t('rankProtLbl'),    desc: `3 ${t('ptsPerDay')}`,     color: C.purple  },
-  ]
 
   return (
     <>
@@ -32,58 +24,6 @@ export default function Ranking() {
         <Typography sx={{ color: C.muted, fontSize: '14px' }}>
           {t('rankingDesc')}
         </Typography>
-      </Box>
-
-      {/* ── Point type legend cards ───────────────────── */}
-      <Box sx={{
-        display:             'grid',
-        gridTemplateColumns: isMobile ? 'repeat(2,1fr)' : 'repeat(4,1fr)',
-        gap:                 1.25,
-        mb:                  3.5,
-      }}>
-        {POINT_TYPES.map((item, i) => (
-          <Paper
-            key={item.id}
-            sx={{
-              p:          '16px 18px',
-              borderRadius:'16px',
-              transition:  `box-shadow 0.25s ${EASE.standard}, transform 0.25s ${EASE.standard}, border-color 0.25s ${EASE.standard}`,
-              cursor:      'default',
-              animation:   `fadeInUp 0.22s ${EASE.decelerate} ${i * 0.06}s both`,
-              '&:hover':   {
-                transform:   'translateY(-3px)',
-                boxShadow:   `0 0 0 1px ${item.color}33, 0 8px 28px rgba(0,0,0,0.4)`,
-                borderColor: `${item.color}33`,
-              },
-            }}
-          >
-            <Box sx={{
-              display:        'inline-flex',
-              alignItems:     'center',
-              justifyContent: 'center',
-              width:          '36px',
-              height:         '28px',
-              borderRadius:   '8px',
-              background:     `${item.color}18`,
-              mb:             0.75,
-            }}>
-              <Typography sx={{ fontSize: '11px', fontWeight: 800, color: item.color, letterSpacing: '0.5px' }}>
-                {item.abbr}
-              </Typography>
-            </Box>
-            <Typography sx={{
-              fontWeight:    700,
-              color:         item.color,
-              fontSize:      '14px',
-              letterSpacing: '-0.1px',
-            }}>
-              {item.label}
-            </Typography>
-            <Typography sx={{ color: C.muted, fontSize: '12px', mt: 0.4 }}>
-              {item.desc}
-            </Typography>
-          </Paper>
-        ))}
       </Box>
 
       {/* ── Podium (top 3) ────────────────────────────── */}
@@ -159,11 +99,20 @@ export default function Ranking() {
                   <Typography sx={{
                     fontWeight:    800,
                     fontSize:      isFirst ? '16px' : '15px',
-                    mb:            0.5,
+                    mb:            0.25,
                     color:         isFirst ? C.primary : C.text,
                     letterSpacing: '-0.1px',
                   }}>
                     {item?.name}
+                  </Typography>
+                  <Typography sx={{
+                    fontSize:   '11px',
+                    fontWeight: 600,
+                    color:      C.muted,
+                    fontStyle:  'italic',
+                    mb:         0.5,
+                  }}>
+                    {getLevelName(item?.level || 1, lang)}
                   </Typography>
                   <Typography sx={{
                     fontSize:      isFirst ? '30px' : '24px',
@@ -173,10 +122,10 @@ export default function Ranking() {
                     letterSpacing: '-0.5px',
                     fontFamily:    "'MontBlanc', sans-serif",
                   }}>
-                    {item?.points}
+                    {item?.xp}
                   </Typography>
                   <Typography sx={{ color: isFirst ? 'rgba(196,233,191,0.55)' : C.muted, fontSize: '12px' }}>
-                    {t('points')}
+                    XP
                   </Typography>
                 </Paper>
               </Box>
@@ -194,7 +143,7 @@ export default function Ranking() {
         {/* Table header */}
         <Box sx={{
           display:             'grid',
-          gridTemplateColumns: isMobile ? '40px 1fr 70px 70px' : '50px 1fr 80px 80px 80px 80px 90px',
+          gridTemplateColumns: isMobile ? '35px 1fr 40px 60px' : '50px 1fr 50px 140px 70px 80px',
           px:                  isMobile ? '12px' : '20px',
           py:                  '12px',
           borderBottom:        `1px solid ${C.border}`,
@@ -203,11 +152,10 @@ export default function Ranking() {
           {[
             '#',
             t('rankClientLbl'),
-            t('rankWeightLbl'),
-            t('rankWorkoutLbl'),
-            'Kcal',
-            t('proteinShortLbl'),
-            t('rankTotalLbl'),
+            ...(isMobile
+              ? ['Lvl', 'XP']
+              : ['Lvl', t('levelNameLbl'), t('badgesLbl'), 'XP']
+            ),
           ].map((h, i) => (
             <Typography
               key={i}
@@ -218,7 +166,6 @@ export default function Ranking() {
                 textTransform: 'uppercase',
                 letterSpacing: '0.8px',
                 textAlign:     i >= 2 ? 'center' : 'left',
-                display:       (!isMobile || i < 4) ? 'block' : 'none',
               }}
             >
               {h}
@@ -236,7 +183,7 @@ export default function Ranking() {
               key={item.name}
               sx={{
                 display:             'grid',
-                gridTemplateColumns: isMobile ? '40px 1fr 70px 70px' : '50px 1fr 80px 80px 80px 80px 90px',
+                gridTemplateColumns: isMobile ? '35px 1fr 40px 60px' : '50px 1fr 50px 140px 70px 80px',
                 px:                  isMobile ? '12px' : '20px',
                 py:                  isMobile ? '10px' : '14px',
                 borderBottom:        i < ranking.length - 1 ? `1px solid ${C.border}` : 'none',
@@ -285,45 +232,51 @@ export default function Ranking() {
                 )}
               </Box>
 
-              {/* Breakdown columns */}
+              {/* Level number */}
               <Typography sx={{
                 textAlign:  'center',
-                color:      C.purple,
                 fontWeight: 700,
                 fontSize:   '14px',
-              }}>
-                {item.breakdown.weightPts}
-              </Typography>
-              <Typography sx={{
-                textAlign:  'center',
                 color:      C.primary,
-                fontWeight: 700,
-                fontSize:   '14px',
               }}>
-                {item.breakdown.workoutPts}
+                {item.level}
               </Typography>
 
+              {/* Desktop-only columns */}
               {!isMobile && (
                 <>
-                  <Typography sx={{ textAlign: 'center', color: C.orange, fontWeight: 700, fontSize: '14px' }}>
-                    {item.breakdown.calPts}
-                  </Typography>
-                  <Typography sx={{ textAlign: 'center', color: C.purple, fontWeight: 700, fontSize: '14px' }}>
-                    {item.breakdown.protPts}
+                  <Typography sx={{
+                    textAlign:  'center',
+                    fontWeight: 600,
+                    fontSize:   '13px',
+                    color:      C.muted,
+                    fontStyle:  'italic',
+                  }}>
+                    {getLevelName(item.level, lang)}
                   </Typography>
                   <Typography sx={{
-                    textAlign:     'center',
-                    fontWeight:    800,
-                    fontSize:      isFirst ? '18px' : '15px',
-                    color:         isFirst ? C.primary : C.text,
-                    fontFamily:    "'MontBlanc', sans-serif",
-                    letterSpacing: '-0.3px',
-                    filter:        isFirst ? 'drop-shadow(0 0 6px rgba(196,233,191,0.25))' : 'none',
+                    textAlign:  'center',
+                    fontWeight: 700,
+                    fontSize:   '14px',
+                    color:      C.purple,
                   }}>
-                    {item.points}
+                    {item.badgeCount}
                   </Typography>
                 </>
               )}
+
+              {/* XP */}
+              <Typography sx={{
+                textAlign:     'center',
+                fontWeight:    800,
+                fontSize:      isFirst ? '18px' : '15px',
+                color:         isFirst ? C.primary : C.text,
+                fontFamily:    "'MontBlanc', sans-serif",
+                letterSpacing: '-0.3px',
+                filter:        isFirst ? 'drop-shadow(0 0 6px rgba(196,233,191,0.25))' : 'none',
+              }}>
+                {item.xp}
+              </Typography>
             </Box>
           )
         })}
@@ -337,7 +290,7 @@ export default function Ranking() {
         opacity:   0.7,
         animation: `fadeIn 0.3s ${EASE.decelerate} 0.4s both`,
       }}>
-        {t('rankFooter')}
+        {t('rankFooterXP')}
       </Typography>
     </>
   )

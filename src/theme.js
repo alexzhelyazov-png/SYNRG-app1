@@ -50,55 +50,6 @@ const DARK = {
   inputBg:          '#111010',
 }
 
-const LIGHT = {
-  bg:               '#F5F4F2',
-  sidebar:          '#EFEFED',
-  card:             '#FFFFFF',
-  cardHigh:         '#F8F8F6',
-  cardDeep:         'rgba(255,255,255,0.97)',
-  text:             '#18181A',
-  muted:            '#6E6C6A',
-  mutedHover:       '#4A4846',
-  primary:          '#2A7D38',
-  primaryHover:     '#23672F',
-  primaryOn:        '#FFFFFF',
-  primaryContainer: 'rgba(42,125,56,0.1)',
-  primaryGlow:      'rgba(42,125,56,0.15)',
-  primaryDeep:      '#1D5E2A',
-  primaryA5:        'rgba(42,125,56,0.05)',
-  primaryA3:        'rgba(42,125,56,0.03)',
-  primaryA13:       'rgba(42,125,56,0.13)',
-  primaryA20:       'rgba(42,125,56,0.20)',
-  border:           'rgba(0,0,0,0.08)',
-  borderHover:      'rgba(0,0,0,0.14)',
-  danger:           '#D42860',
-  dangerSoft:       'rgba(212,40,96,0.1)',
-  dangerHover:      '#E85288',
-  dangerGlow:       'rgba(212,40,96,0.25)',
-  accentSoft:       'rgba(42,125,56,0.08)',
-  purple:           '#4D4AC8',
-  purpleSoft:       'rgba(77,74,200,0.1)',
-  purpleLight:      '#6764E8',
-  purpleLighter:    '#8E8BF0',
-  purpleGlow:       'rgba(77,74,200,0.2)',
-  purpleA5:         'rgba(77,74,200,0.05)',
-  purpleA3:         'rgba(77,74,200,0.03)',
-  purpleA13:        'rgba(77,74,200,0.13)',
-  purpleA20:        'rgba(77,74,200,0.20)',
-  orange:           '#B35B00',
-  shadow:           'rgba(0,0,0,0.12)',
-  shadowSm:         'rgba(0,0,0,0.06)',
-  listHover:        'rgba(0,0,0,0.04)',
-  listSelHover:     'rgba(42,125,56,0.12)',
-  tooltipBg:        'rgba(245,244,242,0.98)',
-  appBarBg:         'rgba(239,239,237,0.92)',
-  mobileNavBg:      'rgba(239,239,237,0.97)',
-  optionBg:         '#F0F0EE',
-  scrollThumb:      'rgba(0,0,0,0.15)',
-  scrollThumbHover: 'rgba(0,0,0,0.25)',
-  inputBg:          '#FFFFFF',
-}
-
 // ── C — CSS variable references (used by all components) ─────────
 export const C = {
   bg:               'var(--c-bg)',
@@ -150,10 +101,9 @@ export const C = {
 }
 
 // ── Apply CSS variables to :root ─────────────────────────────────
-export function applyColors(isDark) {
-  const vals = isDark ? DARK : LIGHT
+export function applyColors() {
   const root = document.documentElement
-  Object.entries(vals).forEach(([key, val]) => {
+  Object.entries(DARK).forEach(([key, val]) => {
     root.style.setProperty(`--c-${key}`, val)
   })
 }
@@ -167,11 +117,11 @@ export const EASE = {
 }
 
 // ── Dynamic MUI theme ────────────────────────────────────────────
-export function makeTheme(isDark) {
-  const vals = isDark ? DARK : LIGHT
+export function makeTheme() {
+  const vals = DARK
   return createTheme({
     palette: {
-      mode:       isDark ? 'dark' : 'light',
+      mode:       'dark',
       primary:    { main: vals.primary,  contrastText: vals.primaryOn },
       secondary:  { main: vals.purple,   contrastText: vals.primaryOn },
       error:      { main: vals.danger },

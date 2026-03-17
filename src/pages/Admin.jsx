@@ -24,10 +24,11 @@ import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings'
 import Switch                from '@mui/material/Switch'
 import { useApp }            from '../context/AppContext'
 import SiteTab               from './AdminSiteTab'
+import ProgramsTab           from './AdminProgramsTab'
 import { useBooking }        from '../context/BookingContext'
 import { C }                 from '../theme'
 import { DB }                from '../lib/db'
-import { MODULE_DEFS, MODULE_PRESETS } from '../lib/modules'
+import { MODULE_DEFS, MODULE_PRESETS, ADMIN_MANAGEABLE_MODULES } from '../lib/modules'
 import {
   isoToday, isoDatePlusDays, groupByDate, dayLabel, fmtTime,
   occupancyStr, planLabel, fmtValidTo, isPlanActive, creditsRemaining,
@@ -795,20 +796,24 @@ function ClientModuleEditor({ clientId, currentModules, t, lang }) {
               {t('clearAll')}
             </Button>
           </Box>
-          {Object.entries(MODULE_DEFS).map(([key, def]) => (
-            <Box key={key} sx={{
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              py: 0.75, borderBottom: `1px solid ${C.border}`,
-            }}>
-              <Typography sx={{ fontSize: '13px', color: C.text }}>
-                {lang === 'bg' ? def.labelBg : def.labelEn}
-              </Typography>
-              <Switch size="small" checked={modules.includes(key)}
-                onChange={() => toggleModule(key)}
-                sx={{ '& .MuiSwitch-switchBase.Mui-checked': { color: C.primary },
-                  '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': { backgroundColor: C.primary } }} />
-            </Box>
-          ))}
+          {ADMIN_MANAGEABLE_MODULES.map(key => {
+            const def = MODULE_DEFS[key]
+            if (!def) return null
+            return (
+              <Box key={key} sx={{
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                py: 0.75, borderBottom: `1px solid ${C.border}`,
+              }}>
+                <Typography sx={{ fontSize: '13px', color: C.text }}>
+                  {lang === 'bg' ? def.labelBg : def.labelEn}
+                </Typography>
+                <Switch size="small" checked={modules.includes(key)}
+                  onChange={() => toggleModule(key)}
+                  sx={{ '& .MuiSwitch-switchBase.Mui-checked': { color: C.primary },
+                    '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': { backgroundColor: C.primary } }} />
+              </Box>
+            )
+          })}
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
           <Button onClick={() => setOpen(false)} sx={{ color: C.muted }}>{t('cancelBtn')}</Button>
@@ -1219,6 +1224,7 @@ export default function Admin() {
     { label: t('coachesTab'),      key: 3 },
     { label: t('expensesTab'),     key: 4 },
     { label: t('siteTab'),         key: 5 },
+    { label: t('adminPrograms'),   key: 6 },
   ]
 
   return (
@@ -1256,6 +1262,7 @@ export default function Admin() {
       {tab === 3 && <CoachesTab t={t} />}
       {tab === 4 && <ExpensesTab t={t} />}
       {tab === 5 && <SiteTab />}
+      {tab === 6 && <ProgramsTab />}
     </Box>
   )
 }

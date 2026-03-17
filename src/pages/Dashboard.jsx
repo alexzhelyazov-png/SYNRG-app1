@@ -5,7 +5,6 @@ import { useApp } from '../context/AppContext'
 import { useBooking } from '../context/BookingContext'
 import { WORKOUT_CATEGORIES } from '../lib/constants'
 import { C, EASE } from '../theme'
-import Tasks       from './Tasks'
 import FoodTracker from './FoodTracker'
 import WeightTracker from './WeightTracker'
 import { todayDate, fmt1 } from '../lib/utils'
@@ -633,6 +632,26 @@ export function ClientDetail() {
               ))
             )}
           </Paper>
+
+          {/* ── Steps history ── */}
+          <Paper sx={{ p: 2.25, border: `1px solid ${C.border}`, borderRadius: '16px' }}>
+            <Typography variant="h3" sx={{ mb: 1.5 }}>{t('stepsHistoryLbl')}</Typography>
+            {(client.stepsLogs || []).length === 0 ? (
+              <Typography sx={{ fontSize: '13px', color: C.muted }}>{t('noStepsLogs')}</Typography>
+            ) : (
+              [...(client.stepsLogs || [])].sort((a, b) => b.date?.localeCompare(a.date)).slice(0, 10).map((s, i) => (
+                <Box key={i} sx={{
+                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                  py: '6px', borderBottom: `1px solid ${C.border}`,
+                }}>
+                  <Typography sx={{ fontSize: '13px', color: C.muted }}>{s.date}</Typography>
+                  <Typography sx={{ fontSize: '13px', fontWeight: 700, color: C.primary }}>
+                    {Number(s.steps).toLocaleString()} {t('stepsUnit')}
+                  </Typography>
+                </Box>
+              ))
+            )}
+          </Paper>
         </Box>
       )}
     </>
@@ -641,19 +660,10 @@ export function ClientDetail() {
 
 // ─── Client / tracker view ────────────────────────────────────────
 function DashboardClient({ isCoachView = false }) {
-  const {
-    client, auth, ranking, t,
-    latestWeight, latestAvg, weeklyRate,
-    kcalPct, protPct, foodTotals,
-    setView, viewingCoach,
-  } = useApp()
-  const {
-    slots, myBookings, myPlan, bookingBusy,
-    loadSlots, loadMyBookings, loadMyPlan, cancelBookingForSlot,
-  } = useBooking()
+  const { client, auth, t, setView, viewingCoach } = useApp()
+  const { slots, myBookings, myPlan, bookingBusy, loadSlots, loadMyBookings, loadMyPlan, cancelBookingForSlot } = useBooking()
 
   const [tab, setTab] = useState(0)
-  const [cancelErr, setCancelErr] = useState({})
 
   // Load booking data for client (not in coach-viewing-own-tracker mode)
   useEffect(() => {
@@ -664,24 +674,9 @@ function DashboardClient({ isCoachView = false }) {
     }
   }, [isCoachView, auth.id]) // eslint-disable-line
 
-  async function handleCancel(slotId) {
-    setCancelErr({})
-    const res = await cancelBookingForSlot(slotId)
-    if (res?.error) setCancelErr(prev => ({ ...prev, [slotId]: res.error }))
-  }
-
-  const myRank = isCoachView ? -1 : ranking.findIndex(r => r.name === client.name)
-  const myData = ranking[myRank]
-
   const title = isCoachView
     ? (viewingCoach === auth.name ? t('myTrackerTitle') : `${client.name} — ${t('trackerLabel')}`)
     : `${t('greeting')}, ${client.name}`
-
-  // 3-tab structure: [Workouts, Tasks (clients only), Progress]
-  const tabLabels = isCoachView
-    ? [t('tabWorkouts'), t('tabProgress')]
-    : [t('tabWorkouts'), t('tabTasks'), t('tabProgress')]
-  const progressTabIdx = isCoachView ? 1 : 2
 
   // Current week bounds (Mon–Sun)
   const now = new Date()
@@ -694,22 +689,10 @@ function DashboardClient({ isCoachView = false }) {
   // Recorded workouts this week
   const weekWorkouts = (client.workouts || []).filter(w => w.date >= weekStartStr && w.date <= weekEndStr)
 
-  // Booked sessions this week (client view only)
-  const weekBookings = !isCoachView
-    ? (myBookings || [])
-        .filter(b => b.status === 'active')
-        .map(b => ({ booking: b, slot: (slots || []).find(s => s.id === b.slot_id) }))
-        .filter(({ slot }) => slot && slot.slot_date >= weekStartStr && slot.slot_date <= weekEndStr && slot.status !== 'cancelled')
-        .sort((a, b) => (a.slot.slot_date + a.slot.start_time).localeCompare(b.slot.slot_date + b.slot.start_time))
-    : []
-
-  return (
-    <>
-      {/* ── Reminder banners (not shown in coach tracker view) ── */}
-      {!isCoachView && <ReminderBanners />}
-
-      {/* ── Own tracker banner (shown when coach views personal tracker) ── */}
-      {isCoachView && (
+  // ─── Coach tracker view (with tabs) ───
+  if (isCoachView) {
+    return (
+      <>
         <Box sx={{
           display: 'flex', alignItems: 'center', gap: 1,
           mb: 2, px: 2, py: 1, borderRadius: '10px',
@@ -724,228 +707,27 @@ function DashboardClient({ isCoachView = false }) {
             {viewingCoach === auth.name ? t('viewingOwnTracker') : `${t('viewingClient')}: ${client.name}`}
           </Typography>
         </Box>
-      )}
 
-      {/* ── Greeting ──────────────────────────────────── */}
-      <Box sx={{ mb: 2.5, animation: `fadeInUp 0.22s ${EASE.decelerate} both` }}>
-        <Typography variant="h2" sx={{ mb: 0.5 }}>{title}</Typography>
-        {!isCoachView && (
-          <Typography sx={{ color: C.muted, fontSize: '14px' }}>{t('yourProgress')}</Typography>
-        )}
-      </Box>
+        <Box sx={{ mb: 2.5, animation: `fadeInUp 0.22s ${EASE.decelerate} both` }}>
+          <Typography variant="h2" sx={{ mb: 0.5 }}>{title}</Typography>
+        </Box>
 
-      {/* ── Tabs ──────────────────────────────────────── */}
-      <Tabs
-        value={tab}
-        onChange={(_, v) => setTab(v)}
-        sx={{
-          mb: 2.5,
-          '& .MuiTabs-indicator': { background: C.primary },
-          '& .MuiTab-root': { color: C.muted, fontSize: '13.5px', fontWeight: 600, textTransform: 'none', minWidth: 0, px: 1.75, py: 1 },
-          '& .Mui-selected': { color: `${C.primary} !important` },
-          borderBottom: `1px solid ${C.border}`,
-        }}
-      >
-        {tabLabels.map((label, i) => <Tab key={i} label={label} />)}
-      </Tabs>
+        <Tabs
+          value={tab}
+          onChange={(_, v) => setTab(v)}
+          sx={{
+            mb: 2.5,
+            '& .MuiTabs-indicator': { background: C.primary },
+            '& .MuiTab-root': { color: C.muted, fontSize: '13.5px', fontWeight: 600, textTransform: 'none', minWidth: 0, px: 1.75, py: 1 },
+            '& .Mui-selected': { color: `${C.primary} !important` },
+            borderBottom: `1px solid ${C.border}`,
+          }}
+        >
+          <Tab label={t('tabWorkouts')} />
+          <Tab label={t('tabProgress')} />
+        </Tabs>
 
-      {/* ── Tab 0: Начало ─────────────────────────────── */}
-      {tab === 0 && !isCoachView && (() => {
-        const today = isoToday()
-        const showBooking = hasModule(auth.modules, 'booking_access')
-
-        // Next upcoming session
-        const nextSession = showBooking ? (myBookings || [])
-          .filter(b => b.status === 'active')
-          .map(b => ({ booking: b, slot: (slots || []).find(s => s.id === b.slot_id) }))
-          .filter(({ slot }) => slot && slot.slot_date >= today && slot.status !== 'cancelled')
-          .sort((a, b) => (a.slot.slot_date + a.slot.start_time).localeCompare(b.slot.slot_date + b.slot.start_time))[0] || null
-          : null
-
-        // Plan status
-        const credits  = myPlan ? (myPlan.plan_type === 'unlimited' ? null : creditsRemaining(myPlan)) : null
-        const daysLeft = myPlan ? daysUntilExpiry(myPlan) : null
-        const planColor = !myPlan ? '#F87171'
-          : (credits !== null && credits <= 2) || (daysLeft !== null && daysLeft <= 3) ? '#F87171'
-          : (credits !== null && credits <= 4) || (daysLeft !== null && daysLeft <= 7) ? '#FB923C'
-          : C.primary
-
-        // Today logging status
-        const todayFoodLogged   = foodTotals.kcal > 0
-        const todayWeightLogged = (client.weightLogs || []).some(w => (w.date || '').slice(0, 10) === today)
-
-        function bgDate(iso) {
-          if (!iso) return ''
-          return new Date(iso + 'T00:00:00').toLocaleDateString('bg-BG', { weekday: 'long', day: 'numeric', month: 'long' })
-        }
-
-        return (
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-
-            {/* ── Следваща тренировка (only with booking_access) ── */}
-            {showBooking && (nextSession ? (
-              <Paper sx={{
-                p: 2.5, borderRadius: '20px',
-                background: 'linear-gradient(135deg, rgba(196,233,191,0.12) 0%, rgba(196,233,191,0.05) 100%)',
-                border: `1px solid ${C.primaryA20}`,
-              }}>
-                <Typography sx={{ fontSize: '11px', color: C.muted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.9px', mb: 1 }}>
-                  {t('nextSessionLbl')}
-                </Typography>
-                <Typography sx={{ fontSize: '22px', fontWeight: 800, color: C.text, lineHeight: 1.2, mb: 0.5, textTransform: 'capitalize' }}>
-                  {bgDate(nextSession.slot.slot_date)}
-                </Typography>
-                <Typography sx={{ fontSize: '28px', fontWeight: 800, color: C.primary, fontFamily: "'MontBlanc', sans-serif", lineHeight: 1, mb: 1 }}>
-                  {nextSession.slot.start_time?.slice(0,5)} – {nextSession.slot.end_time?.slice(0,5)}
-                </Typography>
-                {nextSession.slot.coach_name && (
-                  <Typography sx={{ fontSize: '15px', color: C.muted, mb: 1.5 }}>
-                    с {nextSession.slot.coach_name}
-                  </Typography>
-                )}
-                <Button size="small" variant="outlined" disabled={bookingBusy}
-                  onClick={() => handleCancel(nextSession.slot.id)}
-                  sx={{ fontSize: '13px', borderColor: 'rgba(248,113,113,0.4)', color: '#F87171',
-                    '&:hover': { borderColor: '#F87171', background: 'rgba(248,113,113,0.08)' } }}>
-                  {t('cancelBtn')}
-                </Button>
-              </Paper>
-            ) : (
-              <Paper sx={{ p: 2.5, borderRadius: '20px', border: `1px solid ${C.border}` }}>
-                <Typography sx={{ fontSize: '11px', color: C.muted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.9px', mb: 1 }}>
-                  {t('nextSessionLbl')}
-                </Typography>
-                <Typography sx={{ fontSize: '16px', color: C.muted }}>{t('noUpcomingSessions')}</Typography>
-              </Paper>
-            ))}
-
-            {/* ── Твоят план (only with booking_access) ── */}
-            {showBooking && <Paper sx={{
-              p: 2.5, borderRadius: '20px',
-              border: `1px solid ${planColor}33`,
-              background: `${planColor}08`,
-            }}>
-              <Typography sx={{ fontSize: '11px', color: C.muted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.9px', mb: 1.25 }}>
-                {t('yourPlanLbl')}
-              </Typography>
-              {!myPlan ? (
-                <Typography sx={{ fontSize: '17px', color: '#F87171', fontWeight: 700 }}>{t('noPlan')}</Typography>
-              ) : (
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-                  {/* Remaining sessions */}
-                  {myPlan.plan_type !== 'unlimited' ? (
-                    <Box>
-                      <Typography sx={{ fontSize: '52px', fontWeight: 800, color: planColor, fontFamily: "'MontBlanc', sans-serif", lineHeight: 1, letterSpacing: '-2px' }}>
-                        {credits}
-                      </Typography>
-                      <Typography sx={{ fontSize: '13px', color: C.muted, fontWeight: 600 }}>{t('remainingSessionsLbl')}</Typography>
-                    </Box>
-                  ) : (
-                    <Box>
-                      <Typography sx={{ fontSize: '36px', fontWeight: 800, color: C.primary, fontFamily: "'MontBlanc', sans-serif", lineHeight: 1 }}>∞</Typography>
-                      <Typography sx={{ fontSize: '13px', color: C.muted, fontWeight: 600 }}>{t('unlimitedPlan')}</Typography>
-                    </Box>
-                  )}
-                  {/* Divider */}
-                  <Box sx={{ width: '1px', height: 56, background: C.border, flexShrink: 0 }} />
-                  {/* Expiry */}
-                  <Box>
-                    <Typography sx={{ fontSize: '15px', fontWeight: 700, color: planColor, lineHeight: 1.3 }}>
-                      {fmtValidTo(myPlan)}
-                    </Typography>
-                    <Typography sx={{ fontSize: '12px', color: C.muted, mt: 0.25 }}>
-                      {daysLeft !== null
-                        ? daysLeft <= 0 ? t('planExpired') : `${t('expiresInLbl')} ${daysLeft} ${t('daysLbl')}`
-                        : t('validUntil')}
-                    </Typography>
-                  </Box>
-                </Box>
-              )}
-            </Paper>}
-
-            {/* ── Днес ── */}
-            <Box>
-              <Typography sx={{ fontSize: '11px', color: C.muted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.9px', mb: 1 }}>
-                {t('todayLbl')}
-              </Typography>
-              <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1.5 }}>
-                {/* Food button (only with nutrition_tracking) */}
-                {hasModule(auth.modules, 'nutrition_tracking') && <Paper onClick={() => setTab(progressTabIdx)}
-                  sx={{
-                    p: 2.25, borderRadius: '18px', cursor: 'pointer',
-                    border: `1px solid ${todayFoodLogged ? C.primaryA20 : C.border}`,
-                    background: todayFoodLogged ? 'rgba(196,233,191,0.08)' : 'rgba(255,255,255,0.03)',
-                    transition: 'transform 0.15s',
-                    '&:hover': { transform: 'translateY(-2px)' },
-                    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1, textAlign: 'center',
-                  }}>
-                  <Typography sx={{ fontSize: '30px', lineHeight: 1 }}>🍽</Typography>
-                  <Typography sx={{ fontSize: '15px', fontWeight: 700, color: todayFoodLogged ? C.primary : C.text }}>
-                    {todayFoodLogged ? `${Math.round(foodTotals.kcal)} kcal` : t('addFoodBtn')}
-                  </Typography>
-                  <Typography sx={{ fontSize: '12px', color: C.muted }}>
-                    {todayFoodLogged ? '✓ ' + t('loggedToday') : t('tapToLog')}
-                  </Typography>
-                </Paper>}
-
-                {/* Weight button (only with weight_tracking) */}
-                {hasModule(auth.modules, 'weight_tracking') && <Paper onClick={() => setTab(progressTabIdx)}
-                  sx={{
-                    p: 2.25, borderRadius: '18px', cursor: 'pointer',
-                    border: `1px solid ${todayWeightLogged ? C.primaryA20 : C.border}`,
-                    background: todayWeightLogged ? 'rgba(196,233,191,0.08)' : 'rgba(255,255,255,0.03)',
-                    transition: 'transform 0.15s',
-                    '&:hover': { transform: 'translateY(-2px)' },
-                    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1, textAlign: 'center',
-                  }}>
-                  <Typography sx={{ fontSize: '30px', lineHeight: 1 }}>⚖️</Typography>
-                  <Typography sx={{ fontSize: '15px', fontWeight: 700, color: todayWeightLogged ? C.primary : C.text }}>
-                    {todayWeightLogged && latestWeight ? `${latestWeight} ${t('kgUnit')}` : t('addWeightBtn')}
-                  </Typography>
-                  <Typography sx={{ fontSize: '12px', color: C.muted }}>
-                    {todayWeightLogged ? '✓ ' + t('loggedToday') : t('tapToLog')}
-                  </Typography>
-                </Paper>}
-              </Box>
-            </Box>
-
-            {/* ── Тази седмица ── */}
-            {(weekWorkouts.length > 0 || weekBookings.length > 0) && (
-              <Box>
-                <Typography sx={{ fontSize: '11px', color: C.muted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.9px', mb: 1 }}>
-                  {t('workoutsThisWeekLbl')}
-                </Typography>
-                <Paper sx={{ borderRadius: '16px', border: `1px solid ${C.border}`, overflow: 'hidden' }}>
-                  {weekBookings.map(({ booking, slot }, i) => (
-                    <Box key={slot.id} sx={{ display: 'flex', alignItems: 'center', gap: 1.5,
-                      px: 2, py: 1.25, borderBottom: `1px solid ${C.border}`, '&:last-child': { borderBottom: 'none' } }}>
-                      <Box sx={{ width: 8, height: 8, borderRadius: '50%', background: C.primary, flexShrink: 0 }} />
-                      <Typography sx={{ flex: 1, fontWeight: 600, fontSize: '14px', color: C.text }}>{slot.slot_date}</Typography>
-                      <Typography sx={{ fontSize: '14px', color: C.primary, fontWeight: 700 }}>
-                        {slot.start_time?.slice(0,5)}
-                      </Typography>
-                    </Box>
-                  ))}
-                  {weekWorkouts.map((w, i) => (
-                    <Box key={i} sx={{ display: 'flex', alignItems: 'center', gap: 1.5,
-                      px: 2, py: 1.25, borderBottom: `1px solid ${C.border}`, '&:last-child': { borderBottom: 'none' } }}>
-                      <Box sx={{ width: 8, height: 8, borderRadius: '50%', background: C.purple, flexShrink: 0 }} />
-                      <Typography sx={{ flex: 1, fontWeight: 600, fontSize: '14px', color: C.text }}>{w.date}</Typography>
-                      {w.category && <Chip label={t(w.category)} size="small" sx={{ fontSize: '11px', background: C.purpleSoft, color: C.purple }} />}
-                    </Box>
-                  ))}
-                </Paper>
-              </Box>
-            )}
-
-          </Box>
-        )
-      })()}
-
-      {/* ── Tab 0: Тренировки (coach view) ────────────── */}
-      {tab === 0 && isCoachView && (
-        <>
-          {/* Workouts this week */}
+        {tab === 0 && (
           <Paper sx={{ p: 2.25, mb: 2.5, border: `1px solid ${C.border}`, borderRadius: '16px' }}>
             <Typography variant="h3" sx={{ mb: 1.5 }}>{t('workoutsThisWeekLbl')}</Typography>
             {weekWorkouts.length === 0 ? (
@@ -961,21 +743,178 @@ function DashboardClient({ isCoachView = false }) {
               </Box>
             ))}
           </Paper>
-        </>
-      )}
+        )}
 
-      {/* ── Tab 1: Задачи (clients) ───────────────────── */}
-      {tab === 1 && !isCoachView && <Tasks />}
-
-      {/* ── Tab Прогрес: food + weight trackers ──────── */}
-      {tab === progressTabIdx && (
-        <Box sx={{ animation: `fadeInUp 0.22s ${EASE.decelerate} both` }}>
-          <FoodTracker />
-          <Box sx={{ mt: 2.5 }}>
-            <WeightTracker />
+        {tab === 1 && (
+          <Box sx={{ animation: `fadeInUp 0.22s ${EASE.decelerate} both` }}>
+            <FoodTracker />
+            <Box sx={{ mt: 2.5 }}>
+              <WeightTracker />
+            </Box>
           </Box>
-        </Box>
+        )}
+      </>
+    )
+  }
+
+  // ─── Client dashboard (no tabs) ───
+  const isMobile = window.innerWidth < 640
+  const today = isoToday()
+  const showBooking = hasModule(auth.modules, 'booking_access')
+
+  const nextSession = showBooking ? (myBookings || [])
+    .filter(b => b.status === 'active')
+    .map(b => ({ booking: b, slot: (slots || []).find(s => s.id === b.slot_id) }))
+    .filter(({ slot }) => slot && slot.slot_date >= today && slot.status !== 'cancelled')
+    .sort((a, b) => (a.slot.slot_date + a.slot.start_time).localeCompare(b.slot.slot_date + b.slot.start_time))[0] || null
+    : null
+
+  const credits  = myPlan ? (myPlan.plan_type === 'unlimited' ? null : creditsRemaining(myPlan)) : null
+  const daysLeft = myPlan ? daysUntilExpiry(myPlan) : null
+  const planColor = !myPlan ? '#F87171'
+    : (credits !== null && credits <= 2) || (daysLeft !== null && daysLeft <= 3) ? '#F87171'
+    : (credits !== null && credits <= 4) || (daysLeft !== null && daysLeft <= 7) ? '#FB923C'
+    : C.primary
+
+  function bgDate(iso) {
+    if (!iso) return ''
+    return new Date(iso + 'T00:00:00').toLocaleDateString('bg-BG', { weekday: 'short', day: 'numeric', month: 'short' })
+  }
+
+  return (
+    <>
+      <ReminderBanners />
+
+      {/* ── Greeting ── */}
+      <Box sx={{ mb: 2, animation: `fadeInUp 0.22s ${EASE.decelerate} both` }}>
+        <Typography variant="h2" sx={{ mb: 0.5 }}>{title}</Typography>
+        <Typography sx={{ color: C.muted, fontSize: '14px' }}>{t('yourProgress')}</Typography>
+      </Box>
+
+      {/* ── Compact plan info: next session | remaining | expiry ── */}
+      {showBooking && myPlan && (
+        <Paper sx={{
+          display: 'grid',
+          gridTemplateColumns: isMobile ? '1fr 1fr' : '1fr auto auto auto auto',
+          gap: isMobile ? 1.5 : 0,
+          alignItems: 'center',
+          p: '14px 16px', mb: 2, borderRadius: '16px',
+          border: `1px solid ${planColor}33`,
+          background: `${planColor}08`,
+        }}>
+          {/* Next session */}
+          <Box sx={{ gridColumn: isMobile ? '1 / -1' : 'auto' }}>
+            <Typography sx={{ fontSize: '10px', color: C.muted, fontWeight: 600, mb: 0.25 }}>
+              {t('nextSessionLbl')}
+            </Typography>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+              <Typography sx={{ fontSize: '13px', fontWeight: 700, color: nextSession ? planColor : C.muted, lineHeight: 1.2 }}>
+                {nextSession ? `${bgDate(nextSession.slot.slot_date)} ${nextSession.slot.start_time?.slice(0,5)}` : '—'}
+              </Typography>
+              {nextSession && !isCoachView && (
+                <Button size="small" disabled={bookingBusy}
+                  onClick={() => cancelBookingForSlot(nextSession.slot.id)}
+                  sx={{
+                    minWidth: 'auto', fontSize: '10px', py: '2px', px: 1,
+                    color: '#F87171', border: '1px solid rgba(248,113,113,0.3)',
+                    borderRadius: '8px', lineHeight: 1.2,
+                    '&:hover': { background: 'rgba(248,113,113,0.08)', borderColor: '#F87171' },
+                    '&.Mui-disabled': { opacity: 0.5 },
+                  }}>
+                  {t('cancelBookingBtn')}
+                </Button>
+              )}
+            </Box>
+          </Box>
+
+          {!isMobile && <Box sx={{ width: '1px', height: 32, background: C.border, mx: 1.5, flexShrink: 0 }} />}
+
+          {/* Remaining sessions */}
+          <Box>
+            <Typography sx={{ fontSize: isMobile ? '20px' : '22px', fontWeight: 800, color: planColor, fontFamily: "'MontBlanc', sans-serif", lineHeight: 1 }}>
+              {myPlan.plan_type === 'unlimited' ? '∞' : credits}
+            </Typography>
+            <Typography sx={{ fontSize: '10px', color: C.muted, fontWeight: 600 }}>{t('remainingSessionsLbl')}</Typography>
+          </Box>
+
+          {!isMobile && <Box sx={{ width: '1px', height: 32, background: C.border, mx: 1.5, flexShrink: 0 }} />}
+
+          {/* Plan expiry */}
+          <Box sx={{ textAlign: isMobile ? 'right' : 'right' }}>
+            <Typography sx={{ fontSize: '13px', fontWeight: 700, color: planColor, lineHeight: 1.2 }}>
+              {fmtValidTo(myPlan)}
+            </Typography>
+            <Typography sx={{ fontSize: '10px', color: C.muted }}>
+              {daysLeft !== null
+                ? daysLeft <= 0 ? t('planExpired') : `${t('expiresInLbl')} ${daysLeft} ${t('daysLbl')}`
+                : t('validUntil')}
+            </Typography>
+          </Box>
+        </Paper>
       )}
+
+      {showBooking && !myPlan && (
+        <Paper sx={{ p: '14px 16px', mb: 2, borderRadius: '16px', border: '1px solid rgba(248,113,113,0.3)', background: 'rgba(248,113,113,0.06)' }}>
+          <Typography sx={{ fontSize: '14px', color: '#F87171', fontWeight: 700 }}>{t('noPlan')}</Typography>
+        </Paper>
+      )}
+
+      {/* ── +Добави храна / +Добави тегло ── */}
+      <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1.5 }}>
+        {hasModule(auth.modules, 'nutrition_tracking') && (
+          <Paper onClick={() => setView('food')}
+            sx={{
+              p: 2.25, borderRadius: '18px', cursor: 'pointer',
+              border: `1px solid ${C.border}`,
+              background: 'rgba(255,255,255,0.03)',
+              transition: 'transform 0.15s',
+              '&:hover': { transform: 'translateY(-2px)' },
+              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1, textAlign: 'center',
+            }}>
+            <Typography sx={{ fontSize: '30px', lineHeight: 1 }}>🍽</Typography>
+            <Typography sx={{ fontSize: '15px', fontWeight: 700, color: C.text }}>
+              {t('addFoodBtn')}
+            </Typography>
+            <Typography sx={{ fontSize: '12px', color: C.muted }}>{t('tapToLog')}</Typography>
+          </Paper>
+        )}
+
+        {hasModule(auth.modules, 'weight_tracking') && (
+          <Paper onClick={() => setView('weight')}
+            sx={{
+              p: 2.25, borderRadius: '18px', cursor: 'pointer',
+              border: `1px solid ${C.border}`,
+              background: 'rgba(255,255,255,0.03)',
+              transition: 'transform 0.15s',
+              '&:hover': { transform: 'translateY(-2px)' },
+              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1, textAlign: 'center',
+            }}>
+            <Typography sx={{ fontSize: '30px', lineHeight: 1 }}>⚖️</Typography>
+            <Typography sx={{ fontSize: '15px', fontWeight: 700, color: C.text }}>
+              {t('addWeightBtn')}
+            </Typography>
+            <Typography sx={{ fontSize: '12px', color: C.muted }}>{t('tapToLog')}</Typography>
+          </Paper>
+        )}
+
+        {(hasModule(auth.modules, 'nutrition_tracking') || hasModule(auth.modules, 'weight_tracking')) && (
+          <Paper onClick={() => setView('steps')}
+            sx={{
+              p: 2.25, borderRadius: '18px', cursor: 'pointer',
+              border: `1px solid ${C.border}`,
+              background: 'rgba(255,255,255,0.03)',
+              transition: 'transform 0.15s',
+              '&:hover': { transform: 'translateY(-2px)' },
+              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1, textAlign: 'center',
+            }}>
+            <Typography sx={{ fontSize: '30px', lineHeight: 1 }}>👟</Typography>
+            <Typography sx={{ fontSize: '15px', fontWeight: 700, color: C.text }}>
+              {t('addStepsBtn')}
+            </Typography>
+            <Typography sx={{ fontSize: '12px', color: C.muted }}>{t('tapToLog')}</Typography>
+          </Paper>
+        )}
+      </Box>
     </>
   )
 }
@@ -1093,11 +1032,11 @@ export function ClientSchedule() {
   const rem      = myPlan ? creditsRemaining(myPlan) : 0
   const isUnlim  = myPlan?.plan_type === 'unlimited'
 
-  const nextBooked = (myBookings || [])
+  const allBooked = (myBookings || [])
     .filter(b => b.status === 'active')
     .map(b => ({ booking: b, slot: (slots || []).find(s => s.id === b.slot_id) }))
     .filter(({ slot }) => slot && slot.slot_date >= today && slot.status !== 'cancelled')
-    .sort((a, b) => (a.slot.slot_date + a.slot.start_time).localeCompare(b.slot.slot_date + b.slot.start_time))[0]
+    .sort((a, b) => (a.slot.slot_date + a.slot.start_time).localeCompare(b.slot.slot_date + b.slot.start_time))
 
   // ── 3-day grid ────────────────────────────────────────────────
   const dayDates = [
@@ -1123,18 +1062,16 @@ export function ClientSchedule() {
         {t('navBookSlot')}
       </Typography>
 
-      {/* ── Compact header: Credits + Next session ─────────────── */}
+      {/* ── Compact header: Credits + My sessions ─────────────── */}
       {myPlan && (
-        <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1.5, mb: 2.5 }}>
+        <Box sx={{ mb: 2.5 }}>
           {/* Remaining credits */}
           <Paper sx={{
-            p: 1.75, borderRadius: '14px',
+            p: 1.75, borderRadius: '14px', mb: 1.5,
             border: `1px solid ${C.primaryA20}`,
             background: 'linear-gradient(135deg, rgba(196,233,191,0.08) 0%, rgba(196,233,191,0.04) 100%)',
+            display: 'flex', alignItems: 'center', gap: 2,
           }}>
-            <Typography sx={{ fontSize: '11px', color: C.muted, textTransform: 'uppercase', letterSpacing: '0.5px', mb: 0.5 }}>
-              {t('remainingSessionsLbl')}
-            </Typography>
             <Typography sx={{ fontSize: '30px', fontWeight: 800, color: C.primary, lineHeight: 1 }}>
               {isUnlim ? '∞' : rem}
               {!isUnlim && (
@@ -1143,28 +1080,53 @@ export function ClientSchedule() {
                 </Box>
               )}
             </Typography>
+            <Typography sx={{ fontSize: '11px', color: C.muted, fontWeight: 600 }}>
+              {t('remainingSessionsLbl')}
+            </Typography>
           </Paper>
 
-          {/* Next booked session */}
+          {/* My sessions list */}
           <Paper sx={{
             p: 1.75, borderRadius: '14px',
             border: `1px solid ${C.border}`,
             background: 'rgba(255,255,255,0.03)',
           }}>
-            <Typography sx={{ fontSize: '11px', color: C.muted, textTransform: 'uppercase', letterSpacing: '0.5px', mb: 0.5 }}>
-              {t('nextTraining')}
+            <Typography sx={{ fontSize: '11px', color: C.muted, fontWeight: 600, mb: 1 }}>
+              {t('myTrainings')}
             </Typography>
-            {nextBooked ? (
-              <>
-                <Typography sx={{ fontSize: '14px', fontWeight: 700, color: C.text, lineHeight: 1.3 }}>
-                  {dayLabel(nextBooked.slot.slot_date, lang)}
-                </Typography>
-                <Typography sx={{ fontSize: '12px', color: C.muted, mt: 0.25 }}>
-                  {fmtTime(nextBooked.slot.start_time)} · {nextBooked.slot.coach_name}
-                </Typography>
-              </>
+            {allBooked.length === 0 ? (
+              <Typography sx={{ fontSize: '13px', color: C.muted }}>{t('noUpcoming')}</Typography>
             ) : (
-              <Typography sx={{ fontSize: '13px', color: C.muted }}>—</Typography>
+              allBooked.map(({ booking, slot }) => (
+                <Box key={booking.id} sx={{
+                  display: 'flex', alignItems: 'center', gap: 1.5,
+                  py: 1, borderBottom: `1px solid ${C.border}`,
+                  '&:last-child': { borderBottom: 'none', pb: 0 },
+                  '&:first-of-type': { pt: 0 },
+                }}>
+                  <Box sx={{ flex: 1, minWidth: 0 }}>
+                    <Typography sx={{ fontSize: '13px', fontWeight: 700, color: C.text, lineHeight: 1.3 }}>
+                      {dayLabel(slot.slot_date, lang)}
+                    </Typography>
+                    <Typography sx={{ fontSize: '11px', color: C.muted }}>
+                      {fmtTime(slot.start_time)} – {fmtTime(slot.end_time)} · {slot.coach_name}
+                    </Typography>
+                  </Box>
+                  {canClientCancel(slot).ok && (
+                    <Button size="small" disabled={bookingBusy}
+                      onClick={() => handleCancel(slot.id)}
+                      sx={{
+                        minWidth: 'auto', fontSize: '11px', py: '4px', px: 1.25,
+                        color: '#F87171', border: '1px solid rgba(248,113,113,0.3)',
+                        borderRadius: '8px', flexShrink: 0,
+                        '&:hover': { background: 'rgba(248,113,113,0.08)', borderColor: '#F87171' },
+                        '&.Mui-disabled': { opacity: 0.5 },
+                      }}>
+                      {t('cancelBookingBtn')}
+                    </Button>
+                  )}
+                </Box>
+              ))
             )}
           </Paper>
         </Box>

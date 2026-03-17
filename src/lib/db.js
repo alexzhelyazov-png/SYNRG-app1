@@ -381,6 +381,78 @@ export const DB = {
     return filtered.sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))
   },
 
+  // ── Programs ──────────────────────────────────────────────
+  async getPrograms(statusFilter = null) {
+    if (isUsingSupabase) {
+      const params = statusFilter
+        ? `?select=*&status=eq.${statusFilter}&order=display_order.asc`
+        : '?select=*&order=display_order.asc'
+      return (await sbFetchSafe(sbUrl('programs', params), { headers: sbHeaders() })) || []
+    }
+    const all = await LS.selectAll('programs')
+    const filtered = statusFilter ? all.filter(p => p.status === statusFilter) : all
+    return filtered.sort((a, b) => (a.display_order || 0) - (b.display_order || 0))
+  },
+
+  async getProgramModules(programId) {
+    if (isUsingSupabase) {
+      return (await sbFetchSafe(
+        sbUrl('program_modules', `?select=*&program_id=eq.${programId}&order=display_order.asc`),
+        { headers: sbHeaders() }
+      )) || []
+    }
+    const all = await LS.selectAll('program_modules')
+    return all.filter(m => m.program_id === programId).sort((a, b) => (a.display_order || 0) - (b.display_order || 0))
+  },
+
+  async getProgramLessons(programId) {
+    if (isUsingSupabase) {
+      return (await sbFetchSafe(
+        sbUrl('program_lessons', `?select=*&program_id=eq.${programId}&order=display_order.asc`),
+        { headers: sbHeaders() }
+      )) || []
+    }
+    const all = await LS.selectAll('program_lessons')
+    return all.filter(l => l.program_id === programId).sort((a, b) => (a.display_order || 0) - (b.display_order || 0))
+  },
+
+  async getClientProgress(clientId) {
+    if (isUsingSupabase) {
+      return (await sbFetchSafe(
+        sbUrl('client_lesson_progress', `?select=*&client_id=eq.${clientId}`),
+        { headers: sbHeaders() }
+      )) || []
+    }
+    const all = await LS.selectAll('client_lesson_progress')
+    return all.filter(p => p.client_id === clientId)
+  },
+
+  async markLessonComplete(clientId, lessonId) {
+    if (isUsingSupabase) {
+      return (await sbFetchSafe(sbUrl('client_lesson_progress'), {
+        method: 'POST',
+        headers: sbHeaders({ 'Prefer': 'return=representation,resolution=ignore-duplicates' }),
+        body: JSON.stringify({ client_id: clientId, lesson_id: lessonId }),
+      })) || {}
+    }
+    const all = await LS.selectAll('client_lesson_progress')
+    if (all.some(p => p.client_id === clientId && p.lesson_id === lessonId)) return
+    return LS.insert('client_lesson_progress', { client_id: clientId, lesson_id: lessonId })
+  },
+
+  async unmarkLessonComplete(clientId, lessonId) {
+    if (isUsingSupabase) {
+      await sbFetchSafe(
+        sbUrl('client_lesson_progress', `?client_id=eq.${clientId}&lesson_id=eq.${lessonId}`),
+        { method: 'DELETE', headers: sbHeaders() }
+      )
+      return
+    }
+    const all = await LS.selectAll('client_lesson_progress')
+    const entry = all.find(p => p.client_id === clientId && p.lesson_id === lessonId)
+    if (entry) await LS.deleteById('client_lesson_progress', entry.id)
+  },
+
   // ── Seed coaches & their shadow profiles ──────────────────
   async seedIfEmpty() {
     const COACHES = [
