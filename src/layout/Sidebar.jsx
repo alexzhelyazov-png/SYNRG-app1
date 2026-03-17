@@ -291,6 +291,7 @@ export default function Sidebar() {
               <Typography sx={{ fontSize: '11px', color: C.text, mt: 0.25 }}>
                 {n.action_type === 'task' && `${t('taskNotifLbl')}: `}
                 {n.action_type === 'reaction' && `${t('reactionNotifLbl')}: `}
+                {n.action_type === 'registration' && `${t('registrationNotifLbl')}: `}
                 {n.content}
               </Typography>
             </Box>

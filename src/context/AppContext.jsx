@@ -204,6 +204,10 @@ export function AppProvider({ children }) {
       return updated
     })
     setAuth({ isLoggedIn: true, role: 'client', name, id: data.id, modules: [] })
+
+    // Notify coaches/admins about the new registration
+    DB.insertNotification('Система', name, 'registration', name)
+
     return null
   }
 

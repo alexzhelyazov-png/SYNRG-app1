@@ -78,6 +78,7 @@ export const T = {
     newNotifications:   'нови известия',
     taskNotifLbl:       'Задача',
     reactionNotifLbl:   'Реакция',
+    registrationNotifLbl: 'Нова регистрация',
 
     // ── Mobile ───────────────────────────────────────
     selectClient:       'Избери клиент',
@@ -799,6 +800,7 @@ export const T = {
     newNotifications:   'new notifications',
     taskNotifLbl:       'Task',
     reactionNotifLbl:   'Reaction',
+    registrationNotifLbl: 'New registration',
 
     // ── Mobile ───────────────────────────────────────
     selectClient:       'Select client',
