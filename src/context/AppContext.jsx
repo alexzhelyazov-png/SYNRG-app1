@@ -124,6 +124,8 @@ export function AppProvider({ children }) {
           .filter(r => r.client_id === c.id)
           .sort((a, b) => (b.created_at || '').localeCompare(a.created_at || '')),
         modules: Array.isArray(c.modules) ? c.modules : (c.modules ? JSON.parse(c.modules) : []),
+        dismissedBadges: Array.isArray(c.dismissed_badges) ? c.dismissed_badges
+          : (c.dismissed_badges ? JSON.parse(c.dismissed_badges) : []),
         reminderSettings: c.reminder_settings
           ? (typeof c.reminder_settings === 'string'
               ? JSON.parse(c.reminder_settings)
@@ -624,6 +626,14 @@ export function AppProvider({ children }) {
     }
   }
 
+  async function dismissBadge(badgeId) {
+    const cl = clients[actualIdx]
+    if (!cl) return
+    const updated = [...(cl.dismissedBadges || []), badgeId]
+    await DB.update('clients', cl.id, { dismissed_badges: updated })
+    setClients(prev => prev.map(c => c.id === cl.id ? { ...c, dismissedBadges: updated } : c))
+  }
+
   const value = {
     // Theme
     isDark, setIsDark,
@@ -684,6 +694,7 @@ export function AppProvider({ children }) {
     sendReaction, dismissReaction,
     updateReminderSettings,
     updateClientModules,
+    dismissBadge,
   }
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>
