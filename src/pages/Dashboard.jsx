@@ -245,6 +245,9 @@ function TodayScheduleCard() {
   )
 }
 
+// ─── Persisted recent client IDs (survives remounts) ─────────────
+let _recentClientIds = []
+
 // ─── Coach dashboard (schedule + client list) ───────────────────
 function DashboardCoach() {
   const {
@@ -252,10 +255,12 @@ function DashboardCoach() {
     setCurrentWorkout, setCoachClientMode, setShowClientMenu, setViewingCoach,
   } = useApp()
 
-  const [recentIds, setRecentIds] = useState([])
+  const [recentIds, setRecentIds] = useState(_recentClientIds)
 
   const selectClient = (ri, clientId) => {
-    setRecentIds(prev => [clientId, ...prev.filter(id => id !== clientId)])
+    const updated = [clientId, ..._recentClientIds.filter(id => id !== clientId)]
+    _recentClientIds = updated
+    setRecentIds(updated)
     setSelIdx(ri)
     setCurrentWorkout([])
     setViewingCoach(null)
