@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect } from 'react'
 import { Box, Typography, TextField, Button, Chip, Paper, Switch, Collapse, Tabs, Tab } from '@mui/material'
 import ArrowBackIcon from '@mui/icons-material/ArrowBack'
 import { useApp } from '../context/AppContext'
@@ -260,13 +260,6 @@ function DashboardCoach() {
     setShowClientMenu(false)
   }
 
-  // Selected client always at top
-  const sortedClients = useMemo(() => {
-    const sel = realClients[actualIdx]
-    if (!sel) return visibleClients
-    return [sel, ...visibleClients.filter(c => c.name !== sel.name)]
-  }, [visibleClients, actualIdx, realClients])
-
   return (
     <>
       <TodayScheduleCard />
@@ -276,7 +269,7 @@ function DashboardCoach() {
           <Typography sx={{ fontSize: '12px', color: C.muted }}>{visibleClients.length} {t('ofClients')}</Typography>
         </Box>
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-          {sortedClients.map((c, i) => {
+          {visibleClients.map((c, i) => {
             const ri = realClients.findIndex(x => x.name === c.name)
             const isSel = actualIdx === ri
             return (
