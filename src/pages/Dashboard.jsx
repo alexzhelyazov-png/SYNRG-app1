@@ -5,8 +5,6 @@ import { useApp } from '../context/AppContext'
 import { useBooking } from '../context/BookingContext'
 import { WORKOUT_CATEGORIES } from '../lib/constants'
 import { C, EASE } from '../theme'
-import StatCard    from '../components/StatCard'
-import ProgressRing from '../components/ProgressRing'
 import Tasks       from './Tasks'
 import FoodTracker from './FoodTracker'
 import WeightTracker from './WeightTracker'
@@ -189,349 +187,6 @@ function ReminderBanners() {
   )
 }
 
-// ─── Coach react panel ───────────────────────────────────────────
-function CoachReactPanel() {
-  const { t, sendReaction } = useApp()
-  const [msg,     setMsg]     = useState('')
-  const [showMsg, setShowMsg] = useState(false)
-
-  return (
-    <Paper sx={{
-      p:         2.25,
-      mb:        2.5,
-      border:    `1px solid var(--c-primaryA13)`,
-      animation: `fadeInUp 0.3s ${EASE.decelerate} 0.12s both`,
-    }}>
-      <Typography variant="h3" sx={{ mb: 1.75 }}>{t('reactSectionTitle')}</Typography>
-      <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-        <Button
-          variant="outlined"
-          size="small"
-          onClick={() => { sendReaction('like', ''); setShowMsg(false) }}
-          sx={{
-            borderRadius:'99px', borderColor: C.primaryA20,
-            color: C.primary, fontWeight: 700,
-            '&:hover': { background: C.accentSoft, borderColor: C.primary },
-          }}
-        >
-          {t('reactLikeBtn')}
-        </Button>
-        <Button
-          variant="outlined"
-          size="small"
-          onClick={() => setShowMsg(p => !p)}
-          sx={{
-            borderRadius:'99px', borderColor: C.border,
-            color: C.muted, fontWeight: 600,
-            '&:hover': { background: C.accentSoft, color: C.primary, borderColor: C.primaryA20 },
-          }}
-        >
-          {t('reactTextBtn')}
-        </Button>
-      </Box>
-      <Collapse in={showMsg}>
-        <Box sx={{ display: 'flex', gap: 1, mt: 1.5 }}>
-          <TextField
-            size="small"
-            fullWidth
-            placeholder={t('reactionPlaceholder')}
-            value={msg}
-            onChange={e => setMsg(e.target.value)}
-            onKeyDown={e => {
-              if (e.key === 'Enter') {
-                sendReaction('text', msg)
-                setMsg('')
-                setShowMsg(false)
-              }
-            }}
-            inputProps={{ style: { fontSize: '14px' } }}
-          />
-          <Button
-            variant="contained"
-            size="small"
-            disabled={!msg.trim()}
-            onClick={() => { sendReaction('text', msg); setMsg(''); setShowMsg(false) }}
-            sx={{ px: 2, flexShrink: 0 }}
-          >
-            {t('reactionSendBtn')}
-          </Button>
-        </Box>
-      </Collapse>
-    </Paper>
-  )
-}
-
-// ─── Client progress section (shown in coach view) ───────────────
-function ClientProgressSection() {
-  const { client, t, latestAvg, weeklyRate, sendReaction } = useApp()
-  const [msgOpen,     setMsgOpen]     = useState(false)
-  const [msg,         setMsg]         = useState('')
-  const [historyOpen, setHistoryOpen] = useState(false)
-
-  // Last 7 days in YYYY-MM-DD
-  const today = new Date()
-  const last7 = Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(today)
-    d.setDate(d.getDate() - (6 - i))
-    return d.toISOString().slice(0, 10)
-  })
-
-  // Sum calories per day
-  const kcalByDate = {}
-  ;(client.meals || []).forEach(m => {
-    if (m.date && last7.includes(m.date)) {
-      kcalByDate[m.date] = (kcalByDate[m.date] || 0) + (m.calories || 0)
-    }
-  })
-
-  const target  = client.calorieTarget || 2000
-  const DAY_BG  = ['Нд', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб']
-  const dayData = last7.map(date => {
-    const kcal   = kcalByDate[date] || 0
-    const pct    = Math.min(kcal / target, 1)
-    const logged = kcal > 0
-    return { date, kcal, pct, logged }
-  })
-
-  return (
-    <Paper sx={{
-      p: 2.25, mb: 2.5,
-      border: `1px solid ${C.border}`,
-      borderRadius: '16px',
-      animation: `fadeInUp 0.26s ${EASE.decelerate} 0.04s both`,
-    }}>
-      {/* Header + message button */}
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-        <Typography variant="h3">{t('progressTitle')}</Typography>
-        <Button
-          size="small"
-          onClick={() => setMsgOpen(p => !p)}
-          sx={{
-            fontSize: '12px', borderRadius: '99px', px: 1.5, py: '4px',
-            color: msgOpen ? C.primary : C.muted,
-            background: msgOpen ? C.accentSoft : 'transparent',
-            border: `1px solid ${msgOpen ? C.primaryA20 : C.border}`,
-            '&:hover': { background: C.accentSoft, color: C.primary, borderColor: C.primaryA20 },
-          }}
-        >
-          💬 {t('reactTextBtn')}
-        </Button>
-      </Box>
-
-      {/* Inline message form */}
-      <Collapse in={msgOpen}>
-        <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
-          <TextField
-            size="small" fullWidth
-            placeholder={t('reactionPlaceholder')}
-            value={msg}
-            onChange={e => setMsg(e.target.value)}
-            onKeyDown={e => {
-              if (e.key === 'Enter') {
-                sendReaction('text', msg); setMsg(''); setMsgOpen(false)
-              }
-            }}
-            inputProps={{ style: { fontSize: '13px' } }}
-          />
-          <Button
-            variant="contained" size="small"
-            disabled={!msg.trim()}
-            onClick={() => { sendReaction('text', msg); setMsg(''); setMsgOpen(false) }}
-            sx={{ px: 2, flexShrink: 0 }}
-          >
-            {t('reactionSendBtn')}
-          </Button>
-        </Box>
-      </Collapse>
-
-      {/* Weight stats */}
-      <Box sx={{ display: 'flex', gap: 2.5, mb: 2, flexWrap: 'wrap' }}>
-        <Box>
-          <Typography sx={{ fontSize: '11px', color: C.muted, mb: 0.3, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.7px' }}>
-            {t('sevenDayAvg')}
-          </Typography>
-          <Typography sx={{ fontSize: '22px', fontWeight: 800, color: C.purple, fontFamily: "'MontBlanc', sans-serif", lineHeight: 1.1 }}>
-            {latestAvg !== null ? `${fmt1(latestAvg)} кг` : '—'}
-          </Typography>
-        </Box>
-        <Box>
-          <Typography sx={{ fontSize: '11px', color: C.muted, mb: 0.3, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.7px' }}>
-            Weekly Rate
-          </Typography>
-          <Typography sx={{
-            fontSize: '22px', fontWeight: 800, fontFamily: "'MontBlanc', sans-serif", lineHeight: 1.1,
-            color: weeklyRate === null ? C.muted : weeklyRate > 0 ? C.orange : C.primary,
-          }}>
-            {weeklyRate !== null ? `${weeklyRate > 0 ? '+' : ''}${fmt1(weeklyRate)} ${t('kgWeek')}` : '—'}
-          </Typography>
-        </Box>
-      </Box>
-
-      {/* 7-day calorie bars */}
-      <Typography sx={{ fontSize: '11px', color: C.muted, mb: 1, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.7px' }}>
-        Калории — последните 7 дни
-      </Typography>
-      <Box sx={{ display: 'flex', gap: 0.75 }}>
-        {dayData.map(({ date, kcal, pct, logged }) => {
-          const weekday = new Date(date + 'T12:00:00').getDay()
-          const barH    = logged ? Math.max(12, Math.round(Math.min(pct, 1) * 40)) : 3
-          return (
-            <Box key={date} sx={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5 }}>
-              <Box sx={{ width: '100%', height: '44px', display: 'flex', alignItems: 'flex-end' }}>
-                <Box sx={{
-                  width: '100%', height: `${barH}px`,
-                  borderRadius: '4px',
-                  background: logged
-                    ? (pct >= 0.85 ? C.primary : 'rgba(196,233,191,0.45)')
-                    : 'rgba(255,255,255,0.06)',
-                  transition: `height 0.3s ${EASE.standard}`,
-                }} />
-              </Box>
-              <Typography sx={{ fontSize: '10px', color: C.muted, lineHeight: 1 }}>
-                {DAY_BG[weekday]}
-              </Typography>
-            </Box>
-          )
-        })}
-      </Box>
-
-      {/* History toggle */}
-      <Button
-        size="small" fullWidth
-        onClick={() => setHistoryOpen(p => !p)}
-        sx={{ mt: 1.5, fontSize: '12px', color: historyOpen ? C.primary : C.muted,
-          borderRadius: '8px', py: '4px', justifyContent: 'center',
-          background: historyOpen ? C.accentSoft : 'transparent',
-          border: `1px solid ${historyOpen ? C.primaryA20 : C.border}`,
-          '&:hover': { background: C.accentSoft, color: C.primary, borderColor: C.primaryA20 },
-        }}
-      >
-        {historyOpen ? t('hideHistoryBtn') : t('showHistoryBtn')}
-      </Button>
-
-      {/* Expandable history */}
-      <Collapse in={historyOpen}>
-        <Box sx={{ mt: 1.5, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-
-          {/* Food log */}
-          <Box>
-            <Typography sx={{ fontSize: '11px', fontWeight: 700, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.7px', mb: 0.75 }}>
-              Хранителен дневник
-            </Typography>
-            {(client.meals || []).length === 0 ? (
-              <Typography sx={{ fontSize: '12px', color: C.muted }}>Няма записи</Typography>
-            ) : [...(client.meals || [])].sort((a, b) => b.date?.localeCompare(a.date)).slice(0, 10).map((m, i) => (
-              <Box key={i} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                py: '5px', borderBottom: `1px solid ${C.border}` }}>
-                <Typography sx={{ fontSize: '12px', color: C.muted }}>{m.date}</Typography>
-                <Box sx={{ display: 'flex', gap: 1.5 }}>
-                  <Typography sx={{ fontSize: '12px', fontWeight: 700, color: C.text }}>{m.calories || 0} kcal</Typography>
-                  <Typography sx={{ fontSize: '12px', color: C.purple }}>{m.protein || 0}g</Typography>
-                </Box>
-              </Box>
-            ))}
-          </Box>
-
-          {/* Weight log */}
-          <Box>
-            <Typography sx={{ fontSize: '11px', fontWeight: 700, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.7px', mb: 0.75 }}>
-              История на тегло
-            </Typography>
-            {(client.weightLogs || []).length === 0 ? (
-              <Typography sx={{ fontSize: '12px', color: C.muted }}>Няма записи</Typography>
-            ) : [...(client.weightLogs || [])].sort((a, b) => b.date?.localeCompare(a.date)).slice(0, 10).map((w, i) => (
-              <Box key={i} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                py: '5px', borderBottom: `1px solid ${C.border}` }}>
-                <Typography sx={{ fontSize: '12px', color: C.muted }}>{w.date}</Typography>
-                <Typography sx={{ fontSize: '12px', fontWeight: 700, color: C.purple }}>{w.weight} кг</Typography>
-              </Box>
-            ))}
-          </Box>
-
-        </Box>
-      </Collapse>
-    </Paper>
-  )
-}
-
-// ─── Remaining sessions + upcoming bookings (coach view for a client) ─
-function ClientSessionSummary() {
-  const { client } = useApp()
-  const { allPlans, loadAllPlans, slots, slotBookings, bookingBusy, cancelBookingForClient } = useBooking()
-  const [cancelErr, setCancelErr] = useState({})
-
-  useEffect(() => { loadAllPlans() }, []) // eslint-disable-line
-
-  const plan    = (allPlans || []).find(p => p.client_id === client.id && p.status === 'active')
-  const remCred = plan ? creditsRemaining(plan) : null
-  const today   = isoToday()
-
-  // Find upcoming bookings for this client (with booking record for cancel)
-  const upcoming = (slots || [])
-    .filter(s => s.slot_date >= today && s.status !== 'cancelled')
-    .map(s => ({ slot: s, booking: (slotBookings[s.id] || []).find(b => b.client_id === client.id) }))
-    .filter(({ booking }) => !!booking)
-    .sort((a, b) => (a.slot.slot_date + a.slot.start_time).localeCompare(b.slot.slot_date + b.slot.start_time))
-    .slice(0, 5)
-
-  async function handleCancel(slotId) {
-    setCancelErr({})
-    const res = await cancelBookingForClient(slotId, client.id)
-    if (res?.error) setCancelErr(prev => ({ ...prev, [slotId]: res.error }))
-  }
-
-  if (!plan && upcoming.length === 0) return null
-
-  return (
-    <Paper sx={{
-      p: 2, mb: 2.5,
-      border: `1px solid ${C.border}`, borderRadius: '16px',
-      animation: `fadeInUp 0.28s ${EASE.decelerate} 0.06s both`,
-    }}>
-      <Typography variant="h3" sx={{ mb: 1.5 }}>Sessions</Typography>
-      <Box sx={{ display: 'flex', gap: 3, mb: upcoming.length > 0 ? 1.5 : 0, flexWrap: 'wrap' }}>
-        {plan && (
-          <Box>
-            <Typography sx={{ fontSize: '11px', color: C.muted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.7px', mb: 0.3 }}>
-              Remaining
-            </Typography>
-            <Typography sx={{ fontSize: '22px', fontWeight: 800, color: C.primary, lineHeight: 1.1, fontFamily: "'MontBlanc', sans-serif" }}>
-              {plan.plan_type === 'unlimited' ? '∞' : `${remCred} / ${plan.credits_total}`}
-            </Typography>
-          </Box>
-        )}
-      </Box>
-      {upcoming.length > 0 && (
-        <>
-          <Typography sx={{ fontSize: '11px', color: C.muted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.7px', mb: 0.75 }}>
-            {t('upcomingSessionsLbl')}
-          </Typography>
-          {upcoming.map(({ slot, booking }) => (
-            <Box key={slot.id} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-              py: '7px', borderBottom: `1px solid ${C.border}`, gap: 1 }}>
-              <Box sx={{ flex: 1, minWidth: 0 }}>
-                <Typography sx={{ fontSize: '13px', fontWeight: 700, color: C.text }}>
-                  {slot.slot_date} · {slot.start_time?.slice(0, 5)}
-                </Typography>
-                <Typography sx={{ fontSize: '11.5px', color: C.muted }}>{slot.coach_name}</Typography>
-                {cancelErr[slot.id] && (
-                  <Typography sx={{ fontSize: '11px', color: '#F87171', mt: 0.25 }}>{cancelErr[slot.id]}</Typography>
-                )}
-              </Box>
-              <Button size="small" variant="outlined" disabled={bookingBusy}
-                onClick={() => handleCancel(slot.id)}
-                sx={{ fontSize: '11px', py: 0.4, px: 1.25, flexShrink: 0,
-                  borderColor: C.border, color: C.muted,
-                  '&:hover': { borderColor: '#F87171', color: '#F87171', background: 'rgba(248,113,113,0.08)' } }}>
-                Cancel
-              </Button>
-            </Box>
-          ))}
-        </>
-      )}
-    </Paper>
-  )
-}
 
 // ─── Today's schedule (shown at top of coach dashboard) ──────────
 function TodayScheduleCard() {
@@ -671,235 +326,313 @@ function DashboardCoach() {
 // ─── Client detail view (shown when coach selects any client) ─────
 export function ClientDetail() {
   const {
-    client, t,
+    client, t, weeklyRate,
     setCoachClientMode,
     exName, setExName, exScheme, setExScheme, exWeight, setExWeight,
     workoutCategory, setWorkoutCategory,
     currentWorkout, setCurrentWorkout,
     addExercise, saveWorkout,
-    updateClient, updateClientTargets,
   } = useApp()
+  const { allPlans, loadAllPlans, slots, slotBookings } = useBooking()
 
+  const [tab, setTab] = useState(0)
   const isMobile = window.innerWidth < 640
+
+  useEffect(() => { loadAllPlans() }, []) // eslint-disable-line
+
+  // ── Profile tab data ──
+  const plan    = (allPlans || []).find(p => p.client_id === client.id && p.status === 'active')
+  const remCred = plan ? creditsRemaining(plan) : null
+  const today   = isoToday()
+
+  const nextSlot = (slots || [])
+    .filter(s => s.slot_date >= today && s.status !== 'cancelled')
+    .map(s => ({ slot: s, booking: (slotBookings[s.id] || []).find(b => b.client_id === client.id) }))
+    .filter(({ booking }) => !!booking)
+    .sort((a, b) => (a.slot.slot_date + a.slot.start_time).localeCompare(b.slot.slot_date + b.slot.start_time))[0] || null
+
+  // Aggregate meals by date (last 7 days)
+  const last7 = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(); d.setDate(d.getDate() - (6 - i))
+    return d.toISOString().slice(0, 10)
+  })
+  const mealsByDate = {}
+  ;(client.meals || []).forEach(m => {
+    if (m.date && last7.includes(m.date)) {
+      if (!mealsByDate[m.date]) mealsByDate[m.date] = { kcal: 0, protein: 0 }
+      mealsByDate[m.date].kcal    += (m.kcal || m.calories || 0)
+      mealsByDate[m.date].protein += (m.protein || 0)
+    }
+  })
 
   return (
     <>
-      {/* ── Back button ── */}
-      <Box sx={{ mb: 1.5, animation: `fadeInUp 0.18s ${EASE.decelerate} both` }}>
+      {/* ── Header: Back + Name + Weekly Rate ── */}
+      <Box sx={{ mb: 2, animation: `fadeInUp 0.18s ${EASE.decelerate} both` }}>
         <Button
           size="small"
           onClick={() => setCoachClientMode(false)}
           startIcon={<ArrowBackIcon />}
-          sx={{ color: C.muted, '&:hover': { color: C.primary }, pl: 0 }}
+          sx={{ color: C.muted, '&:hover': { color: C.primary }, pl: 0, mb: 1 }}
         >
           Back
         </Button>
-      </Box>
-
-      {/* ── "Данните на:" header + target inputs ── */}
-      <Box sx={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        mb: 2.5, gap: 2, flexWrap: 'wrap',
-        animation: `fadeInUp 0.22s ${EASE.decelerate} both`,
-      }}>
-        <Box>
-          <Typography sx={{ fontSize: '11px', fontWeight: 700, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.8px', mb: 0.4 }}>
-            Данните на
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
+          <Typography variant="h2">{client.name || '—'}</Typography>
+          <Typography sx={{
+            fontSize: '15px', fontWeight: 800, fontFamily: "'MontBlanc', sans-serif",
+            color: weeklyRate === null ? C.muted : weeklyRate > 0 ? C.orange : C.primary,
+          }}>
+            {weeklyRate !== null ? `${weeklyRate > 0 ? '+' : ''}${fmt1(weeklyRate)} ${t('kgWeek')}` : '—'}
           </Typography>
-          <Typography variant="h2" sx={{ textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-            {client.name || '—'}
-          </Typography>
-        </Box>
-        <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
-          <TextField
-            type="number"
-            placeholder={t('kcalTargetLbl')}
-            value={client.calorieTarget}
-            onChange={e => {
-              const v = Number(e.target.value)
-              if (!isNaN(v)) {
-                updateClient(c => ({ ...c, calorieTarget: v }))
-                updateClientTargets(client.id, v, client.proteinTarget)
-              }
-            }}
-            sx={{ width: '100px' }}
-            inputProps={{ style: { fontSize: '13px', padding: '8px 10px' } }}
-          />
-          <TextField
-            type="number"
-            placeholder={t('protTargetGLbl')}
-            value={client.proteinTarget}
-            onChange={e => {
-              const v = Number(e.target.value)
-              if (!isNaN(v)) {
-                updateClient(c => ({ ...c, proteinTarget: v }))
-                updateClientTargets(client.id, client.calorieTarget, v)
-              }
-            }}
-            sx={{ width: '96px' }}
-            inputProps={{ style: { fontSize: '13px', padding: '8px 10px' } }}
-          />
         </Box>
       </Box>
 
-      {/* ── Client progress & messaging ── */}
-      <ClientProgressSection />
+      {/* ── 3 Tabs ── */}
+      <Tabs
+        value={tab}
+        onChange={(_, v) => setTab(v)}
+        sx={{
+          mb: 2.5,
+          '& .MuiTabs-indicator': { background: C.primary },
+          '& .MuiTab-root': { color: C.muted, fontSize: '13.5px', fontWeight: 600, textTransform: 'none', minWidth: 0, px: 1.75, py: 1 },
+          '& .Mui-selected': { color: `${C.primary} !important` },
+          borderBottom: `1px solid ${C.border}`,
+        }}
+      >
+        <Tab label={t('todayWorkoutTab')} />
+        <Tab label={t('historyTab')} />
+        <Tab label={t('profileTab')} />
+      </Tabs>
 
-      {/* ── Workout Builder ── */}
-      <Paper sx={{
-        border:       `1px solid rgba(196,233,191,0.25)`,
-        borderRadius: '20px',
-        p:            3,
-        mb:           2.5,
-        background:   'linear-gradient(145deg, rgba(196,233,191,0.04) 0%, #1C1A19 100%)',
-        boxShadow:    '0 0 0 1px rgba(196,233,191,0.08), 0 8px 32px rgba(0,0,0,0.3)',
-        animation:    `fadeInUp 0.28s ${EASE.decelerate} 0.06s both`,
-      }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, mb: 2.25 }}>
-          <Box sx={{
-            width: 8, height: 8, borderRadius: '99px',
-            background: C.primary, boxShadow: `0 0 10px ${C.primaryGlow}`,
-            flexShrink: 0, animation: `pulse 2.5s ${EASE.standard} infinite`,
-          }} />
-          <Typography variant="h3">{t('workout')} — {todayDate()}</Typography>
-        </Box>
-
-        {/* Category chips */}
-        <Box sx={{ display: 'flex', gap: 0.75, flexWrap: 'wrap', mb: 2.5 }}>
-          {WORKOUT_CATEGORIES.map(({ key }) => {
-            const active = workoutCategory === key
-            return (
-              <Chip
-                key={key}
-                label={t(key)}
-                onClick={() => setWorkoutCategory(key)}
-                sx={{
-                  background: active ? C.primary : 'rgba(255,255,255,0.04)',
-                  color:      active ? '#0A2E0F' : C.text,
-                  border:     `1px solid ${active ? C.primary : C.border}`,
-                  fontWeight: active ? 800 : 500,
-                  fontSize:   '13px',
-                  cursor:     'pointer',
-                  transition: `all 0.18s ${EASE.spring}`,
-                  '&:hover':  { background: active ? C.primaryHover : C.accentSoft, transform: 'translateY(-1px)' },
-                  '& .MuiChip-label': { px: 1.5 },
-                }}
-              />
-            )
-          })}
-        </Box>
-
-        {/* Exercise inputs */}
-        <Box sx={{
-          display: 'grid',
-          gridTemplateColumns: isMobile ? '1fr' : '2fr 1fr 1fr auto',
-          gap: 1.25, mb: 1.75, alignItems: 'end',
+      {/* ══════ Tab 0: Тренировка днес ══════ */}
+      {tab === 0 && (
+        <Paper sx={{
+          border:       `1px solid rgba(196,233,191,0.25)`,
+          borderRadius: '20px',
+          p:            3,
+          background:   'linear-gradient(145deg, rgba(196,233,191,0.04) 0%, #1C1A19 100%)',
+          boxShadow:    '0 0 0 1px rgba(196,233,191,0.08), 0 8px 32px rgba(0,0,0,0.3)',
+          animation:    `fadeInUp 0.22s ${EASE.decelerate} both`,
         }}>
-          {[
-            { labelKey: 'exerciseLbl', placeholder: t('exPlaceholder'), value: exName,   onChange: e => setExName(e.target.value) },
-            { labelKey: 'setsReps',    placeholder: '4×8',              value: exScheme, onChange: e => setExScheme(e.target.value) },
-            { labelKey: 'kgLbl',       placeholder: '80',               value: exWeight, onChange: e => setExWeight(e.target.value) },
-          ].map(({ labelKey, placeholder, value, onChange }) => (
-            <Box key={labelKey}>
-              <Typography sx={{ fontSize: '11px', color: C.muted, mb: 0.6, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.8px' }}>
-                {t(labelKey)}
-              </Typography>
-              <TextField
-                fullWidth
-                placeholder={placeholder}
-                value={value}
-                onChange={onChange}
-                onKeyDown={e => e.key === 'Enter' && addExercise()}
-                inputProps={{ style: { fontSize: '15px', padding: '12px 14px' } }}
-              />
-            </Box>
-          ))}
-          <Button
-            variant="contained" color="primary" onClick={addExercise}
-            sx={{ py: '13px', px: 2.5, fontSize: '22px', alignSelf: 'flex-end', minWidth: '48px' }}
-          >+</Button>
-        </Box>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, mb: 2.25 }}>
+            <Box sx={{
+              width: 8, height: 8, borderRadius: '99px',
+              background: C.primary, boxShadow: `0 0 10px ${C.primaryGlow}`,
+              flexShrink: 0, animation: `pulse 2.5s ${EASE.standard} infinite`,
+            }} />
+            <Typography variant="h3">{t('workout')} — {todayDate()}</Typography>
+          </Box>
 
-        {/* Current exercises list */}
-        {currentWorkout.length > 0 && (
-          <Box sx={{ background: 'rgba(0,0,0,0.3)', border: `1px solid ${C.border}`, borderRadius: '14px', p: 1.75, mb: 2 }}>
-            <Typography sx={{ fontSize: '11px', color: C.muted, mb: 1.25, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.7px' }}>
-              {t(workoutCategory)} · {currentWorkout.length} {t('exercisesLbl')}
-            </Typography>
-            {currentWorkout.map((ex, i) => (
-              <Box key={i} sx={{
-                display: 'grid',
-                gridTemplateColumns: isMobile ? '1fr 80px auto' : '1fr 110px 80px auto',
-                gap: 1, py: 1.1,
-                borderBottom: i < currentWorkout.length - 1 ? `1px solid ${C.border}` : 'none',
-                alignItems: 'center',
-              }}>
-                <Typography sx={{ fontWeight: 600, fontSize: '14.5px' }}>{ex.exercise}</Typography>
-                <Typography sx={{ color: C.muted, fontSize: '13.5px' }}>{ex.scheme}</Typography>
-                <Typography sx={{ color: C.muted, fontSize: '13.5px' }}>{ex.weight} {t('kgUnit')}</Typography>
-                <Button
-                  size="small"
-                  onClick={() => setCurrentWorkout(prev => prev.filter((_, j) => j !== i))}
-                  sx={{ minWidth: 'auto', background: C.dangerSoft, color: C.danger, border: '1px solid rgba(255,107,157,0.2)', borderRadius: '10px', px: 1.25, py: '4px', fontSize: '13px' }}
-                >×</Button>
+          {/* Category chips */}
+          <Box sx={{ display: 'flex', gap: 0.75, flexWrap: 'wrap', mb: 2.5 }}>
+            {WORKOUT_CATEGORIES.map(({ key }) => {
+              const active = workoutCategory === key
+              return (
+                <Chip
+                  key={key}
+                  label={t(key)}
+                  onClick={() => setWorkoutCategory(key)}
+                  sx={{
+                    background: active ? C.primary : 'rgba(255,255,255,0.04)',
+                    color:      active ? '#0A2E0F' : C.text,
+                    border:     `1px solid ${active ? C.primary : C.border}`,
+                    fontWeight: active ? 800 : 500,
+                    fontSize:   '13px',
+                    cursor:     'pointer',
+                    transition: `all 0.18s ${EASE.spring}`,
+                    '&:hover':  { background: active ? C.primaryHover : C.accentSoft, transform: 'translateY(-1px)' },
+                    '& .MuiChip-label': { px: 1.5 },
+                  }}
+                />
+              )
+            })}
+          </Box>
+
+          {/* Exercise inputs */}
+          <Box sx={{
+            display: 'grid',
+            gridTemplateColumns: isMobile ? '1fr' : '2fr 1fr 1fr auto',
+            gap: 1.25, mb: 1.75, alignItems: 'end',
+          }}>
+            {[
+              { labelKey: 'exerciseLbl', placeholder: t('exPlaceholder'), value: exName,   onChange: e => setExName(e.target.value) },
+              { labelKey: 'setsReps',    placeholder: '4×8',              value: exScheme, onChange: e => setExScheme(e.target.value) },
+              { labelKey: 'kgLbl',       placeholder: '80',               value: exWeight, onChange: e => setExWeight(e.target.value) },
+            ].map(({ labelKey, placeholder, value, onChange }) => (
+              <Box key={labelKey}>
+                <Typography sx={{ fontSize: '11px', color: C.muted, mb: 0.6, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.8px' }}>
+                  {t(labelKey)}
+                </Typography>
+                <TextField
+                  fullWidth
+                  placeholder={placeholder}
+                  value={value}
+                  onChange={onChange}
+                  onKeyDown={e => e.key === 'Enter' && addExercise()}
+                  inputProps={{ style: { fontSize: '15px', padding: '12px 14px' } }}
+                />
               </Box>
             ))}
+            <Button
+              variant="contained" color="primary" onClick={addExercise}
+              sx={{ py: '13px', px: 2.5, fontSize: '22px', alignSelf: 'flex-end', minWidth: '48px' }}
+            >+</Button>
           </Box>
-        )}
 
-        {/* Save button */}
-        <Button
-          variant="contained" fullWidth disabled={!currentWorkout.length} onClick={saveWorkout}
-          sx={{
-            py: 1.875, fontSize: '15px', fontWeight: 800, letterSpacing: '0.3px',
-            background: currentWorkout.length ? `linear-gradient(135deg, ${C.primary}, ${C.primaryDeep})` : 'rgba(255,255,255,0.06)',
-            color: currentWorkout.length ? C.primaryOn : 'rgba(255,255,255,0.3)',
-            '&.Mui-disabled': { background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.3)' },
-          }}
-        >
-          {t('saveWorkout')} ({currentWorkout.length} {t('exercisesLbl')})
-        </Button>
-      </Paper>
-
-      {/* ── Workout history ── */}
-      <Paper sx={{ p: 2.75, animation: `fadeInUp 0.3s ${EASE.decelerate} 0.1s both` }}>
-        <Typography variant="h3" sx={{ mb: 2 }}>{t('workoutHistory')}</Typography>
-        {client.workouts.length === 0 ? (
-          <Typography sx={{ color: C.muted, py: 1 }}>{t('noWorkouts')}</Typography>
-        ) : (
-          client.workouts.map((w, i) => (
-            <Box key={i} sx={{ mb: 2, pb: 1.75, borderBottom: i < client.workouts.length - 1 ? `1px solid ${C.border}` : 'none' }}>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1, alignItems: 'center', flexWrap: 'wrap', gap: 1 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
-                  <Typography sx={{ fontWeight: 700, color: i === 0 ? C.primary : C.text }}>{w.date}</Typography>
-                  {w.category && (
-                    <Chip label={t(w.category)} size="small" sx={{ background: C.purpleSoft, color: C.purple, border: '1px solid rgba(200,197,255,0.2)', fontSize: '11.5px', fontWeight: 600 }} />
-                  )}
-                  {i === 0 && (
-                    <Chip label={t('latestTag')} size="small" sx={{ background: C.accentSoft, color: C.primary, border: '1px solid rgba(196,233,191,0.3)', fontSize: '11px', fontWeight: 700 }} />
-                  )}
+          {/* Current exercises list */}
+          {currentWorkout.length > 0 && (
+            <Box sx={{ background: 'rgba(0,0,0,0.3)', border: `1px solid ${C.border}`, borderRadius: '14px', p: 1.75, mb: 2 }}>
+              <Typography sx={{ fontSize: '11px', color: C.muted, mb: 1.25, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.7px' }}>
+                {t(workoutCategory)} · {currentWorkout.length} {t('exercisesLbl')}
+              </Typography>
+              {currentWorkout.map((ex, i) => (
+                <Box key={i} sx={{
+                  display: 'grid',
+                  gridTemplateColumns: isMobile ? '1fr 80px auto' : '1fr 110px 80px auto',
+                  gap: 1, py: 1.1,
+                  borderBottom: i < currentWorkout.length - 1 ? `1px solid ${C.border}` : 'none',
+                  alignItems: 'center',
+                }}>
+                  <Typography sx={{ fontWeight: 600, fontSize: '14.5px' }}>{ex.exercise}</Typography>
+                  <Typography sx={{ color: C.muted, fontSize: '13.5px' }}>{ex.scheme}</Typography>
+                  <Typography sx={{ color: C.muted, fontSize: '13.5px' }}>{ex.weight} {t('kgUnit')}</Typography>
+                  <Button
+                    size="small"
+                    onClick={() => setCurrentWorkout(prev => prev.filter((_, j) => j !== i))}
+                    sx={{ minWidth: 'auto', background: C.dangerSoft, color: C.danger, border: '1px solid rgba(255,107,157,0.2)', borderRadius: '10px', px: 1.25, py: '4px', fontSize: '13px' }}
+                  >×</Button>
                 </Box>
-                <Typography sx={{ color: C.muted, fontSize: '13px' }}>{t('coachByLbl')}: {w.coach || '—'}</Typography>
-              </Box>
-              <Box sx={{ background: 'rgba(0,0,0,0.15)', borderRadius: '10px', p: '10px 14px' }}>
-                {w.items.map((ex, j) => (
-                  <Box key={j} sx={{ display: 'grid', gridTemplateColumns: '1fr 110px 80px', gap: 1.25, py: 0.75, borderBottom: j < w.items.length - 1 ? `1px solid ${C.border}` : 'none' }}>
-                    <Typography sx={{ color: C.text, fontWeight: 600, fontSize: '13.5px' }}>{ex.exercise}</Typography>
-                    <Typography sx={{ color: C.muted, fontSize: '13px' }}>{ex.scheme}</Typography>
-                    <Typography sx={{ color: C.muted, fontSize: '13px' }}>{ex.weight} {t('kgUnit')}</Typography>
+              ))}
+            </Box>
+          )}
+
+          {/* Save button */}
+          <Button
+            variant="contained" fullWidth disabled={!currentWorkout.length} onClick={saveWorkout}
+            sx={{
+              py: 1.875, fontSize: '15px', fontWeight: 800, letterSpacing: '0.3px',
+              background: currentWorkout.length ? `linear-gradient(135deg, ${C.primary}, ${C.primaryDeep})` : 'rgba(255,255,255,0.06)',
+              color: currentWorkout.length ? C.primaryOn : 'rgba(255,255,255,0.3)',
+              '&.Mui-disabled': { background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.3)' },
+            }}
+          >
+            {t('saveWorkout')} ({currentWorkout.length} {t('exercisesLbl')})
+          </Button>
+        </Paper>
+      )}
+
+      {/* ══════ Tab 1: История ══════ */}
+      {tab === 1 && (
+        <Paper sx={{ p: 2.75, animation: `fadeInUp 0.22s ${EASE.decelerate} both` }}>
+          <Typography variant="h3" sx={{ mb: 2 }}>{t('workoutHistory')}</Typography>
+          {(client.workouts || []).length === 0 ? (
+            <Typography sx={{ color: C.muted, py: 1 }}>{t('noWorkouts')}</Typography>
+          ) : (
+            client.workouts.map((w, i) => (
+              <Box key={i} sx={{ mb: 2, pb: 1.75, borderBottom: i < client.workouts.length - 1 ? `1px solid ${C.border}` : 'none' }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1, alignItems: 'center', flexWrap: 'wrap', gap: 1 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                    <Typography sx={{ fontWeight: 700, color: i === 0 ? C.primary : C.text }}>{w.date}</Typography>
+                    {w.category && (
+                      <Chip label={t(w.category)} size="small" sx={{ background: C.purpleSoft, color: C.purple, border: '1px solid rgba(200,197,255,0.2)', fontSize: '11.5px', fontWeight: 600 }} />
+                    )}
+                    {i === 0 && (
+                      <Chip label={t('latestTag')} size="small" sx={{ background: C.accentSoft, color: C.primary, border: '1px solid rgba(196,233,191,0.3)', fontSize: '11px', fontWeight: 700 }} />
+                    )}
                   </Box>
-                ))}
+                  <Typography sx={{ color: C.muted, fontSize: '13px' }}>{t('coachByLbl')}: {w.coach || '—'}</Typography>
+                </Box>
+                <Box sx={{ background: 'rgba(0,0,0,0.15)', borderRadius: '10px', p: '10px 14px' }}>
+                  {w.items.map((ex, j) => (
+                    <Box key={j} sx={{ display: 'grid', gridTemplateColumns: '1fr 110px 80px', gap: 1.25, py: 0.75, borderBottom: j < w.items.length - 1 ? `1px solid ${C.border}` : 'none' }}>
+                      <Typography sx={{ color: C.text, fontWeight: 600, fontSize: '13.5px' }}>{ex.exercise}</Typography>
+                      <Typography sx={{ color: C.muted, fontSize: '13px' }}>{ex.scheme}</Typography>
+                      <Typography sx={{ color: C.muted, fontSize: '13px' }}>{ex.weight} {t('kgUnit')}</Typography>
+                    </Box>
+                  ))}
+                </Box>
+              </Box>
+            ))
+          )}
+        </Paper>
+      )}
+
+      {/* ══════ Tab 2: Профил ══════ */}
+      {tab === 2 && (
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, animation: `fadeInUp 0.22s ${EASE.decelerate} both` }}>
+
+          {/* ── Food diary (last 7 days) ── */}
+          <Paper sx={{ p: 2.25, border: `1px solid ${C.border}`, borderRadius: '16px' }}>
+            <Typography variant="h3" sx={{ mb: 1.5 }}>{t('foodDiaryLbl')}</Typography>
+            {last7.filter(d => mealsByDate[d]).length === 0 ? (
+              <Typography sx={{ fontSize: '13px', color: C.muted }}>{t('noMealsLbl')}</Typography>
+            ) : (
+              [...last7].reverse().filter(d => mealsByDate[d]).map(date => (
+                <Box key={date} sx={{
+                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                  py: '8px', borderBottom: `1px solid ${C.border}`,
+                }}>
+                  <Typography sx={{ fontSize: '13px', color: C.muted }}>{date}</Typography>
+                  <Box sx={{ display: 'flex', gap: 2 }}>
+                    <Typography sx={{ fontSize: '13px', fontWeight: 700, color: C.text }}>
+                      {Math.round(mealsByDate[date].kcal)} kcal
+                    </Typography>
+                    <Typography sx={{ fontSize: '13px', fontWeight: 700, color: C.purple }}>
+                      {Math.round(mealsByDate[date].protein)}g
+                    </Typography>
+                  </Box>
+                </Box>
+              ))
+            )}
+          </Paper>
+
+          {/* ── Sessions info ── */}
+          <Paper sx={{ p: 2.25, border: `1px solid ${C.border}`, borderRadius: '16px' }}>
+            <Typography variant="h3" sx={{ mb: 1.5 }}>{t('remainingSessionsLbl')}</Typography>
+            <Box sx={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
+              <Box>
+                <Typography sx={{ fontSize: '11px', color: C.muted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.7px', mb: 0.3 }}>
+                  {t('remainingSessionsLbl')}
+                </Typography>
+                <Typography sx={{ fontSize: '28px', fontWeight: 800, color: C.primary, lineHeight: 1.1, fontFamily: "'MontBlanc', sans-serif" }}>
+                  {!plan ? '—' : plan.plan_type === 'unlimited' ? '∞' : `${remCred} / ${plan.credits_total}`}
+                </Typography>
+              </Box>
+              <Box>
+                <Typography sx={{ fontSize: '11px', color: C.muted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.7px', mb: 0.3 }}>
+                  {t('nextSessionLbl')}
+                </Typography>
+                {nextSlot ? (
+                  <Typography sx={{ fontSize: '15px', fontWeight: 700, color: C.text }}>
+                    {nextSlot.slot.slot_date} · {nextSlot.slot.start_time?.slice(0, 5)}
+                  </Typography>
+                ) : (
+                  <Typography sx={{ fontSize: '15px', color: C.muted }}>{t('noUpcoming')}</Typography>
+                )}
               </Box>
             </Box>
-          ))
-        )}
-      </Paper>
+          </Paper>
 
-      {/* ── Изпрати на клиента ── */}
-      <CoachReactPanel />
-
-      {/* ── Тренировки: оставащи + следващи ── */}
-      <ClientSessionSummary />
+          {/* ── Weight history ── */}
+          <Paper sx={{ p: 2.25, border: `1px solid ${C.border}`, borderRadius: '16px' }}>
+            <Typography variant="h3" sx={{ mb: 1.5 }}>{t('weightHistoryLbl')}</Typography>
+            {(client.weightLogs || []).length === 0 ? (
+              <Typography sx={{ fontSize: '13px', color: C.muted }}>{t('noMealsLbl')}</Typography>
+            ) : (
+              [...(client.weightLogs || [])].sort((a, b) => b.date?.localeCompare(a.date)).slice(0, 10).map((w, i) => (
+                <Box key={i} sx={{
+                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                  py: '6px', borderBottom: `1px solid ${C.border}`,
+                }}>
+                  <Typography sx={{ fontSize: '13px', color: C.muted }}>{w.date}</Typography>
+                  <Typography sx={{ fontSize: '13px', fontWeight: 700, color: C.purple }}>{w.weight} кг</Typography>
+                </Box>
+              ))
+            )}
+          </Paper>
+        </Box>
+      )}
     </>
   )
 }
