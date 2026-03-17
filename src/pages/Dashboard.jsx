@@ -252,13 +252,25 @@ function DashboardCoach() {
     setCurrentWorkout, setCoachClientMode, setShowClientMenu, setViewingCoach,
   } = useApp()
 
-  const selectClient = (ri) => {
+  const [recentIds, setRecentIds] = useState([])
+
+  const selectClient = (ri, clientId) => {
+    setRecentIds(prev => [clientId, ...prev.filter(id => id !== clientId)])
     setSelIdx(ri)
     setCurrentWorkout([])
     setViewingCoach(null)
     setCoachClientMode(true)
     setShowClientMenu(false)
   }
+
+  // Sort: recently clicked clients float to top in click order
+  const sortedClients = [...visibleClients].sort((a, b) => {
+    const ai = recentIds.indexOf(a.id), bi = recentIds.indexOf(b.id)
+    if (ai === -1 && bi === -1) return 0
+    if (ai === -1) return 1
+    if (bi === -1) return -1
+    return ai - bi
+  })
 
   return (
     <>
@@ -269,11 +281,11 @@ function DashboardCoach() {
           <Typography sx={{ fontSize: '12px', color: C.muted }}>{visibleClients.length} {t('ofClients')}</Typography>
         </Box>
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-          {visibleClients.map((c, i) => {
+          {sortedClients.map((c, i) => {
             const ri = realClients.findIndex(x => x.name === c.name)
             const isSel = actualIdx === ri
             return (
-              <Box key={c.name} onClick={() => selectClient(ri)} sx={{
+              <Box key={c.name} onClick={() => selectClient(ri, c.id)} sx={{
                 display: 'flex', alignItems: 'center', gap: '12px',
                 py: 1.2, px: 1.5, borderRadius: '12px', cursor: 'pointer',
                 background: isSel
