@@ -267,8 +267,11 @@ function DashboardCoach() {
     setShowClientMenu(false)
   }
 
+  // Only show studio clients (those with studio_access module)
+  const studioClients = visibleClients.filter(c => hasModule(c.modules, 'studio_access'))
+
   // Sort: recently clicked clients float to top in click order
-  const sortedClients = [...visibleClients].sort((a, b) => {
+  const sortedClients = [...studioClients].sort((a, b) => {
     const ai = recentIds.indexOf(a.id), bi = recentIds.indexOf(b.id)
     if (ai === -1 && bi === -1) return 0
     if (ai === -1) return 1
@@ -282,7 +285,7 @@ function DashboardCoach() {
       <Paper sx={{ p: 2, mb: 2.5, border: `1px solid ${C.border}`, borderRadius: '16px', animation: `fadeInUp 0.24s ${EASE.decelerate} 0.04s both` }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.25 }}>
           <Typography variant="h3">{t('clientsHeader')}</Typography>
-          <Typography sx={{ fontSize: '12px', color: C.muted }}>{visibleClients.length} {t('ofClients')}</Typography>
+          <Typography sx={{ fontSize: '12px', color: C.muted }}>{studioClients.length} {t('ofClients')}</Typography>
         </Box>
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
           {sortedClients.map((c, i) => {
@@ -321,7 +324,7 @@ function DashboardCoach() {
               </Box>
             )
           })}
-          {visibleClients.length === 0 && (
+          {studioClients.length === 0 && (
             <Typography sx={{ fontSize: '13px', color: C.muted, textAlign: 'center', py: 2 }}>
               {t('noClients')}
             </Typography>

@@ -281,7 +281,7 @@ export default function Sidebar() {
           </Typography>
 
           <Box sx={{ overflowY: 'auto', flex: 1, pb: 1 }}>
-            {[...visibleClients]
+            {[...visibleClients].filter(c => hasModule(c.modules, 'studio_access'))
               .sort((a, b) => {
                 const ai = recentIds.indexOf(a.id), bi = recentIds.indexOf(b.id)
                 if (ai === -1 && bi === -1) return 0

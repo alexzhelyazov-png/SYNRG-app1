@@ -28,7 +28,7 @@ import ProgramsTab           from './AdminProgramsTab'
 import { useBooking }        from '../context/BookingContext'
 import { C }                 from '../theme'
 import { DB }                from '../lib/db'
-import { MODULE_DEFS, MODULE_PRESETS, ADMIN_MANAGEABLE_MODULES } from '../lib/modules'
+import { MODULE_DEFS, MODULE_PRESETS, ADMIN_MANAGEABLE_MODULES, hasModule } from '../lib/modules'
 import {
   isoToday, isoDatePlusDays, groupByDate, dayLabel, fmtTime,
   occupancyStr, planLabel, fmtValidTo, isPlanActive, creditsRemaining,
@@ -832,6 +832,7 @@ function ClientsTab({ t }) {
   const { allPlans, loadAllPlans, activatePlan, extendPlan, adjustCredits } = useBooking()
   const [planDlg, setPlanDlg] = useState(null)
   const [loaded, setLoaded]   = useState(false)
+  const [showNewRegs, setShowNewRegs] = useState(false)
 
   useEffect(() => { loadAllPlans().then(() => setLoaded(true)) }, [])
 
@@ -839,8 +840,16 @@ function ClientsTab({ t }) {
     return allPlans.find(p => p.client_id === clientId && p.status === 'active') || null
   }
 
-  const pending = realClients.filter(c => !getClientPlan(c.id))
-  const active  = realClients.filter(c => !!getClientPlan(c.id))
+  // Studio clients without active plan → need plan activation
+  const studioPending = realClients.filter(c =>
+    hasModule(c.modules, 'studio_access') && !getClientPlan(c.id)
+  )
+  // Active studio clients with plan
+  const studioActive = realClients.filter(c =>
+    hasModule(c.modules, 'studio_access') && !!getClientPlan(c.id)
+  )
+  // New registrations — no modules at all (freshly registered)
+  const newRegistrations = realClients.filter(c => !c.modules || c.modules.length === 0)
 
   async function handleActivate(clientId, planType, from, price, startCredits) {
     const res = await activatePlan(clientId, planType, from, price, startCredits)
@@ -851,15 +860,15 @@ function ClientsTab({ t }) {
 
   return (
     <Box>
-      {/* Pending activation */}
+      {/* Studio clients pending plan activation */}
       <Typography sx={{ fontWeight: 700, fontSize: '14px', color: '#F87171', mb: 1 }}>
-        {t('pendingActivation')} ({pending.length})
+        {t('pendingActivation')} ({studioPending.length})
       </Typography>
-      {pending.length === 0 ? (
+      {studioPending.length === 0 ? (
         <Typography sx={{ color: C.muted, fontSize: '13px', mb: 3 }}>{t('noPendingClients')}</Typography>
       ) : (
         <Paper sx={{ borderRadius: '16px', border: `1px solid rgba(248,113,113,0.3)`, overflow: 'hidden', mb: 3 }}>
-          {pending.map(client => (
+          {studioPending.map(client => (
             <Box key={client.id} sx={{
               display: 'flex', alignItems: 'center', justifyContent: 'space-between',
               px: 2, py: 1.25, borderBottom: `1px solid ${C.border}`, '&:last-child': { borderBottom: 'none' },
@@ -886,19 +895,67 @@ function ClientsTab({ t }) {
         </Paper>
       )}
 
-      {/* Active clients */}
+      {/* Active studio clients */}
       <Typography sx={{ fontWeight: 700, fontSize: '14px', color: C.text, mb: 1 }}>
-        {t('allClientsLbl')} ({realClients.length})
+        {t('studioClientsLbl')} ({studioActive.length})
       </Typography>
-      <Paper sx={{ borderRadius: '16px', border: `1px solid ${C.border}`, overflow: 'hidden' }}>
-        {active.map(client => {
-          const plan = getClientPlan(client.id)
-          return (
-            <ClientPlanRow key={client.id} client={client} plan={plan} t={t} lang={lang}
-              onManage={(c, p) => setPlanDlg({ client: c, plan: p })} />
-          )
-        })}
-      </Paper>
+      {studioActive.length > 0 ? (
+        <Paper sx={{ borderRadius: '16px', border: `1px solid ${C.border}`, overflow: 'hidden', mb: 3 }}>
+          {studioActive.map(client => {
+            const plan = getClientPlan(client.id)
+            return (
+              <ClientPlanRow key={client.id} client={client} plan={plan} t={t} lang={lang}
+                onManage={(c, p) => setPlanDlg({ client: c, plan: p })} />
+            )
+          })}
+        </Paper>
+      ) : (
+        <Typography sx={{ color: C.muted, fontSize: '13px', mb: 3 }}>{t('noActiveStudioClients')}</Typography>
+      )}
+
+      {/* New registrations (no modules) — collapsible */}
+      {newRegistrations.length > 0 && (
+        <>
+          <Box
+            onClick={() => setShowNewRegs(p => !p)}
+            sx={{
+              display: 'flex', alignItems: 'center', gap: 1, cursor: 'pointer',
+              mb: 1, '&:hover .expand-icon': { color: C.text },
+            }}
+          >
+            <Typography sx={{ fontWeight: 700, fontSize: '14px', color: C.muted }}>
+              {t('newRegistrationsLbl')} ({newRegistrations.length})
+            </Typography>
+            {showNewRegs
+              ? <ExpandLessIcon className="expand-icon" sx={{ fontSize: 18, color: C.muted, transition: 'color 0.15s' }} />
+              : <ExpandMoreIcon className="expand-icon" sx={{ fontSize: 18, color: C.muted, transition: 'color 0.15s' }} />
+            }
+          </Box>
+          <Collapse in={showNewRegs}>
+            <Paper sx={{ borderRadius: '16px', border: `1px solid ${C.border}`, overflow: 'hidden', mb: 3 }}>
+              {newRegistrations.map(client => (
+                <Box key={client.id} sx={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  px: 2, py: 1.25, borderBottom: `1px solid ${C.border}`, '&:last-child': { borderBottom: 'none' },
+                }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flex: 1, minWidth: 0 }}>
+                    <Box sx={{ width: 32, height: 32, borderRadius: '50%', background: 'rgba(255,255,255,0.06)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontSize: '13px', fontWeight: 800, color: C.muted }}>
+                      {client.name.charAt(0).toUpperCase()}
+                    </Box>
+                    <Box sx={{ flex: 1, minWidth: 0 }}>
+                      <Typography sx={{ fontWeight: 700, fontSize: '14px', color: C.text }}>{client.name}</Typography>
+                      <Typography sx={{ fontSize: '11px', color: C.muted, mb: 0.5 }}>{t('noModulesYet')}</Typography>
+                      <ClientModuleEditor clientId={client.id} currentModules={client.modules} t={t} lang={lang} />
+                    </Box>
+                  </Box>
+                </Box>
+              ))}
+            </Paper>
+          </Collapse>
+        </>
+      )}
 
       {planDlg && (
         <PlanDialog open={!!planDlg} onClose={() => setPlanDlg(null)}
