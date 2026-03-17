@@ -26,6 +26,7 @@ import Schedule       from './pages/Schedule'
 import Admin          from './pages/Admin'
 import Programs       from './pages/Programs'
 import StepsTracker   from './pages/StepsTracker'
+import Notifications  from './pages/Notifications'
 
 import ConfirmDeleteModal from './components/ConfirmDeleteModal'
 
@@ -179,6 +180,7 @@ function AppShell() {
                 {view === 'schedule'  && auth.role !== 'client' && <Schedule />}
                 {view === 'steps'     && (auth.role !== 'client' || hasModule(auth.modules, 'nutrition_tracking') || hasModule(auth.modules, 'weight_tracking')) && <StepsTracker />}
                 {view === 'programs'  && (auth.role !== 'client' || hasModule(auth.modules, 'program_access')) && <Programs />}
+                {view === 'notifications' && auth.role === 'coach' && <Notifications />}
                 {view === 'admin'     && admin && <Admin />}
               </>
             )}

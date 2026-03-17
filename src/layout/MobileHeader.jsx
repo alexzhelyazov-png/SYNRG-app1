@@ -1,11 +1,12 @@
 import { useState } from 'react'
 import {
-  AppBar, Toolbar, Box, Typography, IconButton, Button,
+  AppBar, Toolbar, Box, Typography, IconButton, Button, Badge,
   Drawer, List, ListItemButton, ListItemIcon, ListItemText, Divider,
 } from '@mui/material'
 import MenuIcon             from '@mui/icons-material/Menu'
 import CloseIcon            from '@mui/icons-material/Close'
 import LogoutIcon           from '@mui/icons-material/Logout'
+import NotificationsNoneIcon from '@mui/icons-material/NotificationsNone'
 import FitnessCenterIcon    from '@mui/icons-material/FitnessCenter'
 import DirectionsRunIcon    from '@mui/icons-material/DirectionsRun'
 import HomeIcon             from '@mui/icons-material/Home'
@@ -31,7 +32,7 @@ function getSiteLinks(t) {
 }
 
 export default function MobileHeader() {
-  const { auth, logout, client, lang, setLang, t } = useApp()
+  const { auth, logout, client, lang, setLang, setView, setCoachClientMode, setViewingCoach, unreadNotifCount, t } = useApp()
   const [siteMenuOpen, setSiteMenuOpen] = useState(false)
 
   const siteLinks = getSiteLinks(t)
@@ -103,6 +104,25 @@ export default function MobileHeader() {
               )}
             </Box>
           </Box>
+
+          {/* ── Notifications (coach only) ──────────────────── */}
+          {auth.role === 'coach' && (
+            <IconButton
+              onClick={() => { setView('notifications'); setCoachClientMode(false); setViewingCoach(null) }}
+              size="small"
+              aria-label={t('navNotifications')}
+              sx={{
+                color:      unreadNotifCount > 0 ? C.primary : C.muted,
+                flexShrink: 0,
+                transition: `color 0.18s ${EASE.standard}`,
+                '&:hover':  { color: C.primary },
+              }}
+            >
+              <Badge badgeContent={unreadNotifCount} color="error" max={9}>
+                <NotificationsNoneIcon sx={{ fontSize: 22 }} />
+              </Badge>
+            </IconButton>
+          )}
 
           {/* ── Language toggle ───────────────────────────────── */}
           <Button

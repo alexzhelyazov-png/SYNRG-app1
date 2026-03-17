@@ -79,6 +79,10 @@ export const T = {
     taskNotifLbl:       'Задача',
     reactionNotifLbl:   'Реакция',
     registrationNotifLbl: 'Нова регистрация',
+    justNow:            'Току-що',
+    minutesAgo:         'мин',
+    hoursAgo:           'ч',
+    daysAgo:            'дни',
 
     // ── Mobile ───────────────────────────────────────
     selectClient:       'Избери клиент',
@@ -801,6 +805,10 @@ export const T = {
     taskNotifLbl:       'Task',
     reactionNotifLbl:   'Reaction',
     registrationNotifLbl: 'New registration',
+    justNow:            'Just now',
+    minutesAgo:         'min',
+    hoursAgo:           'h',
+    daysAgo:            'days',
 
     // ── Mobile ───────────────────────────────────────
     selectClient:       'Select client',

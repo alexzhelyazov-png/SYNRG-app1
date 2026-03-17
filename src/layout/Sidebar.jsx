@@ -70,7 +70,6 @@ export default function Sidebar() {
   const admin = isAdmin(auth)
 
   const [recentIds,  setRecentIds]  = useState([])
-  const [showNotifs, setShowNotifs] = useState(false)
 
   const open    = sidebarOpen
   const navItems = getNavItems(auth, admin)
@@ -214,15 +213,16 @@ export default function Sidebar() {
         {auth.role === 'coach' && (
           <Tooltip title={!open ? t('navNotifications') : ''} placement="right" arrow>
             <ListItemButton
-              onClick={() => setShowNotifs(p => !p)}
+              selected={view === 'notifications'}
+              onClick={() => { setView('notifications'); setCoachClientMode(false); setViewingCoach(null) }}
               sx={{ justifyContent: open ? 'flex-start' : 'center', px: open ? 2 : 0, mx: open ? 1.5 : 1, my: '2px', minHeight: 44 }}
             >
-              <ListItemIcon sx={{ minWidth: open ? 38 : 'unset', justifyContent: 'center', color: unreadNotifCount > 0 ? C.primary : C.muted }}>
+              <ListItemIcon sx={{ minWidth: open ? 38 : 'unset', justifyContent: 'center', color: view === 'notifications' ? C.primary : unreadNotifCount > 0 ? C.primary : C.muted }}>
                 <Badge badgeContent={unreadNotifCount} color="error" max={9}>
                   <NotificationsNoneIcon sx={{ fontSize: '20px' }} />
                 </Badge>
               </ListItemIcon>
-              {open && <ListItemText primary={t('navNotifications')} sx={{ '& .MuiListItemText-primary': { color: unreadNotifCount > 0 ? C.primary : C.text, fontWeight: unreadNotifCount > 0 ? 700 : 500, fontSize: '14px' } }} />}
+              {open && <ListItemText primary={t('navNotifications')} sx={{ '& .MuiListItemText-primary': { color: view === 'notifications' ? C.primary : unreadNotifCount > 0 ? C.primary : C.text, fontWeight: view === 'notifications' || unreadNotifCount > 0 ? 700 : 500, fontSize: '14px' } }} />}
             </ListItemButton>
           </Tooltip>
         )}
@@ -271,33 +271,6 @@ export default function Sidebar() {
           </ListItemButton>
         </Tooltip>
       </List>
-
-      {/* ── Notifications panel (coach only) ────────────── */}
-      {open && auth.role === 'coach' && showNotifs && (
-        <Box sx={{ mx: 1.5, mb: 1, maxHeight: '200px', overflowY: 'auto', flexShrink: 0 }}>
-          <Divider sx={{ borderColor: C.border, mb: 1 }} />
-          {notifications.length === 0 ? (
-            <Typography sx={{ color: C.muted, fontSize: '12px', px: 1, pb: 1 }}>{t('noNotifications')}</Typography>
-          ) : notifications.slice(0, 10).map((n, i) => (
-            <Box key={n.id || i} sx={{
-              px: 1.5, py: 0.75, mb: 0.5,
-              background: n.from_coach !== auth.name ? C.accentSoft : 'rgba(255,255,255,0.03)',
-              borderRadius: '10px', border: `1px solid ${n.from_coach !== auth.name ? C.primaryA20 : C.border}`,
-            }}>
-              <Typography sx={{ fontSize: '11.5px', fontWeight: 700, color: n.from_coach !== auth.name ? C.primary : C.muted }}>
-                {n.from_coach}
-                <Box component="span" sx={{ fontWeight: 400, color: C.muted, ml: 0.5 }}>→ {n.client_name}</Box>
-              </Typography>
-              <Typography sx={{ fontSize: '11px', color: C.text, mt: 0.25 }}>
-                {n.action_type === 'task' && `${t('taskNotifLbl')}: `}
-                {n.action_type === 'reaction' && `${t('reactionNotifLbl')}: `}
-                {n.action_type === 'registration' && `${t('registrationNotifLbl')}: `}
-                {n.content}
-              </Typography>
-            </Box>
-          ))}
-        </Box>
-      )}
 
       {/* ── CLIENTS section (coach only) — NOW ABOVE COACHES ── */}
       {open && auth.role === 'coach' && (
