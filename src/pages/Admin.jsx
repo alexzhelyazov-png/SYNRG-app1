@@ -1203,14 +1203,15 @@ function DashboardTab({ t, lang, setTab }) {
     return allPlans.find(p => p.client_id === clientId && p.status === 'active') || null
   }
 
-  const pending    = realClients.filter(c => !getActivePlan(c.id))
-  const expiring   = realClients.filter(c => {
+  const studioClients = realClients.filter(c => hasModule(c.modules, 'studio_access'))
+  const pending    = studioClients.filter(c => !getActivePlan(c.id))
+  const expiring   = studioClients.filter(c => {
     const p = getActivePlan(c.id)
     if (!p) return false
     const d = daysUntilExpiry(p)
     return d !== null && d >= 0 && d <= 7
   })
-  const lowCred    = realClients.filter(c => {
+  const lowCred    = studioClients.filter(c => {
     const p = getActivePlan(c.id)
     if (!p || p.plan_type === 'unlimited') return false
     return creditsRemaining(p) <= 2
