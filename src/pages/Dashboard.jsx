@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Box, Typography, TextField, Button, Chip, Paper, Switch, Collapse, Tabs, Tab } from '@mui/material'
 import ArrowBackIcon from '@mui/icons-material/ArrowBack'
 import { useApp } from '../context/AppContext'
@@ -70,7 +70,7 @@ function ReminderBanners() {
                   key={label}
                   size="small"
                   variant="outlined"
-                  onClick={() => { setView('food'); dismiss(r.id) }}
+                  onClick={() => { setView(auth.role === 'client' ? 'progress' : 'food'); dismiss(r.id) }}
                   sx={{
                     fontSize: '12px', py: '3px', px: 1.25,
                     borderRadius: '99px', borderColor: C.primaryA20,
@@ -86,18 +86,18 @@ function ReminderBanners() {
             ? t('reminderWeightFirst')
             : t('reminderWeightMsg').replace('{days}', r.daysSince)
           actions = (
-            <Button size="small" onClick={() => { setView('weight'); dismiss(r.id) }}
+            <Button size="small" onClick={() => { setView(auth.role === 'client' ? 'progress' : 'weight'); dismiss(r.id) }}
               sx={{ mt: 0.75, fontSize: '12px', color: C.purple, p: 0 }}>
-              → {t('navWeight')}
+              → {t('navProgress')}
             </Button>
           )
         } else if (r.type === 'foodLog') {
           icon = 'F'
           msg  = t('reminderFoodMsg')
           actions = (
-            <Button size="small" onClick={() => { setView('food'); dismiss(r.id) }}
+            <Button size="small" onClick={() => { setView(auth.role === 'client' ? 'progress' : 'food'); dismiss(r.id) }}
               sx={{ mt: 0.75, fontSize: '12px', color: C.primary, p: 0 }}>
-              → {t('navFood')}
+              → {t('navProgress')}
             </Button>
           )
         } else if (r.type === 'coach') {
@@ -590,36 +590,80 @@ function TodayScheduleCard() {
   )
 }
 
-// ─── Coach dashboard (schedule + ranking only) ───────────────────
+// ─── Coach dashboard (schedule + client list) ───────────────────
 function DashboardCoach() {
-  const { ranking } = useApp()
+  const {
+    t, visibleClients, realClients, actualIdx, setSelIdx,
+    setCurrentWorkout, setCoachClientMode, setShowClientMenu, setViewingCoach,
+  } = useApp()
+
+  const selectClient = (ri) => {
+    setSelIdx(ri)
+    setCurrentWorkout([])
+    setViewingCoach(null)
+    setCoachClientMode(true)
+    setShowClientMenu(false)
+  }
+
+  // Selected client always at top
+  const sortedClients = useMemo(() => {
+    const sel = realClients[actualIdx]
+    if (!sel) return visibleClients
+    return [sel, ...visibleClients.filter(c => c.name !== sel.name)]
+  }, [visibleClients, actualIdx, realClients])
 
   return (
     <>
       <TodayScheduleCard />
-      {ranking.length > 0 && (
-        <Paper sx={{ p: 2, mb: 2.5, border: `1px solid ${C.border}`, borderRadius: '16px', animation: `fadeInUp 0.24s ${EASE.decelerate} 0.04s both` }}>
-          <Typography variant="h3" sx={{ mb: 1.25 }}>Rankings</Typography>
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-            {ranking.slice(0, 10).map((r, i) => (
-              <Box key={r.name} sx={{
-                display: 'flex', alignItems: 'center', gap: 1.5,
-                py: '6px', px: 1, borderRadius: '8px',
-                background: i === 0 ? C.accentSoft : 'transparent',
+      <Paper sx={{ p: 2, mb: 2.5, border: `1px solid ${C.border}`, borderRadius: '16px', animation: `fadeInUp 0.24s ${EASE.decelerate} 0.04s both` }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.25 }}>
+          <Typography variant="h3">{t('clientsHeader')}</Typography>
+          <Typography sx={{ fontSize: '12px', color: C.muted }}>{visibleClients.length} {t('ofClients')}</Typography>
+        </Box>
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+          {sortedClients.map((c, i) => {
+            const ri = realClients.findIndex(x => x.name === c.name)
+            const isSel = actualIdx === ri
+            return (
+              <Box key={c.name} onClick={() => selectClient(ri)} sx={{
+                display: 'flex', alignItems: 'center', gap: '12px',
+                py: 1.2, px: 1.5, borderRadius: '12px', cursor: 'pointer',
+                background: isSel
+                  ? 'linear-gradient(135deg, rgba(196,233,191,0.14) 0%, rgba(196,233,191,0.08) 100%)'
+                  : 'rgba(255,255,255,0.04)',
+                border: `1px solid ${isSel ? 'rgba(196,233,191,0.3)' : 'rgba(255,255,255,0.06)'}`,
+                transition: `all 0.18s ${EASE.standard}`,
+                animation: `fadeInUp 0.2s ${EASE.standard} both`,
+                animationDelay: `${i * 0.04}s`,
+                '&:hover': { background: isSel ? 'rgba(196,233,191,0.16)' : 'rgba(255,255,255,0.07)' },
               }}>
-                <Typography sx={{
-                  fontSize: '12px', fontWeight: 800, color: i === 0 ? C.primary : C.muted,
-                  minWidth: '22px', textAlign: 'right', fontFamily: "'MontBlanc', sans-serif",
-                }}>#{i + 1}</Typography>
-                <Typography sx={{ flex: 1, fontSize: '13.5px', fontWeight: i === 0 ? 700 : 500, color: C.text }}>{r.name}</Typography>
-                <Typography sx={{ fontSize: '13px', fontWeight: 700, color: i === 0 ? C.primary : C.muted, fontFamily: "'MontBlanc', sans-serif" }}>
-                  {r.points} т.
-                </Typography>
+                <Box sx={{
+                  width: 36, height: 36, borderRadius: '50%',
+                  background: isSel ? C.primaryContainer : 'rgba(255,255,255,0.08)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: '15px', fontWeight: 800, color: isSel ? C.primary : C.muted, flexShrink: 0,
+                }}>
+                  {c.name.charAt(0).toUpperCase()}
+                </Box>
+                <Box sx={{ flex: 1, minWidth: 0 }}>
+                  <Typography sx={{ fontWeight: 700, fontSize: '14px', color: isSel ? C.primary : C.text, lineHeight: 1.3 }}>
+                    {c.name}
+                  </Typography>
+                  <Typography sx={{ fontSize: '12px', color: C.muted, mt: 0.2 }}>
+                    {c.calorieTarget} kcal · {c.proteinTarget}{t('gUnit')} {t('proteinShortLbl')}
+                  </Typography>
+                </Box>
+                {isSel && <Box sx={{ fontSize: '16px', flexShrink: 0, color: C.primary }}>✓</Box>}
               </Box>
-            ))}
-          </Box>
-        </Paper>
-      )}
+            )
+          })}
+          {visibleClients.length === 0 && (
+            <Typography sx={{ fontSize: '13px', color: C.muted, textAlign: 'center', py: 2 }}>
+              {t('noClients')}
+            </Typography>
+          )}
+        </Box>
+      </Paper>
     </>
   )
 }
