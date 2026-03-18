@@ -28,7 +28,7 @@ import ProgramsTab           from './AdminProgramsTab'
 import { useBooking }        from '../context/BookingContext'
 import { C }                 from '../theme'
 import { DB }                from '../lib/db'
-import { MODULE_DEFS, MODULE_PRESETS, ADMIN_MANAGEABLE_MODULES, hasModule } from '../lib/modules'
+import { MODULE_DEFS, MODULE_PRESETS, ADMIN_MANAGEABLE_MODULES } from '../lib/modules'
 import {
   isoToday, isoDatePlusDays, groupByDate, dayLabel, fmtTime,
   occupancyStr, planLabel, fmtValidTo, isPlanActive, creditsRemaining,
@@ -386,7 +386,7 @@ function PlanDialog({ open, onClose, onActivate, onExtend, onAdjust, client, pla
 }
 
 // ── Client Plan Row ──────────────────────────────────────────
-function ClientPlanRow({ client, plan, onManage, t, lang }) {
+function ClientPlanRow({ client, plan, onManage, onDeactivate, onDelete, t, lang }) {
   const active   = isPlanActive(plan)
   const daysLeft = plan ? daysUntilExpiry(plan) : null
   const credits  = plan ? creditsRemaining(plan) : null
@@ -438,11 +438,29 @@ function ClientPlanRow({ client, plan, onManage, t, lang }) {
           <ClientModuleEditor clientId={client.id} currentModules={client.modules} t={t} lang={lang} />
         </Box>
       </Box>
-      <Button size="small" variant="outlined" onClick={() => onManage(client, plan)}
-        sx={{ fontSize: '11px', borderColor: C.border, color: C.muted,
-          '&:hover': { borderColor: C.primary, color: C.primary }, flexShrink: 0 }}>
-        {plan ? t('managePlanBtn') : t('activatePlanRowBtn')}
-      </Button>
+      <Box sx={{ display: 'flex', gap: 0.5, flexShrink: 0, alignItems: 'center' }}>
+        <Button size="small" variant="outlined" onClick={() => onManage(client, plan)}
+          sx={{ fontSize: '11px', borderColor: C.border, color: C.muted,
+            '&:hover': { borderColor: C.primary, color: C.primary } }}>
+          {plan ? t('managePlanBtn') : t('activatePlanRowBtn')}
+        </Button>
+        {plan && onDeactivate && (
+          <Tooltip title={t('deactivatePlanBtn')} arrow>
+            <IconButton size="small" onClick={() => onDeactivate(plan.id)}
+              sx={{ color: C.muted, '&:hover': { color: '#FB923C' } }}>
+              <PersonRemoveIcon sx={{ fontSize: 16 }} />
+            </IconButton>
+          </Tooltip>
+        )}
+        {onDelete && (
+          <Tooltip title={t('deleteClientBtn')} arrow>
+            <IconButton size="small" onClick={() => onDelete(client)}
+              sx={{ color: C.muted, '&:hover': { color: '#F87171' } }}>
+              <DeleteOutlineIcon sx={{ fontSize: 16 }} />
+            </IconButton>
+          </Tooltip>
+        )}
+      </Box>
     </Box>
   )
 }
@@ -828,11 +846,10 @@ function ClientModuleEditor({ clientId, currentModules, t, lang }) {
 }
 
 function ClientsTab({ t }) {
-  const { realClients, showSnackbar, lang } = useApp()
-  const { allPlans, loadAllPlans, activatePlan, extendPlan, adjustCredits } = useBooking()
+  const { realClients, showSnackbar, lang, setConfirmDelete } = useApp()
+  const { allPlans, loadAllPlans, activatePlan, extendPlan, adjustCredits, deactivatePlan } = useBooking()
   const [planDlg, setPlanDlg] = useState(null)
   const [loaded, setLoaded]   = useState(false)
-  const [showNewRegs, setShowNewRegs] = useState(false)
 
   useEffect(() => { loadAllPlans().then(() => setLoaded(true)) }, [])
 
@@ -840,16 +857,8 @@ function ClientsTab({ t }) {
     return allPlans.find(p => p.client_id === clientId && p.status === 'active') || null
   }
 
-  // Studio clients without active plan → need plan activation
-  const studioPending = realClients.filter(c =>
-    hasModule(c.modules, 'studio_access') && !getClientPlan(c.id)
-  )
-  // Active studio clients with plan
-  const studioActive = realClients.filter(c =>
-    hasModule(c.modules, 'studio_access') && !!getClientPlan(c.id)
-  )
-  // New registrations — no modules at all (freshly registered)
-  const newRegistrations = realClients.filter(c => !c.modules || c.modules.length === 0)
+  const pending = realClients.filter(c => !getClientPlan(c.id))
+  const active  = realClients.filter(c => !!getClientPlan(c.id))
 
   async function handleActivate(clientId, planType, from, price, startCredits) {
     const res = await activatePlan(clientId, planType, from, price, startCredits)
@@ -858,25 +867,35 @@ function ClientsTab({ t }) {
     return { ok: true }
   }
 
+  async function handleDeactivate(planId) {
+    const res = await deactivatePlan(planId)
+    if (res?.error) { showSnackbar('Грешка: ' + res.error); return }
+    showSnackbar(t('deactivatePlanMsg'))
+  }
+
+  function handleDelete(client) {
+    setConfirmDelete({ id: client.id, name: client.name })
+  }
+
   return (
     <Box>
-      {/* Studio clients pending plan activation */}
+      {/* Pending activation (new registrations) */}
       <Typography sx={{ fontWeight: 700, fontSize: '14px', color: '#F87171', mb: 1 }}>
-        {t('pendingActivation')} ({studioPending.length})
+        {t('pendingActivation')} ({pending.length})
       </Typography>
-      {studioPending.length === 0 ? (
+      {pending.length === 0 ? (
         <Typography sx={{ color: C.muted, fontSize: '13px', mb: 3 }}>{t('noPendingClients')}</Typography>
       ) : (
         <Paper sx={{ borderRadius: '16px', border: `1px solid rgba(248,113,113,0.3)`, overflow: 'hidden', mb: 3 }}>
-          {studioPending.map(client => (
+          {pending.map(client => (
             <Box key={client.id} sx={{
               display: 'flex', alignItems: 'center', justifyContent: 'space-between',
               px: 2, py: 1.25, borderBottom: `1px solid ${C.border}`, '&:last-child': { borderBottom: 'none' },
             }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flex: 1, minWidth: 0 }}>
                 <Box sx={{ width: 32, height: 32, borderRadius: '50%', background: 'rgba(248,113,113,0.15)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: '13px', fontWeight: 800, color: '#F87171' }}>
+                  fontSize: '13px', fontWeight: 800, color: '#F87171', flexShrink: 0 }}>
                   {client.name.charAt(0).toUpperCase()}
                 </Box>
                 <Box sx={{ flex: 1, minWidth: 0 }}>
@@ -885,77 +904,39 @@ function ClientsTab({ t }) {
                   <ClientModuleEditor clientId={client.id} currentModules={client.modules} t={t} lang={lang} />
                 </Box>
               </Box>
-              <Button size="small" variant="contained"
-                onClick={() => setPlanDlg({ client, plan: null })}
-                sx={{ background: C.primary, color: '#0f1c11', fontWeight: 700, fontSize: '11px', flexShrink: 0 }}>
-                {t('activatePlanBtn')}
-              </Button>
+              <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center', flexShrink: 0 }}>
+                <Button size="small" variant="contained"
+                  onClick={() => setPlanDlg({ client, plan: null })}
+                  sx={{ background: C.primary, color: '#0f1c11', fontWeight: 700, fontSize: '11px' }}>
+                  {t('activatePlanBtn')}
+                </Button>
+                <Tooltip title={t('deleteClientBtn')} arrow>
+                  <IconButton size="small" onClick={() => handleDelete(client)}
+                    sx={{ color: C.muted, '&:hover': { color: '#F87171' } }}>
+                    <DeleteOutlineIcon sx={{ fontSize: 16 }} />
+                  </IconButton>
+                </Tooltip>
+              </Box>
             </Box>
           ))}
         </Paper>
       )}
 
-      {/* Active studio clients */}
+      {/* Active clients */}
       <Typography sx={{ fontWeight: 700, fontSize: '14px', color: C.text, mb: 1 }}>
-        {t('studioClientsLbl')} ({studioActive.length})
+        {t('allClientsLbl')} ({realClients.length})
       </Typography>
-      {studioActive.length > 0 ? (
-        <Paper sx={{ borderRadius: '16px', border: `1px solid ${C.border}`, overflow: 'hidden', mb: 3 }}>
-          {studioActive.map(client => {
-            const plan = getClientPlan(client.id)
-            return (
-              <ClientPlanRow key={client.id} client={client} plan={plan} t={t} lang={lang}
-                onManage={(c, p) => setPlanDlg({ client: c, plan: p })} />
-            )
-          })}
-        </Paper>
-      ) : (
-        <Typography sx={{ color: C.muted, fontSize: '13px', mb: 3 }}>{t('noActiveStudioClients')}</Typography>
-      )}
-
-      {/* New registrations (no modules) — collapsible */}
-      {newRegistrations.length > 0 && (
-        <>
-          <Box
-            onClick={() => setShowNewRegs(p => !p)}
-            sx={{
-              display: 'flex', alignItems: 'center', gap: 1, cursor: 'pointer',
-              mb: 1, '&:hover .expand-icon': { color: C.text },
-            }}
-          >
-            <Typography sx={{ fontWeight: 700, fontSize: '14px', color: C.muted }}>
-              {t('newRegistrationsLbl')} ({newRegistrations.length})
-            </Typography>
-            {showNewRegs
-              ? <ExpandLessIcon className="expand-icon" sx={{ fontSize: 18, color: C.muted, transition: 'color 0.15s' }} />
-              : <ExpandMoreIcon className="expand-icon" sx={{ fontSize: 18, color: C.muted, transition: 'color 0.15s' }} />
-            }
-          </Box>
-          <Collapse in={showNewRegs}>
-            <Paper sx={{ borderRadius: '16px', border: `1px solid ${C.border}`, overflow: 'hidden', mb: 3 }}>
-              {newRegistrations.map(client => (
-                <Box key={client.id} sx={{
-                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                  px: 2, py: 1.25, borderBottom: `1px solid ${C.border}`, '&:last-child': { borderBottom: 'none' },
-                }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flex: 1, minWidth: 0 }}>
-                    <Box sx={{ width: 32, height: 32, borderRadius: '50%', background: 'rgba(255,255,255,0.06)',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      fontSize: '13px', fontWeight: 800, color: C.muted }}>
-                      {client.name.charAt(0).toUpperCase()}
-                    </Box>
-                    <Box sx={{ flex: 1, minWidth: 0 }}>
-                      <Typography sx={{ fontWeight: 700, fontSize: '14px', color: C.text }}>{client.name}</Typography>
-                      <Typography sx={{ fontSize: '11px', color: C.muted, mb: 0.5 }}>{t('noModulesYet')}</Typography>
-                      <ClientModuleEditor clientId={client.id} currentModules={client.modules} t={t} lang={lang} />
-                    </Box>
-                  </Box>
-                </Box>
-              ))}
-            </Paper>
-          </Collapse>
-        </>
-      )}
+      <Paper sx={{ borderRadius: '16px', border: `1px solid ${C.border}`, overflow: 'hidden' }}>
+        {active.map(client => {
+          const plan = getClientPlan(client.id)
+          return (
+            <ClientPlanRow key={client.id} client={client} plan={plan} t={t} lang={lang}
+              onManage={(c, p) => setPlanDlg({ client: c, plan: p })}
+              onDeactivate={handleDeactivate}
+              onDelete={handleDelete} />
+          )
+        })}
+      </Paper>
 
       {planDlg && (
         <PlanDialog open={!!planDlg} onClose={() => setPlanDlg(null)}
@@ -1191,7 +1172,7 @@ function CoachesTab({ t }) {
 
 // ── Dashboard Tab ────────────────────────────────────────────
 function DashboardTab({ t, lang, setTab }) {
-  const { realClients, showSnackbar } = useApp()
+  const { realClients, showSnackbar, setConfirmDelete } = useApp()
   const { allPlans, loadAllPlans } = useBooking()
   const [loaded, setLoaded] = useState(false)
 
@@ -1203,15 +1184,14 @@ function DashboardTab({ t, lang, setTab }) {
     return allPlans.find(p => p.client_id === clientId && p.status === 'active') || null
   }
 
-  const studioClients = realClients.filter(c => hasModule(c.modules, 'studio_access'))
-  const pending    = studioClients.filter(c => !getActivePlan(c.id))
-  const expiring   = studioClients.filter(c => {
+  const pending    = realClients.filter(c => !getActivePlan(c.id))
+  const expiring   = realClients.filter(c => {
     const p = getActivePlan(c.id)
     if (!p) return false
     const d = daysUntilExpiry(p)
     return d !== null && d >= 0 && d <= 7
   })
-  const lowCred    = studioClients.filter(c => {
+  const lowCred    = realClients.filter(c => {
     const p = getActivePlan(c.id)
     if (!p || p.plan_type === 'unlimited') return false
     return creditsRemaining(p) <= 2
@@ -1238,6 +1218,12 @@ function DashboardTab({ t, lang, setTab }) {
                 borderBottom: `1px solid ${C.border}`, '&:last-child': { borderBottom: 'none' } }}>
                 <Typography sx={{ fontWeight: 600, fontSize: '14px', color: C.text, flex: 1 }}>{c.name}</Typography>
                 <Typography sx={{ fontSize: '11px', color: '#F87171' }}>{t('noPlanShort')}</Typography>
+                <Tooltip title={t('deleteClientBtn')} arrow>
+                  <IconButton size="small" onClick={() => setConfirmDelete({ id: c.id, name: c.name })}
+                    sx={{ color: C.muted, '&:hover': { color: '#F87171' } }}>
+                    <DeleteOutlineIcon sx={{ fontSize: 16 }} />
+                  </IconButton>
+                </Tooltip>
               </Box>
             ))}
           </Paper>
@@ -1259,6 +1245,12 @@ function DashboardTab({ t, lang, setTab }) {
                   borderBottom: `1px solid ${C.border}`, '&:last-child': { borderBottom: 'none' } }}>
                   <Typography sx={{ fontWeight: 600, fontSize: '14px', color: C.text, flex: 1 }}>{c.name}</Typography>
                   <Typography sx={{ fontSize: '11px', color: '#FB923C' }}>{d}д</Typography>
+                  <Tooltip title={t('deleteClientBtn')} arrow>
+                    <IconButton size="small" onClick={() => setConfirmDelete({ id: c.id, name: c.name })}
+                      sx={{ color: C.muted, '&:hover': { color: '#F87171' } }}>
+                      <DeleteOutlineIcon sx={{ fontSize: 16 }} />
+                    </IconButton>
+                  </Tooltip>
                 </Box>
               )
             })}

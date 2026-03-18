@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { Box, Typography, Paper } from '@mui/material'
 import NotificationsNoneIcon from '@mui/icons-material/NotificationsNone'
 import PersonAddAlt1Icon from '@mui/icons-material/PersonAddAlt1'
@@ -24,7 +25,9 @@ function timeAgo(dateStr, t) {
 }
 
 export default function Notifications() {
-  const { auth, notifications, t } = useApp()
+  const { auth, notifications, markNotifsRead, t } = useApp()
+
+  useEffect(() => { markNotifsRead() }, [])
 
   return (
     <Box sx={{ maxWidth: '640px', mx: 'auto' }}>

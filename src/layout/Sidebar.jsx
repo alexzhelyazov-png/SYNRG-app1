@@ -5,7 +5,6 @@ import {
 } from '@mui/material'
 import ChevronRightIcon      from '@mui/icons-material/ChevronRight'
 import ChevronLeftIcon       from '@mui/icons-material/ChevronLeft'
-import DeleteOutlineIcon     from '@mui/icons-material/DeleteOutline'
 import LogoutIcon            from '@mui/icons-material/Logout'
 import DashboardIcon         from '@mui/icons-material/Dashboard'
 import TrendingUpIcon        from '@mui/icons-material/TrendingUp'
@@ -14,6 +13,8 @@ import AssignmentIcon        from '@mui/icons-material/Assignment'
 import PeopleIcon            from '@mui/icons-material/People'
 import NotificationsNoneIcon from '@mui/icons-material/NotificationsNone'
 import PersonIcon            from '@mui/icons-material/Person'
+import LightModeIcon         from '@mui/icons-material/LightMode'
+import DarkModeIcon          from '@mui/icons-material/DarkMode'
 import CalendarMonthIcon     from '@mui/icons-material/CalendarMonth'
 import EventIcon             from '@mui/icons-material/Event'
 import PlayCircleOutlineIcon from '@mui/icons-material/PlayCircleOutline'
@@ -57,30 +58,21 @@ function getNavItems(auth, admin) {
 export default function Sidebar() {
   const {
     auth, view, setView, logout,
-    clients, realClients, visibleClients, actualIdx, setSelIdx, setCurrentWorkout,
     sidebarOpen, setSidebarOpen,
-    setConfirmDelete,
     coaches, coachProfiles,
     viewingCoach, setViewingCoach,
     coachClientMode, setCoachClientMode,
     notifications, unreadNotifCount,
     lang, setLang, t,
+    isDark, setIsDark,
   } = useApp()
 
   const admin = isAdmin(auth)
 
-  const [recentIds,  setRecentIds]  = useState([])
+  const [showNotifs, setShowNotifs] = useState(false)
 
   const open    = sidebarOpen
   const navItems = getNavItems(auth, admin)
-
-  function selectClient(ri, clientId) {
-    setRecentIds(prev => [clientId, ...prev.filter(id => id !== clientId)])
-    setSelIdx(ri)
-    setCurrentWorkout([])
-    setViewingCoach(null)
-    setCoachClientMode(true)
-  }
 
   function selectCoachTracker(coachName) {
     setViewingCoach(coachName)
@@ -213,16 +205,15 @@ export default function Sidebar() {
         {auth.role === 'coach' && (
           <Tooltip title={!open ? t('navNotifications') : ''} placement="right" arrow>
             <ListItemButton
-              selected={view === 'notifications'}
-              onClick={() => { setView('notifications'); setCoachClientMode(false); setViewingCoach(null) }}
+              onClick={() => setShowNotifs(p => !p)}
               sx={{ justifyContent: open ? 'flex-start' : 'center', px: open ? 2 : 0, mx: open ? 1.5 : 1, my: '2px', minHeight: 44 }}
             >
-              <ListItemIcon sx={{ minWidth: open ? 38 : 'unset', justifyContent: 'center', color: view === 'notifications' ? C.primary : unreadNotifCount > 0 ? C.primary : C.muted }}>
+              <ListItemIcon sx={{ minWidth: open ? 38 : 'unset', justifyContent: 'center', color: unreadNotifCount > 0 ? C.primary : C.muted }}>
                 <Badge badgeContent={unreadNotifCount} color="error" max={9}>
                   <NotificationsNoneIcon sx={{ fontSize: '20px' }} />
                 </Badge>
               </ListItemIcon>
-              {open && <ListItemText primary={t('navNotifications')} sx={{ '& .MuiListItemText-primary': { color: view === 'notifications' ? C.primary : unreadNotifCount > 0 ? C.primary : C.text, fontWeight: view === 'notifications' || unreadNotifCount > 0 ? 700 : 500, fontSize: '14px' } }} />}
+              {open && <ListItemText primary={t('navNotifications')} sx={{ '& .MuiListItemText-primary': { color: unreadNotifCount > 0 ? C.primary : C.text, fontWeight: unreadNotifCount > 0 ? 700 : 500, fontSize: '14px' } }} />}
             </ListItemButton>
           </Tooltip>
         )}
@@ -242,6 +233,15 @@ export default function Sidebar() {
                 {l.toUpperCase()}
               </Button>
             ))}
+            <Tooltip title={isDark ? t('lightMode') : t('darkMode')} placement="right" arrow>
+              <IconButton onClick={() => setIsDark(!isDark)} size="small" sx={{
+                color: C.muted, border: `1px solid ${C.border}`, borderRadius: '8px',
+                width: 36, height: 36,
+                '&:hover': { background: C.accentSoft, color: C.primary, borderColor: C.primaryA20 },
+              }}>
+                {isDark ? <LightModeIcon fontSize="small" /> : <DarkModeIcon fontSize="small" />}
+              </IconButton>
+            </Tooltip>
           </Box>
         ) : (
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
@@ -251,6 +251,15 @@ export default function Sidebar() {
                 <Typography sx={{ fontSize: '10px', fontWeight: 700, color: C.muted }}>
                   {lang === 'bg' ? 'EN' : 'BG'}
                 </Typography>
+              </ListItemButton>
+            </Tooltip>
+            <Tooltip title={isDark ? t('lightMode') : t('darkMode')} placement="right" arrow>
+              <ListItemButton onClick={() => setIsDark(!isDark)}
+                sx={{ justifyContent: 'center', px: 0, mx: 1, my: '1px', minHeight: 36 }}>
+                {isDark
+                  ? <LightModeIcon sx={{ fontSize: '18px', color: C.muted }} />
+                  : <DarkModeIcon  sx={{ fontSize: '18px', color: C.muted }} />
+                }
               </ListItemButton>
             </Tooltip>
           </Box>
@@ -272,62 +281,34 @@ export default function Sidebar() {
         </Tooltip>
       </List>
 
-      {/* ── CLIENTS section (coach only) — NOW ABOVE COACHES ── */}
-      {open && auth.role === 'coach' && (
-        <>
-          <Divider sx={{ mx: 2, borderColor: C.border, mt: 0.5, mb: 1, flexShrink: 0 }} />
-          <Typography variant="overline" sx={{ px: 2.5, color: C.muted, flexShrink: 0, mb: 0.5 }}>
-            {t('clientsHeader')}
-          </Typography>
-
-          <Box sx={{ overflowY: 'auto', flex: 1, pb: 1 }}>
-            {[...visibleClients].filter(c => hasModule(c.modules, 'studio_access'))
-              .sort((a, b) => {
-                const ai = recentIds.indexOf(a.id), bi = recentIds.indexOf(b.id)
-                if (ai === -1 && bi === -1) return 0
-                if (ai === -1) return 1
-                if (bi === -1) return -1
-                return ai - bi
-              })
-              .map(c => {
-                const ri    = realClients.findIndex(x => x.name === c.name)
-                const isSel = !viewingCoach && actualIdx === ri
-                return (
-                  <Box key={c.name} sx={{ display: 'flex', alignItems: 'center', mx: 1.5, mb: '2px' }}>
-                    <ListItemButton
-                      selected={isSel}
-                      onClick={() => selectClient(ri, c.id)}
-                      sx={{ flex: 1, flexDirection: 'column', alignItems: 'flex-start', py: 0.9, gap: 0 }}
-                    >
-                      <Typography sx={{
-                        fontWeight: 600, fontSize: '13.5px', lineHeight: 1.35,
-                        color: isSel ? C.primary : C.text,
-                      }}>
-                        {c.name}
-                      </Typography>
-                      <Typography variant="caption" sx={{ color: isSel ? 'rgba(196,233,191,0.65)' : C.muted }}>
-                        {c.calorieTarget} kcal · {c.proteinTarget}{t('gUnit')}
-                      </Typography>
-                    </ListItemButton>
-                    <Tooltip title={t('deleteClientTip')} arrow>
-                      <IconButton
-                        onClick={() => setConfirmDelete({ id: c.id, name: c.name })}
-                        size="small"
-                        sx={{
-                          flexShrink: 0, color: 'transparent', width: 26, height: 26,
-                          '&:hover': { color: C.danger, bgcolor: 'rgba(255,107,157,0.1)' },
-                          '.MuiBox-root:hover &': { color: C.muted },
-                        }}
-                      >
-                        <DeleteOutlineIcon sx={{ fontSize: 15 }} />
-                      </IconButton>
-                    </Tooltip>
-                  </Box>
-                )
-              })}
-          </Box>
-        </>
+      {/* ── Notifications panel (coach only) ────────────── */}
+      {open && auth.role === 'coach' && showNotifs && (
+        <Box sx={{ mx: 1.5, mb: 1, maxHeight: '200px', overflowY: 'auto', flexShrink: 0 }}>
+          <Divider sx={{ borderColor: C.border, mb: 1 }} />
+          {notifications.length === 0 ? (
+            <Typography sx={{ color: C.muted, fontSize: '12px', px: 1, pb: 1 }}>{t('noNotifications')}</Typography>
+          ) : notifications.slice(0, 10).map((n, i) => (
+            <Box key={n.id || i} sx={{
+              px: 1.5, py: 0.75, mb: 0.5,
+              background: n.from_coach !== auth.name ? C.accentSoft : 'rgba(255,255,255,0.03)',
+              borderRadius: '10px', border: `1px solid ${n.from_coach !== auth.name ? C.primaryA20 : C.border}`,
+            }}>
+              <Typography sx={{ fontSize: '11.5px', fontWeight: 700, color: n.from_coach !== auth.name ? C.primary : C.muted }}>
+                {n.from_coach}
+                <Box component="span" sx={{ fontWeight: 400, color: C.muted, ml: 0.5 }}>→ {n.client_name}</Box>
+              </Typography>
+              <Typography sx={{ fontSize: '11px', color: C.text, mt: 0.25 }}>
+                {n.action_type === 'task' && `${t('taskNotifLbl')}: `}
+                {n.action_type === 'reaction' && `${t('reactionNotifLbl')}: `}
+                {n.content}
+              </Typography>
+            </Box>
+          ))}
+        </Box>
       )}
+
+      {/* Spacer to push content up */}
+      <Box sx={{ flex: 1 }} />
 
     </Drawer>
   )
