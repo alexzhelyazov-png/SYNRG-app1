@@ -100,6 +100,7 @@ export function AppProvider({ children }) {
         id:             c.id,
         name:           c.name,
         password:       c.password,
+        email:          c.email || null,
         is_coach:       c.is_coach || false,
         calorieTarget:  c.calorie_target  || c.calorieTarget  || 2000,
         proteinTarget:  c.protein_target  || c.proteinTarget  || 140,

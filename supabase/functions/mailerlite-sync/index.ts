@@ -130,16 +130,16 @@ Deno.serve(async (req) => {
       // Send plan activation email
       const planLabel =
         fields?.plan_type === "unlimited"
-          ? "Unlimited"
-          : `${fields?.plan_type} visits`;
+          ? "Неограничен"
+          : `${fields?.plan_type} посещения`;
       await sendTransactionalEmail(
         apiKey,
         { email, name },
-        "Your plan is activated!",
+        "Планът ти е активиран!",
         `<div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px;background:#1a1a1a;color:#e0e0e0;border-radius:16px">
           <h2 style="color:#c4e9bf;margin:0 0 16px">${name || "Hey"},</h2>
-          <p style="font-size:16px;line-height:1.6">Your <strong style="color:#c4e9bf">${planLabel}</strong> plan at SYNRG Beyond Fitness is now active!</p>
-          <p style="font-size:14px;color:#999">Valid until: <strong style="color:#e0e0e0">${fields?.plan_expires || "N/A"}</strong></p>
+          <p style="font-size:16px;line-height:1.6">Планът ти <strong style="color:#c4e9bf">${planLabel}</strong> в SYNRG Beyond Fitness е активиран!</p>
+          <p style="font-size:14px;color:#999">Валиден до: <strong style="color:#e0e0e0">${fields?.plan_expires || ""}</strong></p>
           <hr style="border:none;border-top:1px solid #333;margin:24px 0">
           <p style="font-size:12px;color:#666">SYNRG Beyond Fitness</p>
         </div>`
@@ -159,11 +159,11 @@ Deno.serve(async (req) => {
         await sendTransactionalEmail(
           apiKey,
           { email, name },
-          "Your plan has expired",
+          "Планът ти изтече",
           `<div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px;background:#1a1a1a;color:#e0e0e0;border-radius:16px">
             <h2 style="color:#c4e9bf;margin:0 0 16px">${name || "Hey"},</h2>
-            <p style="font-size:16px;line-height:1.6">Your plan at SYNRG Beyond Fitness has expired.</p>
-            <p style="font-size:14px;color:#999">Contact us to renew and keep training!</p>
+            <p style="font-size:16px;line-height:1.6">Планът ти в SYNRG Beyond Fitness изтече.</p>
+            <p style="font-size:14px;color:#999">Свържи се с нас за подновяване!</p>
             <hr style="border:none;border-top:1px solid #333;margin:24px 0">
             <p style="font-size:12px;color:#666">SYNRG Beyond Fitness</p>
           </div>`

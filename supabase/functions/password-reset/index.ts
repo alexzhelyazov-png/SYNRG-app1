@@ -95,14 +95,14 @@ Deno.serve(async (req) => {
         body: JSON.stringify({
           sender: SENDER,
           to: [{ email, name: client.name }],
-          subject: "Password reset code",
+          subject: "Код за смяна на парола",
           htmlContent: `<div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px;background:#1a1a1a;color:#e0e0e0;border-radius:16px">
             <h2 style="color:#c4e9bf;margin:0 0 16px">${client.name},</h2>
-            <p style="font-size:16px;line-height:1.6">Your password reset code is:</p>
+            <p style="font-size:16px;line-height:1.6">Твоят код за смяна на парола е:</p>
             <div style="text-align:center;margin:24px 0">
               <span style="font-size:32px;font-weight:bold;letter-spacing:8px;color:#c4e9bf;background:#252525;padding:16px 32px;border-radius:12px;display:inline-block">${resetCode}</span>
             </div>
-            <p style="font-size:14px;color:#999">This code expires in 15 minutes. If you didn't request this, ignore this email.</p>
+            <p style="font-size:14px;color:#999">Кодът е валиден 15 минути. Ако не си поискал смяна на парола, игнорирай този имейл.</p>
             <hr style="border:none;border-top:1px solid #333;margin:24px 0">
             <p style="font-size:12px;color:#666">SYNRG Beyond Fitness</p>
           </div>`,
