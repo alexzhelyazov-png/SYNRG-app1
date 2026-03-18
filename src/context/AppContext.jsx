@@ -185,12 +185,12 @@ export function AppProvider({ children }) {
     return t('errLogin')
   }
 
-  async function handleRegisterClient(name, pass) {
+  async function handleRegisterClient(name, pass, email = null) {
     const exists = clients.find(c => !c.is_coach && c.name.toLowerCase() === name.toLowerCase())
     if (exists) return t('errClientExists')
-    const data = await DB.insert('clients', {
-      name, password: pass, calorie_target: 2000, protein_target: 140, is_coach: false, modules: [],
-    })
+    const row = { name, password: pass, calorie_target: 2000, protein_target: 140, is_coach: false, modules: [] }
+    if (email) row.email = email
+    const data = await DB.insert('clients', row)
     const newClient = {
       id: data.id, name, password: pass, is_coach: false,
       calorieTarget: 2000, proteinTarget: 140, modules: [],
@@ -207,6 +207,9 @@ export function AppProvider({ children }) {
 
     // Notify coaches/admins about the new registration
     DB.insertNotification('Система', name, 'registration', name)
+
+    // Sync to MailerLite (if email provided)
+    if (email) DB.syncToMailerLite('register', email, name)
 
     return null
   }

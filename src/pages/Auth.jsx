@@ -16,6 +16,7 @@ export default function Auth() {
 
   const [mode,    setMode]    = useState('login')   // 'login' | 'register'
   const [name,    setName]    = useState('')
+  const [email,   setEmail]   = useState('')
   const [pass,    setPass]    = useState('')
   const [pass2,   setPass2]   = useState('')
   const [error,   setError]   = useState('')
@@ -33,6 +34,7 @@ export default function Auth() {
     setMode(m)
     setError('')
     setName('')
+    setEmail('')
     setPass('')
     setPass2('')
   }
@@ -45,8 +47,12 @@ export default function Auth() {
     if (mode === 'register') {
       if (pass.length < 3)   { setError(t('errPassShort')); return }
       if (pass !== pass2)    { setError(t('errPassMismatch')); return }
+      const trimmedEmail = email.trim()
+      if (trimmedEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+        setError(t('errEmailInvalid')); return
+      }
       setLoading(true)
-      const err = await handleRegisterClient(name.trim(), pass)
+      const err = await handleRegisterClient(name.trim(), pass, trimmedEmail || null)
       setLoading(false)
       if (err) setError(err)
     } else {
@@ -184,6 +190,17 @@ export default function Auth() {
             inputProps={{ style: { fontSize: '15px', padding: '13px 14px' } }}
             autoComplete="username"
           />
+          {isRegister && (
+            <TextField
+              fullWidth
+              type="email"
+              placeholder={`${t('emailPlaceholder')} ${t('emailOptional')}`}
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              inputProps={{ style: { fontSize: '15px', padding: '13px 14px' } }}
+              autoComplete="email"
+            />
+          )}
           <TextField
             fullWidth
             type="password"

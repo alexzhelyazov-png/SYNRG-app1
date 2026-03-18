@@ -257,6 +257,15 @@ export function BookingProvider({ children }) {
         }
       }
       await loadAllPlans()
+
+      // Sync plan info to MailerLite (if client has email)
+      if (targetClient?.email) {
+        DB.syncToMailerLite('plan_activated', targetClient.email, targetClient.name, {
+          plan_type: planType,
+          plan_expires: to,
+        })
+      }
+
       return result
     } catch (e) { return { error: e.message } }
   }, [auth, loadAllPlans, realClients])

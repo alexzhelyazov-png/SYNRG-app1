@@ -488,4 +488,19 @@ export const DB = {
       }
     }
   },
+
+  // ── MailerLite sync (via Supabase Edge Function) ──────────
+  async syncToMailerLite(action, email, name, fields = {}) {
+    if (!isUsingSupabase || !email) return
+    try {
+      await fetch(`${SUPABASE_URL}/functions/v1/mailerlite-sync`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${SUPABASE_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ action, email, name, fields }),
+      })
+    } catch { /* silent — email sync should not block UI */ }
+  },
 }
