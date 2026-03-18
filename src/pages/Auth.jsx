@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Box, Paper, Typography, TextField, Button, Alert, useMediaQuery, useTheme } from '@mui/material'
+import { Box, Paper, Typography, TextField, Button, Alert, Dialog, useMediaQuery, useTheme } from '@mui/material'
 import ArrowBackIcon from '@mui/icons-material/ArrowBack'
 import GetAppIcon from '@mui/icons-material/GetApp'
 import { useApp } from '../context/AppContext'
@@ -8,6 +8,7 @@ import { C, EASE } from '../theme'
 import SynrgLogomark from '../layout/SynrgLogomark'
 
 const isStandalone = window.navigator.standalone || window.matchMedia('(display-mode: standalone)').matches
+const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent)
 const SITE_BASE = '../'
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL
 const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
@@ -27,6 +28,7 @@ export default function Auth() {
   const [error,   setError]   = useState('')
   const [success, setSuccess] = useState('')
   const [loading, setLoading] = useState(false)
+  const [showInstall, setShowInstall] = useState(false)
 
   // PWA install prompt
   const [deferredPrompt, setDeferredPrompt] = useState(null)
@@ -161,11 +163,34 @@ export default function Auth() {
 
       {/* ── Logo ────────────────────────────────────────── */}
       <Box sx={{
-        mb:     3,
+        mb:     1.5,
         filter: 'drop-shadow(0 0 28px rgba(196,233,191,0.18))',
       }}>
         <SynrgLogomark size={120} />
       </Box>
+
+      {/* ── Install button (below logo) ───────────────── */}
+      {!isStandalone && (
+        <Button
+          startIcon={<GetAppIcon sx={{ fontSize: '18px' }} />}
+          onClick={() => setShowInstall(true)}
+          sx={{
+            mb: 2.5,
+            color: C.muted,
+            fontSize: '12px',
+            fontWeight: 600,
+            textTransform: 'none',
+            borderRadius: '99px',
+            border: `1px solid ${C.border}`,
+            px: 2,
+            py: 0.75,
+            transition: `all 0.18s ${EASE.standard}`,
+            '&:hover': { color: C.primary, borderColor: C.primaryA20, background: C.accentSoft },
+          }}
+        >
+          {t('installOnPhone')}
+        </Button>
+      )}
 
       {/* ── Lang + theme row ─────────────────────────────── */}
       <Box sx={{ display: 'flex', gap: 0.75, mb: 3 }}>
@@ -380,38 +405,97 @@ export default function Auth() {
         )}
       </Paper>
 
-      <Typography variant="body2" sx={{ color: C.muted, mt: 2.5, letterSpacing: '0.3px', fontSize: '12.5px' }}>
-        {t('tagline')}
-      </Typography>
+      {/* Install guide dialog */}
+      <Dialog
+        open={showInstall}
+        onClose={() => setShowInstall(false)}
+        PaperProps={{ sx: { borderRadius: '20px', maxWidth: '380px', width: '100%', p: 3 } }}
+      >
+        <Typography sx={{ fontWeight: 800, fontSize: '18px', color: C.text, mb: 0.5 }}>
+          {isIOS ? t('installTitleIOS') : t('installTitle')}
+        </Typography>
+        <Typography sx={{ fontSize: '13px', color: C.muted, mb: 2.5, lineHeight: 1.5 }}>
+          {t('installDesc')}
+        </Typography>
 
-      {/* Install on phone button — only in browser, not standalone */}
-      {!isStandalone && (
-        <Button
-          startIcon={<GetAppIcon sx={{ fontSize: '18px' }} />}
-          onClick={async () => {
-            if (deferredPrompt) {
-              deferredPrompt.prompt()
-              await deferredPrompt.userChoice
-              setDeferredPrompt(null)
-            }
-          }}
-          sx={{
-            mt: 2,
-            color: C.muted,
-            fontSize: '12px',
-            fontWeight: 600,
-            textTransform: 'none',
-            borderRadius: '99px',
-            border: `1px solid ${C.border}`,
-            px: 2,
-            py: 0.75,
-            transition: `all 0.18s ${EASE.standard}`,
-            '&:hover': { color: C.primary, borderColor: C.primaryA20, background: C.accentSoft },
-          }}
-        >
-          {t('installOnPhone')}
+        {isIOS ? (
+          <Box sx={{ display: 'grid', gap: 2.5 }}>
+            {/* Step 1: Tap Share */}
+            <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center' }}>
+              <Box sx={{ minWidth: 28, height: 28, borderRadius: '50%', background: C.accentSoft, color: C.primary,
+                display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', fontWeight: 800 }}>1</Box>
+              <Typography sx={{ fontSize: '14px', color: C.text, flex: 1 }}>
+                {t('installStep1IOS')}
+              </Typography>
+              {/* iOS Share icon — exact replica */}
+              <Box sx={{ minWidth: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                border: '1px solid #3478F6', borderRadius: '8px', background: 'rgba(52,120,246,0.1)' }}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                  <path d="M12 3L12 16" stroke="#3478F6" strokeWidth="2" strokeLinecap="round"/>
+                  <path d="M8 7L12 3L16 7" stroke="#3478F6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  <path d="M4 14V19C4 20.1 4.9 21 6 21H18C19.1 21 20 20.1 20 19V14" stroke="#3478F6" strokeWidth="2" strokeLinecap="round"/>
+                </svg>
+              </Box>
+            </Box>
+            {/* Step 2: Add to Home Screen */}
+            <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center' }}>
+              <Box sx={{ minWidth: 28, height: 28, borderRadius: '50%', background: C.accentSoft, color: C.primary,
+                display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', fontWeight: 800 }}>2</Box>
+              <Typography sx={{ fontSize: '14px', color: C.text, flex: 1 }}>
+                {t('installStep2IOS')}
+              </Typography>
+              {/* iOS Add to Home Screen icon — plus in square */}
+              <Box sx={{ minWidth: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                border: '1px solid #999', borderRadius: '8px', background: 'rgba(255,255,255,0.05)' }}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                  <rect x="3" y="3" width="18" height="18" rx="4" stroke="#999" strokeWidth="1.5"/>
+                  <path d="M12 8V16M8 12H16" stroke="#999" strokeWidth="2" strokeLinecap="round"/>
+                </svg>
+              </Box>
+            </Box>
+            {/* Step 3: Done */}
+            <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center' }}>
+              <Box sx={{ minWidth: 28, height: 28, borderRadius: '50%', background: C.accentSoft, color: C.primary,
+                display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', fontWeight: 800 }}>3</Box>
+              <Typography sx={{ fontSize: '14px', color: C.primary, fontWeight: 700 }}>
+                {t('installStep3IOS')}
+              </Typography>
+            </Box>
+          </Box>
+        ) : (
+          <Box sx={{ display: 'grid', gap: 2 }}>
+            {[1, 2, 3].map(step => (
+              <Box key={step} sx={{ display: 'flex', gap: 1.5, alignItems: 'flex-start' }}>
+                <Box sx={{ minWidth: 28, height: 28, borderRadius: '50%', background: C.accentSoft, color: C.primary,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', fontWeight: 800 }}>{step}</Box>
+                <Box>
+                  <Typography sx={{ fontSize: '14px', color: C.text, pt: '3px', lineHeight: 1.5 }}>
+                    {t(`installStep${step}Android`)}
+                  </Typography>
+                  {step === 1 && (
+                    <Box sx={{ mt: 1, display: 'inline-flex', alignItems: 'center', px: 1.5, py: 0.75,
+                      border: `1px solid ${C.border}`, borderRadius: '10px', background: 'rgba(255,255,255,0.05)' }}>
+                      <Typography sx={{ fontSize: '18px', fontWeight: 800, color: C.muted, letterSpacing: '2px' }}>⋮</Typography>
+                    </Box>
+                  )}
+                </Box>
+              </Box>
+            ))}
+            {deferredPrompt && (
+              <Button variant="contained" color="primary" fullWidth
+                onClick={async () => { deferredPrompt.prompt(); await deferredPrompt.userChoice; setDeferredPrompt(null); setShowInstall(false) }}
+                sx={{ py: 1.5, fontWeight: 800, fontSize: '15px' }}>
+                {t('installBtn')}
+              </Button>
+            )}
+          </Box>
+        )}
+
+        <Button fullWidth onClick={() => setShowInstall(false)}
+          sx={{ mt: 2, color: C.muted, fontSize: '13px', fontWeight: 600 }}>
+          {t('closeBtn')}
         </Button>
-      )}
+      </Dialog>
     </Box>
   )
 }

@@ -9,6 +9,14 @@ export const T = {
     installIOSHint2:    'в Safari, след това',
     installIOSHint3:    '"Add to Home Screen"',
     installSkip:        'Продължи без инсталиране →',
+    installStep1Android:'Натисни менюто ⋮ горе вдясно в браузъра',
+    installStep2Android:'Избери "Добави към началния екран"',
+    installStep3Android:'Натисни "Добави" за потвърждение',
+    installStep1IOS:    'Натисни долу на екрана',
+    installStep2IOS:    'Натисни "Add to Home Screen"',
+    installStep3IOS:    'Готово!',
+    closeBtn:           'Затвори',
+    installOnPhone:     'Свали на телефона си',
     tagline:            'Фитнес платформа за студиото',
 
     // ── Loading / Error ───────────────────────────────
@@ -754,6 +762,14 @@ export const T = {
     installIOSHint2:    'in Safari, then',
     installIOSHint3:    '"Add to Home Screen"',
     installSkip:        'Continue without installing →',
+    installStep1Android:'Tap the ⋮ menu at the top right of your browser',
+    installStep2Android:'Select "Add to Home Screen"',
+    installStep3Android:'Tap "Add" to confirm',
+    installStep1IOS:    'Tap at the bottom of the screen',
+    installStep2IOS:    'Tap "Add to Home Screen"',
+    installStep3IOS:    'Done!',
+    closeBtn:           'Close',
+    installOnPhone:     'Download on your phone',
     tagline:            'Fitness platform for the studio',
 
     // ── Loading / Error ───────────────────────────────
