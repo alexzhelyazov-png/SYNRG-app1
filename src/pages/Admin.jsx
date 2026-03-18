@@ -857,8 +857,9 @@ function ClientsTab({ t }) {
     return allPlans.find(p => p.client_id === clientId && p.status === 'active') || null
   }
 
-  const pending = realClients.filter(c => !getClientPlan(c.id))
-  const active  = realClients.filter(c => !!getClientPlan(c.id))
+  const newRegs  = realClients.filter(c => !(c.modules || []).length)
+  const pending  = realClients.filter(c => !getClientPlan(c.id) && (c.modules || []).includes('studio_access'))
+  const active   = realClients.filter(c => !!getClientPlan(c.id))
 
   async function handleActivate(clientId, planType, from, price, startCredits) {
     const res = await activatePlan(clientId, planType, from, price, startCredits)
@@ -879,7 +880,45 @@ function ClientsTab({ t }) {
 
   return (
     <Box>
-      {/* Pending activation (new registrations) */}
+      {/* New registrations (no modules assigned yet) */}
+      {newRegs.length > 0 && (
+        <>
+          <Typography sx={{ fontWeight: 700, fontSize: '14px', color: '#60A5FA', mb: 1 }}>
+            {t('newRegistrations')} ({newRegs.length})
+          </Typography>
+          <Paper sx={{ borderRadius: '16px', border: '1px solid rgba(96,165,250,0.3)', overflow: 'hidden', mb: 3 }}>
+            {newRegs.map(client => (
+              <Box key={client.id} sx={{
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                px: 2, py: 1.25, borderBottom: `1px solid ${C.border}`, '&:last-child': { borderBottom: 'none' },
+              }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flex: 1, minWidth: 0 }}>
+                  <Box sx={{ width: 32, height: 32, borderRadius: '50%', background: 'rgba(96,165,250,0.15)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: '13px', fontWeight: 800, color: '#60A5FA', flexShrink: 0 }}>
+                    {client.name.charAt(0).toUpperCase()}
+                  </Box>
+                  <Box sx={{ flex: 1, minWidth: 0 }}>
+                    <Typography sx={{ fontWeight: 700, fontSize: '14px', color: C.text }}>{client.name}</Typography>
+                    <Typography sx={{ fontSize: '11px', color: '#60A5FA', mb: 0.5 }}>{t('newRegHint')}</Typography>
+                    <ClientModuleEditor clientId={client.id} currentModules={client.modules} t={t} lang={lang} />
+                  </Box>
+                </Box>
+                <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center', flexShrink: 0 }}>
+                  <Tooltip title={t('deleteClientBtn')} arrow>
+                    <IconButton size="small" onClick={() => handleDelete(client)}
+                      sx={{ color: C.muted, '&:hover': { color: '#F87171' } }}>
+                      <DeleteOutlineIcon sx={{ fontSize: 16 }} />
+                    </IconButton>
+                  </Tooltip>
+                </Box>
+              </Box>
+            ))}
+          </Paper>
+        </>
+      )}
+
+      {/* Pending activation (studio clients without plan) */}
       <Typography sx={{ fontWeight: 700, fontSize: '14px', color: '#F87171', mb: 1 }}>
         {t('pendingActivation')} ({pending.length})
       </Typography>
@@ -1184,7 +1223,8 @@ function DashboardTab({ t, lang, setTab }) {
     return allPlans.find(p => p.client_id === clientId && p.status === 'active') || null
   }
 
-  const pending    = realClients.filter(c => !getActivePlan(c.id))
+  const newRegs    = realClients.filter(c => !(c.modules || []).length)
+  const pending    = realClients.filter(c => !getActivePlan(c.id) && (c.modules || []).includes('studio_access'))
   const expiring   = realClients.filter(c => {
     const p = getActivePlan(c.id)
     if (!p) return false
@@ -1201,10 +1241,29 @@ function DashboardTab({ t, lang, setTab }) {
     <Box>
       {/* Summary cards */}
       <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', mb: 3 }}>
+        {newRegs.length > 0 && <StatCard icon={PersonAddIcon} label={t('newRegistrations')} value={newRegs.length} color="#60A5FA" onClick={() => setTab(1)} />}
         <StatCard icon={PeopleIcon}       label={t('pendingCard')}  value={pending.length}   color="#F87171" onClick={() => setTab(1)} />
         <StatCard icon={WarningAmberIcon} label={t('expiringCard')} value={expiring.length}  color="#FB923C" onClick={() => setTab(1)} />
         <StatCard icon={CreditCardIcon}   label={t('lowCredCard')}  value={lowCred.length}   color="#FBBF24" onClick={() => setTab(1)} />
       </Box>
+
+      {/* New registrations */}
+      {newRegs.length > 0 && (
+        <>
+          <Typography sx={{ fontWeight: 700, fontSize: '14px', color: '#60A5FA', mb: 1 }}>
+            {t('newRegistrations')} ({newRegs.length})
+          </Typography>
+          <Paper sx={{ borderRadius: '14px', border: '1px solid rgba(96,165,250,0.25)', mb: 2, overflow: 'hidden' }}>
+            {newRegs.slice(0, 5).map(c => (
+              <Box key={c.id} sx={{ px: 2, py: 1, display: 'flex', alignItems: 'center', gap: 1.5,
+                borderBottom: `1px solid ${C.border}`, '&:last-child': { borderBottom: 'none' } }}>
+                <Typography sx={{ fontWeight: 600, fontSize: '14px', color: C.text, flex: 1 }}>{c.name}</Typography>
+                <Typography sx={{ fontSize: '11px', color: '#60A5FA' }}>{t('newRegHint')}</Typography>
+              </Box>
+            ))}
+          </Paper>
+        </>
+      )}
 
       {/* Pending list */}
       {pending.length > 0 && (

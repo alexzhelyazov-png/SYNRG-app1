@@ -255,6 +255,15 @@ export function BookingProvider({ children }) {
         if (merged.length !== currentModules.length || !merged.every(m => currentModules.includes(m))) {
           await DB.update('clients', clientId, { modules: merged })
         }
+        // Send plan activation email
+        if (targetClient.email) {
+          const planLabel = planType === 'unlimited' ? 'Неограничен' : `${planType} тренировки`
+          DB.syncToMailerLite('plan_activated', targetClient.email, targetClient.name, {
+            PLAN_TYPE: planType,
+            PLAN_EXPIRES: to,
+            PLAN_STATUS: 'active',
+          })
+        }
       }
       await loadAllPlans()
       return result
