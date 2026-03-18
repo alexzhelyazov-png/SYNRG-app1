@@ -3,23 +3,29 @@ import { Box, Paper, Typography, TextField, Button, Alert, useMediaQuery, useThe
 import ArrowBackIcon from '@mui/icons-material/ArrowBack'
 import GetAppIcon from '@mui/icons-material/GetApp'
 import { useApp } from '../context/AppContext'
+import { DB, isUsingSupabase } from '../lib/db'
 import { C, EASE } from '../theme'
 import SynrgLogomark from '../layout/SynrgLogomark'
 
 const isStandalone = window.navigator.standalone || window.matchMedia('(display-mode: standalone)').matches
 const SITE_BASE = '../'
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL
+const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
 
 export default function Auth() {
   const { handleLogin, handleRegisterClient, t, lang, setLang } = useApp()
   const theme    = useTheme()
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'))
 
-  const [mode,    setMode]    = useState('login')   // 'login' | 'register'
+  const [mode,    setMode]    = useState('login')   // 'login' | 'register' | 'forgot' | 'forgot_code'
   const [name,    setName]    = useState('')
   const [email,   setEmail]   = useState('')
   const [pass,    setPass]    = useState('')
   const [pass2,   setPass2]   = useState('')
+  const [resetCode, setResetCode] = useState('')
+  const [resetEmail, setResetEmail] = useState('')
   const [error,   setError]   = useState('')
+  const [success, setSuccess] = useState('')
   const [loading, setLoading] = useState(false)
 
   // PWA install prompt
@@ -33,10 +39,13 @@ export default function Auth() {
   function switchMode(m) {
     setMode(m)
     setError('')
+    setSuccess('')
     setName('')
     setEmail('')
     setPass('')
     setPass2('')
+    setResetCode('')
+    setResetEmail('')
   }
 
   async function handleSubmit() {
@@ -63,7 +72,53 @@ export default function Auth() {
     }
   }
 
+  async function handleForgotRequest() {
+    setError('')
+    const em = resetEmail.trim()
+    if (!em || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em)) {
+      setError(t('errEmailInvalid')); return
+    }
+    setLoading(true)
+    try {
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/password-reset`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'request', email: em }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setError(data.error === 'no_account' ? t('errNoAccount') : (data.error || 'Error'))
+      } else {
+        setMode('forgot_code')
+      }
+    } catch { setError('Network error') }
+    setLoading(false)
+  }
+
+  async function handleForgotVerify() {
+    setError('')
+    if (!resetCode.trim()) { setError(t('errCodeRequired')); return }
+    if (!pass || pass.length < 3) { setError(t('errPassShort')); return }
+    setLoading(true)
+    try {
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/password-reset`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'verify', email: resetEmail.trim(), code: resetCode.trim(), new_password: pass }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setError(data.error === 'invalid_code' ? t('errInvalidCode') : (data.error || 'Error'))
+      } else {
+        setSuccess(t('resetSuccess'))
+        setTimeout(() => switchMode('login'), 2000)
+      }
+    } catch { setError('Network error') }
+    setLoading(false)
+  }
+
   const isRegister = mode === 'register'
+  const isForgot = mode === 'forgot' || mode === 'forgot_code'
 
   return (
     <Box sx={{
@@ -145,102 +200,184 @@ export default function Auth() {
         animation:    `fadeInUp 0.28s ${EASE.decelerate} 0.05s both`,
       }}>
 
-        {/* Mode tabs */}
-        <Box sx={{
-          display:      'flex',
-          borderRadius: '12px',
-          border:       `1px solid ${C.border}`,
-          overflow:     'hidden',
-          mb:           2.5,
-        }}>
-          {[
-            { key: 'login',    label: t('loginTab') },
-            { key: 'register', label: t('registerClientTab').split(' - ')[1] || t('registerTitle') },
-          ].map(({ key, label }) => (
-            <Box
-              key={key}
-              onClick={() => switchMode(key)}
-              sx={{
-                flex:           1,
-                py:             1.1,
-                textAlign:      'center',
-                cursor:         'pointer',
-                fontSize:       '13px',
-                fontWeight:     700,
-                background:     mode === key ? C.accentSoft : 'transparent',
-                color:          mode === key ? C.primary    : C.muted,
-                borderRight:    key === 'login' ? `1px solid ${C.border}` : 'none',
-                transition:     `all 0.18s ${EASE.standard}`,
-                userSelect:     'none',
-                '&:hover':      { color: C.primary },
-              }}
-            >
-              {label}
-            </Box>
-          ))}
-        </Box>
+        {/* Mode tabs — hidden during forgot password */}
+        {!isForgot && (
+          <Box sx={{
+            display:      'flex',
+            borderRadius: '12px',
+            border:       `1px solid ${C.border}`,
+            overflow:     'hidden',
+            mb:           2.5,
+          }}>
+            {[
+              { key: 'login',    label: t('loginTab') },
+              { key: 'register', label: t('registerClientTab').split(' - ')[1] || t('registerTitle') },
+            ].map(({ key, label }) => (
+              <Box
+                key={key}
+                onClick={() => switchMode(key)}
+                sx={{
+                  flex:           1,
+                  py:             1.1,
+                  textAlign:      'center',
+                  cursor:         'pointer',
+                  fontSize:       '13px',
+                  fontWeight:     700,
+                  background:     mode === key ? C.accentSoft : 'transparent',
+                  color:          mode === key ? C.primary    : C.muted,
+                  borderRight:    key === 'login' ? `1px solid ${C.border}` : 'none',
+                  transition:     `all 0.18s ${EASE.standard}`,
+                  userSelect:     'none',
+                  '&:hover':      { color: C.primary },
+                }}
+              >
+                {label}
+              </Box>
+            ))}
+          </Box>
+        )}
 
-        <Box sx={{ display: 'grid', gap: 1.25 }}>
-          <TextField
-            fullWidth
-            placeholder={t('namePlaceholder')}
-            value={name}
-            onChange={e => setName(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && handleSubmit()}
-            inputProps={{ style: { fontSize: '15px', padding: '13px 14px' } }}
-            autoComplete="username"
-          />
-          {isRegister && (
+        {/* ── Forgot password: enter email ── */}
+        {mode === 'forgot' && (
+          <Box sx={{ display: 'grid', gap: 1.25 }}>
+            <Typography sx={{ fontWeight: 700, fontSize: '16px', color: C.text, mb: 0.5 }}>
+              {t('forgotTitle')}
+            </Typography>
+            <Typography sx={{ fontSize: '13px', color: C.muted, mb: 0.5 }}>
+              {t('enterEmailReset')}
+            </Typography>
             <TextField
-              fullWidth
-              type="email"
-              placeholder={`${t('emailPlaceholder')} ${t('emailOptional')}`}
-              value={email}
-              onChange={e => setEmail(e.target.value)}
+              fullWidth type="email"
+              placeholder={t('emailPlaceholder')}
+              value={resetEmail}
+              onChange={e => setResetEmail(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleForgotRequest()}
               inputProps={{ style: { fontSize: '15px', padding: '13px 14px' } }}
               autoComplete="email"
             />
-          )}
-          <TextField
-            fullWidth
-            type="password"
-            placeholder={t('passPlaceholder')}
-            value={pass}
-            onChange={e => setPass(e.target.value)}
-            onKeyDown={e => !isRegister && e.key === 'Enter' && handleSubmit()}
-            inputProps={{ style: { fontSize: '15px', padding: '13px 14px' } }}
-            autoComplete={isRegister ? 'new-password' : 'current-password'}
-          />
-          {isRegister && (
+            {error && <Alert severity="error" sx={{ borderRadius: '12px', fontSize: '13px', py: 0.75 }}>{error}</Alert>}
+            <Button variant="contained" color="primary" fullWidth disabled={loading}
+              onClick={handleForgotRequest}
+              sx={{ py: 1.625, mt: 0.5, fontWeight: 800, fontSize: '15px' }}>
+              {loading ? t('saving') : t('sendCode')}
+            </Button>
+            <Button size="small" onClick={() => switchMode('login')}
+              sx={{ color: C.muted, fontSize: '12px', fontWeight: 600, mt: 0.5 }}>
+              {t('backToLogin')}
+            </Button>
+          </Box>
+        )}
+
+        {/* ── Forgot password: enter code + new password ── */}
+        {mode === 'forgot_code' && (
+          <Box sx={{ display: 'grid', gap: 1.25 }}>
+            <Typography sx={{ fontWeight: 700, fontSize: '16px', color: C.text, mb: 0.5 }}>
+              {t('forgotTitle')}
+            </Typography>
+            <Typography sx={{ fontSize: '13px', color: C.muted, mb: 0.5 }}>
+              {t('enterCode')}
+            </Typography>
             <TextField
               fullWidth
-              type="password"
-              placeholder={t('repeatPass')}
-              value={pass2}
-              onChange={e => setPass2(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && handleSubmit()}
+              placeholder={t('codePlaceholder')}
+              value={resetCode}
+              onChange={e => setResetCode(e.target.value)}
+              inputProps={{ style: { fontSize: '15px', padding: '13px 14px', letterSpacing: '4px', textAlign: 'center' } }}
+            />
+            <TextField
+              fullWidth type="password"
+              placeholder={t('newPassPlaceholder')}
+              value={pass}
+              onChange={e => setPass(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleForgotVerify()}
               inputProps={{ style: { fontSize: '15px', padding: '13px 14px' } }}
               autoComplete="new-password"
             />
-          )}
+            {error && <Alert severity="error" sx={{ borderRadius: '12px', fontSize: '13px', py: 0.75 }}>{error}</Alert>}
+            {success && <Alert severity="success" sx={{ borderRadius: '12px', fontSize: '13px', py: 0.75 }}>{success}</Alert>}
+            <Button variant="contained" color="primary" fullWidth disabled={loading || !!success}
+              onClick={handleForgotVerify}
+              sx={{ py: 1.625, mt: 0.5, fontWeight: 800, fontSize: '15px' }}>
+              {loading ? t('saving') : t('resetPassword')}
+            </Button>
+            <Button size="small" onClick={() => switchMode('login')}
+              sx={{ color: C.muted, fontSize: '12px', fontWeight: 600, mt: 0.5 }}>
+              {t('backToLogin')}
+            </Button>
+          </Box>
+        )}
 
-          {error && (
-            <Alert severity="error" sx={{ borderRadius: '12px', fontSize: '13px', py: 0.75 }}>
-              {error}
-            </Alert>
-          )}
+        {/* ── Normal login / register form ── */}
+        {!isForgot && (
+          <Box sx={{ display: 'grid', gap: 1.25 }}>
+            <TextField
+              fullWidth
+              placeholder={t('namePlaceholder')}
+              value={name}
+              onChange={e => setName(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleSubmit()}
+              inputProps={{ style: { fontSize: '15px', padding: '13px 14px' } }}
+              autoComplete="username"
+            />
+            {isRegister && (
+              <TextField
+                fullWidth
+                type="email"
+                placeholder={`${t('emailPlaceholder')} ${t('emailOptional')}`}
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                inputProps={{ style: { fontSize: '15px', padding: '13px 14px' } }}
+                autoComplete="email"
+              />
+            )}
+            <TextField
+              fullWidth
+              type="password"
+              placeholder={t('passPlaceholder')}
+              value={pass}
+              onChange={e => setPass(e.target.value)}
+              onKeyDown={e => !isRegister && e.key === 'Enter' && handleSubmit()}
+              inputProps={{ style: { fontSize: '15px', padding: '13px 14px' } }}
+              autoComplete={isRegister ? 'new-password' : 'current-password'}
+            />
+            {isRegister && (
+              <TextField
+                fullWidth
+                type="password"
+                placeholder={t('repeatPass')}
+                value={pass2}
+                onChange={e => setPass2(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && handleSubmit()}
+                inputProps={{ style: { fontSize: '15px', padding: '13px 14px' } }}
+                autoComplete="new-password"
+              />
+            )}
 
-          <Button
-            variant="contained"
-            color="primary"
-            fullWidth
-            disabled={loading}
-            onClick={handleSubmit}
-            sx={{ py: 1.625, mt: 0.5, fontWeight: 800, fontSize: '15px', letterSpacing: '0.2px' }}
-          >
-            {loading ? t('saving') : (isRegister ? t('createProfile') : t('loginBtn'))}
-          </Button>
-        </Box>
+            {error && (
+              <Alert severity="error" sx={{ borderRadius: '12px', fontSize: '13px', py: 0.75 }}>
+                {error}
+              </Alert>
+            )}
+
+            <Button
+              variant="contained"
+              color="primary"
+              fullWidth
+              disabled={loading}
+              onClick={handleSubmit}
+              sx={{ py: 1.625, mt: 0.5, fontWeight: 800, fontSize: '15px', letterSpacing: '0.2px' }}
+            >
+              {loading ? t('saving') : (isRegister ? t('createProfile') : t('loginBtn'))}
+            </Button>
+
+            {!isRegister && (
+              <Button size="small" onClick={() => switchMode('forgot')}
+                sx={{ color: C.muted, fontSize: '12px', fontWeight: 600, mt: 0.5, textTransform: 'none' }}>
+                {t('forgotPassword')}
+              </Button>
+            )}
+          </Box>
+        )}
       </Paper>
 
       <Typography variant="body2" sx={{ color: C.muted, mt: 2.5, letterSpacing: '0.3px', fontSize: '12.5px' }}>
