@@ -857,7 +857,6 @@ function ClientsTab({ t }) {
     return allPlans.find(p => p.client_id === clientId && p.status === 'active') || null
   }
 
-  const newRegs  = realClients.filter(c => !(c.modules || []).length)
   const pending  = realClients.filter(c => !getClientPlan(c.id) && (c.modules || []).includes('studio_access'))
   const active   = realClients.filter(c => !!getClientPlan(c.id))
 
@@ -880,44 +879,6 @@ function ClientsTab({ t }) {
 
   return (
     <Box>
-      {/* New registrations (no modules assigned yet) */}
-      {newRegs.length > 0 && (
-        <>
-          <Typography sx={{ fontWeight: 700, fontSize: '14px', color: '#60A5FA', mb: 1 }}>
-            {t('newRegistrations')} ({newRegs.length})
-          </Typography>
-          <Paper sx={{ borderRadius: '16px', border: '1px solid rgba(96,165,250,0.3)', overflow: 'hidden', mb: 3 }}>
-            {newRegs.map(client => (
-              <Box key={client.id} sx={{
-                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                px: 2, py: 1.25, borderBottom: `1px solid ${C.border}`, '&:last-child': { borderBottom: 'none' },
-              }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flex: 1, minWidth: 0 }}>
-                  <Box sx={{ width: 32, height: 32, borderRadius: '50%', background: 'rgba(96,165,250,0.15)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: '13px', fontWeight: 800, color: '#60A5FA', flexShrink: 0 }}>
-                    {client.name.charAt(0).toUpperCase()}
-                  </Box>
-                  <Box sx={{ flex: 1, minWidth: 0 }}>
-                    <Typography sx={{ fontWeight: 700, fontSize: '14px', color: C.text }}>{client.name}</Typography>
-                    <Typography sx={{ fontSize: '11px', color: '#60A5FA', mb: 0.5 }}>{t('newRegHint')}</Typography>
-                    <ClientModuleEditor clientId={client.id} currentModules={client.modules} t={t} lang={lang} />
-                  </Box>
-                </Box>
-                <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center', flexShrink: 0 }}>
-                  <Tooltip title={t('deleteClientBtn')} arrow>
-                    <IconButton size="small" onClick={() => handleDelete(client)}
-                      sx={{ color: C.muted, '&:hover': { color: '#F87171' } }}>
-                      <DeleteOutlineIcon sx={{ fontSize: 16 }} />
-                    </IconButton>
-                  </Tooltip>
-                </Box>
-              </Box>
-            ))}
-          </Paper>
-        </>
-      )}
-
       {/* Pending activation (studio clients without plan) */}
       <Typography sx={{ fontWeight: 700, fontSize: '14px', color: '#F87171', mb: 1 }}>
         {t('pendingActivation')} ({pending.length})
@@ -1259,6 +1220,12 @@ function DashboardTab({ t, lang, setTab }) {
                 borderBottom: `1px solid ${C.border}`, '&:last-child': { borderBottom: 'none' } }}>
                 <Typography sx={{ fontWeight: 600, fontSize: '14px', color: C.text, flex: 1 }}>{c.name}</Typography>
                 <Typography sx={{ fontSize: '11px', color: '#60A5FA' }}>{t('newRegHint')}</Typography>
+                <Tooltip title={t('deleteClientBtn')} arrow>
+                  <IconButton size="small" onClick={() => setConfirmDelete({ id: c.id, name: c.name })}
+                    sx={{ color: C.muted, '&:hover': { color: '#F87171' } }}>
+                    <DeleteOutlineIcon sx={{ fontSize: 16 }} />
+                  </IconButton>
+                </Tooltip>
               </Box>
             ))}
           </Paper>

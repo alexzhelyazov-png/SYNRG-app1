@@ -1,7 +1,6 @@
-import { useState } from 'react'
 import {
   Drawer, Box, List, ListItemButton, ListItemIcon, ListItemText,
-  Typography, IconButton, Divider, Tooltip, Button, Badge, Collapse,
+  Typography, IconButton, Tooltip, Button, Badge,
 } from '@mui/material'
 import ChevronRightIcon      from '@mui/icons-material/ChevronRight'
 import ChevronLeftIcon       from '@mui/icons-material/ChevronLeft'
@@ -13,8 +12,6 @@ import AssignmentIcon        from '@mui/icons-material/Assignment'
 import PeopleIcon            from '@mui/icons-material/People'
 import NotificationsNoneIcon from '@mui/icons-material/NotificationsNone'
 import PersonIcon            from '@mui/icons-material/Person'
-import LightModeIcon         from '@mui/icons-material/LightMode'
-import DarkModeIcon          from '@mui/icons-material/DarkMode'
 import CalendarMonthIcon     from '@mui/icons-material/CalendarMonth'
 import EventIcon             from '@mui/icons-material/Event'
 import PlayCircleOutlineIcon from '@mui/icons-material/PlayCircleOutline'
@@ -62,14 +59,11 @@ export default function Sidebar() {
     coaches, coachProfiles,
     viewingCoach, setViewingCoach,
     coachClientMode, setCoachClientMode,
-    notifications, unreadNotifCount,
+    unreadNotifCount,
     lang, setLang, t,
-    isDark, setIsDark,
   } = useApp()
 
   const admin = isAdmin(auth)
-
-  const [showNotifs, setShowNotifs] = useState(false)
 
   const open    = sidebarOpen
   const navItems = getNavItems(auth, admin)
@@ -201,24 +195,28 @@ export default function Sidebar() {
           )
         })()}
 
-        {/* Notifications (coach only) */}
-        {auth.role === 'coach' && (
-          <Tooltip title={!open ? t('navNotifications') : ''} placement="right" arrow>
-            <ListItemButton
-              onClick={() => setShowNotifs(p => !p)}
-              sx={{ justifyContent: open ? 'flex-start' : 'center', px: open ? 2 : 0, mx: open ? 1.5 : 1, my: '2px', minHeight: 44 }}
-            >
-              <ListItemIcon sx={{ minWidth: open ? 38 : 'unset', justifyContent: 'center', color: unreadNotifCount > 0 ? C.primary : C.muted }}>
-                <Badge badgeContent={unreadNotifCount} color="error" max={9}>
-                  <NotificationsNoneIcon sx={{ fontSize: '20px' }} />
-                </Badge>
-              </ListItemIcon>
-              {open && <ListItemText primary={t('navNotifications')} sx={{ '& .MuiListItemText-primary': { color: unreadNotifCount > 0 ? C.primary : C.text, fontWeight: unreadNotifCount > 0 ? 700 : 500, fontSize: '14px' } }} />}
-            </ListItemButton>
-          </Tooltip>
-        )}
+        {/* Notifications (coach only) — navigates to dedicated page */}
+        {auth.role === 'coach' && (() => {
+          const isActive = view === 'notifications'
+          return (
+            <Tooltip title={!open ? t('navNotifications') : ''} placement="right" arrow>
+              <ListItemButton
+                selected={isActive}
+                onClick={() => { setView('notifications'); setViewingCoach(null); setCoachClientMode(false) }}
+                sx={{ justifyContent: open ? 'flex-start' : 'center', px: open ? 2 : 0, mx: open ? 1.5 : 1, my: '2px', minHeight: 44 }}
+              >
+                <ListItemIcon sx={{ minWidth: open ? 38 : 'unset', justifyContent: 'center', color: isActive ? C.primary : (unreadNotifCount > 0 ? '#F87171' : C.muted) }}>
+                  <Badge badgeContent={unreadNotifCount} color="error" max={9}>
+                    <NotificationsNoneIcon sx={{ fontSize: '20px' }} />
+                  </Badge>
+                </ListItemIcon>
+                {open && <ListItemText primary={t('navNotifications')} sx={{ '& .MuiListItemText-primary': { color: isActive ? C.primary : (unreadNotifCount > 0 ? C.text : C.muted), fontWeight: isActive || unreadNotifCount > 0 ? 700 : 500, fontSize: '14px' } }} />}
+              </ListItemButton>
+            </Tooltip>
+          )
+        })()}
 
-        {/* Lang + Theme */}
+        {/* Lang toggle */}
         {open ? (
           <Box sx={{ mx: 1.5, my: '4px', px: 2, display: 'flex', gap: 0.5 }}>
             {['bg', 'en'].map(l => (
@@ -233,36 +231,16 @@ export default function Sidebar() {
                 {l.toUpperCase()}
               </Button>
             ))}
-            <Tooltip title={isDark ? t('lightMode') : t('darkMode')} placement="right" arrow>
-              <IconButton onClick={() => setIsDark(!isDark)} size="small" sx={{
-                color: C.muted, border: `1px solid ${C.border}`, borderRadius: '8px',
-                width: 36, height: 36,
-                '&:hover': { background: C.accentSoft, color: C.primary, borderColor: C.primaryA20 },
-              }}>
-                {isDark ? <LightModeIcon fontSize="small" /> : <DarkModeIcon fontSize="small" />}
-              </IconButton>
-            </Tooltip>
           </Box>
         ) : (
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-            <Tooltip title={lang === 'bg' ? 'English' : 'Български'} placement="right" arrow>
-              <ListItemButton onClick={() => setLang(lang === 'bg' ? 'en' : 'bg')}
-                sx={{ justifyContent: 'center', px: 0, mx: 1, my: '1px', minHeight: 36 }}>
-                <Typography sx={{ fontSize: '10px', fontWeight: 700, color: C.muted }}>
-                  {lang === 'bg' ? 'EN' : 'BG'}
-                </Typography>
-              </ListItemButton>
-            </Tooltip>
-            <Tooltip title={isDark ? t('lightMode') : t('darkMode')} placement="right" arrow>
-              <ListItemButton onClick={() => setIsDark(!isDark)}
-                sx={{ justifyContent: 'center', px: 0, mx: 1, my: '1px', minHeight: 36 }}>
-                {isDark
-                  ? <LightModeIcon sx={{ fontSize: '18px', color: C.muted }} />
-                  : <DarkModeIcon  sx={{ fontSize: '18px', color: C.muted }} />
-                }
-              </ListItemButton>
-            </Tooltip>
-          </Box>
+          <Tooltip title={lang === 'bg' ? 'English' : 'Български'} placement="right" arrow>
+            <ListItemButton onClick={() => setLang(lang === 'bg' ? 'en' : 'bg')}
+              sx={{ justifyContent: 'center', px: 0, mx: 1, my: '1px', minHeight: 36 }}>
+              <Typography sx={{ fontSize: '10px', fontWeight: 700, color: C.muted }}>
+                {lang === 'bg' ? 'EN' : 'BG'}
+              </Typography>
+            </ListItemButton>
+          </Tooltip>
         )}
 
         {/* Logout */}
@@ -281,31 +259,7 @@ export default function Sidebar() {
         </Tooltip>
       </List>
 
-      {/* ── Notifications panel (coach only) ────────────── */}
-      {open && auth.role === 'coach' && showNotifs && (
-        <Box sx={{ mx: 1.5, mb: 1, maxHeight: '200px', overflowY: 'auto', flexShrink: 0 }}>
-          <Divider sx={{ borderColor: C.border, mb: 1 }} />
-          {notifications.length === 0 ? (
-            <Typography sx={{ color: C.muted, fontSize: '12px', px: 1, pb: 1 }}>{t('noNotifications')}</Typography>
-          ) : notifications.slice(0, 10).map((n, i) => (
-            <Box key={n.id || i} sx={{
-              px: 1.5, py: 0.75, mb: 0.5,
-              background: n.from_coach !== auth.name ? C.accentSoft : 'rgba(255,255,255,0.03)',
-              borderRadius: '10px', border: `1px solid ${n.from_coach !== auth.name ? C.primaryA20 : C.border}`,
-            }}>
-              <Typography sx={{ fontSize: '11.5px', fontWeight: 700, color: n.from_coach !== auth.name ? C.primary : C.muted }}>
-                {n.from_coach}
-                <Box component="span" sx={{ fontWeight: 400, color: C.muted, ml: 0.5 }}>→ {n.client_name}</Box>
-              </Typography>
-              <Typography sx={{ fontSize: '11px', color: C.text, mt: 0.25 }}>
-                {n.action_type === 'task' && `${t('taskNotifLbl')}: `}
-                {n.action_type === 'reaction' && `${t('reactionNotifLbl')}: `}
-                {n.content}
-              </Typography>
-            </Box>
-          ))}
-        </Box>
-      )}
+      {/* Notifications panel removed — now uses dedicated page */}
 
       {/* Spacer to push content up */}
       <Box sx={{ flex: 1 }} />
