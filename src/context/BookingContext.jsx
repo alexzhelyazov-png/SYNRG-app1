@@ -86,13 +86,35 @@ export function BookingProvider({ children }) {
       })
       if (result?.error) return { error: result.error }
       await Promise.all([loadSlots(), loadMyBookings(auth.id), loadMyPlan(auth.id)])
+
+      // Send booking confirmation email to client
+      const clientData = realClients.find(c => c.id === auth.id)
+      if (clientData?.email) {
+        const slot = slots.find(s => s.id === slotId)
+        const dateStr = slot ? new Date(slot.slot_date + 'T00:00:00').toLocaleDateString('bg-BG', { weekday: 'long', day: 'numeric', month: 'long' }) : ''
+        const timeStr = slot?.start_time?.slice(0, 5) || ''
+        DB.syncToMailerLite('send_email', clientData.email, auth.name, {},
+          'Записан си за тренировка!',
+          `<div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px;background:#1a1a1a;color:#e0e0e0;border-radius:16px">
+            <h2 style="color:#c4e9bf;margin:0 0 16px">${auth.name},</h2>
+            <p style="font-size:16px;line-height:1.6">Успешно се записа за тренировка!</p>
+            <div style="background:#252525;border-radius:12px;padding:16px;margin:16px 0">
+              <p style="margin:0;font-size:14px;color:#999">Дата: <strong style="color:#e0e0e0">${dateStr}</strong></p>
+              <p style="margin:4px 0 0;font-size:14px;color:#999">Час: <strong style="color:#c4e9bf">${timeStr}</strong></p>
+            </div>
+            <p style="font-size:13px;color:#666">Ако не можеш да присъстваш, моля отмени от приложението.</p>
+            <hr style="border:none;border-top:1px solid #333;margin:24px 0">
+            <p style="font-size:12px;color:#666">SYNRG Beyond Fitness</p>
+          </div>`)
+      }
+
       return { ok: true }
     } catch (e) {
       return { error: e.message || 'Грешка при записване' }
     } finally {
       setBookingBusy(false)
     }
-  }, [auth, loadSlots, loadMyBookings, loadMyPlan])
+  }, [auth, loadSlots, loadMyBookings, loadMyPlan, realClients, slots])
 
   // ── Client: cancel booking ────────────────────────────────
   const cancelBookingForSlot = useCallback(async (slotId) => {
@@ -104,13 +126,31 @@ export function BookingProvider({ children }) {
       })
       if (result?.error) return { error: result.error }
       await Promise.all([loadSlots(), loadMyBookings(auth.id), loadMyPlan(auth.id)])
+
+      // Notify coach about cancelled booking
+      const slot = slots.find(s => s.id === slotId)
+      const dateStr = slot ? new Date(slot.slot_date + 'T00:00:00').toLocaleDateString('bg-BG', { weekday: 'long', day: 'numeric', month: 'long' }) : ''
+      const timeStr = slot?.start_time?.slice(0, 5) || ''
+      DB.syncToMailerLite('send_email', 'info@synrg-beyondfitness.com', 'SYNRG Team', {},
+        `Отменена тренировка: ${auth.name}`,
+        `<div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px;background:#1a1a1a;color:#e0e0e0;border-radius:16px">
+          <h2 style="color:#F87171;margin:0 0 16px">Отменена тренировка</h2>
+          <p style="font-size:16px;line-height:1.6"><strong>${auth.name}</strong> отмени тренировката си.</p>
+          <div style="background:#252525;border-radius:12px;padding:16px;margin:16px 0">
+            <p style="margin:0;font-size:14px;color:#999">Дата: <strong style="color:#e0e0e0">${dateStr}</strong></p>
+            <p style="margin:4px 0 0;font-size:14px;color:#999">Час: <strong style="color:#e0e0e0">${timeStr}</strong></p>
+          </div>
+          <hr style="border:none;border-top:1px solid #333;margin:24px 0">
+          <p style="font-size:12px;color:#666">SYNRG Beyond Fitness</p>
+        </div>`)
+
       return { ok: true }
     } catch (e) {
       return { error: e.message || 'Грешка при отказ' }
     } finally {
       setBookingBusy(false)
     }
-  }, [auth, loadSlots, loadMyBookings, loadMyPlan])
+  }, [auth, loadSlots, loadMyBookings, loadMyPlan, slots])
 
   // Coach/admin cancels a booking on behalf of a specific client
   const cancelBookingForClient = useCallback(async (slotId, clientId) => {

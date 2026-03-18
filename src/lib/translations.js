@@ -18,6 +18,13 @@ export const T = {
     closeBtn:           'Затвори',
     installOnPhone:     'Свали на телефона си',
     tagline:            'Фитнес платформа за студиото',
+    myProfileLbl:       'Моят профил',
+    planLbl:            'План',
+    creditsLbl:         'Оставащи кредити',
+    validToLbl:         'Валиден до',
+    noPlanLbl:          'Няма активен план',
+    emailLbl:           'Имейл',
+    modulesLbl:         'Достъп',
 
     // ── Loading / Error ───────────────────────────────
     loading:            'Зареждане от базата данни...',
@@ -771,6 +778,13 @@ export const T = {
     closeBtn:           'Close',
     installOnPhone:     'Download on your phone',
     tagline:            'Fitness platform for the studio',
+    myProfileLbl:       'My profile',
+    planLbl:            'Plan',
+    creditsLbl:         'Remaining credits',
+    validToLbl:         'Valid until',
+    noPlanLbl:          'No active plan',
+    emailLbl:           'Email',
+    modulesLbl:         'Access',
 
     // ── Loading / Error ───────────────────────────────
     loading:            'Loading from database...',

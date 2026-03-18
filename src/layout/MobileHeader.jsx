@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import {
-  AppBar, Toolbar, Box, Typography, IconButton, Button, Badge,
+  AppBar, Toolbar, Box, Typography, IconButton, Button, Badge, Dialog,
   Drawer, List, ListItemButton, ListItemIcon, ListItemText, Divider,
 } from '@mui/material'
 import MenuIcon             from '@mui/icons-material/Menu'
@@ -14,6 +14,8 @@ import StorefrontIcon       from '@mui/icons-material/Storefront'
 import OndemandVideoIcon    from '@mui/icons-material/OndemandVideo'
 import AttachMoneyIcon      from '@mui/icons-material/AttachMoney'
 import { useApp } from '../context/AppContext'
+import { useBooking } from '../context/BookingContext'
+import { creditsRemaining, daysUntilExpiry, fmtValidTo } from '../lib/bookingUtils'
 import { C, EASE } from '../theme'
 import SynrgLogo from './SynrgLogo'
 
@@ -33,7 +35,9 @@ function getSiteLinks(t) {
 
 export default function MobileHeader() {
   const { auth, logout, client, lang, setLang, setView, setCoachClientMode, setViewingCoach, unreadNotifCount, t } = useApp()
+  const { myPlan } = useBooking()
   const [siteMenuOpen, setSiteMenuOpen] = useState(false)
+  const [showProfile, setShowProfile] = useState(false)
 
   const siteLinks = getSiteLinks(t)
 
@@ -62,18 +66,21 @@ export default function MobileHeader() {
 
           {/* ── Leading: avatar + name ──────────────────────── */}
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flex: 1, minWidth: 0 }}>
-            {/* Role avatar */}
-            <Box sx={{
-              width:          40,
-              height:         40,
-              borderRadius:   '12px',
-              background:     auth.role === 'coach' ? C.primaryContainer : C.purpleSoft,
-              border:         `1px solid ${auth.role === 'coach' ? 'rgba(196,233,191,0.2)' : 'rgba(200,197,255,0.2)'}`,
-              display:        'flex',
-              alignItems:     'center',
-              justifyContent: 'center',
-              flexShrink:     0,
-            }}>
+            {/* Role avatar — clickable for clients */}
+            <Box
+              onClick={auth.role === 'client' ? () => setShowProfile(true) : undefined}
+              sx={{
+                width:          40,
+                height:         40,
+                borderRadius:   '12px',
+                background:     auth.role === 'coach' ? C.primaryContainer : C.purpleSoft,
+                border:         `1px solid ${auth.role === 'coach' ? 'rgba(196,233,191,0.2)' : 'rgba(200,197,255,0.2)'}`,
+                display:        'flex',
+                alignItems:     'center',
+                justifyContent: 'center',
+                flexShrink:     0,
+                cursor:         auth.role === 'client' ? 'pointer' : 'default',
+              }}>
               {auth.role === 'coach'
                 ? <FitnessCenterIcon sx={{ fontSize: '20px', color: C.primary }} />
                 : <DirectionsRunIcon sx={{ fontSize: '20px', color: C.purple }} />
@@ -227,6 +234,84 @@ export default function MobileHeader() {
           </Box>
         </Drawer>
       )}
+
+      {/* ── Client profile dialog ─────────────────────────── */}
+      {auth.role === 'client' && (
+        <Dialog
+          open={showProfile}
+          onClose={() => setShowProfile(false)}
+          PaperProps={{ sx: { borderRadius: '20px', maxWidth: '380px', width: '100%', p: 3 } }}
+        >
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2.5 }}>
+            <Box sx={{
+              width: 44, height: 44, borderRadius: '12px',
+              background: C.purpleSoft, border: '1px solid rgba(200,197,255,0.2)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              <DirectionsRunIcon sx={{ fontSize: '22px', color: C.purple }} />
+            </Box>
+            <Box>
+              <Typography sx={{ fontWeight: 800, fontSize: '17px', color: C.text }}>{auth.name}</Typography>
+              <Typography sx={{ fontSize: '12px', color: C.muted }}>{t('clientRole')}</Typography>
+            </Box>
+          </Box>
+
+          {client?.email && (
+            <ProfileRow label={t('emailLbl')} value={client.email} />
+          )}
+
+          {myPlan ? (
+            <>
+              <ProfileRow label={t('planLbl')}
+                value={myPlan.plan_type === 'unlimited' ? 'Unlimited' : `${myPlan.plan_type} ${t('remainingSessionsLbl') || 'sessions'}`}
+                color={C.primary} />
+              {myPlan.plan_type !== 'unlimited' && (
+                <ProfileRow label={t('creditsLbl')}
+                  value={`${creditsRemaining(myPlan)} / ${myPlan.credits_total}`}
+                  color={creditsRemaining(myPlan) <= 2 ? '#F87171' : C.primary} />
+              )}
+              <ProfileRow label={t('validToLbl')}
+                value={fmtValidTo(myPlan)}
+                color={daysUntilExpiry(myPlan) <= 3 ? '#F87171' : daysUntilExpiry(myPlan) <= 7 ? '#FB923C' : C.text} />
+            </>
+          ) : (
+            <ProfileRow label={t('planLbl')} value={t('noPlanLbl')} color="#F87171" />
+          )}
+
+          {auth.modules?.length > 0 && (
+            <Box sx={{ mt: 1.5 }}>
+              <Typography sx={{ fontSize: '10px', fontWeight: 700, color: C.muted, mb: 0.5, letterSpacing: '0.08em' }}>
+                {t('modulesLbl')}
+              </Typography>
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                {auth.modules.map(m => (
+                  <Box key={m} sx={{
+                    px: 1, py: '3px', borderRadius: '6px', fontSize: '11px', fontWeight: 600,
+                    background: C.accentSoft, color: C.primary, border: `1px solid ${C.primaryA20}`,
+                  }}>
+                    {m.replace(/_/g, ' ')}
+                  </Box>
+                ))}
+              </Box>
+            </Box>
+          )}
+
+          <Button fullWidth onClick={() => setShowProfile(false)}
+            sx={{ mt: 2.5, color: C.muted, fontSize: '13px', fontWeight: 600 }}>
+            {t('closeBtn')}
+          </Button>
+        </Dialog>
+      )}
     </>
+  )
+}
+
+function ProfileRow({ label, value, color }) {
+  return (
+    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 1,
+      borderBottom: `1px solid ${C.border}` }}>
+      <Typography sx={{ fontSize: '13px', color: C.muted, fontWeight: 600 }}>{label}</Typography>
+      <Typography sx={{ fontSize: '14px', fontWeight: 700, color: color || C.text }}>{value}</Typography>
+    </Box>
   )
 }

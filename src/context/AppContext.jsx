@@ -208,8 +208,19 @@ export function AppProvider({ children }) {
     // Notify coaches/admins about the new registration
     DB.insertNotification('Система', name, 'registration', name)
 
-    // Sync to MailerLite (if email provided)
-    if (email) DB.syncToMailerLite('register', email, name)
+    // Sync to MailerLite + send welcome email (if email provided)
+    if (email) {
+      DB.syncToMailerLite('register', email, name)
+      DB.syncToMailerLite('send_email', email, name, {},
+        'Добре дошъл в SYNRG Beyond Fitness!',
+        `<div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px;background:#1a1a1a;color:#e0e0e0;border-radius:16px">
+          <h2 style="color:#c4e9bf;margin:0 0 16px">${name},</h2>
+          <p style="font-size:16px;line-height:1.6">Добре дошъл в SYNRG Beyond Fitness!</p>
+          <p style="font-size:14px;color:#999;line-height:1.6">Профилът ти е създаден успешно. Очакваме те в студиото!</p>
+          <hr style="border:none;border-top:1px solid #333;margin:24px 0">
+          <p style="font-size:12px;color:#666">SYNRG Beyond Fitness</p>
+        </div>`)
+    }
 
     return null
   }
