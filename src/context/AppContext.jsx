@@ -357,11 +357,20 @@ export function AppProvider({ children }) {
   const kcalPct  = Math.min((foodTotals.kcal    / (client.calorieTarget || 1)) * 100, 100)
   const protPct  = Math.min((foodTotals.protein / (client.proteinTarget || 1)) * 100, 100)
 
-  // ── Notifications: unread count ───────────────────────────────
+  // ── Notifications: unread count (resets when viewing notifications page) ──
+  const [lastNotifSeen, setLastNotifSeen] = useState(() => {
+    return localStorage.getItem('synrg_last_notif_seen') || ''
+  })
+  function markNotifsRead() {
+    const now = new Date().toISOString()
+    setLastNotifSeen(now)
+    localStorage.setItem('synrg_last_notif_seen', now)
+  }
   const unreadNotifCount = useMemo(() => {
     if (!auth.isLoggedIn || auth.role !== 'coach') return 0
-    return notifications.filter(n => n.from_coach !== auth.name).length
-  }, [notifications, auth])
+    if (!lastNotifSeen) return notifications.filter(n => n.from_coach !== auth.name).length
+    return notifications.filter(n => n.from_coach !== auth.name && n.created_at > lastNotifSeen).length
+  }, [notifications, auth, lastNotifSeen])
 
   // ── Update helpers ────────────────────────────────────────────
   function updateClient(fn) {
@@ -465,15 +474,32 @@ export function AppProvider({ children }) {
   }
 
   async function deleteClient(clientId) {
-    const [clientMeals, clientWorkouts, clientWeights] = await Promise.all([
-      DB.findWhere('meals',       'client_id', clientId),
-      DB.findWhere('workouts',    'client_id', clientId),
-      DB.findWhere('weight_logs', 'client_id', clientId),
+    const [clientMeals, clientWorkouts, clientWeights, clientTasks, clientReactions, clientSteps, clientPlans, clientBookings] = await Promise.all([
+      DB.findWhere('meals',          'client_id', clientId),
+      DB.findWhere('workouts',       'client_id', clientId),
+      DB.findWhere('weight_logs',    'client_id', clientId),
+      DB.findWhere('tasks',          'client_id', clientId),
+      DB.findWhere('reactions',      'client_id', clientId),
+      DB.findWhere('steps_logs',     'client_id', clientId).catch(() => []),
+      DB.findWhere('client_plans',   'client_id', clientId).catch(() => []),
+      DB.findWhere('slot_bookings',  'client_id', clientId).catch(() => []),
     ])
+    // Delete task comments for each task
+    const taskCommentDeletes = []
+    for (const tk of clientTasks) {
+      const comments = await DB.findWhere('task_comments', 'task_id', tk.id).catch(() => [])
+      comments.forEach(c => taskCommentDeletes.push(DB.deleteById('task_comments', c.id)))
+    }
     await Promise.all([
-      ...clientMeals.map(m    => DB.deleteById('meals',       m.id)),
-      ...clientWorkouts.map(w => DB.deleteById('workouts',    w.id)),
-      ...clientWeights.map(w  => DB.deleteById('weight_logs', w.id)),
+      ...taskCommentDeletes,
+      ...clientMeals.map(m     => DB.deleteById('meals',          m.id)),
+      ...clientWorkouts.map(w  => DB.deleteById('workouts',       w.id)),
+      ...clientWeights.map(w   => DB.deleteById('weight_logs',    w.id)),
+      ...clientTasks.map(tk    => DB.deleteById('tasks',          tk.id)),
+      ...clientReactions.map(r => DB.deleteById('reactions',      r.id)),
+      ...clientSteps.map(s     => DB.deleteById('steps_logs',     s.id)),
+      ...clientPlans.map(p     => DB.deleteById('client_plans',   p.id)),
+      ...clientBookings.map(b  => DB.deleteById('slot_bookings',  b.id)),
       DB.deleteById('clients', clientId),
     ])
     setClients(prev => {
@@ -710,7 +736,7 @@ export function AppProvider({ children }) {
     // Snackbar
     snackbar, showSnackbar, closeSnackbar,
     // Notifications
-    notifications, unreadNotifCount, pollNotifications,
+    notifications, unreadNotifCount, markNotifsRead, pollNotifications,
     // Workout
     exName, setExName,
     exScheme, setExScheme,

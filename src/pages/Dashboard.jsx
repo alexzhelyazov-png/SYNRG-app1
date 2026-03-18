@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
-import { Box, Typography, TextField, Button, Chip, Paper, Switch, Collapse, Tabs, Tab } from '@mui/material'
+import { Box, Typography, TextField, Button, Chip, Paper, Switch, Collapse, Tabs, Tab, IconButton, Tooltip } from '@mui/material'
 import ArrowBackIcon from '@mui/icons-material/ArrowBack'
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline'
 import { useApp } from '../context/AppContext'
 import { useBooking } from '../context/BookingContext'
 import { WORKOUT_CATEGORIES } from '../lib/constants'
@@ -252,6 +253,7 @@ function DashboardCoach() {
   const {
     t, visibleClients, realClients, actualIdx, setSelIdx,
     setCurrentWorkout, setCoachClientMode, setShowClientMenu, setViewingCoach,
+    setConfirmDelete,
   } = useApp()
 
   const [recentIds, setRecentIds] = useState(_recentClientIds)
@@ -320,7 +322,16 @@ function DashboardCoach() {
                     {c.calorieTarget} kcal · {c.proteinTarget}{t('gUnit')} {t('proteinShortLbl')}
                   </Typography>
                 </Box>
-                {isSel && <Box sx={{ fontSize: '16px', flexShrink: 0, color: C.primary }}>✓</Box>}
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flexShrink: 0 }}>
+                  {isSel && <Box sx={{ fontSize: '16px', color: C.primary }}>✓</Box>}
+                  <Tooltip title={t('deleteClientBtn')} arrow>
+                    <IconButton size="small"
+                      onClick={e => { e.stopPropagation(); setConfirmDelete({ id: c.id, name: c.name }) }}
+                      sx={{ color: C.muted, opacity: 0.5, '&:hover': { color: '#F87171', opacity: 1 } }}>
+                      <DeleteOutlineIcon sx={{ fontSize: 16 }} />
+                    </IconButton>
+                  </Tooltip>
+                </Box>
               </Box>
             )
           })}
