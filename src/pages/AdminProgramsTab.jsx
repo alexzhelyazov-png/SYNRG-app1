@@ -455,7 +455,7 @@ function LessonDialog({ t, item, modules, onClose, onSave }) {
 // ══════════════════════════════════════════════════════════════
 // RESOURCES SUB-TAB
 // ══════════════════════════════════════════════════════════════
-function ResourcesSubTab({ t }) {
+function ResourcesSubTab({ t, onSelectResource }) {
   const { showSnackbar } = useApp()
   const [items, setItems] = useState([])
   const [dlg, setDlg]     = useState(null)
@@ -480,21 +480,21 @@ function ResourcesSubTab({ t }) {
       {items.length === 0 && <Typography sx={{ fontSize: '13px', color: C.muted }}>{t('noResources')}</Typography>}
       <Paper sx={{ borderRadius: '14px', overflow: 'hidden' }}>
         {items.map((r, i) => (
-          <Box key={r.id} sx={{
+          <Box key={r.id} onClick={() => onSelectResource && onSelectResource(r)} sx={{
             px: 2, py: 1.5, display: 'flex', alignItems: 'center', gap: 1.5,
             borderBottom: i < items.length - 1 ? `1px solid ${C.border}` : 'none',
+            cursor: 'pointer', '&:hover': { background: C.listHover },
           }}>
             <PlayCircleIcon sx={{ fontSize: 20, color: r.video_url ? C.primary : C.muted, flexShrink: 0 }} />
             <Box sx={{ flex: 1 }}>
               <Typography sx={{ fontWeight: 600, fontSize: '14px', color: C.text }}>{r.name_bg}</Typography>
               <Typography sx={{ fontSize: '11px', color: C.muted }}>
                 {r.category_bg || '–'} · {r.duration_min || 0} {t('minutesShort')}
-                {r.video_url && ' · video'}
               </Typography>
             </Box>
             <StatusChip status={r.status} t={t} />
-            <IconButton size="small" onClick={() => setDlg(r)}><EditIcon sx={{ fontSize: 16, color: C.muted }} /></IconButton>
-            <IconButton size="small" onClick={() => del(r.id)}><DeleteOutlineIcon sx={{ fontSize: 16, color: C.danger }} /></IconButton>
+            <IconButton size="small" onClick={(e) => { e.stopPropagation(); setDlg(r) }}><EditIcon sx={{ fontSize: 16, color: C.muted }} /></IconButton>
+            <IconButton size="small" onClick={(e) => { e.stopPropagation(); del(r.id) }}><DeleteOutlineIcon sx={{ fontSize: 16, color: C.danger }} /></IconButton>
           </Box>
         ))}
       </Paper>
@@ -602,12 +602,145 @@ function ResourceDialog({ t, item, onClose, onSave }) {
 }
 
 // ══════════════════════════════════════════════════════════════
+// RESOURCE STEPS SUB-TAB
+// ══════════════════════════════════════════════════════════════
+function ResourceStepsSubTab({ t, resourceId }) {
+  const { showSnackbar } = useApp()
+  const [items, setItems] = useState([])
+  const [dlg, setDlg]     = useState(null)
+
+  const load = async () => {
+    if (!resourceId) { setItems([]); return }
+    setItems(await DB.getResourceSteps(resourceId))
+  }
+  useEffect(() => { load() }, [resourceId])
+
+  const save = async (data) => {
+    if (dlg?.id) await DB.update('resource_steps', dlg.id, data)
+    else await DB.insert('resource_steps', { ...data, resource_id: resourceId })
+    showSnackbar(t('savedMsg'))
+    setDlg(null); load()
+  }
+  const del = async (id) => { await DB.deleteById('resource_steps', id); showSnackbar(t('deletedMsg')); load() }
+
+  if (!resourceId) return <Typography sx={{ fontSize: '13px', color: C.muted }}>Избери ресурс</Typography>
+
+  return (
+    <Box>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
+        <Typography sx={{ fontWeight: 700, fontSize: '14px', color: C.text }}>Стъпки</Typography>
+        <Button size="small" startIcon={<AddIcon />} onClick={() => setDlg({})} sx={{ color: C.primary, fontSize: '12px' }}>Нова стъпка</Button>
+      </Box>
+      {items.length === 0 && <Typography sx={{ fontSize: '13px', color: C.muted }}>Няма стъпки</Typography>}
+      <Paper sx={{ borderRadius: '14px', overflow: 'hidden' }}>
+        {items.map((s, i) => (
+          <Box key={s.id} sx={{ px: 2, py: 1.5, display: 'flex', alignItems: 'center', gap: 1.5,
+            borderBottom: i < items.length - 1 ? `1px solid ${C.border}` : 'none' }}>
+            <PlayCircleIcon sx={{ fontSize: 20, color: s.video_url ? C.primary : C.muted, flexShrink: 0 }} />
+            <Box sx={{ flex: 1 }}>
+              <Typography sx={{ fontWeight: 600, fontSize: '14px', color: C.text }}>{s.name_bg}</Typography>
+              <Typography sx={{ fontSize: '11px', color: C.muted }}>{s.duration_min || 0} {t('minutesShort')} {s.video_url && '· video'}</Typography>
+            </Box>
+            <IconButton size="small" onClick={() => setDlg(s)}><EditIcon sx={{ fontSize: 16, color: C.muted }} /></IconButton>
+            <IconButton size="small" onClick={() => del(s.id)}><DeleteOutlineIcon sx={{ fontSize: 16, color: C.danger }} /></IconButton>
+          </Box>
+        ))}
+      </Paper>
+      {dlg !== null && <StepDialog t={t} item={dlg} onClose={() => setDlg(null)} onSave={save} />}
+    </Box>
+  )
+}
+
+function StepDialog({ t, item, onClose, onSave }) {
+  const [f, setF] = useState({
+    name_bg: '', name_en: '', description_bg: '', description_en: '',
+    video_url: '', thumbnail_url: '', duration_min: 0, display_order: 0,
+    ...item,
+  })
+  const set = (k, v) => setF(p => ({ ...p, [k]: v }))
+  const parsed = parseVideoUrl(f.video_url)
+  const [uploading, setUploading] = useState(false)
+  const [uploadPct, setUploadPct] = useState(0)
+  const [uploadError, setUploadError] = useState('')
+  const fileRef = useRef(null)
+
+  async function handleBunnyUpload(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setUploading(true); setUploadPct(0); setUploadError('')
+    try {
+      const title = f.name_bg || f.name_en || file.name.replace(/\.[^.]+$/, '')
+      const createRes = await fetch(`${SUPABASE_URL}/functions/v1/bunny-upload`, {
+        method: 'POST', headers: { 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'create', title }),
+      })
+      if (!createRes.ok) throw new Error('Failed')
+      const { uploadUrl, embedUrl, thumbnailUrl, apiKey } = await createRes.json()
+      await new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest()
+        xhr.open('PUT', uploadUrl)
+        xhr.setRequestHeader('AccessKey', apiKey)
+        xhr.upload.onprogress = (ev) => { if (ev.lengthComputable) setUploadPct(Math.round((ev.loaded / ev.total) * 100)) }
+        xhr.onload = () => xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new Error('Upload failed'))
+        xhr.onerror = () => reject(new Error('Error'))
+        xhr.send(file)
+      })
+      setF(prev => ({ ...prev, video_url: embedUrl, thumbnail_url: thumbnailUrl }))
+    } catch (err) { setUploadError(err.message) }
+    finally { setUploading(false); if (fileRef.current) fileRef.current.value = '' }
+  }
+
+  return (
+    <Dialog open onClose={onClose} maxWidth="sm" fullWidth>
+      <DialogTitle>{item?.id ? 'Редактирай стъпка' : 'Нова стъпка'}</DialogTitle>
+      <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, pt: '12px !important' }}>
+        <Box sx={{ display: 'flex', gap: 1.5 }}>
+          <TextField label={t('nameBg')} value={f.name_bg} onChange={e => set('name_bg', e.target.value)} fullWidth size="small" sx={inputSx} />
+          <TextField label={t('nameEn')} value={f.name_en} onChange={e => set('name_en', e.target.value)} fullWidth size="small" sx={inputSx} />
+        </Box>
+        <TextField label={t('descBg')} value={f.description_bg} onChange={e => set('description_bg', e.target.value)} fullWidth multiline rows={2} size="small" sx={inputSx} />
+        <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-start' }}>
+          <TextField label={t('videoUrl')} value={f.video_url} onChange={e => set('video_url', e.target.value)} fullWidth size="small" sx={inputSx}
+            helperText={parsed ? `${parsed.type} ✓` : t('videoUrlHint')} />
+          <input ref={fileRef} type="file" accept="video/*" style={{ display: 'none' }} onChange={handleBunnyUpload} />
+          <Button variant="outlined" size="small" disabled={uploading} onClick={() => fileRef.current?.click()} startIcon={<UploadSvg />}
+            sx={{ mt: 0.5, minWidth: 'auto', whiteSpace: 'nowrap', borderColor: C.border, color: C.muted, px: 1.5 }}>
+            {t('uploadVideoBtn')}
+          </Button>
+        </Box>
+        {uploading && (
+          <Box>
+            <LinearProgress variant="determinate" value={uploadPct} sx={{ height: 6, borderRadius: 3, background: C.border, '& .MuiLinearProgress-bar': { background: C.primary } }} />
+            <Typography sx={{ fontSize: '11px', color: C.muted, mt: 0.5 }}>{t('uploadingVideo')} {uploadPct}%</Typography>
+          </Box>
+        )}
+        {uploadError && <Typography sx={{ fontSize: '12px', color: C.danger }}>{uploadError}</Typography>}
+        {parsed && parsed.type !== 'direct' && (
+          <Box sx={{ position: 'relative', width: '100%', pt: '56.25%', borderRadius: '12px', overflow: 'hidden', background: '#000' }}>
+            <iframe src={parsed.embedUrl} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: 'none' }} allow="autoplay; fullscreen" allowFullScreen />
+          </Box>
+        )}
+        <Box sx={{ display: 'flex', gap: 1.5 }}>
+          <TextField label={t('durationMin')} type="number" value={f.duration_min} onChange={e => set('duration_min', +e.target.value)} sx={{ ...inputSx, width: 140 }} size="small" />
+          <TextField label={t('orderLbl')} type="number" value={f.display_order} onChange={e => set('display_order', +e.target.value)} sx={{ ...inputSx, width: 100 }} size="small" />
+        </Box>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose} sx={{ color: C.muted }}>{t('cancelBtn')}</Button>
+        <Button variant="contained" disabled={uploading} onClick={() => { const { id, created_at, resource_id, ...data } = f; onSave(data) }}>{t('saveBtn')}</Button>
+      </DialogActions>
+    </Dialog>
+  )
+}
+
+// ══════════════════════════════════════════════════════════════
 // MAIN ADMIN PROGRAMS TAB
 // ══════════════════════════════════════════════════════════════
 export default function AdminProgramsTab() {
   const { t } = useApp()
   const [sub, setSub] = useState('programs')
   const [selectedProgram, setSelectedProgram] = useState(null)
+  const [selectedResource, setSelectedResource] = useState(null)
   const [modules, setModules] = useState([])
 
   useEffect(() => {
@@ -620,6 +753,7 @@ export default function AdminProgramsTab() {
     { label: t('programModules'), key: 'modules' },
     { label: t('programLessons'), key: 'lessons' },
     { label: t('adminResources'), key: 'resources' },
+    { label: 'Стъпки',           key: 'steps' },
   ]
 
   return (
@@ -639,12 +773,12 @@ export default function AdminProgramsTab() {
         ))}
 
         {selectedProgram && (
-          <Chip
-            label={selectedProgram.name_bg}
-            size="small"
-            onDelete={() => setSelectedProgram(null)}
-            sx={{ ml: 1, background: C.primaryContainer, color: C.primary, fontWeight: 700 }}
-          />
+          <Chip label={selectedProgram.name_bg} size="small" onDelete={() => setSelectedProgram(null)}
+            sx={{ ml: 1, background: C.primaryContainer, color: C.primary, fontWeight: 700 }} />
+        )}
+        {selectedResource && (
+          <Chip label={selectedResource.name_bg} size="small" onDelete={() => setSelectedResource(null)}
+            sx={{ ml: 0.5, background: 'rgba(200,197,255,0.12)', color: '#C8C5FF', fontWeight: 700 }} />
         )}
       </Box>
 
@@ -655,7 +789,10 @@ export default function AdminProgramsTab() {
       )}
       {sub === 'modules' && <ModulesSubTab t={t} programId={selectedProgram?.id} />}
       {sub === 'lessons' && <LessonsSubTab t={t} programId={selectedProgram?.id} modules={modules} />}
-      {sub === 'resources' && <ResourcesSubTab t={t} />}
+      {sub === 'resources' && (
+        <ResourcesSubTab t={t} onSelectResource={(r) => { setSelectedResource(r); setSub('steps') }} />
+      )}
+      {sub === 'steps' && <ResourceStepsSubTab t={t} resourceId={selectedResource?.id} />}
     </Box>
   )
 }

@@ -500,33 +500,26 @@ function LessonView({ lesson, allLessons, progress, onBack, onToggle, onNavigate
 }
 
 // ── Resources List View ──────────────────────────────────────
-function ResourcesList({ resources, hasAccess, onWatch, t, lang }) {
+function ResourcesList({ resources, resourceSteps, resourceProgress, hasAccess, onSelect, t, lang }) {
   const n = (r) => lang === 'en' && r.name_en ? r.name_en : r.name_bg
   const d = (r) => lang === 'en' && r.description_en ? r.description_en : r.description_bg
   const cat = (r) => lang === 'en' && r.category_en ? r.category_en : r.category_bg
 
-  // Group by category
   const categories = useMemo(() => {
     const map = {}
-    resources.forEach(r => {
-      const c = cat(r) || ''
-      if (!map[c]) map[c] = []
-      map[c].push(r)
-    })
+    resources.forEach(r => { const c = cat(r) || ''; if (!map[c]) map[c] = []; map[c].push(r) })
     return Object.entries(map)
   }, [resources, lang])
 
+  const completedSet = useMemo(() => new Set(resourceProgress.map(p => p.step_id)), [resourceProgress])
+
   return (
     <Box>
-      <Typography variant="overline" sx={{ color: C.primary, display: 'block', mb: 0.5 }}>
-        {t('resourcesOverline')}
-      </Typography>
-      <Typography variant="h2" sx={{ color: C.text, mb: 3 }}>
-        {t('resourcesTitle')}
-      </Typography>
+      <Typography variant="overline" sx={{ color: C.primary, display: 'block', mb: 0.5 }}>{t('resourcesOverline')}</Typography>
+      <Typography variant="h2" sx={{ color: C.text, mb: 3 }}>{t('resourcesTitle')}</Typography>
 
       {!hasAccess && (
-        <Paper sx={{ p: 3, mb: 3, textAlign: 'center', background: 'rgba(200,197,255,0.06)', border: `1px solid rgba(200,197,255,0.15)` }}>
+        <Paper sx={{ p: 3, mb: 3, textAlign: 'center', background: 'rgba(200,197,255,0.06)', border: '1px solid rgba(200,197,255,0.15)' }}>
           <LockSvg />
           <Typography sx={{ fontSize: '14px', color: C.muted, mt: 1 }}>{t('resourcesLocked')}</Typography>
         </Paper>
@@ -546,55 +539,56 @@ function ResourcesList({ resources, hasAccess, onWatch, t, lang }) {
             </Typography>
           )}
           <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2 }}>
-            {items.map((res, i) => (
-              <Paper
-                key={res.id}
-                onClick={() => hasAccess && onWatch(res)}
-                sx={{
-                  cursor: hasAccess ? 'pointer' : 'default',
-                  overflow: 'hidden', p: 0,
-                  opacity: hasAccess ? 1 : 0.5,
-                  animation: `fadeInUp 0.3s ${EASE.standard} both`,
-                  animationDelay: `${i * 0.06}s`,
-                  '&:hover': hasAccess ? { transform: 'translateY(-2px)' } : {},
-                }}
-              >
-                {/* Thumbnail */}
-                <Box sx={{
-                  width: '100%', pt: '56.25%', position: 'relative',
-                  background: res.thumbnail_url
-                    ? `url(${res.thumbnail_url}) center/cover`
-                    : `linear-gradient(135deg, ${C.primaryContainer} 0%, ${C.purpleSoft} 100%)`,
-                }}>
-                  {hasAccess && (
-                    <Box sx={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <PlayCircleIcon sx={{ fontSize: 48, color: 'rgba(255,255,255,0.85)' }} />
-                    </Box>
-                  )}
-                  {!hasAccess && (
-                    <Box sx={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.4)' }}>
-                      <LockSvg />
-                    </Box>
-                  )}
-                  {res.duration_min > 0 && (
-                    <Box sx={{ position: 'absolute', bottom: 8, right: 8, background: 'rgba(0,0,0,0.7)', color: '#fff', borderRadius: '6px', px: 1, py: 0.25, fontSize: '11px', fontWeight: 700 }}>
-                      {res.duration_min} {t('minutesShort')}
-                    </Box>
-                  )}
-                </Box>
-                <Box sx={{ p: 2 }}>
-                  <Typography sx={{ fontWeight: 700, fontSize: '15px', color: C.text, lineHeight: 1.3 }}>
-                    {n(res)}
-                  </Typography>
-                  {d(res) && (
-                    <Typography sx={{ fontSize: '12px', color: C.muted, mt: 0.5, lineHeight: 1.4,
-                      display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-                      {d(res)}
-                    </Typography>
-                  )}
-                </Box>
-              </Paper>
-            ))}
+            {items.map((res, i) => {
+              const steps = resourceSteps.filter(s => s.resource_id === res.id)
+              const doneCount = steps.filter(s => completedSet.has(s.id)).length
+              const totalCount = steps.length
+              const pct = totalCount > 0 ? Math.round((doneCount / totalCount) * 100) : 0
+
+              return (
+                <Paper key={res.id} onClick={() => hasAccess && onSelect(res)}
+                  sx={{
+                    cursor: hasAccess ? 'pointer' : 'default', overflow: 'hidden', p: 0,
+                    opacity: hasAccess ? 1 : 0.5,
+                    animation: `fadeInUp 0.3s ${EASE.standard} both`, animationDelay: `${i * 0.06}s`,
+                    '&:hover': hasAccess ? { transform: 'translateY(-2px)' } : {},
+                  }}>
+                  <Box sx={{
+                    width: '100%', pt: '50%', position: 'relative',
+                    background: res.thumbnail_url ? `url(${res.thumbnail_url}) center/cover`
+                      : `linear-gradient(135deg, ${C.primaryContainer} 0%, ${C.purpleSoft} 100%)`,
+                  }}>
+                    {!hasAccess && (
+                      <Box sx={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.4)' }}>
+                        <LockSvg />
+                      </Box>
+                    )}
+                    {pct === 100 && (
+                      <Box sx={{ position: 'absolute', top: 12, right: 12, background: C.primary, color: C.primaryOn, borderRadius: '12px', px: 1.25, py: 0.4, fontSize: '11px', fontWeight: 800 }}>
+                        {t('completedLabel')}
+                      </Box>
+                    )}
+                  </Box>
+                  <Box sx={{ p: 2.5 }}>
+                    <Typography sx={{ fontWeight: 800, fontSize: '17px', color: C.text, mb: 0.5, lineHeight: 1.3 }}>{n(res)}</Typography>
+                    {d(res) && (
+                      <Typography sx={{ fontSize: '12px', color: C.muted, mb: 1.5, lineHeight: 1.4,
+                        display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{d(res)}</Typography>
+                    )}
+                    {totalCount > 0 && hasAccess && (
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                        <LinearProgress variant="determinate" value={pct}
+                          sx={{ flex: 1, height: 6, borderRadius: 3, backgroundColor: C.border,
+                            '& .MuiLinearProgress-bar': { borderRadius: 3, background: pct === 100 ? `linear-gradient(90deg, ${C.primary}, ${C.primaryDeep})` : C.primary } }} />
+                        <Typography sx={{ fontSize: '12px', fontWeight: 700, color: pct > 0 ? C.primary : C.muted, whiteSpace: 'nowrap' }}>
+                          {doneCount}/{totalCount}
+                        </Typography>
+                      </Box>
+                    )}
+                  </Box>
+                </Paper>
+              )
+            })}
           </Box>
         </Box>
       ))}
@@ -602,35 +596,119 @@ function ResourcesList({ resources, hasAccess, onWatch, t, lang }) {
   )
 }
 
-// ── Resource Video View ─────────────────────────────────────
-function ResourceView({ resource, onBack, t, lang }) {
+// ── Resource Detail View (steps list + video player) ─────────
+function ResourceDetail({ resource, steps, progress, onBack, onStep, onToggleStep, t, lang }) {
   const n = (o) => lang === 'en' && o.name_en ? o.name_en : o.name_bg
   const d = (o) => lang === 'en' && o.description_en ? o.description_en : o.description_bg
+  const completedSet = useMemo(() => new Set(progress.map(p => p.step_id)), [progress])
+  const doneCount = steps.filter(s => completedSet.has(s.id)).length
+  const pct = steps.length > 0 ? Math.round((doneCount / steps.length) * 100) : 0
+
+  return (
+    <Box sx={{ animation: 'fadeInUp 0.25s ease both' }}>
+      <Button startIcon={<ArrowBackIcon />} onClick={onBack}
+        sx={{ color: C.muted, mb: 2, '&:hover': { color: C.text } }}>{t('tabResources')}</Button>
+
+      {/* Hero */}
+      <Box sx={{
+        width: '100%', pt: '35%', position: 'relative', borderRadius: '20px', overflow: 'hidden', mb: 3,
+        background: resource.thumbnail_url ? `url(${resource.thumbnail_url}) center/cover`
+          : `linear-gradient(135deg, ${C.primaryContainer} 0%, ${C.purpleSoft} 100%)`,
+      }}>
+        <Box sx={{ position: 'absolute', inset: 0, background: 'linear-gradient(0deg, rgba(0,0,0,0.7) 0%, transparent 50%)',
+          display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', p: 3 }}>
+          <Typography sx={{ fontWeight: 800, fontSize: { xs: '22px', md: '28px' }, color: '#fff', lineHeight: 1.2, mb: 0.5 }}>{n(resource)}</Typography>
+          <Typography sx={{ fontSize: '14px', color: 'rgba(255,255,255,0.75)', maxWidth: '600px' }}>{d(resource)}</Typography>
+        </Box>
+      </Box>
+
+      {/* Progress bar */}
+      <Paper sx={{ p: 2.5, mb: 2.5, display: 'flex', alignItems: 'center', gap: 2.5 }}>
+        <Box sx={{ position: 'relative', display: 'inline-flex' }}>
+          <CircularProgress variant="determinate" value={pct} size={56} thickness={4}
+            sx={{ color: C.primary, '& .MuiCircularProgress-circle': { strokeLinecap: 'round' } }} />
+          <Box sx={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Typography sx={{ fontSize: '14px', fontWeight: 800, color: C.text }}>{pct}%</Typography>
+          </Box>
+        </Box>
+        <Box sx={{ flex: 1 }}>
+          <Typography sx={{ fontWeight: 700, fontSize: '15px', color: C.text }}>{t('programProgress')}</Typography>
+          <Typography sx={{ fontSize: '13px', color: C.muted }}>{doneCount} / {steps.length} {t('lessonsCount')} {t('completedLessons')}</Typography>
+        </Box>
+      </Paper>
+
+      {/* Steps list */}
+      <Paper sx={{ overflow: 'hidden', p: 0 }}>
+        {steps.map((step, i) => {
+          const isDone = completedSet.has(step.id)
+          return (
+            <Box key={step.id} sx={{
+              display: 'flex', alignItems: 'center', gap: 1.5, px: 2.5, py: 1.5,
+              borderBottom: i < steps.length - 1 ? `1px solid ${C.border}` : 'none',
+              cursor: 'pointer', '&:hover': { background: C.listHover },
+              animation: `fadeInUp 0.2s ${EASE.standard} both`, animationDelay: `${i * 0.04}s`,
+            }}>
+              <IconButton size="small" onClick={(e) => { e.stopPropagation(); onToggleStep(step.id) }} sx={{ p: 0.25 }}>
+                {isDone ? <CheckCircleIcon sx={{ fontSize: 22, color: C.primary }} />
+                  : <RadioButtonUncheckedIcon sx={{ fontSize: 22, color: C.muted }} />}
+              </IconButton>
+              <Box sx={{ flex: 1, minWidth: 0 }} onClick={() => onStep(step)}>
+                <Typography sx={{ fontWeight: 600, fontSize: '14px', lineHeight: 1.3,
+                  color: isDone ? C.muted : C.text, textDecoration: isDone ? 'line-through' : 'none' }}>
+                  {n(step)}
+                </Typography>
+              </Box>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, flexShrink: 0 }}>
+                {step.duration_min > 0 && (
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.3 }}>
+                    <AccessTimeIcon sx={{ fontSize: 14, color: C.muted }} />
+                    <Typography sx={{ fontSize: '12px', color: C.muted, fontWeight: 600 }}>{step.duration_min} {t('minutesShort')}</Typography>
+                  </Box>
+                )}
+                <IconButton size="small" onClick={() => onStep(step)} sx={{ color: C.primary }}>
+                  <PlayCircleIcon sx={{ fontSize: 22 }} />
+                </IconButton>
+              </Box>
+            </Box>
+          )
+        })}
+      </Paper>
+    </Box>
+  )
+}
+
+// ── Step Video View ─────────────────────────────────────────
+function StepView({ step, allSteps, progress, onBack, onToggle, onNavigate, t, lang }) {
+  const n = (o) => lang === 'en' && o.name_en ? o.name_en : o.name_bg
+  const d = (o) => lang === 'en' && o.description_en ? o.description_en : o.description_bg
+  const isDone = progress.some(p => p.step_id === step.id)
+  const idx = allSteps.findIndex(s => s.id === step.id)
+  const prev = idx > 0 ? allSteps[idx - 1] : null
+  const next = idx < allSteps.length - 1 ? allSteps[idx + 1] : null
 
   return (
     <Box sx={{ animation: 'fadeInUp 0.25s ease both', maxWidth: '900px', mx: 'auto' }}>
       <Button startIcon={<ArrowBackIcon />} onClick={onBack}
-        sx={{ color: C.muted, mb: 2, '&:hover': { color: C.text } }}>
-        {t('tabResources')}
-      </Button>
-      {resource.video_url && <VideoEmbed url={resource.video_url} />}
+        sx={{ color: C.muted, mb: 2, '&:hover': { color: C.text } }}>{t('backToProgram')}</Button>
+      {step.video_url && <VideoEmbed url={step.video_url} />}
       <Box sx={{ mt: 2.5 }}>
-        <Typography sx={{ fontWeight: 800, fontSize: { xs: '20px', md: '24px' }, color: C.text, mb: 1, lineHeight: 1.3 }}>
-          {n(resource)}
-        </Typography>
-        {resource.duration_min > 0 && (
+        <Typography sx={{ fontWeight: 800, fontSize: { xs: '20px', md: '24px' }, color: C.text, mb: 1, lineHeight: 1.3 }}>{n(step)}</Typography>
+        {step.duration_min > 0 && (
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 2 }}>
             <AccessTimeIcon sx={{ fontSize: 16, color: C.muted }} />
-            <Typography sx={{ fontSize: '13px', color: C.muted, fontWeight: 600 }}>
-              {resource.duration_min} {t('minutesShort')}
-            </Typography>
+            <Typography sx={{ fontSize: '13px', color: C.muted, fontWeight: 600 }}>{step.duration_min} {t('minutesShort')}</Typography>
           </Box>
         )}
-        {d(resource) && (
-          <Typography sx={{ fontSize: '14px', color: C.muted, lineHeight: 1.7 }}>
-            {d(resource)}
-          </Typography>
-        )}
+        {d(step) && <Typography sx={{ fontSize: '14px', color: C.muted, lineHeight: 1.7, mb: 2.5 }}>{d(step)}</Typography>}
+        <Button variant={isDone ? 'outlined' : 'contained'}
+          startIcon={isDone ? <CheckCircleIcon /> : <RadioButtonUncheckedIcon />}
+          onClick={() => onToggle(step.id)} sx={{ mb: 2.5 }}>
+          {isDone ? t('markIncomplete') : t('markComplete')}
+        </Button>
+        <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap' }}>
+          {prev && <Button variant="outlined" size="small" startIcon={<SkipPreviousIcon />} onClick={() => onNavigate(prev)} sx={{ flex: 1 }}>{n(prev)}</Button>}
+          {next && <Button variant="outlined" size="small" endIcon={<SkipNextIcon />} onClick={() => onNavigate(next)} sx={{ flex: 1 }}>{n(next)}</Button>}
+        </Box>
       </Box>
     </Box>
   )
@@ -649,6 +727,8 @@ export default function Programs() {
   const [progress, setProgress]   = useState([])
   const [purchases, setPurchases] = useState([])
   const [resources, setResources] = useState([])
+  const [resourceSteps, setResourceSteps] = useState([])
+  const [resourceProgress, setResourceProgress] = useState([])
   const [loading, setLoading]     = useState(true)
   const [buyLoading, setBuyLoading] = useState(null)
 
@@ -656,6 +736,7 @@ export default function Programs() {
   const [selectedProgram, setSelectedProgram] = useState(null)
   const [selectedLesson, setSelectedLesson]   = useState(null)
   const [selectedResource, setSelectedResource] = useState(null)
+  const [selectedStep, setSelectedStep] = useState(null)
 
   // Check for purchase success URL param
   useEffect(() => {
@@ -686,6 +767,7 @@ export default function Programs() {
       setPrograms(progs)
       setResources(res)
 
+      // Load program modules + lessons
       const allModules = []
       const allLessons = []
       await Promise.all(progs.map(async (p) => {
@@ -699,13 +781,23 @@ export default function Programs() {
       setModules(allModules)
       setLessons(allLessons)
 
+      // Load resource steps
+      const allSteps = []
+      await Promise.all(res.map(async (r) => {
+        const steps = await DB.getResourceSteps(r.id)
+        allSteps.push(...steps)
+      }))
+      setResourceSteps(allSteps)
+
       if (auth.id) {
-        const [prog, purch] = await Promise.all([
+        const [prog, purch, resProg] = await Promise.all([
           DB.getClientProgress(auth.id),
           DB.getClientPurchases(auth.id),
+          DB.getResourceProgress(auth.id),
         ])
         setProgress(prog)
         setPurchases(purch)
+        setResourceProgress(resProg)
       }
     } catch (err) {
       console.error('Programs load error:', err)
@@ -726,6 +818,18 @@ export default function Programs() {
       setProgress(prev => [...prev, { client_id: auth.id, lesson_id: lessonId, completed_at: new Date().toISOString() }])
     }
   }, [auth.id, progress])
+
+  // Toggle resource step completion
+  const toggleStep = useCallback(async (stepId) => {
+    const isDone = resourceProgress.some(p => p.step_id === stepId)
+    if (isDone) {
+      await DB.unmarkStepComplete(auth.id, stepId)
+      setResourceProgress(prev => prev.filter(p => p.step_id !== stepId))
+    } else {
+      await DB.markStepComplete(auth.id, stepId)
+      setResourceProgress(prev => [...prev, { client_id: auth.id, step_id: stepId, completed_at: new Date().toISOString() }])
+    }
+  }, [auth.id, resourceProgress])
 
   const handleBuy = useCallback(async (prog) => {
     if (!prog.stripe_price_id) { showSnackbar(t('purchaseError')); return }
@@ -775,10 +879,21 @@ export default function Programs() {
       onToggle={toggleLesson} t={t} lang={lang} />
   }
 
-  // Resource Video View
+  // Step Video View (inside resource)
+  if (selectedStep && selectedResource) {
+    const resSteps = resourceSteps.filter(s => s.resource_id === selectedResource.id)
+    return <StepView step={selectedStep} allSteps={resSteps} progress={resourceProgress}
+      onBack={() => setSelectedStep(null)} onToggle={toggleStep}
+      onNavigate={(s) => { setSelectedStep(s); window.scrollTo({ top: 0, behavior: 'smooth' }) }} t={t} lang={lang} />
+  }
+
+  // Resource Detail View (steps list)
   if (selectedResource) {
-    return <ResourceView resource={selectedResource}
-      onBack={() => setSelectedResource(null)} t={t} lang={lang} />
+    const resSteps = resourceSteps.filter(s => s.resource_id === selectedResource.id)
+    return <ResourceDetail resource={selectedResource} steps={resSteps} progress={resourceProgress}
+      onBack={() => setSelectedResource(null)}
+      onStep={(s) => { setSelectedStep(s); window.scrollTo({ top: 0, behavior: 'smooth' }) }}
+      onToggleStep={toggleStep} t={t} lang={lang} />
   }
 
   // ── Main view with sub-tabs ────────────────────────────────
@@ -807,8 +922,9 @@ export default function Programs() {
           onBuy={handleBuy} buyLoading={buyLoading} t={t} lang={lang} auth={auth} />
       )}
       {tab === 'resources' && (
-        <ResourcesList resources={resources} hasAccess={hasResourceAccess}
-          onWatch={(r) => { setSelectedResource(r); window.scrollTo({ top: 0, behavior: 'smooth' }) }}
+        <ResourcesList resources={resources} resourceSteps={resourceSteps} resourceProgress={resourceProgress}
+          hasAccess={hasResourceAccess}
+          onSelect={(r) => { setSelectedResource(r); window.scrollTo({ top: 0, behavior: 'smooth' }) }}
           t={t} lang={lang} />
       )}
     </Box>

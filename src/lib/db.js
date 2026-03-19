@@ -466,6 +466,55 @@ export const DB = {
     return filtered.sort((a, b) => (a.display_order || 0) - (b.display_order || 0))
   },
 
+  // ── Resource Steps + Progress ─────────────────────────────
+  async getResourceSteps(resourceId) {
+    if (isUsingSupabase) {
+      return (await sbFetchSafe(
+        sbUrl('resource_steps', `?select=*&resource_id=eq.${resourceId}&order=display_order.asc`),
+        { headers: sbHeaders() }
+      )) || []
+    }
+    const all = await LS.selectAll('resource_steps')
+    return all.filter(s => s.resource_id === resourceId).sort((a, b) => (a.display_order || 0) - (b.display_order || 0))
+  },
+
+  async getResourceProgress(clientId) {
+    if (isUsingSupabase) {
+      return (await sbFetchSafe(
+        sbUrl('resource_step_progress', `?select=*&client_id=eq.${clientId}`),
+        { headers: sbHeaders() }
+      )) || []
+    }
+    const all = await LS.selectAll('resource_step_progress')
+    return all.filter(p => p.client_id === clientId)
+  },
+
+  async markStepComplete(clientId, stepId) {
+    if (isUsingSupabase) {
+      return (await sbFetchSafe(sbUrl('resource_step_progress'), {
+        method: 'POST',
+        headers: sbHeaders({ 'Prefer': 'return=representation,resolution=ignore-duplicates' }),
+        body: JSON.stringify({ client_id: clientId, step_id: stepId }),
+      })) || {}
+    }
+    const all = await LS.selectAll('resource_step_progress')
+    if (all.some(p => p.client_id === clientId && p.step_id === stepId)) return
+    return LS.insert('resource_step_progress', { client_id: clientId, step_id: stepId })
+  },
+
+  async unmarkStepComplete(clientId, stepId) {
+    if (isUsingSupabase) {
+      await sbFetchSafe(
+        sbUrl('resource_step_progress', `?client_id=eq.${clientId}&step_id=eq.${stepId}`),
+        { method: 'DELETE', headers: sbHeaders() }
+      )
+      return
+    }
+    const all = await LS.selectAll('resource_step_progress')
+    const entry = all.find(p => p.client_id === clientId && p.step_id === stepId)
+    if (entry) await LS.deleteById('resource_step_progress', entry.id)
+  },
+
   // ── Program Purchases ───────────────────────────────────
   async getClientPurchases(clientId) {
     if (isUsingSupabase) {
