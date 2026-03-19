@@ -29,8 +29,8 @@ export function parseVideoUrl(url) {
     return { type: 'bunny', embedUrl: `https://iframe.mediadelivery.net/embed/${bunnyMatch[1]}/${bunnyMatch[2]}?autoplay=false&preload=true` }
   }
 
-  // Bunny Stream direct URL (just the video ID + library)
-  const bunnyDirect = u.match(/iframe\.mediadelivery\.net\/play\/(\d+)\/([a-f0-9-]+)/)
+  // Bunny Stream play URL (player.mediadelivery.net/play/ or iframe.mediadelivery.net/play/)
+  const bunnyDirect = u.match(/(?:player|iframe)\.mediadelivery\.net\/play\/(\d+)\/([a-f0-9-]+)/)
   if (bunnyDirect) {
     return { type: 'bunny', embedUrl: `https://iframe.mediadelivery.net/embed/${bunnyDirect[1]}/${bunnyDirect[2]}?autoplay=false&preload=true` }
   }

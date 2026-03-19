@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect, useRef } from 'react'
 import { Box, Typography, Dialog, IconButton } from '@mui/material'
+import Ranking from './Ranking'
 import { useApp } from '../context/AppContext'
 import { C, EASE } from '../theme'
 import {
@@ -61,6 +62,7 @@ export default function Progress() {
   const { client, t, lang, dismissBadge } = useApp()
   const isMobile = window.innerWidth < 640
   const [selectedBadge, setSelectedBadge] = useState(null)
+  const [tab, setTab] = useState('progress') // 'progress' | 'ranking'
 
   // ── Compute gamification data ────────────────────────────────
   const earnedIds  = useMemo(() => evaluateBadges(client), [client.meals, client.weightLogs, client.workouts, client.stepsLogs])
@@ -128,6 +130,24 @@ export default function Progress() {
 
   return (
     <>
+      {/* ── Sub-tabs ────────────────────────────────────────── */}
+      <Box sx={{ display: 'flex', gap: 0.75, mb: 3 }}>
+        {['progress', 'ranking'].map(key => (
+          <Box key={key} onClick={() => setTab(key)} sx={{
+            px: 2, py: 1, borderRadius: '12px', cursor: 'pointer',
+            fontSize: '14px', fontWeight: tab === key ? 800 : 600,
+            background: tab === key ? C.primaryContainer : 'transparent',
+            color: tab === key ? C.primary : C.muted,
+            border: `1px solid ${tab === key ? C.primaryA20 : C.border}`,
+            transition: 'all 0.15s',
+          }}>
+            {key === 'progress' ? t('navProgress') : t('navRanking')}
+          </Box>
+        ))}
+      </Box>
+
+      {tab === 'ranking' && <Ranking />}
+      {tab === 'progress' && <>
       {/* ── Header ───────────────────────────────────────────── */}
       <Box sx={{ mb: 2.5 }}>
         <Typography variant="h2" sx={{ fontStyle: 'italic' }}>
@@ -251,6 +271,7 @@ export default function Progress() {
       {levelUpInfo && (
         <LevelUpCelebration info={levelUpInfo} t={t} onDismiss={() => setLevelUpInfo(null)} />
       )}
+      </>}
     </>
   )
 }

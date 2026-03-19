@@ -32,10 +32,7 @@ function getNavItems(auth, admin) {
   const items = [{ view: 'dashboard', Icon: DashboardIcon, labelKey: 'navDashboard' }]
   if (hasModule(modules, 'nutrition_tracking') || hasModule(modules, 'weight_tracking'))
     items.push({ view: 'progress', Icon: TrendingUpIcon, labelKey: 'navProgress' })
-  if (hasModule(modules, 'weight_tracking') || hasModule(modules, 'nutrition_tracking'))
-    items.push({ view: 'ranking', Icon: LeaderboardIcon, labelKey: 'navRanking' })
   if (hasModule(modules, 'program_access'))       items.push({ view: 'programs', Icon: PlayCircleOutlineIcon, labelKey: 'navPrograms' })
-  if (modules.length > 0)                        items.push({ view: 'tasks', Icon: AssignmentIcon, labelKey: 'navTasks' })
   if (hasModule(modules, 'booking_access'))       items.push({ view: 'schedule', Icon: CalendarMonthIcon, labelKey: 'navBookSlot' })
   return items
 }

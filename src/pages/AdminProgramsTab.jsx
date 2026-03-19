@@ -629,7 +629,7 @@ function ResourceStepsSubTab({ t, resourceId }) {
     <Box>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
         <Typography sx={{ fontWeight: 700, fontSize: '14px', color: C.text }}>Стъпки</Typography>
-        <Button size="small" startIcon={<AddIcon />} onClick={() => setDlg({})} sx={{ color: C.primary, fontSize: '12px' }}>Нова стъпка</Button>
+        <Button size="small" startIcon={<AddIcon />} onClick={() => setDlg({ display_order: items.length })} sx={{ color: C.primary, fontSize: '12px' }}>Нова стъпка</Button>
       </Box>
       {items.length === 0 && <Typography sx={{ fontSize: '13px', color: C.muted }}>Няма стъпки</Typography>}
       <Paper sx={{ borderRadius: '14px', overflow: 'hidden' }}>

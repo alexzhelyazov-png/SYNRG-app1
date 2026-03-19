@@ -805,64 +805,53 @@ function DashboardClient({ isCoachView = false }) {
         <Typography sx={{ color: C.muted, fontSize: '14px' }}>{t('yourProgress')}</Typography>
       </Box>
 
-      {/* ── Compact plan info: next session | remaining | expiry ── */}
+      {/* ── Plan info card ── */}
       {showBooking && myPlan && (
-        <Paper sx={{
-          display: 'grid',
-          gridTemplateColumns: isMobile ? '1fr 1fr' : '1fr auto auto auto auto',
-          gap: isMobile ? 1.5 : 0,
-          alignItems: 'center',
-          p: '14px 16px', mb: 2, borderRadius: '16px',
-          border: `1px solid ${planColor}33`,
-          background: `${planColor}08`,
-        }}>
-          {/* Next session */}
-          <Box sx={{ gridColumn: isMobile ? '1 / -1' : 'auto' }}>
-            <Typography sx={{ fontSize: '10px', color: C.muted, fontWeight: 600, mb: 0.25 }}>
-              {t('nextSessionLbl')}
-            </Typography>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
-              <Typography sx={{ fontSize: '13px', fontWeight: 700, color: nextSession ? planColor : C.muted, lineHeight: 1.2 }}>
-                {nextSession ? `${bgDate(nextSession.slot.slot_date)} ${nextSession.slot.start_time?.slice(0,5)}` : '—'}
+        <Paper sx={{ p: 2, mb: 2, borderRadius: '16px', border: `1px solid ${C.border}` }}>
+          {/* Row 1: Next session + cancel */}
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
+            <Box>
+              <Typography sx={{ fontSize: '11px', color: C.muted, fontWeight: 700, letterSpacing: '0.5px', mb: 0.25 }}>
+                {t('nextSessionLbl')}
               </Typography>
-              {nextSession && !isCoachView && (
-                <Button size="small" disabled={bookingBusy}
-                  onClick={() => cancelBookingForSlot(nextSession.slot.id)}
-                  sx={{
-                    minWidth: 'auto', fontSize: '10px', py: '2px', px: 1,
-                    color: '#F87171', border: '1px solid rgba(248,113,113,0.3)',
-                    borderRadius: '8px', lineHeight: 1.2,
-                    '&:hover': { background: 'rgba(248,113,113,0.08)', borderColor: '#F87171' },
-                    '&.Mui-disabled': { opacity: 0.5 },
-                  }}>
-                  {t('cancelBookingBtn')}
-                </Button>
-              )}
+              <Typography sx={{ fontSize: '14px', fontWeight: 700, color: nextSession ? planColor : C.muted }}>
+                {nextSession ? `${bgDate(nextSession.slot.slot_date)}, ${nextSession.slot.start_time?.slice(0,5)}` : t('noUpcoming')}
+              </Typography>
             </Box>
+            {nextSession && !isCoachView && (
+              <Button size="small" disabled={bookingBusy}
+                onClick={() => cancelBookingForSlot(nextSession.slot.id)}
+                sx={{
+                  fontSize: '11px', py: '4px', px: 1.5,
+                  color: '#F87171', border: '1px solid rgba(248,113,113,0.3)',
+                  borderRadius: '10px',
+                  '&:hover': { background: 'rgba(248,113,113,0.08)', borderColor: '#F87171' },
+                }}>
+                {t('cancelBookingBtn')}
+              </Button>
+            )}
           </Box>
 
-          {!isMobile && <Box sx={{ width: '1px', height: 32, background: C.border, mx: 1.5, flexShrink: 0 }} />}
-
-          {/* Remaining sessions */}
-          <Box>
-            <Typography sx={{ fontSize: isMobile ? '20px' : '22px', fontWeight: 800, color: planColor, fontFamily: "'MontBlanc', sans-serif", lineHeight: 1 }}>
-              {myPlan.plan_type === 'unlimited' ? '∞' : credits}
-            </Typography>
-            <Typography sx={{ fontSize: '10px', color: C.muted, fontWeight: 600 }}>{t('remainingSessionsLbl')}</Typography>
-          </Box>
-
-          {!isMobile && <Box sx={{ width: '1px', height: 32, background: C.border, mx: 1.5, flexShrink: 0 }} />}
-
-          {/* Plan expiry */}
-          <Box sx={{ textAlign: isMobile ? 'right' : 'right' }}>
-            <Typography sx={{ fontSize: '13px', fontWeight: 700, color: planColor, lineHeight: 1.2 }}>
-              {fmtValidTo(myPlan)}
-            </Typography>
-            <Typography sx={{ fontSize: '10px', color: C.muted }}>
-              {daysLeft !== null
-                ? daysLeft <= 0 ? t('planExpired') : `${t('expiresInLbl')} ${daysLeft} ${t('daysLbl')}`
-                : t('validUntil')}
-            </Typography>
+          {/* Row 2: Credits + Expiry side by side */}
+          <Box sx={{ display: 'flex', gap: 1.5 }}>
+            <Box sx={{ flex: 1, p: 1.5, borderRadius: '12px', background: `${planColor}0A`, border: `1px solid ${planColor}20`, textAlign: 'center' }}>
+              <Typography sx={{ fontSize: '22px', fontWeight: 800, color: planColor, fontFamily: "'MontBlanc', sans-serif", lineHeight: 1 }}>
+                {myPlan.plan_type === 'unlimited' ? '∞' : credits}
+              </Typography>
+              <Typography sx={{ fontSize: '11px', color: C.muted, fontWeight: 600, mt: 0.5 }}>
+                {t('remainingSessionsLbl')}
+              </Typography>
+            </Box>
+            <Box sx={{ flex: 1, p: 1.5, borderRadius: '12px', background: `${planColor}0A`, border: `1px solid ${planColor}20`, textAlign: 'center' }}>
+              <Typography sx={{ fontSize: '14px', fontWeight: 700, color: planColor, lineHeight: 1.2 }}>
+                {fmtValidTo(myPlan)}
+              </Typography>
+              <Typography sx={{ fontSize: '11px', color: C.muted, fontWeight: 600, mt: 0.5 }}>
+                {daysLeft !== null && daysLeft > 0
+                  ? `${t('expiresInLbl')} ${daysLeft} ${t('daysLbl')}`
+                  : daysLeft !== null && daysLeft <= 0 ? t('planExpired') : t('validUntil')}
+              </Typography>
+            </Box>
           </Box>
         </Paper>
       )}
@@ -928,6 +917,22 @@ function DashboardClient({ isCoachView = false }) {
             <Typography sx={{ fontSize: '12px', color: C.muted }}>{t('tapToLog')}</Typography>
           </Paper>
         )}
+
+        <Paper onClick={() => setView('tasks')}
+          sx={{
+            p: 2.25, borderRadius: '18px', cursor: 'pointer',
+            border: `1px solid ${C.border}`,
+            background: 'rgba(255,255,255,0.03)',
+            transition: 'transform 0.15s',
+            '&:hover': { transform: 'translateY(-2px)' },
+            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1, textAlign: 'center',
+          }}>
+          <Typography sx={{ fontSize: '30px', lineHeight: 1 }}>📋</Typography>
+          <Typography sx={{ fontSize: '15px', fontWeight: 700, color: C.text }}>
+            {t('navTasks')}
+          </Typography>
+          <Typography sx={{ fontSize: '12px', color: C.muted }}>{t('tapToLog')}</Typography>
+        </Paper>
       </Box>
     </>
   )
