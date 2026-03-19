@@ -4,6 +4,7 @@ import {
   Dialog, DialogTitle, DialogContent, DialogActions, TextField,
   MenuItem, Select, FormControl, InputLabel, CircularProgress,
   Tab, Tabs, Alert, Collapse, useMediaQuery,
+  Checkbox, FormControlLabel,
 } from '@mui/material'
 import { useTheme }          from '@mui/material/styles'
 import CalendarMonthIcon     from '@mui/icons-material/CalendarMonth'
@@ -220,14 +221,15 @@ function SlotDialog({ open, onClose, onSave, coaches, t }) {
 }
 
 // ── Activate/manage plan dialog ──────────────────────────────
-function PlanDialog({ open, onClose, onActivate, onExtend, onAdjust, client, plan, t }) {
+function PlanDialog({ open, onClose, onActivate, onExtend, onAdjust, onTogglePaid, client, plan, t }) {
   const [mode,          setMode]         = useState('activate') // 'activate' | 'extend' | 'adjust'
   const [planType,      setPlanType]     = useState('8')
   const [validFrom,     setValidFrom]    = useState(isoToday())
   const [extendTo,      setExtendTo]     = useState('')
   const [credUsed,      setCredUsed]     = useState(plan?.credits_used ?? 0)
   const [price,         setPrice]        = useState(plan?.price ?? 0)
-  const [startCredits,  setStartCredits] = useState('')   // migration: remaining from old platform
+  const [isPaid,        setIsPaid]       = useState(plan?.is_paid ?? false)
+  const [startCredits,  setStartCredits] = useState('')
   const [saving,        setSaving]       = useState(false)
 
   // When planType changes, reset startCredits to full plan (no override)
@@ -246,11 +248,15 @@ function PlanDialog({ open, onClose, onActivate, onExtend, onAdjust, client, pla
     let res
     if (mode === 'activate') {
       const sc = startCredits !== '' ? Number(startCredits) : null
-      res = await onActivate(client.id, planType, validFrom, price, sc)
+      res = await onActivate(client.id, planType, validFrom, price, sc, isPaid)
     } else if (mode === 'extend') {
       res = await onExtend(plan.id, extendTo)
     } else if (mode === 'adjust') {
       res = await onAdjust(plan.id, Number(credUsed))
+    }
+    // Update is_paid separately if plan exists and changed
+    if (plan && plan.is_paid !== isPaid && onTogglePaid) {
+      await onTogglePaid(plan.id, isPaid)
     }
     setSaving(false)
     if (!res?.error) onClose()
@@ -299,6 +305,12 @@ function PlanDialog({ open, onClose, onActivate, onExtend, onAdjust, client, pla
               {plan.plan_type !== 'unlimited' && ` · ${creditsRemaining(plan)}/${plan.credits_total}`}
               {' · '}{t('validUntil')}: {fmtValidTo(plan)}
             </Typography>
+            <FormControlLabel
+              control={<Checkbox checked={isPaid} onChange={e => setIsPaid(e.target.checked)}
+                sx={{ color: C.primary, '&.Mui-checked': { color: C.primary }, p: 0.5 }} />}
+              label={isPaid ? t('markedPaid') : t('markedUnpaid')}
+              sx={{ '& .MuiTypography-root': { fontSize: '12px', color: isPaid ? C.primary : '#FB923C', fontWeight: 700 }, mt: 0.5 }}
+            />
           </Box>
         )}
 
@@ -315,12 +327,20 @@ function PlanDialog({ open, onClose, onActivate, onExtend, onAdjust, client, pla
             <TextField label={t('validFromLbl')} type="date" size="small"
               value={validFrom} onChange={e => setValidFrom(e.target.value)}
               sx={inputSx} InputLabelProps={{ shrink: true }} />
-            <TextField label={t('priceLbl')} type="number" size="small"
-              value={price} onChange={e => setPrice(e.target.value)}
-              inputProps={{ min: 0 }} sx={inputSx}
-              helperText={Number(price) === 0 ? t('freeLbl') : `${price} €`}
-              FormHelperTextProps={{ sx: { color: Number(price) === 0 ? C.muted : C.primary } }}
-            />
+            <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'flex-start' }}>
+              <TextField label={t('priceLbl')} type="number" size="small"
+                value={price} onChange={e => setPrice(e.target.value)}
+                inputProps={{ min: 0 }} sx={{ ...inputSx, flex: 1 }}
+                helperText={Number(price) === 0 ? t('freeLbl') : `${price} €`}
+                FormHelperTextProps={{ sx: { color: Number(price) === 0 ? C.muted : C.primary } }}
+              />
+              <FormControlLabel
+                control={<Checkbox checked={isPaid} onChange={e => setIsPaid(e.target.checked)}
+                  sx={{ color: C.primary, '&.Mui-checked': { color: C.primary }, p: 0.5 }} />}
+                label={t('markedPaid')}
+                sx={{ '& .MuiTypography-root': { fontSize: '12px', color: isPaid ? C.primary : C.muted, fontWeight: 700 }, mt: 0.5 }}
+              />
+            </Box>
             {/* Migration override: remaining sessions from old platform */}
             {planType !== 'unlimited' && (() => {
               const total = planType === '8' ? 8 : 12
@@ -399,7 +419,7 @@ function ClientPlanRow({ client, plan, onManage, onDeactivate, onDelete, t, lang
   const active   = isPlanActive(plan)
   const credits  = plan ? creditsRemaining(plan) : null
   const isLow    = plan && plan.plan_type !== 'unlimited' && credits !== null && credits <= 2
-  const isPaid   = plan && Number(plan.price) > 0
+  const isPaid   = plan?.is_paid
 
   return (
     <Box sx={{
@@ -436,11 +456,13 @@ function ClientPlanRow({ client, plan, onManage, onDeactivate, onDelete, t, lang
               ∞
             </Typography>
           )}
-          {/* Paid marker */}
-          <Box sx={{
-            width: 8, height: 8, borderRadius: '50%', flexShrink: 0,
-            background: isPaid ? C.primary : '#FB923C',
-          }} />
+          {/* Paid indicator: green = paid, red = unpaid */}
+          <Tooltip title={isPaid ? t('markedPaid') : t('markedUnpaid')} arrow>
+            <Box sx={{
+              width: 8, height: 8, borderRadius: '50%', flexShrink: 0,
+              background: isPaid ? C.primary : '#F87171',
+            }} />
+          </Tooltip>
         </Box>
       ) : (
         <Typography sx={{ fontSize: '10px', color: '#F87171', fontWeight: 700, flexShrink: 0 }}>—</Typography>
@@ -695,9 +717,11 @@ function PlansTab({ t }) {
     return allPlans.find(p => p.client_id === clientId && p.status === 'active') || null
   }
 
-  async function handleActivate(clientId, planType, from, price, startCredits) {
+  async function handleActivate(clientId, planType, from, price, startCredits, isPaid) {
     const res = await activatePlan(clientId, planType, from, price, startCredits)
     if (res?.error) { showSnackbar('Грешка: ' + res.error); return res }
+    // Set is_paid on the newly created plan
+    if (isPaid && res?.id) await DB.update('client_plans', res.id, { is_paid: true })
     showSnackbar(t('planActivatedMsg'))
     return { ok: true }
   }
@@ -712,6 +736,10 @@ function PlansTab({ t }) {
     if (res?.error) { showSnackbar('Грешка: ' + res.error); return res }
     showSnackbar(t('creditsAdjustedMsg'))
     return { ok: true }
+  }
+  async function handleTogglePaid(planId, newValue) {
+    await DB.update('client_plans', planId, { is_paid: newValue })
+    await loadAllPlans()
   }
 
   const filtered = realClients.filter(c =>
@@ -738,7 +766,8 @@ function PlansTab({ t }) {
               const plan = getClientPlan(client.id)
               return (
                 <ClientPlanRow key={client.id} client={client} plan={plan} t={t}
-                  onManage={(c, p) => setPlanDlg({ client: c, plan: p })} />
+                  onManage={(c, p) => setPlanDlg({ client: c, plan: p })}
+                  />
               )
             })
           )}
@@ -752,6 +781,7 @@ function PlansTab({ t }) {
           onActivate={handleActivate}
           onExtend={handleExtend}
           onAdjust={handleAdjust}
+          onTogglePaid={handleTogglePaid}
           client={planDlg.client}
           plan={planDlg.plan}
           t={t}
@@ -858,9 +888,11 @@ function ClientsTab({ t }) {
   const pending  = realClients.filter(c => !getClientPlan(c.id) && (c.modules || []).includes('studio_access'))
   const active   = realClients.filter(c => !!getClientPlan(c.id))
 
-  async function handleActivate(clientId, planType, from, price, startCredits) {
+  async function handleActivate(clientId, planType, from, price, startCredits, isPaid) {
     const res = await activatePlan(clientId, planType, from, price, startCredits)
     if (res?.error) { showSnackbar('Грешка: ' + res.error); return res }
+    // Set is_paid on the newly created plan
+    if (isPaid && res?.id) await DB.update('client_plans', res.id, { is_paid: true })
     showSnackbar(t('planActivatedMsg'))
     return { ok: true }
   }
@@ -869,6 +901,12 @@ function ClientsTab({ t }) {
     const res = await deactivatePlan(planId)
     if (res?.error) { showSnackbar('Грешка: ' + res.error); return }
     showSnackbar(t('deactivatePlanMsg'))
+  }
+
+  async function handleTogglePaid(planId, newValue) {
+    await DB.update('client_plans', planId, { is_paid: newValue })
+    await loadAllPlans()
+    showSnackbar(newValue ? t('markedPaid') : t('markedUnpaid'))
   }
 
   function handleDelete(client) {
@@ -926,7 +964,8 @@ function ClientsTab({ t }) {
             <ClientPlanRow key={client.id} client={client} plan={plan} t={t} lang={lang}
               onManage={(c, p) => setPlanDlg({ client: c, plan: p })}
               onDeactivate={handleDeactivate}
-              onDelete={handleDelete} />
+              onDelete={handleDelete}
+              onTogglePaid={handleTogglePaid} />
           )
         })}
       </Paper>
@@ -936,6 +975,7 @@ function ClientsTab({ t }) {
           onActivate={handleActivate}
           onExtend={async (planId, date) => { const r = await extendPlan(planId, date); if (r?.error) { showSnackbar('Грешка: ' + r.error); return r } showSnackbar(t('planExtendedMsg')); return { ok: true } }}
           onAdjust={async (planId, credits) => { const r = await adjustCredits(planId, credits); if (r?.error) { showSnackbar('Грешка: ' + r.error); return r } showSnackbar(t('creditsAdjustedMsg')); return { ok: true } }}
+          onTogglePaid={handleTogglePaid}
           client={planDlg.client} plan={planDlg.plan} t={t} />
       )}
     </Box>
