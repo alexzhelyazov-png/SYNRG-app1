@@ -885,8 +885,16 @@ function ClientsTab({ t }) {
     return allPlans.find(p => p.client_id === clientId && p.status === 'active') || null
   }
 
-  const pending  = realClients.filter(c => !getClientPlan(c.id) && (c.modules || []).includes('studio_access'))
-  const active   = realClients.filter(c => !!getClientPlan(c.id))
+  const pending  = realClients.filter(c => {
+    const p = getClientPlan(c.id)
+    if (!p) return (c.modules || []).includes('studio_access')
+    // Credits exhausted = needs reactivation
+    return !isPlanActive(p)
+  })
+  const active   = realClients.filter(c => {
+    const p = getClientPlan(c.id)
+    return p && isPlanActive(p)
+  })
 
   async function handleActivate(clientId, planType, from, price, startCredits, isPaid) {
     const res = await activatePlan(clientId, planType, from, price, startCredits)

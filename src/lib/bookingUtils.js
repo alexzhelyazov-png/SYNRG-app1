@@ -28,9 +28,10 @@ export function effectiveValidTo(plan) {
 
 export function isPlanActive(plan) {
   if (!plan || plan.status !== 'active') return false
+  // Credits exhausted = plan expired (except unlimited)
+  if (plan.plan_type !== 'unlimited' && (plan.credits_used || 0) >= (plan.credits_total || 0)) return false
   const validTo = effectiveValidTo(plan)
   if (!validTo) return false
-  // Compare date-only (not time) so plan is valid all day on valid_to
   const today = new Date()
   today.setHours(0, 0, 0, 0)
   const expiry = new Date(validTo + 'T00:00:00')
