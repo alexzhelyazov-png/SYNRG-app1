@@ -12,9 +12,12 @@ import SkipPreviousIcon    from '@mui/icons-material/SkipPrevious'
 import AccessTimeIcon      from '@mui/icons-material/AccessTime'
 import ExpandMoreIcon      from '@mui/icons-material/ExpandMore'
 import ExpandLessIcon      from '@mui/icons-material/ExpandLess'
+import LockIcon            from '@mui/icons-material/Lock'
+import ShoppingCartIcon    from '@mui/icons-material/ShoppingCart'
 import { useApp }          from '../context/AppContext'
 import { DB }              from '../lib/db'
 import { parseVideoUrl }   from '../lib/videoUtils'
+import { hasModule }       from '../lib/modules'
 import { C, EASE }         from '../theme'
 
 // ── Video Embed Component ───────────────────────────────────
@@ -47,8 +50,26 @@ function VideoEmbed({ url }) {
   )
 }
 
+/** Check if client can access a program (purchased or studio client) */
+function canAccessProgram(auth, prog, purchases) {
+  // Coaches/admins always have access
+  if (auth.role === 'coach') return true
+  // Free programs (no price)
+  if (!prog.price_cents || prog.price_cents === 0) return true
+  // Studio clients get all programs free
+  if (hasModule(auth.modules, 'studio_access')) return true
+  // Check if purchased
+  if (purchases.some(p => p.program_id === prog.id)) return true
+  return false
+}
+
+function formatPrice(cents, currency, t) {
+  const amount = (cents / 100).toFixed(2).replace(/\.00$/, '')
+  return currency === 'EUR' ? `${amount} EUR` : `${amount} ${t('currencyBGN')}`
+}
+
 // ── Programs List View ──────────────────────────────────────
-function ProgramsList({ programs, progress, lessons, onSelect, t, lang }) {
+function ProgramsList({ programs, progress, lessons, purchases, onSelect, onBuy, buyLoading, t, lang, auth }) {
   const n = (p) => lang === 'en' && p.name_en ? p.name_en : p.name_bg
   const d = (p) => lang === 'en' && p.description_en ? p.description_en : p.description_bg
 
@@ -69,20 +90,26 @@ function ProgramsList({ programs, progress, lessons, onSelect, t, lang }) {
 
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2.5 }}>
         {programs.map((prog, i) => {
+          const hasAccess = canAccessProgram(auth, prog, purchases)
+          const isPaid = prog.price_cents > 0
+          const isPurchased = purchases.some(p => p.program_id === prog.id)
+          const isStudioFree = hasModule(auth.modules, 'studio_access') && isPaid
           const progLessons   = lessons.filter(l => l.program_id === prog.id)
-          const completedCount = progLessons.filter(l => progress.some(p => p.lesson_id === l.id)).length
+          const completedCount = hasAccess ? progLessons.filter(l => progress.some(p => p.lesson_id === l.id)).length : 0
           const totalCount     = progLessons.length
           const pct            = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0
 
           return (
             <Paper
               key={prog.id}
-              onClick={() => onSelect(prog)}
+              onClick={() => hasAccess ? onSelect(prog) : null}
               sx={{
-                cursor: 'pointer', overflow: 'hidden', p: 0,
+                cursor: hasAccess ? 'pointer' : 'default',
+                overflow: 'hidden', p: 0,
                 animation: `fadeInUp 0.3s ${EASE.standard} both`,
                 animationDelay: `${i * 0.08}s`,
-                '&:hover': { transform: 'translateY(-3px)' },
+                opacity: hasAccess ? 1 : 0.85,
+                '&:hover': hasAccess ? { transform: 'translateY(-3px)' } : {},
               }}
             >
               {/* Cover image */}
@@ -92,7 +119,8 @@ function ProgramsList({ programs, progress, lessons, onSelect, t, lang }) {
                   ? `url(${prog.cover_url}) center/cover`
                   : `linear-gradient(135deg, ${C.primaryContainer} 0%, ${C.purpleSoft} 100%)`,
               }}>
-                {pct === 100 && (
+                {/* Badges */}
+                {hasAccess && pct === 100 && (
                   <Box sx={{
                     position: 'absolute', top: 12, right: 12,
                     background: C.primary, color: C.primaryOn,
@@ -100,6 +128,38 @@ function ProgramsList({ programs, progress, lessons, onSelect, t, lang }) {
                     fontSize: '11px', fontWeight: 800, letterSpacing: '0.5px',
                   }}>
                     {t('completedLabel')}
+                  </Box>
+                )}
+                {isPaid && !hasAccess && (
+                  <Box sx={{
+                    position: 'absolute', top: 12, right: 12,
+                    background: 'rgba(0,0,0,0.65)', color: '#fff',
+                    borderRadius: '12px', px: 1.25, py: 0.4,
+                    fontSize: '11px', fontWeight: 800, letterSpacing: '0.5px',
+                    display: 'flex', alignItems: 'center', gap: 0.5,
+                  }}>
+                    <LockIcon sx={{ fontSize: 13 }} />
+                    {formatPrice(prog.price_cents, prog.currency, t)}
+                  </Box>
+                )}
+                {isPurchased && (
+                  <Box sx={{
+                    position: 'absolute', top: 12, left: 12,
+                    background: C.primary, color: C.primaryOn,
+                    borderRadius: '12px', px: 1.25, py: 0.4,
+                    fontSize: '11px', fontWeight: 800,
+                  }}>
+                    {t('purchased')}
+                  </Box>
+                )}
+                {isStudioFree && !isPurchased && (
+                  <Box sx={{
+                    position: 'absolute', top: 12, left: 12,
+                    background: 'rgba(200,197,255,0.9)', color: '#1a1a2e',
+                    borderRadius: '12px', px: 1.25, py: 0.4,
+                    fontSize: '10px', fontWeight: 800,
+                  }}>
+                    {t('includedStudio')}
                   </Box>
                 )}
               </Box>
@@ -116,35 +176,55 @@ function ProgramsList({ programs, progress, lessons, onSelect, t, lang }) {
                   {d(prog)}
                 </Typography>
 
-                {/* Progress */}
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                  <LinearProgress
-                    variant="determinate"
-                    value={pct}
-                    sx={{
-                      flex: 1, height: 6, borderRadius: 3,
-                      backgroundColor: C.border,
-                      '& .MuiLinearProgress-bar': {
-                        borderRadius: 3,
-                        background: pct === 100
-                          ? `linear-gradient(90deg, ${C.primary}, ${C.primaryDeep})`
-                          : `linear-gradient(90deg, ${C.primary}, ${C.primaryHover})`,
-                      },
-                    }}
-                  />
-                  <Typography sx={{ fontSize: '12px', fontWeight: 700, color: pct > 0 ? C.primary : C.muted, whiteSpace: 'nowrap' }}>
-                    {completedCount}/{totalCount}
-                  </Typography>
-                </Box>
+                {/* Progress (only if has access) */}
+                {hasAccess && (
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
+                    <LinearProgress
+                      variant="determinate"
+                      value={pct}
+                      sx={{
+                        flex: 1, height: 6, borderRadius: 3,
+                        backgroundColor: C.border,
+                        '& .MuiLinearProgress-bar': {
+                          borderRadius: 3,
+                          background: pct === 100
+                            ? `linear-gradient(90deg, ${C.primary}, ${C.primaryDeep})`
+                            : `linear-gradient(90deg, ${C.primary}, ${C.primaryHover})`,
+                        },
+                      }}
+                    />
+                    <Typography sx={{ fontSize: '12px', fontWeight: 700, color: pct > 0 ? C.primary : C.muted, whiteSpace: 'nowrap' }}>
+                      {completedCount}/{totalCount}
+                    </Typography>
+                  </Box>
+                )}
 
-                <Button
-                  fullWidth
-                  variant={pct === 0 ? 'contained' : 'outlined'}
-                  size="small"
-                  sx={{ mt: 2 }}
-                >
-                  {pct === 0 ? t('startProgram') : pct === 100 ? t('reviewProgram') : t('continueProgram')}
-                </Button>
+                {/* Action buttons */}
+                {hasAccess ? (
+                  <Button
+                    fullWidth
+                    variant={pct === 0 ? 'contained' : 'outlined'}
+                    size="small"
+                    onClick={(e) => { e.stopPropagation(); onSelect(prog) }}
+                  >
+                    {pct === 0 ? t('startProgram') : pct === 100 ? t('reviewProgram') : t('continueProgram')}
+                  </Button>
+                ) : (
+                  <Button
+                    fullWidth
+                    variant="contained"
+                    size="small"
+                    startIcon={buyLoading === prog.id ? <CircularProgress size={16} sx={{ color: '#fff' }} /> : <ShoppingCartIcon />}
+                    disabled={!!buyLoading}
+                    onClick={(e) => { e.stopPropagation(); onBuy(prog) }}
+                    sx={{
+                      background: `linear-gradient(135deg, ${C.purple} 0%, ${C.primary} 100%)`,
+                      '&:hover': { background: `linear-gradient(135deg, ${C.primary} 0%, ${C.purple} 100%)` },
+                    }}
+                  >
+                    {t('buyProgramFor')} {formatPrice(prog.price_cents, prog.currency, t)}
+                  </Button>
+                )}
               </Box>
             </Paper>
           )
@@ -424,11 +504,26 @@ export default function Programs() {
   const [modules, setModules]     = useState([])
   const [lessons, setLessons]     = useState([])
   const [progress, setProgress]   = useState([])
+  const [purchases, setPurchases] = useState([])
   const [loading, setLoading]     = useState(true)
+  const [buyLoading, setBuyLoading] = useState(null) // program id being purchased
 
   // Navigation state
   const [selectedProgram, setSelectedProgram] = useState(null)
   const [selectedLesson, setSelectedLesson]   = useState(null)
+
+  // Check for purchase success URL param
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('purchase') === 'success') {
+      showSnackbar(t('purchaseSuccess'))
+      // Clean URL
+      const url = new URL(window.location.href)
+      url.searchParams.delete('purchase')
+      url.searchParams.delete('program_id')
+      window.history.replaceState({}, '', url.pathname + url.hash)
+    }
+  }, [])
 
   // Load all data
   const loadData = useCallback(async () => {
@@ -451,10 +546,14 @@ export default function Programs() {
       setModules(allModules)
       setLessons(allLessons)
 
-      // Load progress for current client
+      // Load progress + purchases for current client
       if (auth.id) {
-        const prog = await DB.getClientProgress(auth.id)
+        const [prog, purch] = await Promise.all([
+          DB.getClientProgress(auth.id),
+          DB.getClientPurchases(auth.id),
+        ])
         setProgress(prog)
+        setPurchases(purch)
       }
     } catch (err) {
       console.error('Programs load error:', err)
@@ -476,6 +575,35 @@ export default function Programs() {
       setProgress(prev => [...prev, { client_id: auth.id, lesson_id: lessonId, completed_at: new Date().toISOString() }])
     }
   }, [auth.id, progress])
+
+  // Buy program via Stripe
+  const handleBuy = useCallback(async (prog) => {
+    if (!prog.stripe_price_id) {
+      showSnackbar(t('purchaseError'))
+      return
+    }
+    setBuyLoading(prog.id)
+    try {
+      const baseUrl = window.location.origin + window.location.pathname
+      const result = await DB.createCheckoutSession(
+        prog.id,
+        auth.id,
+        prog.stripe_price_id,
+        `${baseUrl}?purchase=success&program_id=${prog.id}#/programs`,
+        `${baseUrl}#/programs`,
+        lang,
+      )
+      if (result?.url) {
+        window.location.href = result.url
+      } else {
+        showSnackbar(t('purchaseError'))
+      }
+    } catch {
+      showSnackbar(t('purchaseError'))
+    } finally {
+      setBuyLoading(null)
+    }
+  }, [auth.id, lang, showSnackbar, t])
 
   if (loading) {
     return (
@@ -537,9 +665,13 @@ export default function Programs() {
       programs={programs}
       progress={progress}
       lessons={lessons}
+      purchases={purchases}
       onSelect={(p) => { setSelectedProgram(p); window.scrollTo({ top: 0, behavior: 'smooth' }) }}
+      onBuy={handleBuy}
+      buyLoading={buyLoading}
       t={t}
       lang={lang}
+      auth={auth}
     />
   )
 }

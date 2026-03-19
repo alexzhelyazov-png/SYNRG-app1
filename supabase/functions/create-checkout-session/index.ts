@@ -17,7 +17,7 @@ Deno.serve(async (req) => {
       apiVersion: "2023-10-16",
     });
 
-    const { line_items, success_url, cancel_url, locale } = await req.json();
+    const { line_items, success_url, cancel_url, locale, metadata } = await req.json();
 
     if (!line_items || !line_items.length) {
       return new Response(
@@ -32,6 +32,7 @@ Deno.serve(async (req) => {
       success_url,
       cancel_url,
       locale: locale === "en" ? "en" : "bg",
+      metadata: metadata || {},
     });
 
     return new Response(

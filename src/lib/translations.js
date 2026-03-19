@@ -322,6 +322,10 @@ export const T = {
     countLbl:           'Брой',
     pieceUnit:          'бр.',
     gramsLbl:           'Грама',
+    aiPhotoBtn:         'Снимай храната',
+    aiAnalyzing:        'AI анализира снимката...',
+    aiRecognizeError:   'Не успях да разпозная храната. Опитай отново или търси ръчно.',
+    aiGramsHint:        'Грамаж (коригирай ако трябва)',
 
     // ── Tasks (постоянни задачи от треньора) ───────────
     tasksCoachTitle:    'Задачи',
@@ -701,6 +705,16 @@ export const T = {
     noLessons:          'Няма уроци',
     allLabel:           'Всички',
     statusDraft:        'Чернова',
+    buyProgram:         'Купи програма',
+    buyProgramFor:      'Купи за',
+    purchaseSuccess:    'Покупката е успешна! Добре дошъл в програмата.',
+    purchaseError:      'Грешка при покупката. Моля, опитай отново.',
+    lockedLesson:       'Този урок е заключен. Купи програмата за достъп.',
+    includedStudio:     'Включена в студио абонамента',
+    purchased:          'Закупена',
+    currencyBGN:        'лв',
+    programLocked:      'Заключена програма',
+    programLockedDesc:  'Тази програма е платена. Купи я за пълен достъп.',
   },
 
   en: {
@@ -1026,6 +1040,10 @@ export const T = {
     countLbl:           'Count',
     pieceUnit:          'pc.',
     gramsLbl:           'Grams',
+    aiPhotoBtn:         'Snap your food',
+    aiAnalyzing:        'AI is analyzing the photo...',
+    aiRecognizeError:   'Could not recognize the food. Try again or search manually.',
+    aiGramsHint:        'Grams (adjust if needed)',
 
     // ── Tasks (permanent coach tasks) ──────────────────
     tasksCoachTitle:    'Tasks',
@@ -1405,5 +1423,15 @@ export const T = {
     noLessons:          'No lessons',
     allLabel:           'All',
     statusDraft:        'Draft',
+    buyProgram:         'Buy program',
+    buyProgramFor:      'Buy for',
+    purchaseSuccess:    'Purchase successful! Welcome to the program.',
+    purchaseError:      'Purchase error. Please try again.',
+    lockedLesson:       'This lesson is locked. Purchase the program to access it.',
+    includedStudio:     'Included in studio membership',
+    purchased:          'Purchased',
+    currencyBGN:        'BGN',
+    programLocked:      'Locked program',
+    programLockedDesc:  'This is a paid program. Purchase it for full access.',
   },
 }

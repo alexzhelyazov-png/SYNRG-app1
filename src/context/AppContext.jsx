@@ -654,6 +654,20 @@ export function AppProvider({ children }) {
     showSnackbar(`${food.label} ${t('foodAddedSuffix')}`)
   }
 
+  function addBarcodeFood(name, grams, kcalPer100, protPer100) {
+    if (!grams || isNaN(grams)) { showSnackbar(t('warningGrams'), 'warning'); return }
+    const meal = {
+      label:   name,
+      grams,
+      kcal:    Math.round((kcalPer100 / 100) * grams),
+      protein: Math.round(((protPer100 / 100) * grams) * 10) / 10,
+      date:    selFoodDate,
+    }
+    addMealToClient(client.id, meal)
+    setFoodModalOpen(false)
+    showSnackbar(`${name} ${t('foodAddedSuffix')}`)
+  }
+
   // ── Weight actions ────────────────────────────────────────────
   function saveWeight() {
     const w = Number(String(weightInput).replace(',', '.'))
@@ -773,7 +787,7 @@ export function AppProvider({ children }) {
     saveWeightLog, deleteWeightLog,
     saveStepsLog, deleteStepsLog,
     deleteClient,
-    addFoodFromModal, addQuickFood,
+    addFoodFromModal, addQuickFood, addBarcodeFood,
     saveWeight, saveSteps, addExercise, saveWorkout,
     addTask, addTaskForClient, toggleTaskDone, deleteTask, addTaskComment,
     sendReaction, dismissReaction,

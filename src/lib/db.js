@@ -453,6 +453,40 @@ export const DB = {
     if (entry) await LS.deleteById('client_lesson_progress', entry.id)
   },
 
+  // ── Program Purchases ───────────────────────────────────
+  async getClientPurchases(clientId) {
+    if (isUsingSupabase) {
+      return (await sbFetchSafe(
+        sbUrl('program_purchases', `?select=*&client_id=eq.${clientId}&status=eq.active`),
+        { headers: sbHeaders() }
+      )) || []
+    }
+    const all = await LS.selectAll('program_purchases')
+    return all.filter(p => p.client_id === clientId && p.status === 'active')
+  },
+
+  async createCheckoutSession(programId, clientId, stripePriceId, successUrl, cancelUrl, locale) {
+    if (!isUsingSupabase) return null
+    try {
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/create-checkout-session`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${SUPABASE_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          line_items: [{ price: stripePriceId, quantity: 1 }],
+          success_url: successUrl,
+          cancel_url: cancelUrl,
+          locale,
+          metadata: { client_id: clientId, program_id: programId },
+        }),
+      })
+      if (!res.ok) return null
+      return res.json()
+    } catch { return null }
+  },
+
   // ── Seed coaches & their shadow profiles ──────────────────
   async seedIfEmpty() {
     const COACHES = [
