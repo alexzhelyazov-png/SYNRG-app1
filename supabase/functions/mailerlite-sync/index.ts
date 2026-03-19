@@ -121,17 +121,20 @@ Deno.serve(async (req) => {
 
     // ── Plan activated: update attributes + send email ────
     if (action === "plan_activated") {
+      const planType = fields?.PLAN_TYPE || fields?.plan_type || "";
+      const planExpires = fields?.PLAN_EXPIRES || fields?.plan_expires || "";
+
       await upsertContact(apiKey, email, name, {
-        PLAN_TYPE: fields?.plan_type || "",
-        PLAN_EXPIRES: fields?.plan_expires || "",
+        PLAN_TYPE: planType,
+        PLAN_EXPIRES: planExpires,
         PLAN_STATUS: "active",
       });
 
       // Send plan activation email
       const planLabel =
-        fields?.plan_type === "unlimited"
+        planType === "unlimited"
           ? "Неограничен"
-          : `${fields?.plan_type} посещения`;
+          : `${planType} посещения`;
       await sendTransactionalEmail(
         apiKey,
         { email, name },
@@ -139,7 +142,7 @@ Deno.serve(async (req) => {
         `<div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px;background:#1a1a1a;color:#e0e0e0;border-radius:16px">
           <h2 style="color:#c4e9bf;margin:0 0 16px">${name || "Hey"},</h2>
           <p style="font-size:16px;line-height:1.6">Планът ти <strong style="color:#c4e9bf">${planLabel}</strong> в SYNRG Beyond Fitness е активиран!</p>
-          <p style="font-size:14px;color:#999">Валиден до: <strong style="color:#e0e0e0">${fields?.plan_expires || ""}</strong></p>
+          <p style="font-size:14px;color:#999">Валиден до: <strong style="color:#e0e0e0">${planExpires}</strong></p>
           <hr style="border:none;border-top:1px solid #333;margin:24px 0">
           <p style="font-size:12px;color:#666">SYNRG Beyond Fitness</p>
         </div>`
@@ -149,13 +152,15 @@ Deno.serve(async (req) => {
 
     // ── Plan updated (expired, paused, etc.) ──────────────
     if (action === "plan_updated") {
+      const updStatus = fields?.PLAN_STATUS || fields?.plan_status || "";
+      const updExpires = fields?.PLAN_EXPIRES || fields?.plan_expires || "";
+
       await upsertContact(apiKey, email, name, {
-        PLAN_STATUS: fields?.plan_status || "",
-        PLAN_EXPIRES: fields?.plan_expires || "",
+        PLAN_STATUS: updStatus,
+        PLAN_EXPIRES: updExpires,
       });
 
-      // If expired, send notification
-      if (fields?.plan_status === "expired") {
+      if (updStatus === "expired") {
         await sendTransactionalEmail(
           apiKey,
           { email, name },

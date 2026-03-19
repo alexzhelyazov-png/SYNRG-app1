@@ -990,33 +990,68 @@ function ClientsTab({ t }) {
   )
 }
 
-// ── Analytics Tab ─────────────────────────────────────────────
+// ── Analytics Tab (monthly) ───────────────────────────────────
 function AnalyticsTab({ t }) {
   const { allPlans, loadAllPlans } = useBooking()
   const [expenses, setExpenses] = useState([])
+  const [month, setMonth] = useState(() => {
+    const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+  })
 
   useEffect(() => {
     loadAllPlans()
     DB.selectAll('expenses').then(rows => setExpenses(rows || []))
   }, []) // eslint-disable-line
 
-  const allRevenue  = allPlans.filter(p => p.is_paid).reduce((sum, p) => sum + (Number(p.price) || 0), 0)
-  const allExpenses = expenses.reduce((sum, e) => sum + (Number(e.amount) || 0), 0)
+  // Filter by selected month
+  const monthStart = `${month}-01`
+  const nextMonth = (() => {
+    const [y, m] = month.split('-').map(Number)
+    return m === 12 ? `${y + 1}-01-01` : `${y}-${String(m + 1).padStart(2, '0')}-01`
+  })()
+
+  const monthPlans = allPlans.filter(p => {
+    if (!p.is_paid) return false
+    const d = (p.created_at || '').slice(0, 10)
+    return d >= monthStart && d < nextMonth
+  })
+  const monthExpenses = expenses.filter(e => {
+    const d = (e.created_at || '').slice(0, 10)
+    return d >= monthStart && d < nextMonth
+  })
+
+  const revenue = monthPlans.reduce((sum, p) => sum + (Number(p.price) || 0), 0)
+  const expTotal = monthExpenses.reduce((sum, e) => sum + (Number(e.amount) || 0), 0)
+  const profit = revenue - expTotal
+
+  // Month navigation
+  const prevMonth = () => {
+    const [y, m] = month.split('-').map(Number)
+    setMonth(m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, '0')}`)
+  }
+  const nextMonthFn = () => {
+    const [y, m] = month.split('-').map(Number)
+    setMonth(m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, '0')}`)
+  }
+
+  const MONTH_NAMES_BG = ['', 'Януари', 'Февруари', 'Март', 'Април', 'Май', 'Юни', 'Юли', 'Август', 'Септември', 'Октомври', 'Ноември', 'Декември']
+  const [y, m] = month.split('-').map(Number)
+  const monthLabel = `${MONTH_NAMES_BG[m]} ${y}`
 
   const bigBox = (label, value, positive) => (
     <Paper sx={{
-      p: 3.5, borderRadius: '20px',
+      p: 2.5, borderRadius: '16px',
       border: `1px solid ${positive ? C.primaryA20 : 'rgba(248,113,113,0.25)'}`,
       background: positive
-        ? 'linear-gradient(135deg, rgba(196,233,191,0.12) 0%, rgba(196,233,191,0.05) 100%)'
-        : 'linear-gradient(135deg, rgba(248,113,113,0.10) 0%, rgba(248,113,113,0.04) 100%)',
+        ? 'linear-gradient(135deg, rgba(196,233,191,0.08) 0%, rgba(196,233,191,0.03) 100%)'
+        : 'linear-gradient(135deg, rgba(248,113,113,0.08) 0%, rgba(248,113,113,0.03) 100%)',
     }}>
-      <Typography sx={{ fontSize: '11px', color: C.muted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.9px', mb: 1.25 }}>
+      <Typography sx={{ fontSize: '10px', color: C.muted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.8px', mb: 0.75 }}>
         {label}
       </Typography>
-      <Typography sx={{ fontSize: '48px', fontWeight: 800, color: positive ? C.primary : '#F87171',
+      <Typography sx={{ fontSize: '36px', fontWeight: 800, color: positive ? C.primary : '#F87171',
         fontFamily: "'MontBlanc', sans-serif", lineHeight: 1, letterSpacing: '-1px' }}>
-        {value} <Typography component="span" sx={{ fontSize: '22px', fontWeight: 600,
+        {value} <Typography component="span" sx={{ fontSize: '18px', fontWeight: 600,
           color: positive ? C.primary : '#F87171', fontFamily: "'MontBlanc', sans-serif" }}>€</Typography>
       </Typography>
     </Paper>
@@ -1024,8 +1059,35 @@ function AnalyticsTab({ t }) {
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-      {bigBox(t('totalRevenueLbl'),  allRevenue,  true)}
-      {bigBox(t('totalExpensesLbl'), allExpenses, false)}
+      {/* Month selector */}
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2 }}>
+        <IconButton size="small" onClick={prevMonth} sx={{ color: C.muted }}>
+          <Typography sx={{ fontSize: '18px', fontWeight: 800 }}>‹</Typography>
+        </IconButton>
+        <Typography sx={{ fontSize: '16px', fontWeight: 800, color: C.text, minWidth: '160px', textAlign: 'center' }}>
+          {monthLabel}
+        </Typography>
+        <IconButton size="small" onClick={nextMonthFn} sx={{ color: C.muted }}>
+          <Typography sx={{ fontSize: '18px', fontWeight: 800 }}>›</Typography>
+        </IconButton>
+      </Box>
+
+      {bigBox(t('totalRevenueLbl'), revenue, true)}
+      {bigBox(t('totalExpensesLbl'), expTotal, false)}
+
+      {/* Profit/Loss */}
+      <Paper sx={{
+        p: 2.5, borderRadius: '16px', textAlign: 'center',
+        border: `1px solid ${profit >= 0 ? C.primaryA20 : 'rgba(248,113,113,0.25)'}`,
+      }}>
+        <Typography sx={{ fontSize: '10px', color: C.muted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.8px', mb: 0.5 }}>
+          {profit >= 0 ? t('profitLbl') : t('lossLbl')}
+        </Typography>
+        <Typography sx={{ fontSize: '28px', fontWeight: 800, color: profit >= 0 ? C.primary : '#F87171',
+          fontFamily: "'MontBlanc', sans-serif" }}>
+          {profit >= 0 ? '+' : ''}{profit} €
+        </Typography>
+      </Paper>
     </Box>
   )
 }
