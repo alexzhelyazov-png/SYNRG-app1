@@ -1000,7 +1000,7 @@ function AnalyticsTab({ t }) {
     DB.selectAll('expenses').then(rows => setExpenses(rows || []))
   }, []) // eslint-disable-line
 
-  const allRevenue  = allPlans.reduce((sum, p) => sum + (Number(p.price) || 0), 0)
+  const allRevenue  = allPlans.filter(p => p.is_paid).reduce((sum, p) => sum + (Number(p.price) || 0), 0)
   const allExpenses = expenses.reduce((sum, e) => sum + (Number(e.amount) || 0), 0)
 
   const bigBox = (label, value, positive) => (
