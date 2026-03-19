@@ -715,6 +715,8 @@ export const T = {
     currencyBGN:        'лв',
     programLocked:      'Заключена програма',
     programLockedDesc:  'Тази програма е платена. Купи я за пълен достъп.',
+    uploadVideoBtn:     'Качи',
+    uploadingVideo:     'Качване на видео...',
   },
 
   en: {
@@ -1433,5 +1435,7 @@ export const T = {
     currencyBGN:        'BGN',
     programLocked:      'Locked program',
     programLockedDesc:  'This is a paid program. Purchase it for full access.',
+    uploadVideoBtn:     'Upload',
+    uploadingVideo:     'Uploading video...',
   },
 }

@@ -12,8 +12,13 @@ import SkipPreviousIcon    from '@mui/icons-material/SkipPrevious'
 import AccessTimeIcon      from '@mui/icons-material/AccessTime'
 import ExpandMoreIcon      from '@mui/icons-material/ExpandMore'
 import ExpandLessIcon      from '@mui/icons-material/ExpandLess'
-import LockIcon            from '@mui/icons-material/Lock'
-import ShoppingCartIcon    from '@mui/icons-material/ShoppingCart'
+// Inline SVGs to avoid Vite dep optimization issues with @mui/icons-material
+const LockSvg = () => (
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg>
+)
+const CartSvg = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M7 18c-1.1 0-1.99.9-1.99 2S5.9 22 7 22s2-.9 2-2-.9-2-2-2zM1 2v2h2l3.6 7.59-1.35 2.45c-.16.28-.25.61-.25.96 0 1.1.9 2 2 2h12v-2H7.42c-.14 0-.25-.11-.25-.25l.03-.12.9-1.63h7.45c.75 0 1.41-.41 1.75-1.03l3.58-6.49c.08-.14.12-.31.12-.48 0-.55-.45-1-1-1H5.21l-.94-2H1zm16 16c-1.1 0-1.99.9-1.99 2s.89 2 1.99 2 2-.9 2-2-.9-2-2-2z"/></svg>
+)
 import { useApp }          from '../context/AppContext'
 import { DB }              from '../lib/db'
 import { parseVideoUrl }   from '../lib/videoUtils'
@@ -138,7 +143,7 @@ function ProgramsList({ programs, progress, lessons, purchases, onSelect, onBuy,
                     fontSize: '11px', fontWeight: 800, letterSpacing: '0.5px',
                     display: 'flex', alignItems: 'center', gap: 0.5,
                   }}>
-                    <LockIcon sx={{ fontSize: 13 }} />
+                    <LockSvg />
                     {formatPrice(prog.price_cents, prog.currency, t)}
                   </Box>
                 )}
@@ -214,7 +219,7 @@ function ProgramsList({ programs, progress, lessons, purchases, onSelect, onBuy,
                     fullWidth
                     variant="contained"
                     size="small"
-                    startIcon={buyLoading === prog.id ? <CircularProgress size={16} sx={{ color: '#fff' }} /> : <ShoppingCartIcon />}
+                    startIcon={buyLoading === prog.id ? <CircularProgress size={16} sx={{ color: '#fff' }} /> : <CartSvg />}
                     disabled={!!buyLoading}
                     onClick={(e) => { e.stopPropagation(); onBuy(prog) }}
                     sx={{
