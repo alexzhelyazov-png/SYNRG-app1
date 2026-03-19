@@ -8,7 +8,7 @@ const SITE_BASE = '../'
 
 const SITE_LINKS = [
   { href: `${SITE_BASE}studio.html`,    labelKey: 'siteStudio' },
-  { href: `${SITE_BASE}programs.html`,  labelKey: 'sitePrograms' },
+  { href: `${SITE_BASE}remote.html`,  labelKey: 'sitePrograms' },
   { href: `${SITE_BASE}pricing.html`,   labelKey: 'sitePricing' },
 ]
 

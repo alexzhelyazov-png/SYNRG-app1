@@ -28,7 +28,7 @@ function getSiteLinks(t) {
   return [
     { href: `${SITE_BASE}index.html`,      label: t('siteHome'),      Icon: HomeIcon },
     { href: `${SITE_BASE}studio.html`,      label: t('siteStudio'),    Icon: StorefrontIcon },
-    { href: `${SITE_BASE}programs.html`,    label: t('sitePrograms'),  Icon: OndemandVideoIcon },
+    { href: `${SITE_BASE}remote.html`,      label: t('sitePrograms'),  Icon: OndemandVideoIcon },
     { href: `${SITE_BASE}pricing.html`,     label: t('sitePricing'),   Icon: AttachMoneyIcon },
   ]
 }

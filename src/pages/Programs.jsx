@@ -499,30 +499,169 @@ function LessonView({ lesson, allLessons, progress, onBack, onToggle, onNavigate
   )
 }
 
+// ── Resources List View ──────────────────────────────────────
+function ResourcesList({ resources, hasAccess, onWatch, t, lang }) {
+  const n = (r) => lang === 'en' && r.name_en ? r.name_en : r.name_bg
+  const d = (r) => lang === 'en' && r.description_en ? r.description_en : r.description_bg
+  const cat = (r) => lang === 'en' && r.category_en ? r.category_en : r.category_bg
+
+  // Group by category
+  const categories = useMemo(() => {
+    const map = {}
+    resources.forEach(r => {
+      const c = cat(r) || ''
+      if (!map[c]) map[c] = []
+      map[c].push(r)
+    })
+    return Object.entries(map)
+  }, [resources, lang])
+
+  return (
+    <Box>
+      <Typography variant="overline" sx={{ color: C.primary, display: 'block', mb: 0.5 }}>
+        {t('resourcesOverline')}
+      </Typography>
+      <Typography variant="h2" sx={{ color: C.text, mb: 3 }}>
+        {t('resourcesTitle')}
+      </Typography>
+
+      {!hasAccess && (
+        <Paper sx={{ p: 3, mb: 3, textAlign: 'center', background: 'rgba(200,197,255,0.06)', border: `1px solid rgba(200,197,255,0.15)` }}>
+          <LockSvg />
+          <Typography sx={{ fontSize: '14px', color: C.muted, mt: 1 }}>{t('resourcesLocked')}</Typography>
+        </Paper>
+      )}
+
+      {resources.length === 0 && (
+        <Paper sx={{ p: 4, textAlign: 'center' }}>
+          <Typography sx={{ color: C.muted, fontSize: '15px' }}>{t('noResources')}</Typography>
+        </Paper>
+      )}
+
+      {categories.map(([category, items]) => (
+        <Box key={category} sx={{ mb: 3 }}>
+          {category && (
+            <Typography sx={{ fontSize: '12px', fontWeight: 700, color: C.primary, letterSpacing: '0.08em', textTransform: 'uppercase', mb: 1.5 }}>
+              {category}
+            </Typography>
+          )}
+          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2 }}>
+            {items.map((res, i) => (
+              <Paper
+                key={res.id}
+                onClick={() => hasAccess && onWatch(res)}
+                sx={{
+                  cursor: hasAccess ? 'pointer' : 'default',
+                  overflow: 'hidden', p: 0,
+                  opacity: hasAccess ? 1 : 0.5,
+                  animation: `fadeInUp 0.3s ${EASE.standard} both`,
+                  animationDelay: `${i * 0.06}s`,
+                  '&:hover': hasAccess ? { transform: 'translateY(-2px)' } : {},
+                }}
+              >
+                {/* Thumbnail */}
+                <Box sx={{
+                  width: '100%', pt: '56.25%', position: 'relative',
+                  background: res.thumbnail_url
+                    ? `url(${res.thumbnail_url}) center/cover`
+                    : `linear-gradient(135deg, ${C.primaryContainer} 0%, ${C.purpleSoft} 100%)`,
+                }}>
+                  {hasAccess && (
+                    <Box sx={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <PlayCircleIcon sx={{ fontSize: 48, color: 'rgba(255,255,255,0.85)' }} />
+                    </Box>
+                  )}
+                  {!hasAccess && (
+                    <Box sx={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.4)' }}>
+                      <LockSvg />
+                    </Box>
+                  )}
+                  {res.duration_min > 0 && (
+                    <Box sx={{ position: 'absolute', bottom: 8, right: 8, background: 'rgba(0,0,0,0.7)', color: '#fff', borderRadius: '6px', px: 1, py: 0.25, fontSize: '11px', fontWeight: 700 }}>
+                      {res.duration_min} {t('minutesShort')}
+                    </Box>
+                  )}
+                </Box>
+                <Box sx={{ p: 2 }}>
+                  <Typography sx={{ fontWeight: 700, fontSize: '15px', color: C.text, lineHeight: 1.3 }}>
+                    {n(res)}
+                  </Typography>
+                  {d(res) && (
+                    <Typography sx={{ fontSize: '12px', color: C.muted, mt: 0.5, lineHeight: 1.4,
+                      display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                      {d(res)}
+                    </Typography>
+                  )}
+                </Box>
+              </Paper>
+            ))}
+          </Box>
+        </Box>
+      ))}
+    </Box>
+  )
+}
+
+// ── Resource Video View ─────────────────────────────────────
+function ResourceView({ resource, onBack, t, lang }) {
+  const n = (o) => lang === 'en' && o.name_en ? o.name_en : o.name_bg
+  const d = (o) => lang === 'en' && o.description_en ? o.description_en : o.description_bg
+
+  return (
+    <Box sx={{ animation: 'fadeInUp 0.25s ease both', maxWidth: '900px', mx: 'auto' }}>
+      <Button startIcon={<ArrowBackIcon />} onClick={onBack}
+        sx={{ color: C.muted, mb: 2, '&:hover': { color: C.text } }}>
+        {t('tabResources')}
+      </Button>
+      {resource.video_url && <VideoEmbed url={resource.video_url} />}
+      <Box sx={{ mt: 2.5 }}>
+        <Typography sx={{ fontWeight: 800, fontSize: { xs: '20px', md: '24px' }, color: C.text, mb: 1, lineHeight: 1.3 }}>
+          {n(resource)}
+        </Typography>
+        {resource.duration_min > 0 && (
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 2 }}>
+            <AccessTimeIcon sx={{ fontSize: 16, color: C.muted }} />
+            <Typography sx={{ fontSize: '13px', color: C.muted, fontWeight: 600 }}>
+              {resource.duration_min} {t('minutesShort')}
+            </Typography>
+          </Box>
+        )}
+        {d(resource) && (
+          <Typography sx={{ fontSize: '14px', color: C.muted, lineHeight: 1.7 }}>
+            {d(resource)}
+          </Typography>
+        )}
+      </Box>
+    </Box>
+  )
+}
+
 // ══════════════════════════════════════════════════════════════
 // MAIN PROGRAMS PAGE
 // ══════════════════════════════════════════════════════════════
 export default function Programs() {
   const { auth, t, lang, showSnackbar } = useApp()
 
+  const [tab, setTab] = useState('programs') // 'programs' | 'resources'
   const [programs, setPrograms]   = useState([])
   const [modules, setModules]     = useState([])
   const [lessons, setLessons]     = useState([])
   const [progress, setProgress]   = useState([])
   const [purchases, setPurchases] = useState([])
+  const [resources, setResources] = useState([])
   const [loading, setLoading]     = useState(true)
-  const [buyLoading, setBuyLoading] = useState(null) // program id being purchased
+  const [buyLoading, setBuyLoading] = useState(null)
 
   // Navigation state
   const [selectedProgram, setSelectedProgram] = useState(null)
   const [selectedLesson, setSelectedLesson]   = useState(null)
+  const [selectedResource, setSelectedResource] = useState(null)
 
   // Check for purchase success URL param
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     if (params.get('purchase') === 'success') {
       showSnackbar(t('purchaseSuccess'))
-      // Clean URL
       const url = new URL(window.location.href)
       url.searchParams.delete('purchase')
       url.searchParams.delete('program_id')
@@ -530,14 +669,23 @@ export default function Programs() {
     }
   }, [])
 
+  // Resources access: studio clients OR clients who purchased any program
+  const hasResourceAccess = auth.role === 'coach'
+    || hasModule(auth.modules, 'studio_access')
+    || hasModule(auth.modules, 'program_access')
+    || purchases.length > 0
+
   // Load all data
   const loadData = useCallback(async () => {
     setLoading(true)
     try {
-      const progs = await DB.getPrograms('active')
+      const [progs, res] = await Promise.all([
+        DB.getPrograms('active'),
+        DB.getResources('active'),
+      ])
       setPrograms(progs)
+      setResources(res)
 
-      // Load modules + lessons for all programs in parallel
       const allModules = []
       const allLessons = []
       await Promise.all(progs.map(async (p) => {
@@ -551,7 +699,6 @@ export default function Programs() {
       setModules(allModules)
       setLessons(allLessons)
 
-      // Load progress + purchases for current client
       if (auth.id) {
         const [prog, purch] = await Promise.all([
           DB.getClientProgress(auth.id),
@@ -569,7 +716,6 @@ export default function Programs() {
 
   useEffect(() => { loadData() }, [loadData])
 
-  // Toggle lesson completion
   const toggleLesson = useCallback(async (lessonId) => {
     const isDone = progress.some(p => p.lesson_id === lessonId)
     if (isDone) {
@@ -581,33 +727,20 @@ export default function Programs() {
     }
   }, [auth.id, progress])
 
-  // Buy program via Stripe
   const handleBuy = useCallback(async (prog) => {
-    if (!prog.stripe_price_id) {
-      showSnackbar(t('purchaseError'))
-      return
-    }
+    if (!prog.stripe_price_id) { showSnackbar(t('purchaseError')); return }
     setBuyLoading(prog.id)
     try {
       const baseUrl = window.location.origin + window.location.pathname
       const result = await DB.createCheckoutSession(
-        prog.id,
-        auth.id,
-        prog.stripe_price_id,
+        prog.id, auth.id, prog.stripe_price_id,
         `${baseUrl}?purchase=success&program_id=${prog.id}#/programs`,
-        `${baseUrl}#/programs`,
-        lang,
+        `${baseUrl}#/programs`, lang,
       )
-      if (result?.url) {
-        window.location.href = result.url
-      } else {
-        showSnackbar(t('purchaseError'))
-      }
-    } catch {
-      showSnackbar(t('purchaseError'))
-    } finally {
-      setBuyLoading(null)
-    }
+      if (result?.url) window.location.href = result.url
+      else showSnackbar(t('purchaseError'))
+    } catch { showSnackbar(t('purchaseError')) }
+    finally { setBuyLoading(null) }
   }, [auth.id, lang, showSnackbar, t])
 
   if (loading) {
@@ -618,65 +751,66 @@ export default function Programs() {
     )
   }
 
-  // Lesson View
+  // Lesson View (inside programs tab)
   if (selectedLesson && selectedProgram) {
     const progLessons = lessons
       .filter(l => l.program_id === selectedProgram.id)
       .sort((a, b) => {
         const modA = modules.find(m => m.id === a.module_id)
         const modB = modules.find(m => m.id === b.module_id)
-        const orderA = (modA?.display_order || 0) * 10000 + (a.display_order || 0)
-        const orderB = (modB?.display_order || 0) * 10000 + (b.display_order || 0)
-        return orderA - orderB
+        return ((modA?.display_order || 0) * 10000 + (a.display_order || 0)) - ((modB?.display_order || 0) * 10000 + (b.display_order || 0))
       })
-
-    return (
-      <LessonView
-        lesson={selectedLesson}
-        allLessons={progLessons}
-        progress={progress}
-        onBack={() => setSelectedLesson(null)}
-        onToggle={toggleLesson}
-        onNavigate={(l) => { setSelectedLesson(l); window.scrollTo({ top: 0, behavior: 'smooth' }) }}
-        t={t}
-        lang={lang}
-      />
-    )
+    return <LessonView lesson={selectedLesson} allLessons={progLessons} progress={progress}
+      onBack={() => setSelectedLesson(null)} onToggle={toggleLesson}
+      onNavigate={(l) => { setSelectedLesson(l); window.scrollTo({ top: 0, behavior: 'smooth' }) }} t={t} lang={lang} />
   }
 
   // Program Detail View
   if (selectedProgram) {
-    const progModules = modules.filter(m => m.program_id === selectedProgram.id)
-    const progLessons = lessons.filter(l => l.program_id === selectedProgram.id)
-
-    return (
-      <ProgramDetail
-        program={selectedProgram}
-        modules={progModules}
-        lessons={progLessons}
-        progress={progress}
-        onBack={() => setSelectedProgram(null)}
-        onLesson={(l) => { setSelectedLesson(l); window.scrollTo({ top: 0, behavior: 'smooth' }) }}
-        onToggle={toggleLesson}
-        t={t}
-        lang={lang}
-      />
-    )
+    return <ProgramDetail program={selectedProgram}
+      modules={modules.filter(m => m.program_id === selectedProgram.id)}
+      lessons={lessons.filter(l => l.program_id === selectedProgram.id)}
+      progress={progress} onBack={() => setSelectedProgram(null)}
+      onLesson={(l) => { setSelectedLesson(l); window.scrollTo({ top: 0, behavior: 'smooth' }) }}
+      onToggle={toggleLesson} t={t} lang={lang} />
   }
 
-  // Programs List View
+  // Resource Video View
+  if (selectedResource) {
+    return <ResourceView resource={selectedResource}
+      onBack={() => setSelectedResource(null)} t={t} lang={lang} />
+  }
+
+  // ── Main view with sub-tabs ────────────────────────────────
   return (
-    <ProgramsList
-      programs={programs}
-      progress={progress}
-      lessons={lessons}
-      purchases={purchases}
-      onSelect={(p) => { setSelectedProgram(p); window.scrollTo({ top: 0, behavior: 'smooth' }) }}
-      onBuy={handleBuy}
-      buyLoading={buyLoading}
-      t={t}
-      lang={lang}
-      auth={auth}
-    />
+    <Box>
+      {/* Sub-tab bar */}
+      <Box sx={{ display: 'flex', gap: 0.75, mb: 3 }}>
+        {['programs', 'resources'].map(key => (
+          <Box key={key} onClick={() => setTab(key)} sx={{
+            px: 2, py: 1, borderRadius: '12px', cursor: 'pointer',
+            fontSize: '14px', fontWeight: tab === key ? 800 : 600,
+            background: tab === key ? C.primaryContainer : 'transparent',
+            color: tab === key ? C.primary : C.muted,
+            border: `1px solid ${tab === key ? C.primaryA20 : C.border}`,
+            transition: 'all 0.15s',
+          }}>
+            {key === 'programs' ? t('tabMyPrograms') : t('tabResources')}
+          </Box>
+        ))}
+      </Box>
+
+      {/* Tab content */}
+      {tab === 'programs' && (
+        <ProgramsList programs={programs} progress={progress} lessons={lessons} purchases={purchases}
+          onSelect={(p) => { setSelectedProgram(p); window.scrollTo({ top: 0, behavior: 'smooth' }) }}
+          onBuy={handleBuy} buyLoading={buyLoading} t={t} lang={lang} auth={auth} />
+      )}
+      {tab === 'resources' && (
+        <ResourcesList resources={resources} hasAccess={hasResourceAccess}
+          onWatch={(r) => { setSelectedResource(r); window.scrollTo({ top: 0, behavior: 'smooth' }) }}
+          t={t} lang={lang} />
+      )}
+    </Box>
   )
 }

@@ -453,6 +453,19 @@ export const DB = {
     if (entry) await LS.deleteById('client_lesson_progress', entry.id)
   },
 
+  // ── Resources ──────────────────────────────────────────
+  async getResources(statusFilter = 'active') {
+    if (isUsingSupabase) {
+      const params = statusFilter
+        ? `?select=*&status=eq.${statusFilter}&order=display_order.asc`
+        : '?select=*&order=display_order.asc'
+      return (await sbFetchSafe(sbUrl('resources', params), { headers: sbHeaders() })) || []
+    }
+    const all = await LS.selectAll('resources')
+    const filtered = statusFilter ? all.filter(r => r.status === statusFilter) : all
+    return filtered.sort((a, b) => (a.display_order || 0) - (b.display_order || 0))
+  },
+
   // ── Program Purchases ───────────────────────────────────
   async getClientPurchases(clientId) {
     if (isUsingSupabase) {

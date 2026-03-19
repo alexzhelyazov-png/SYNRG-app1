@@ -453,6 +453,155 @@ function LessonDialog({ t, item, modules, onClose, onSave }) {
 }
 
 // ══════════════════════════════════════════════════════════════
+// RESOURCES SUB-TAB
+// ══════════════════════════════════════════════════════════════
+function ResourcesSubTab({ t }) {
+  const { showSnackbar } = useApp()
+  const [items, setItems] = useState([])
+  const [dlg, setDlg]     = useState(null)
+
+  const load = async () => { setItems(await DB.getResources()) }
+  useEffect(() => { load() }, [])
+
+  const save = async (data) => {
+    if (dlg?.id) await DB.update('resources', dlg.id, data)
+    else await DB.insert('resources', data)
+    showSnackbar(t('savedMsg'))
+    setDlg(null); load()
+  }
+  const del = async (id) => { await DB.deleteById('resources', id); showSnackbar(t('deletedMsg')); load() }
+
+  return (
+    <Box>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
+        <Typography sx={{ fontWeight: 700, fontSize: '14px', color: C.text }}>{t('adminResources')}</Typography>
+        <Button size="small" startIcon={<AddIcon />} onClick={() => setDlg({})} sx={{ color: C.primary, fontSize: '12px' }}>{t('addResource')}</Button>
+      </Box>
+      {items.length === 0 && <Typography sx={{ fontSize: '13px', color: C.muted }}>{t('noResources')}</Typography>}
+      <Paper sx={{ borderRadius: '14px', overflow: 'hidden' }}>
+        {items.map((r, i) => (
+          <Box key={r.id} sx={{
+            px: 2, py: 1.5, display: 'flex', alignItems: 'center', gap: 1.5,
+            borderBottom: i < items.length - 1 ? `1px solid ${C.border}` : 'none',
+          }}>
+            <PlayCircleIcon sx={{ fontSize: 20, color: r.video_url ? C.primary : C.muted, flexShrink: 0 }} />
+            <Box sx={{ flex: 1 }}>
+              <Typography sx={{ fontWeight: 600, fontSize: '14px', color: C.text }}>{r.name_bg}</Typography>
+              <Typography sx={{ fontSize: '11px', color: C.muted }}>
+                {r.category_bg || '–'} · {r.duration_min || 0} {t('minutesShort')}
+                {r.video_url && ' · video'}
+              </Typography>
+            </Box>
+            <StatusChip status={r.status} t={t} />
+            <IconButton size="small" onClick={() => setDlg(r)}><EditIcon sx={{ fontSize: 16, color: C.muted }} /></IconButton>
+            <IconButton size="small" onClick={() => del(r.id)}><DeleteOutlineIcon sx={{ fontSize: 16, color: C.danger }} /></IconButton>
+          </Box>
+        ))}
+      </Paper>
+      {dlg !== null && <ResourceDialog t={t} item={dlg} onClose={() => setDlg(null)} onSave={save} />}
+    </Box>
+  )
+}
+
+function ResourceDialog({ t, item, onClose, onSave }) {
+  const [f, setF] = useState({
+    name_bg: '', name_en: '', description_bg: '', description_en: '',
+    video_url: '', thumbnail_url: '', category_bg: '', category_en: '',
+    duration_min: 0, display_order: 0, status: 'active',
+    ...item,
+  })
+  const set = (k, v) => setF(p => ({ ...p, [k]: v }))
+  const parsed = parseVideoUrl(f.video_url)
+
+  // Bunny upload state
+  const [uploading, setUploading] = useState(false)
+  const [uploadPct, setUploadPct] = useState(0)
+  const [uploadError, setUploadError] = useState('')
+  const fileRef = useRef(null)
+
+  async function handleBunnyUpload(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setUploading(true); setUploadPct(0); setUploadError('')
+    try {
+      const title = f.name_bg || f.name_en || file.name.replace(/\.[^.]+$/, '')
+      const createRes = await fetch(`${SUPABASE_URL}/functions/v1/bunny-upload`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'create', title }),
+      })
+      if (!createRes.ok) throw new Error('Failed to create video')
+      const { uploadUrl, embedUrl, thumbnailUrl, apiKey } = await createRes.json()
+      await new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest()
+        xhr.open('PUT', uploadUrl)
+        xhr.setRequestHeader('AccessKey', apiKey)
+        xhr.upload.onprogress = (ev) => { if (ev.lengthComputable) setUploadPct(Math.round((ev.loaded / ev.total) * 100)) }
+        xhr.onload = () => xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new Error(`Upload failed: ${xhr.status}`))
+        xhr.onerror = () => reject(new Error('Upload error'))
+        xhr.send(file)
+      })
+      setF(prev => ({ ...prev, video_url: embedUrl, thumbnail_url: thumbnailUrl }))
+    } catch (err) { setUploadError(err.message || 'Upload failed') }
+    finally { setUploading(false); if (fileRef.current) fileRef.current.value = '' }
+  }
+
+  return (
+    <Dialog open onClose={onClose} maxWidth="sm" fullWidth>
+      <DialogTitle>{item?.id ? t('editResource') : t('addResource')}</DialogTitle>
+      <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, pt: '12px !important' }}>
+        <Box sx={{ display: 'flex', gap: 1.5 }}>
+          <TextField label={t('nameBg')} value={f.name_bg} onChange={e => set('name_bg', e.target.value)} fullWidth size="small" sx={inputSx} />
+          <TextField label={t('nameEn')} value={f.name_en} onChange={e => set('name_en', e.target.value)} fullWidth size="small" sx={inputSx} />
+        </Box>
+        <TextField label={t('descBg')} value={f.description_bg} onChange={e => set('description_bg', e.target.value)} fullWidth multiline rows={2} size="small" sx={inputSx} />
+        <TextField label={t('descEn')} value={f.description_en} onChange={e => set('description_en', e.target.value)} fullWidth multiline rows={2} size="small" sx={inputSx} />
+        <Box sx={{ display: 'flex', gap: 1.5 }}>
+          <TextField label={`${t('categoryLbl')} BG`} value={f.category_bg} onChange={e => set('category_bg', e.target.value)} fullWidth size="small" sx={inputSx} />
+          <TextField label={`${t('categoryLbl')} EN`} value={f.category_en} onChange={e => set('category_en', e.target.value)} fullWidth size="small" sx={inputSx} />
+        </Box>
+        <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-start' }}>
+          <TextField label={t('videoUrl')} value={f.video_url} onChange={e => set('video_url', e.target.value)} fullWidth size="small" sx={inputSx}
+            helperText={parsed ? `${parsed.type} ✓` : t('videoUrlHint')} />
+          <input ref={fileRef} type="file" accept="video/*" style={{ display: 'none' }} onChange={handleBunnyUpload} />
+          <Button variant="outlined" size="small" disabled={uploading} onClick={() => fileRef.current?.click()} startIcon={<UploadSvg />}
+            sx={{ mt: 0.5, minWidth: 'auto', whiteSpace: 'nowrap', borderColor: C.border, color: C.muted, px: 1.5, '&:hover': { borderColor: C.primary, color: C.primary } }}>
+            {t('uploadVideoBtn')}
+          </Button>
+        </Box>
+        {uploading && (
+          <Box>
+            <LinearProgress variant="determinate" value={uploadPct} sx={{ height: 6, borderRadius: 3, background: C.border, '& .MuiLinearProgress-bar': { background: C.primary, borderRadius: 3 } }} />
+            <Typography sx={{ fontSize: '11px', color: C.muted, mt: 0.5 }}>{t('uploadingVideo')} {uploadPct}%</Typography>
+          </Box>
+        )}
+        {uploadError && <Typography sx={{ fontSize: '12px', color: C.danger }}>{uploadError}</Typography>}
+        {parsed && parsed.type !== 'direct' && (
+          <Box sx={{ position: 'relative', width: '100%', pt: '56.25%', borderRadius: '12px', overflow: 'hidden', background: '#000' }}>
+            <iframe src={parsed.embedUrl} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: 'none' }} allow="autoplay; fullscreen" allowFullScreen />
+          </Box>
+        )}
+        <Box sx={{ display: 'flex', gap: 1.5 }}>
+          <TextField label={t('durationMin')} type="number" value={f.duration_min} onChange={e => set('duration_min', +e.target.value)} sx={{ ...inputSx, width: 140 }} size="small" />
+          <TextField label={t('orderLbl')} type="number" value={f.display_order} onChange={e => set('display_order', +e.target.value)} sx={{ ...inputSx, width: 100 }} size="small" />
+          <FormControl size="small" fullWidth sx={inputSx}>
+            <InputLabel>{t('statusLbl')}</InputLabel>
+            <Select value={f.status} label={t('statusLbl')} onChange={e => set('status', e.target.value)}>
+              <MenuItem value="active">{t('statusActive')}</MenuItem>
+              <MenuItem value="draft">{t('statusDraft')}</MenuItem>
+            </Select>
+          </FormControl>
+        </Box>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose} sx={{ color: C.muted }}>{t('cancelBtn')}</Button>
+        <Button variant="contained" disabled={uploading} onClick={() => { const { id, created_at, ...data } = f; onSave(data) }}>{t('saveBtn')}</Button>
+      </DialogActions>
+    </Dialog>
+  )
+}
+
+// ══════════════════════════════════════════════════════════════
 // MAIN ADMIN PROGRAMS TAB
 // ══════════════════════════════════════════════════════════════
 export default function AdminProgramsTab() {
@@ -461,7 +610,6 @@ export default function AdminProgramsTab() {
   const [selectedProgram, setSelectedProgram] = useState(null)
   const [modules, setModules] = useState([])
 
-  // Load modules when program selected
   useEffect(() => {
     if (!selectedProgram) { setModules([]); return }
     DB.getProgramModules(selectedProgram.id).then(setModules)
@@ -471,11 +619,11 @@ export default function AdminProgramsTab() {
     { label: t('adminPrograms'),  key: 'programs' },
     { label: t('programModules'), key: 'modules' },
     { label: t('programLessons'), key: 'lessons' },
+    { label: t('adminResources'), key: 'resources' },
   ]
 
   return (
     <Box>
-      {/* Sub-tab navigation */}
       <Box sx={{ display: 'flex', gap: 0.75, mb: 2.5, flexWrap: 'wrap', alignItems: 'center' }}>
         {SUBS.map(({ label, key }) => (
           <Box key={key} onClick={() => setSub(key)} sx={{
@@ -490,7 +638,6 @@ export default function AdminProgramsTab() {
           </Box>
         ))}
 
-        {/* Selected program indicator */}
         {selectedProgram && (
           <Chip
             label={selectedProgram.name_bg}
@@ -502,18 +649,13 @@ export default function AdminProgramsTab() {
       </Box>
 
       {sub === 'programs' && (
-        <ProgramsSubTab
-          t={t}
+        <ProgramsSubTab t={t}
           onSelectProgram={(p) => { setSelectedProgram(p); setSub('modules') }}
-          selectedProgramId={selectedProgram?.id}
-        />
+          selectedProgramId={selectedProgram?.id} />
       )}
-      {sub === 'modules' && (
-        <ModulesSubTab t={t} programId={selectedProgram?.id} />
-      )}
-      {sub === 'lessons' && (
-        <LessonsSubTab t={t} programId={selectedProgram?.id} modules={modules} />
-      )}
+      {sub === 'modules' && <ModulesSubTab t={t} programId={selectedProgram?.id} />}
+      {sub === 'lessons' && <LessonsSubTab t={t} programId={selectedProgram?.id} modules={modules} />}
+      {sub === 'resources' && <ResourcesSubTab t={t} />}
     </Box>
   )
 }
