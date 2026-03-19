@@ -373,6 +373,15 @@ function PlanDialog({ open, onClose, onActivate, onExtend, onAdjust, client, pla
             </Typography>
           </>
         )}
+        {/* Module access */}
+        {client && (
+          <Box sx={{ p: 1.5, borderRadius: '10px', background: 'rgba(255,255,255,0.04)', border: `1px solid ${C.border}` }}>
+            <Typography sx={{ fontSize: '11px', color: C.muted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.7px', mb: 1 }}>
+              {t('editModules')}
+            </Typography>
+            <ClientModuleEditor clientId={client.id} currentModules={client.modules} t={t} lang="bg" />
+          </Box>
+        )}
       </DialogContent>
       <DialogActions sx={{ px: 3, pb: 2 }}>
         <Button onClick={onClose} sx={{ color: C.muted }}>{t('cancelBtn')}</Button>
@@ -385,80 +394,69 @@ function PlanDialog({ open, onClose, onActivate, onExtend, onAdjust, client, pla
   )
 }
 
-// ── Client Plan Row ──────────────────────────────────────────
+// ── Client Plan Row (compact) ─────────────────────────────────
 function ClientPlanRow({ client, plan, onManage, onDeactivate, onDelete, t, lang }) {
   const active   = isPlanActive(plan)
-  const daysLeft = plan ? daysUntilExpiry(plan) : null
   const credits  = plan ? creditsRemaining(plan) : null
   const isLow    = plan && plan.plan_type !== 'unlimited' && credits !== null && credits <= 2
-  const isExpiring = daysLeft !== null && daysLeft <= 7
+  const isPaid   = plan && Number(plan.price) > 0
 
   return (
     <Box sx={{
-      display: 'flex', alignItems: 'center', gap: 1.5, py: 1.25, px: 1.5,
+      display: 'flex', alignItems: 'center', gap: 1.25, py: 1, px: 1.5,
       borderBottom: `1px solid ${C.border}`,
       '&:last-child': { borderBottom: 'none' },
     }}>
+      {/* Avatar */}
       <Box sx={{
-        width: 36, height: 36, borderRadius: '50%', flexShrink: 0,
+        width: 32, height: 32, borderRadius: '50%', flexShrink: 0,
         background: active ? C.primaryContainer : 'rgba(255,255,255,0.06)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: '14px', fontWeight: 800, color: active ? C.primary : C.muted,
+        fontSize: '13px', fontWeight: 800, color: active ? C.primary : C.muted,
       }}>
         {client.name.charAt(0).toUpperCase()}
       </Box>
-      <Box sx={{ flex: 1, minWidth: 0 }}>
-        <Typography sx={{ fontWeight: 700, fontSize: '14px', color: C.text }}>
-          {client.name}
-        </Typography>
-        {plan ? (
-          <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mt: 0.25 }}>
-            <Chip label={planLabel(plan.plan_type, t)} size="small"
-              sx={{ fontSize: '10px', height: 18, background: active ? C.primaryContainer : 'rgba(255,255,255,0.06)', color: active ? C.primary : C.muted }} />
-            {plan.plan_type !== 'unlimited' && (
-              <Chip label={`${credits}/${plan.credits_total}`} size="small"
-                sx={{ fontSize: '10px', height: 18, background: isLow ? 'rgba(251,146,60,0.12)' : 'rgba(255,255,255,0.06)', color: isLow ? '#FB923C' : C.muted }} />
-            )}
-            {daysLeft !== null && (
-              <Chip label={`${daysLeft}д`} size="small"
-                sx={{ fontSize: '10px', height: 18, background: isExpiring ? 'rgba(251,146,60,0.12)' : 'rgba(255,255,255,0.06)', color: isExpiring ? '#FB923C' : C.muted }} />
-            )}
-            <Chip
-              label={Number(plan.price) > 0 ? `${plan.price} €` : t('freeLbl')}
-              size="small"
-              sx={{ fontSize: '10px', height: 18,
-                background: Number(plan.price) > 0 ? 'rgba(196,233,191,0.12)' : 'rgba(255,255,255,0.06)',
-                color: Number(plan.price) > 0 ? C.primary : C.muted }}
-            />
-          </Box>
-        ) : (
-          <Typography sx={{ fontSize: '11px', color: '#F87171' }}>{t('noPlanLbl')}</Typography>
-        )}
-        <Box sx={{ mt: 0.5 }}>
-          <ClientModuleEditor clientId={client.id} currentModules={client.modules} t={t} lang={lang} />
+
+      {/* Name */}
+      <Typography sx={{ fontWeight: 700, fontSize: '13px', color: C.text, flex: 1, minWidth: 0,
+        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        {client.name}
+      </Typography>
+
+      {/* Plan info: credits remaining */}
+      {plan ? (
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, flexShrink: 0 }}>
+          {plan.plan_type !== 'unlimited' ? (
+            <Typography sx={{ fontSize: '12px', fontWeight: 800,
+              color: isLow ? '#FB923C' : C.primary }}>
+              {credits}
+            </Typography>
+          ) : (
+            <Typography sx={{ fontSize: '10px', fontWeight: 700, color: C.primary }}>
+              ∞
+            </Typography>
+          )}
+          {/* Paid marker */}
+          <Box sx={{
+            width: 8, height: 8, borderRadius: '50%', flexShrink: 0,
+            background: isPaid ? C.primary : '#FB923C',
+          }} />
         </Box>
-      </Box>
-      <Box sx={{ display: 'flex', gap: 0.5, flexShrink: 0, alignItems: 'center' }}>
-        <Button size="small" variant="outlined" onClick={() => onManage(client, plan)}
-          sx={{ fontSize: '11px', borderColor: C.border, color: C.muted,
-            '&:hover': { borderColor: C.primary, color: C.primary } }}>
-          {plan ? t('managePlanBtn') : t('activatePlanRowBtn')}
-        </Button>
-        {plan && onDeactivate && (
-          <Tooltip title={t('deactivatePlanBtn')} arrow>
-            <IconButton size="small" onClick={() => onDeactivate(plan.id)}
-              sx={{ color: C.muted, '&:hover': { color: '#FB923C' } }}>
-              <PersonRemoveIcon sx={{ fontSize: 16 }} />
-            </IconButton>
-          </Tooltip>
-        )}
+      ) : (
+        <Typography sx={{ fontSize: '10px', color: '#F87171', fontWeight: 700, flexShrink: 0 }}>—</Typography>
+      )}
+
+      {/* Actions */}
+      <Box sx={{ display: 'flex', gap: 0.25, flexShrink: 0 }}>
+        <IconButton size="small" onClick={() => onManage(client, plan)}
+          sx={{ color: C.muted, '&:hover': { color: C.primary } }}>
+          <EditIcon sx={{ fontSize: 14 }} />
+        </IconButton>
         {onDelete && (
-          <Tooltip title={t('deleteClientBtn')} arrow>
-            <IconButton size="small" onClick={() => onDelete(client)}
-              sx={{ color: C.muted, '&:hover': { color: '#F87171' } }}>
-              <DeleteOutlineIcon sx={{ fontSize: 16 }} />
-            </IconButton>
-          </Tooltip>
+          <IconButton size="small" onClick={() => onDelete(client)}
+            sx={{ color: C.muted, '&:hover': { color: '#F87171' } }}>
+            <DeleteOutlineIcon sx={{ fontSize: 14 }} />
+          </IconButton>
         )}
       </Box>
     </Box>
@@ -889,33 +887,28 @@ function ClientsTab({ t }) {
         <Paper sx={{ borderRadius: '16px', border: `1px solid rgba(248,113,113,0.3)`, overflow: 'hidden', mb: 3 }}>
           {pending.map(client => (
             <Box key={client.id} sx={{
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              px: 2, py: 1.25, borderBottom: `1px solid ${C.border}`, '&:last-child': { borderBottom: 'none' },
+              display: 'flex', alignItems: 'center', gap: 1.25, py: 1, px: 1.5,
+              borderBottom: `1px solid ${C.border}`, '&:last-child': { borderBottom: 'none' },
             }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flex: 1, minWidth: 0 }}>
-                <Box sx={{ width: 32, height: 32, borderRadius: '50%', background: 'rgba(248,113,113,0.15)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: '13px', fontWeight: 800, color: '#F87171', flexShrink: 0 }}>
-                  {client.name.charAt(0).toUpperCase()}
-                </Box>
-                <Box sx={{ flex: 1, minWidth: 0 }}>
-                  <Typography sx={{ fontWeight: 700, fontSize: '14px', color: C.text }}>{client.name}</Typography>
-                  <Typography sx={{ fontSize: '11px', color: '#F87171', mb: 0.5 }}>{t('hasNoPlan')}</Typography>
-                  <ClientModuleEditor clientId={client.id} currentModules={client.modules} t={t} lang={lang} />
-                </Box>
+              <Box sx={{ width: 32, height: 32, borderRadius: '50%', background: 'rgba(248,113,113,0.15)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: '13px', fontWeight: 800, color: '#F87171', flexShrink: 0 }}>
+                {client.name.charAt(0).toUpperCase()}
               </Box>
-              <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center', flexShrink: 0 }}>
-                <Button size="small" variant="contained"
-                  onClick={() => setPlanDlg({ client, plan: null })}
-                  sx={{ background: C.primary, color: '#0f1c11', fontWeight: 700, fontSize: '11px' }}>
-                  {t('activatePlanBtn')}
-                </Button>
-                <Tooltip title={t('deleteClientBtn')} arrow>
-                  <IconButton size="small" onClick={() => handleDelete(client)}
-                    sx={{ color: C.muted, '&:hover': { color: '#F87171' } }}>
-                    <DeleteOutlineIcon sx={{ fontSize: 16 }} />
-                  </IconButton>
-                </Tooltip>
+              <Typography sx={{ fontWeight: 700, fontSize: '13px', color: C.text, flex: 1, minWidth: 0,
+                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {client.name}
+              </Typography>
+              <Typography sx={{ fontSize: '10px', color: '#F87171', fontWeight: 700, flexShrink: 0 }}>—</Typography>
+              <Box sx={{ display: 'flex', gap: 0.25, flexShrink: 0 }}>
+                <IconButton size="small" onClick={() => setPlanDlg({ client, plan: null })}
+                  sx={{ color: C.primary }}>
+                  <EditIcon sx={{ fontSize: 14 }} />
+                </IconButton>
+                <IconButton size="small" onClick={() => handleDelete(client)}
+                  sx={{ color: C.muted, '&:hover': { color: '#F87171' } }}>
+                  <DeleteOutlineIcon sx={{ fontSize: 14 }} />
+                </IconButton>
               </Box>
             </Box>
           ))}
