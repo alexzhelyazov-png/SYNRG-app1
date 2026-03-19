@@ -567,6 +567,7 @@ export const T = {
     // ── Site Header (gateway nav) ────────────────────
     siteHome:           'Начало',
     siteStudio:         'Студио',
+    sitePrograms:       'Програми',
     siteRemote:         'С нас навсякъде',
     sitePricing:        'Цени',
     siteCTA:            'Безплатна консултация →',
@@ -1287,6 +1288,7 @@ export const T = {
     // ── Site Header (gateway nav) ────────────────────
     siteHome:           'Home',
     siteStudio:         'Studio',
+    sitePrograms:       'Programs',
     siteRemote:         'With us anywhere',
     sitePricing:        'Pricing',
     siteCTA:            'Free consultation →',

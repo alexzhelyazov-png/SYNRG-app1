@@ -7,9 +7,9 @@ import SynrgLogo from './SynrgLogo'
 const SITE_BASE = '../'
 
 const SITE_LINKS = [
-  { href: `${SITE_BASE}studio.html`,  labelKey: 'siteStudio' },
-  { href: `${SITE_BASE}remote.html`,  labelKey: 'siteRemote' },
-  { href: `${SITE_BASE}pricing.html`, labelKey: 'sitePricing' },
+  { href: `${SITE_BASE}studio.html`,    labelKey: 'siteStudio' },
+  { href: `${SITE_BASE}programs.html`,  labelKey: 'sitePrograms' },
+  { href: `${SITE_BASE}pricing.html`,   labelKey: 'sitePricing' },
 ]
 
 const CTA_HREF  = `${SITE_BASE}index.html#cta`
