@@ -168,7 +168,7 @@ export default function Progress() {
           transition: `all 0.2s ${EASE.standard}`,
           '&:hover': { borderColor: C.borderHover, transform: 'translateY(-2px)' },
         }}>
-          <Typography sx={{ fontSize: '10px', fontWeight: 700, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.8px', mb: 1 }}>
+          <Typography sx={{ fontSize: '12px', fontWeight: 700, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.8px', mb: 1.5 }}>
             {lang === 'en' ? 'Leaderboard' : 'Класация'}
           </Typography>
           <Box sx={{ display: 'flex', gap: 1 }}>
@@ -177,22 +177,22 @@ export default function Progress() {
               const medal = i < 3 ? ['#C8C5FF', '#94A3B8', '#CD7F32'][i] : null
               return (
                 <Box key={r.name} sx={{
-                  flex: 1, textAlign: 'center', py: 0.75, px: 0.5, borderRadius: '10px',
+                  flex: 1, textAlign: 'center', py: 1, px: 0.5, borderRadius: '10px',
                   background: isMe ? 'rgba(170,169,205,0.08)' : 'transparent',
                   border: isMe ? '1px solid rgba(170,169,205,0.2)' : '1px solid transparent',
                 }}>
-                  <Typography sx={{ fontSize: '9px', fontWeight: 700, color: medal || C.muted, mb: 0.25 }}>
+                  <Typography sx={{ fontSize: '11px', fontWeight: 700, color: medal || C.muted, mb: 0.5 }}>
                     #{i + 1}
                   </Typography>
-                  <Typography sx={{ fontSize: '11px', fontWeight: isMe ? 800 : 600, color: C.text, mb: 0.25,
+                  <Typography sx={{ fontSize: '13px', fontWeight: isMe ? 800 : 600, color: C.text, mb: 0.5,
                     overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {r.name?.split(' ')[0]}
                   </Typography>
-                  <Typography sx={{ fontSize: '13px', fontWeight: 800, color: medal || C.text,
+                  <Typography sx={{ fontSize: '17px', fontWeight: 800, color: medal || C.text,
                     fontFamily: "'MontBlanc', sans-serif", lineHeight: 1 }}>
                     {r.xp}
                   </Typography>
-                  <Typography sx={{ fontSize: '8px', color: C.muted, fontWeight: 600 }}>XP</Typography>
+                  <Typography sx={{ fontSize: '10px', color: C.muted, fontWeight: 600 }}>XP</Typography>
                 </Box>
               )
             })}
