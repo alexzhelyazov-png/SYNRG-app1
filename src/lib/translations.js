@@ -264,6 +264,7 @@ export const T = {
     // ── Dashboard extras ─────────────────────────────
     foodDiaryLbl:       'Хранителен дневник',
     noMealsLbl:         'Няма записани хранения',
+    noWeightLbl:        'Няма записани тегла',
     todayWorkoutTab:    'Тренировка',
     myTrainings:        'Моите тренировки',
 
@@ -597,6 +598,9 @@ export const T = {
     // ── Module Management (Admin) ───────────────────
     noModules:           'Без достъп',
     editModules:         'Редактирай модули',
+    nutritionTargets:    'Хранителни цели',
+    calorieTargetLbl:    'Калории',
+    proteinTargetLbl:    'Протеин',
     modulesLbl:          'Модули',
     preset_studio_client:'Студио клиент',
     preset_full_access:  'Пълен достъп',
@@ -1007,6 +1011,7 @@ export const T = {
     // ── Dashboard extras ─────────────────────────────
     foodDiaryLbl:       'Food Diary',
     noMealsLbl:         'No meals logged',
+    noWeightLbl:        'No weight records',
     todayWorkoutTab:    'Workout',
     myTrainings:        'My Workouts',
 
@@ -1340,6 +1345,9 @@ export const T = {
     // ── Module Management (Admin) ───────────────────
     noModules:           'No access',
     editModules:         'Edit modules',
+    nutritionTargets:    'Nutrition targets',
+    calorieTargetLbl:    'Calories',
+    proteinTargetLbl:    'Protein',
     modulesLbl:          'Modules',
     preset_studio_client:'Studio client',
     preset_full_access:  'Full access',

@@ -407,6 +407,7 @@ function PlanDialog({ open, onClose, onActivate, onExtend, onAdjust, onTogglePai
             <ClientModuleEditor clientId={client.id} currentModules={client.modules} t={t} lang="bg" />
           </Box>
         )}
+
       </DialogContent>
       <DialogActions sx={{ px: 3, pb: 2 }}>
         <Button onClick={onClose} sx={{ color: C.muted }}>{t('cancelBtn')}</Button>

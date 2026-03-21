@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Box, Typography, TextField, Button, Chip, Paper, Switch, Collapse, Tabs, Tab, IconButton, Tooltip } from '@mui/material'
 import ArrowBackIcon from '@mui/icons-material/ArrowBack'
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline'
+import EditIcon from '@mui/icons-material/Edit'
 import RestaurantIcon from '@mui/icons-material/Restaurant'
 import MonitorWeightIcon from '@mui/icons-material/MonitorWeight'
 import DirectionsWalkIcon from '@mui/icons-material/DirectionsWalk'
@@ -404,8 +405,8 @@ function MiniBarChart({ data, width = 200, height = 48, color = C.purple }) {
 
 export function ClientDetail() {
   const {
-    client, t, lang, weeklyRate,
-    setCoachClientMode,
+    client, auth, t, lang, weeklyRate,
+    setCoachClientMode, updateClientTargets,
     exName, setExName, exScheme, setExScheme, exWeight, setExWeight,
     workoutCategory, setWorkoutCategory,
     currentWorkout, setCurrentWorkout,
@@ -414,7 +415,9 @@ export function ClientDetail() {
   const { allPlans, loadAllPlans, slots, slotBookings } = useBooking()
 
   const [tab, setTab] = useState(0)
+  const [editingTargets, setEditingTargets] = useState(null) // { cal, prot }
   const isMobile = window.innerWidth < 640
+  const isCoach = auth.role === 'coach' || auth.role === 'admin'
 
   useEffect(() => { loadAllPlans() }, []) // eslint-disable-line
 
@@ -695,7 +698,7 @@ export function ClientDetail() {
                 {t('weightHistoryLbl')}
               </Typography>
               {!lastWeight ? (
-                <Typography sx={{ fontSize: '13px', color: C.muted }}>{t('noMealsLbl')}</Typography>
+                <Typography sx={{ fontSize: '13px', color: C.muted }}>{t('noWeightLbl')}</Typography>
               ) : (
                 <>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 3, mb: 1.5 }}>
@@ -723,9 +726,48 @@ export function ClientDetail() {
 
             {/* ── 3. Хранителен дневник (последни 7 дни) ── */}
             <Paper sx={{ p: 2.5, border: `1px solid ${C.border}`, borderRadius: '16px' }}>
-              <Typography sx={{ fontSize: '12px', fontWeight: 700, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.6px', mb: 1.5 }}>
-                {t('foodDiaryLbl')}
-              </Typography>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
+                <Typography sx={{ fontSize: '12px', fontWeight: 700, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.6px' }}>
+                  {t('foodDiaryLbl')}
+                </Typography>
+                {editingTargets ? (
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+                    <TextField size="small" type="number"
+                      value={editingTargets.cal}
+                      onChange={e => setEditingTargets(p => ({ ...p, cal: e.target.value }))}
+                      inputProps={{ min: 500, max: 10000, style: { padding: '3px 6px', fontSize: '12px', width: '50px', color: C.text } }}
+                      sx={{ '& .MuiOutlinedInput-notchedOutline': { borderColor: C.border } }}
+                    />
+                    <Typography sx={{ fontSize: '11px', color: C.muted }}>kcal</Typography>
+                    <TextField size="small" type="number"
+                      value={editingTargets.prot}
+                      onChange={e => setEditingTargets(p => ({ ...p, prot: e.target.value }))}
+                      inputProps={{ min: 10, max: 500, style: { padding: '3px 6px', fontSize: '12px', width: '40px', color: C.text } }}
+                      sx={{ '& .MuiOutlinedInput-notchedOutline': { borderColor: C.border } }}
+                    />
+                    <Typography sx={{ fontSize: '11px', color: C.muted }}>{t('gUnit')}</Typography>
+                    <IconButton size="small" onClick={async () => {
+                      await updateClientTargets(client.id, Number(editingTargets.cal), Number(editingTargets.prot))
+                      setEditingTargets(null)
+                    }} sx={{ color: C.primary, p: 0.25 }}>
+                      <RestaurantIcon sx={{ fontSize: 14 }} />
+                    </IconButton>
+                  </Box>
+                ) : (
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                    <Typography sx={{ fontSize: '12px', color: C.muted }}>
+                      {client.calorieTarget} kcal · {client.proteinTarget}{t('gUnit')}
+                    </Typography>
+                    {isCoach && (
+                      <IconButton size="small"
+                        onClick={() => setEditingTargets({ cal: client.calorieTarget, prot: client.proteinTarget })}
+                        sx={{ color: C.muted, opacity: 0.5, p: 0.25, '&:hover': { opacity: 1, color: C.purple } }}>
+                        <EditIcon sx={{ fontSize: 13 }} />
+                      </IconButton>
+                    )}
+                  </Box>
+                )}
+              </Box>
               {[...last7].reverse().map((date, i) => {
                 const hasMeals = !!mealsByDate[date]
                 const dayStr = new Date(date).toLocaleDateString('bg-BG', { day: 'numeric', month: 'short', weekday: 'short' })
