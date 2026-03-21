@@ -1,6 +1,8 @@
 // ── Video embed utilities ────────────────────────────────────
 // Supports: Vimeo, YouTube, Bunny Stream, direct MP4
 
+const BUNNY_CDN = import.meta.env.VITE_BUNNY_CDN || ''
+
 /**
  * Convert any video URL to an embeddable URL
  * @param {string} url - Video URL (Vimeo, YouTube, Bunny, or direct)
@@ -45,20 +47,43 @@ export function parseVideoUrl(url) {
 }
 
 /**
+ * Extract Bunny video ID from any Bunny URL
+ * @param {string} url
+ * @returns {string|null}
+ */
+function extractBunnyVideoId(url) {
+  if (!url) return null
+  const u = url.trim()
+  // embed URL
+  const embed = u.match(/(?:iframe\.mediadelivery\.net|video\.bunnycdn\.com)\/embed\/\d+\/([a-f0-9-]+)/)
+  if (embed) return embed[1]
+  // play URL
+  const play = u.match(/(?:player|iframe)\.mediadelivery\.net\/play\/\d+\/([a-f0-9-]+)/)
+  if (play) return play[1]
+  // CDN URL (vz-xxx.b-cdn.net/{video_id}/...)
+  const cdn = u.match(/vz-[^/]+\.b-cdn\.net\/([a-f0-9-]+)\//)
+  if (cdn) return cdn[1]
+  return null
+}
+
+/**
  * Get a thumbnail URL from a video URL
  * @param {string} url
  * @returns {string|null}
  */
 export function getVideoThumbnail(url) {
   if (!url) return null
-  const parsed = parseVideoUrl(url)
-  if (!parsed) return null
+  const u = url.trim()
 
-  if (parsed.type === 'youtube') {
-    const match = url.match(/(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/)
-    if (match) return `https://img.youtube.com/vi/${match[1]}/hqdefault.jpg`
+  // YouTube
+  const ytMatch = u.match(/(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/)
+  if (ytMatch) return `https://img.youtube.com/vi/${ytMatch[1]}/hqdefault.jpg`
+
+  // Bunny Stream — use configured CDN hostname
+  if (BUNNY_CDN) {
+    const videoId = extractBunnyVideoId(u)
+    if (videoId) return `https://${BUNNY_CDN}/${videoId}/thumbnail.jpg`
   }
 
-  // For Vimeo and Bunny — no easy static thumbnail without API call
   return null
 }

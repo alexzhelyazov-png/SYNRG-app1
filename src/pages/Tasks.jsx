@@ -7,6 +7,7 @@ import AssignmentIcon        from '@mui/icons-material/Assignment'
 import ChatBubbleOutlineIcon from '@mui/icons-material/ChatBubbleOutline'
 import CloseIcon             from '@mui/icons-material/Close'
 import { useApp }  from '../context/AppContext'
+import { hasModule } from '../lib/modules'
 import { C, EASE } from '../theme'
 
 // ─── Single rule row ──────────────────────────────────────────────
@@ -30,7 +31,7 @@ function RuleRow({ task, index, onDelete, onComment, commentText, onCommentChang
           width: 26, height: 26, borderRadius: '8px', flexShrink: 0,
           background: C.accentSoft, border: `1px solid ${C.primaryA20}`,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: '12px', fontWeight: 800, color: C.primary, mt: '1px',
+          fontSize: '12px', fontWeight: 800, color: C.text, mt: '1px',
         }}>
           {index + 1}
         </Box>
@@ -52,10 +53,10 @@ function RuleRow({ task, index, onDelete, onComment, commentText, onCommentChang
           <Button size="small"
             onClick={() => setExpanded(p => !p)}
             sx={{
-              fontSize: '12px', color: expanded ? C.primary : C.muted, minWidth: 'auto',
+              fontSize: '12px', color: expanded ? C.purple : C.muted, minWidth: 'auto',
               px: 0.75, py: '2px', borderRadius: '6px',
               background: expanded ? C.accentSoft : 'transparent',
-              '&:hover': { background: C.accentSoft, color: C.primary },
+              '&:hover': { background: C.accentSoft, color: C.purple },
             }}
           >
             <ChatBubbleOutlineIcon sx={{ fontSize: '13px', mr: cmtCount ? 0.4 : 0 }} />
@@ -83,7 +84,7 @@ function RuleRow({ task, index, onDelete, onComment, commentText, onCommentChang
               borderRadius: '8px',
               borderLeft: `2px solid ${cm.is_coach ? C.primary : C.purple}`,
             }}>
-              <Typography sx={{ fontSize: '12px', fontWeight: 700, color: cm.is_coach ? C.primary : C.purple, minWidth: '60px', flexShrink: 0 }}>
+              <Typography sx={{ fontSize: '12px', fontWeight: 700, color: C.purple, minWidth: '60px', flexShrink: 0 }}>
                 {cm.author}
               </Typography>
               <Typography sx={{ fontSize: '13px', color: C.text }}>{cm.text}</Typography>
@@ -143,7 +144,7 @@ export function AllClientsTasks() {
         {t('tasksCoachTitle')}
       </Typography>
 
-      {(realClients || []).map((c, ci) => {
+      {(realClients || []).filter(c => hasModule(c.modules, 'studio_access')).map((c, ci) => {
         const tasks  = c.tasks || []
         const isOpen = expandedClient === c.id
 
@@ -167,12 +168,12 @@ export function AllClientsTasks() {
                 background: isOpen ? C.primaryContainer : 'rgba(255,255,255,0.08)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 fontSize: '15px', fontWeight: 800,
-                color: isOpen ? C.primary : C.muted, flexShrink: 0,
+                color: isOpen ? C.purple : C.muted, flexShrink: 0,
               }}>
                 {c.name.charAt(0).toUpperCase()}
               </Box>
               <Box sx={{ flex: 1 }}>
-                <Typography sx={{ fontWeight: 700, fontSize: '15px', color: isOpen ? C.primary : C.text }}>
+                <Typography sx={{ fontWeight: 700, fontSize: '15px', color: isOpen ? C.purple : C.text }}>
                   {c.name}
                 </Typography>
                 <Typography sx={{ fontSize: '12px', color: C.muted }}>
@@ -185,7 +186,7 @@ export function AllClientsTasks() {
                   background: C.accentSoft,
                   border: `1px solid ${C.primaryA20}`,
                 }}>
-                  <Typography sx={{ fontSize: '12px', fontWeight: 700, color: C.primary }}>
+                  <Typography sx={{ fontSize: '12px', fontWeight: 700, color: C.text }}>
                     {tasks.length}
                   </Typography>
                 </Box>

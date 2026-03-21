@@ -126,7 +126,7 @@ export default function Auth() {
     <Box sx={{
       flex:           1,
       minHeight:      0,
-      background:     `radial-gradient(ellipse at 50% 0%, rgba(196,233,191,0.05) 0%, ${C.bg} 60%)`,
+      background:     `radial-gradient(ellipse at 50% 0%, rgba(170,169,205,0.05) 0%, ${C.bg} 60%)`,
       display:        'flex',
       flexDirection:  'column',
       alignItems:     'center',
@@ -164,7 +164,7 @@ export default function Auth() {
       {/* ── Logo ────────────────────────────────────────── */}
       <Box sx={{
         mb:     1.5,
-        filter: 'drop-shadow(0 0 28px rgba(196,233,191,0.18))',
+        filter: 'drop-shadow(0 0 28px rgba(170,169,205,0.18))',
       }}>
         <SynrgLogomark size={120} />
       </Box>
@@ -185,7 +185,7 @@ export default function Auth() {
             px: 2,
             py: 0.75,
             transition: `all 0.18s ${EASE.standard}`,
-            '&:hover': { color: C.primary, borderColor: C.primaryA20, background: C.accentSoft },
+            '&:hover': { color: C.purple, borderColor: C.primaryA20, background: C.accentSoft },
           }}
         >
           {t('installOnPhone')}
@@ -206,9 +206,9 @@ export default function Auth() {
               fontWeight:  700,
               borderRadius:'99px',
               background:  lang === l ? C.accentSoft : 'transparent',
-              color:       lang === l ? C.primary    : C.muted,
+              color:       lang === l ? C.purple    : C.muted,
               border:      `1px solid ${lang === l ? C.primaryA20 : C.border}`,
-              '&:hover':   { background: C.accentSoft, color: C.primary },
+              '&:hover':   { background: C.accentSoft, color: C.purple },
             }}
           >
             {l.toUpperCase()}
@@ -249,11 +249,11 @@ export default function Auth() {
                   fontSize:       '13px',
                   fontWeight:     700,
                   background:     mode === key ? C.accentSoft : 'transparent',
-                  color:          mode === key ? C.primary    : C.muted,
+                  color:          mode === key ? C.purple    : C.muted,
                   borderRight:    key === 'login' ? `1px solid ${C.border}` : 'none',
                   transition:     `all 0.18s ${EASE.standard}`,
                   userSelect:     'none',
-                  '&:hover':      { color: C.primary },
+                  '&:hover':      { color: C.purple },
                 }}
               >
                 {label}
@@ -422,7 +422,7 @@ export default function Auth() {
           <Box sx={{ display: 'grid', gap: 2.5 }}>
             {/* Step 1: Tap Share */}
             <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center' }}>
-              <Box sx={{ minWidth: 28, height: 28, borderRadius: '50%', background: C.accentSoft, color: C.primary,
+              <Box sx={{ minWidth: 28, height: 28, borderRadius: '50%', background: C.accentSoft, color: C.text,
                 display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', fontWeight: 800 }}>1</Box>
               <Typography sx={{ fontSize: '14px', color: C.text, flex: 1 }}>
                 {t('installStep1IOS')}
@@ -439,7 +439,7 @@ export default function Auth() {
             </Box>
             {/* Step 2: Add to Home Screen */}
             <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center' }}>
-              <Box sx={{ minWidth: 28, height: 28, borderRadius: '50%', background: C.accentSoft, color: C.primary,
+              <Box sx={{ minWidth: 28, height: 28, borderRadius: '50%', background: C.accentSoft, color: C.text,
                 display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', fontWeight: 800 }}>2</Box>
               <Typography sx={{ fontSize: '14px', color: C.text, flex: 1 }}>
                 {t('installStep2IOS')}
@@ -455,9 +455,9 @@ export default function Auth() {
             </Box>
             {/* Step 3: Done */}
             <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center' }}>
-              <Box sx={{ minWidth: 28, height: 28, borderRadius: '50%', background: C.accentSoft, color: C.primary,
+              <Box sx={{ minWidth: 28, height: 28, borderRadius: '50%', background: C.accentSoft, color: C.text,
                 display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', fontWeight: 800 }}>3</Box>
-              <Typography sx={{ fontSize: '14px', color: C.primary, fontWeight: 700 }}>
+              <Typography sx={{ fontSize: '14px', color: C.text, fontWeight: 700 }}>
                 {t('installStep3IOS')}
               </Typography>
             </Box>
@@ -466,7 +466,7 @@ export default function Auth() {
           <Box sx={{ display: 'grid', gap: 2 }}>
             {[1, 2, 3].map(step => (
               <Box key={step} sx={{ display: 'flex', gap: 1.5, alignItems: 'flex-start' }}>
-                <Box sx={{ minWidth: 28, height: 28, borderRadius: '50%', background: C.accentSoft, color: C.primary,
+                <Box sx={{ minWidth: 28, height: 28, borderRadius: '50%', background: C.accentSoft, color: C.text,
                   display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', fontWeight: 800 }}>{step}</Box>
                 <Box>
                   <Typography sx={{ fontSize: '14px', color: C.text, pt: '3px', lineHeight: 1.5 }}>

@@ -114,6 +114,11 @@ export const BADGES = [
   { id: 'monthly_steps_silver', category: 'special', xp: 35, tier: 'silver', series: 'monthly_steps', muiIcon: 'DirectionsWalk', condType: 'monthly_steps', condValue: 300000 },
   { id: 'monthly_steps_gold',   category: 'special', xp: 50, tier: 'gold',   series: 'monthly_steps', muiIcon: 'DirectionsWalk', condType: 'monthly_steps', condValue: 450000 },
 
+  // ── FIRST ENTRY (instant gratification) ──
+  { id: 'first_meal',   category: 'consistency', xp: 5,  tier: null, series: null, muiIcon: 'Restaurant',    condType: 'count', condField: 'mealCount',   condValue: 1 },
+  { id: 'first_weight', category: 'consistency', xp: 5,  tier: null, series: null, muiIcon: 'MonitorWeight', condType: 'count', condField: 'weightCount', condValue: 1 },
+  { id: 'first_steps',  category: 'consistency', xp: 5,  tier: null, series: null, muiIcon: 'DirectionsWalk', condType: 'count', condField: 'stepsCount', condValue: 1 },
+
   // ── STANDALONE ──
   { id: 'first_pr',     category: 'strength', xp: 25, tier: null, series: null, muiIcon: 'EmojiEvents', condType: 'strength_pr', condValue: 1   },
   { id: 'all_rounder',  category: 'special',  xp: 40, tier: null, series: null, muiIcon: 'AutoAwesome', condType: 'compound',    condValue: 1   },

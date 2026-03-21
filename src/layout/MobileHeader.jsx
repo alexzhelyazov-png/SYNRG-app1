@@ -74,7 +74,7 @@ export default function MobileHeader() {
                 height:         40,
                 borderRadius:   '12px',
                 background:     auth.role === 'coach' ? C.primaryContainer : C.purpleSoft,
-                border:         `1px solid ${auth.role === 'coach' ? 'rgba(196,233,191,0.2)' : 'rgba(200,197,255,0.2)'}`,
+                border:         `1px solid ${auth.role === 'coach' ? 'rgba(170,169,205,0.2)' : 'rgba(200,197,255,0.2)'}`,
                 display:        'flex',
                 alignItems:     'center',
                 justifyContent: 'center',
@@ -82,7 +82,7 @@ export default function MobileHeader() {
                 cursor:         auth.role === 'client' ? 'pointer' : 'default',
               }}>
               {auth.role === 'coach'
-                ? <FitnessCenterIcon sx={{ fontSize: '20px', color: C.primary }} />
+                ? <FitnessCenterIcon sx={{ fontSize: '20px', color: C.purple }} />
                 : <DirectionsRunIcon sx={{ fontSize: '20px', color: C.purple }} />
               }
             </Box>
@@ -93,7 +93,7 @@ export default function MobileHeader() {
               </Typography>
               {auth.role === 'coach' && client?.name ? (
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                  <Typography variant="overline" sx={{ color: C.primary, lineHeight: 1 }}>
+                  <Typography variant="overline" sx={{ color: C.text, lineHeight: 1 }}>
                     {t('coachRole')}
                   </Typography>
                   <Typography variant="overline" sx={{ color: C.muted, lineHeight: 1 }}>·</Typography>
@@ -103,7 +103,7 @@ export default function MobileHeader() {
                 </Box>
               ) : (
                 <Typography variant="overline" sx={{
-                  color:      auth.role === 'coach' ? C.primary : C.purple,
+                  color:      C.purple,
                   lineHeight: 1,
                 }}>
                   {auth.role === 'coach' ? t('coachRole') : t('clientRole')}
@@ -119,10 +119,10 @@ export default function MobileHeader() {
               size="small"
               aria-label={t('navNotifications')}
               sx={{
-                color:      unreadNotifCount > 0 ? C.primary : C.muted,
+                color:      unreadNotifCount > 0 ? C.purple : C.muted,
                 flexShrink: 0,
                 transition: `color 0.18s ${EASE.standard}`,
-                '&:hover':  { color: C.primary },
+                '&:hover':  { color: C.purple },
               }}
             >
               <Badge badgeContent={unreadNotifCount} color="error" max={9}>
@@ -147,7 +147,7 @@ export default function MobileHeader() {
               border:       `1px solid ${C.border}`,
               flexShrink:   0,
               transition:   `all 0.18s ${EASE.standard}`,
-              '&:hover':    { color: C.primary, borderColor: 'rgba(196,233,191,0.3)' },
+              '&:hover':    { color: C.purple, borderColor: 'rgba(200,197,255,0.3)' },
             }}
           >
             {lang === 'bg' ? 'EN' : 'BG'}
@@ -264,11 +264,11 @@ export default function MobileHeader() {
             <>
               <ProfileRow label={t('planLbl')}
                 value={myPlan.plan_type === 'unlimited' ? 'Unlimited' : `${myPlan.plan_type} ${t('remainingSessionsLbl') || 'sessions'}`}
-                color={C.primary} />
+                color={C.purple} />
               {myPlan.plan_type !== 'unlimited' && (
                 <ProfileRow label={t('creditsLbl')}
                   value={`${creditsRemaining(myPlan)} / ${myPlan.credits_total}`}
-                  color={creditsRemaining(myPlan) <= 2 ? '#F87171' : C.primary} />
+                  color={creditsRemaining(myPlan) <= 2 ? '#F87171' : C.purple} />
               )}
               <ProfileRow label={t('validToLbl')}
                 value={fmtValidTo(myPlan)}
@@ -287,7 +287,7 @@ export default function MobileHeader() {
                 {auth.modules.map(m => (
                   <Box key={m} sx={{
                     px: 1, py: '3px', borderRadius: '6px', fontSize: '11px', fontWeight: 600,
-                    background: C.accentSoft, color: C.primary, border: `1px solid ${C.primaryA20}`,
+                    background: C.accentSoft, color: C.text, border: `1px solid ${C.primaryA20}`,
                   }}>
                     {m.replace(/_/g, ' ')}
                   </Box>

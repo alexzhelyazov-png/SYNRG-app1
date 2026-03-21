@@ -123,10 +123,12 @@ function SlotDialog({ open, onClose, onSave, coaches, t }) {
         <Box sx={{ display: 'flex', gap: 1, mb: 0.5 }}>
           {['single', 'recurring'].map(m => (
             <Box key={m} onClick={() => setMode(m)} sx={{
-              px: 2, py: 0.75, borderRadius: '10px', cursor: 'pointer', fontSize: '13px', fontWeight: 600,
-              background: mode === m ? C.primaryContainer : 'rgba(255,255,255,0.05)',
-              color:      mode === m ? C.primary : C.muted,
-              border:     `1px solid ${mode === m ? C.primaryA20 : C.border}`,
+              px: 2, py: 0.75, borderRadius: '100px', cursor: 'pointer', fontSize: '13px', fontWeight: 700,
+              background: mode === m ? C.primary : 'transparent',
+              color:      mode === m ? C.primaryOn : C.text,
+              border:     `1px solid ${mode === m ? C.primary : C.loganBorder}`,
+              transition: 'all 0.22s',
+              '&:hover': mode === m ? {} : { borderColor: C.logan, background: C.loganDeep },
             }}>
               {m === 'single' ? t('createOne') : t('createMulti')}
             </Box>
@@ -185,7 +187,7 @@ function SlotDialog({ open, onClose, onSave, coaches, t }) {
                     px: 1.5, py: 0.5, borderRadius: '8px', cursor: 'pointer',
                     fontSize: '12px', fontWeight: 700,
                     background: weekdays.includes(d) ? C.primaryContainer : 'rgba(255,255,255,0.06)',
-                    color:      weekdays.includes(d) ? C.primary : C.muted,
+                    color:      weekdays.includes(d) ? C.purple : C.muted,
                     border:     `1px solid ${weekdays.includes(d) ? C.primaryA20 : C.border}`,
                   }}>
                     {WEEKDAY_LABELS_BG[d]}
@@ -284,10 +286,12 @@ function PlanDialog({ open, onClose, onActivate, onExtend, onAdjust, onTogglePai
             ...(plan && plan.plan_type !== 'unlimited' ? [{ key: 'adjust', label: t('adjustCreditsBtn') }] : []),
           ].map(({ key, label }) => (
             <Box key={key} onClick={() => setMode(key)} sx={{
-              px: 2, py: 0.75, borderRadius: '10px', cursor: 'pointer', fontSize: '12px', fontWeight: 600,
-              background: mode === key ? C.primaryContainer : 'rgba(255,255,255,0.05)',
-              color:      mode === key ? C.primary : C.muted,
-              border:     `1px solid ${mode === key ? C.primaryA20 : C.border}`,
+              px: 2, py: 0.75, borderRadius: '100px', cursor: 'pointer', fontSize: '12px', fontWeight: 700,
+              background: mode === key ? C.primary : 'transparent',
+              color:      mode === key ? C.primaryOn : C.text,
+              border:     `1px solid ${mode === key ? C.primary : C.loganBorder}`,
+              transition: 'all 0.22s',
+              '&:hover': mode === key ? {} : { borderColor: C.logan, background: C.loganDeep },
             }}>
               {label}
             </Box>
@@ -309,7 +313,7 @@ function PlanDialog({ open, onClose, onActivate, onExtend, onAdjust, onTogglePai
               control={<Checkbox checked={isPaid} onChange={e => setIsPaid(e.target.checked)}
                 sx={{ color: C.primary, '&.Mui-checked': { color: C.primary }, p: 0.5 }} />}
               label={isPaid ? t('markedPaid') : t('markedUnpaid')}
-              sx={{ '& .MuiTypography-root': { fontSize: '12px', color: isPaid ? C.primary : '#FB923C', fontWeight: 700 }, mt: 0.5 }}
+              sx={{ '& .MuiTypography-root': { fontSize: '12px', color: isPaid ? C.purple : '#FB923C', fontWeight: 700 }, mt: 0.5 }}
             />
           </Box>
         )}
@@ -332,13 +336,13 @@ function PlanDialog({ open, onClose, onActivate, onExtend, onAdjust, onTogglePai
                 value={price} onChange={e => setPrice(e.target.value)}
                 inputProps={{ min: 0 }} sx={{ ...inputSx, flex: 1 }}
                 helperText={Number(price) === 0 ? t('freeLbl') : `${price} €`}
-                FormHelperTextProps={{ sx: { color: Number(price) === 0 ? C.muted : C.primary } }}
+                FormHelperTextProps={{ sx: { color: Number(price) === 0 ? C.muted : C.purple } }}
               />
               <FormControlLabel
                 control={<Checkbox checked={isPaid} onChange={e => setIsPaid(e.target.checked)}
                   sx={{ color: C.primary, '&.Mui-checked': { color: C.primary }, p: 0.5 }} />}
                 label={t('markedPaid')}
-                sx={{ '& .MuiTypography-root': { fontSize: '12px', color: isPaid ? C.primary : C.muted, fontWeight: 700 }, mt: 0.5 }}
+                sx={{ '& .MuiTypography-root': { fontSize: '12px', color: isPaid ? C.purple : C.muted, fontWeight: 700 }, mt: 0.5 }}
               />
             </Box>
             {/* Migration override: remaining sessions from old platform */}
@@ -359,7 +363,7 @@ function PlanDialog({ open, onClose, onActivate, onExtend, onAdjust, onTogglePai
                     helperText={startCredits === ''
                       ? t('startingCreditsHint')
                       : `${t('creditsLeft')}: ${remaining} / ${total}`}
-                    FormHelperTextProps={{ sx: { color: startCredits !== '' ? C.primary : C.muted } }}
+                    FormHelperTextProps={{ sx: { color: startCredits !== '' ? C.purple : C.muted } }}
                   />
                 </Box>
               )
@@ -432,7 +436,7 @@ function ClientPlanRow({ client, plan, onManage, onDeactivate, onDelete, t, lang
         width: 32, height: 32, borderRadius: '50%', flexShrink: 0,
         background: active ? C.primaryContainer : 'rgba(255,255,255,0.06)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: '13px', fontWeight: 800, color: active ? C.primary : C.muted,
+        fontSize: '13px', fontWeight: 800, color: active ? C.purple : C.muted,
       }}>
         {client.name.charAt(0).toUpperCase()}
       </Box>
@@ -448,11 +452,11 @@ function ClientPlanRow({ client, plan, onManage, onDeactivate, onDelete, t, lang
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, flexShrink: 0 }}>
           {plan.plan_type !== 'unlimited' ? (
             <Typography sx={{ fontSize: '12px', fontWeight: 800,
-              color: isLow ? '#FB923C' : C.primary }}>
+              color: isLow ? '#FB923C' : C.purple }}>
               {credits}
             </Typography>
           ) : (
-            <Typography sx={{ fontSize: '10px', fontWeight: 700, color: C.primary }}>
+            <Typography sx={{ fontSize: '10px', fontWeight: 700, color: C.text }}>
               ∞
             </Typography>
           )}
@@ -471,7 +475,7 @@ function ClientPlanRow({ client, plan, onManage, onDeactivate, onDelete, t, lang
       {/* Actions */}
       <Box sx={{ display: 'flex', gap: 0.25, flexShrink: 0 }}>
         <IconButton size="small" onClick={() => onManage(client, plan)}
-          sx={{ color: C.muted, '&:hover': { color: C.primary } }}>
+          sx={{ color: C.muted, '&:hover': { color: C.purple } }}>
           <EditIcon sx={{ fontSize: 14 }} />
         </IconButton>
         {onDelete && (
@@ -576,7 +580,7 @@ function AdminScheduleTab({ t, lang }) {
       ) : (
         dates.map(date => (
           <Box key={date} sx={{ mb: 3 }}>
-            <Typography sx={{ fontWeight: 800, fontSize: '14px', color: date === isoToday() ? C.primary : C.text,
+            <Typography sx={{ fontWeight: 800, fontSize: '14px', color: date === isoToday() ? C.purple : C.text,
               mb: 1, pl: 1, borderLeft: `3px solid ${date === isoToday() ? C.primary : C.border}` }}>
               {dayLabel(date, lang)} · {date}
             </Typography>
@@ -596,14 +600,14 @@ function AdminScheduleTab({ t, lang }) {
                       <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', mt: 0.25 }}>
                         <Chip label={`${occupancyStr(slot.booked_count || 0, slot.capacity)}`} size="small"
                           sx={{ fontSize: '10px', height: 18, background: isFull ? 'rgba(248,113,113,0.12)' : C.accentSoft,
-                            color: isFull ? '#F87171' : C.primary }} />
+                            color: isFull ? '#F87171' : C.purple }} />
                         {slot.notes && <Typography sx={{ fontSize: '11px', color: C.muted, fontStyle: 'italic' }}>{slot.notes}</Typography>}
                       </Box>
                     </Box>
                     <Box sx={{ display: 'flex', gap: 0.5 }}>
                       <Tooltip title={t('addClientToSlot')} arrow>
                         <IconButton size="small" onClick={() => setAddTarget(slot)}
-                          sx={{ color: C.muted, '&:hover': { color: C.primary } }}>
+                          sx={{ color: C.muted, '&:hover': { color: C.purple } }}>
                           <PersonAddIcon sx={{ fontSize: 16 }} />
                         </IconButton>
                       </Tooltip>
@@ -623,7 +627,7 @@ function AdminScheduleTab({ t, lang }) {
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                             <Box sx={{ width: 22, height: 22, borderRadius: '50%', background: C.primaryContainer,
                               display: 'flex', alignItems: 'center', justifyContent: 'center',
-                              fontSize: '10px', fontWeight: 800, color: C.primary }}>
+                              fontSize: '10px', fontWeight: 800, color: C.text }}>
                               {b.client_name.charAt(0).toUpperCase()}
                             </Box>
                             <Typography sx={{ fontSize: '13px', color: C.text }}>{b.client_name}</Typography>
@@ -815,7 +819,7 @@ function ClientModuleEditor({ clientId, currentModules, t, lang }) {
         {(currentModules || []).length > 0 ? (currentModules || []).map(m => (
           <Chip key={m} label={MODULE_DEFS[m]?.[lang === 'bg' ? 'labelBg' : 'labelEn'] || m}
             size="small"
-            sx={{ fontSize: '9px', height: '20px', background: C.primaryContainer, color: C.primary }} />
+            sx={{ fontSize: '9px', height: '20px', background: C.primaryContainer, color: C.text }} />
         )) : (
           <Chip label={t('noModules')} size="small" variant="outlined"
             sx={{ fontSize: '9px', height: '20px', borderColor: C.border, color: C.muted }} />
@@ -833,7 +837,7 @@ function ClientModuleEditor({ clientId, currentModules, t, lang }) {
             {Object.entries(MODULE_PRESETS).map(([key]) => (
               <Button key={key} size="small" variant="outlined" onClick={() => applyPreset(key)}
                 sx={{ fontSize: '11px', textTransform: 'none', borderColor: C.border, color: C.text,
-                  '&:hover': { borderColor: C.primary, color: C.primary } }}>
+                  '&:hover': { borderColor: C.purple, color: C.purple } }}>
                 {t(`preset_${key}`)}
               </Button>
             ))}
@@ -948,7 +952,7 @@ function ClientsTab({ t }) {
               <Typography sx={{ fontSize: '10px', color: '#F87171', fontWeight: 700, flexShrink: 0 }}>—</Typography>
               <Box sx={{ display: 'flex', gap: 0.25, flexShrink: 0 }}>
                 <IconButton size="small" onClick={() => setPlanDlg({ client, plan: null })}
-                  sx={{ color: C.primary }}>
+                  sx={{ color: C.purple }}>
                   <EditIcon sx={{ fontSize: 14 }} />
                 </IconButton>
                 <IconButton size="small" onClick={() => handleDelete(client)}
@@ -1043,16 +1047,16 @@ function AnalyticsTab({ t }) {
       p: 2.5, borderRadius: '16px',
       border: `1px solid ${positive ? C.primaryA20 : 'rgba(248,113,113,0.25)'}`,
       background: positive
-        ? 'linear-gradient(135deg, rgba(196,233,191,0.08) 0%, rgba(196,233,191,0.03) 100%)'
+        ? 'linear-gradient(135deg, rgba(170,169,205,0.08) 0%, rgba(170,169,205,0.03) 100%)'
         : 'linear-gradient(135deg, rgba(248,113,113,0.08) 0%, rgba(248,113,113,0.03) 100%)',
     }}>
       <Typography sx={{ fontSize: '10px', color: C.muted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.8px', mb: 0.75 }}>
         {label}
       </Typography>
-      <Typography sx={{ fontSize: '36px', fontWeight: 800, color: positive ? C.primary : '#F87171',
+      <Typography sx={{ fontSize: '36px', fontWeight: 800, color: positive ? C.text : '#F87171',
         fontFamily: "'MontBlanc', sans-serif", lineHeight: 1, letterSpacing: '-1px' }}>
         {value} <Typography component="span" sx={{ fontSize: '18px', fontWeight: 600,
-          color: positive ? C.primary : '#F87171', fontFamily: "'MontBlanc', sans-serif" }}>€</Typography>
+          color: positive ? C.text : '#F87171', fontFamily: "'MontBlanc', sans-serif" }}>€</Typography>
       </Typography>
     </Paper>
   )
@@ -1083,7 +1087,7 @@ function AnalyticsTab({ t }) {
         <Typography sx={{ fontSize: '10px', color: C.muted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.8px', mb: 0.5 }}>
           {profit >= 0 ? t('profitLbl') : t('lossLbl')}
         </Typography>
-        <Typography sx={{ fontSize: '28px', fontWeight: 800, color: profit >= 0 ? C.primary : '#F87171',
+        <Typography sx={{ fontSize: '28px', fontWeight: 800, color: profit >= 0 ? C.text : '#F87171',
           fontFamily: "'MontBlanc', sans-serif" }}>
           {profit >= 0 ? '+' : ''}{profit} €
         </Typography>
@@ -1245,20 +1249,20 @@ function CoachesTab({ t }) {
           <Box key={name} sx={{ display: 'flex', alignItems: 'center', gap: 1.5,
             px: 2, py: 1.5,
             borderBottom: `1px solid ${C.border}`, '&:last-child': { borderBottom: 'none' } }}>
-            <Typography sx={{ fontSize: '18px', fontWeight: 800, color: i === 0 ? C.primary : C.muted,
+            <Typography sx={{ fontSize: '18px', fontWeight: 800, color: i === 0 ? C.purple : C.muted,
               minWidth: 28, fontFamily: "'MontBlanc', sans-serif" }}>
               #{i + 1}
             </Typography>
             <Box sx={{ width: 36, height: 36, borderRadius: '50%', flexShrink: 0,
               background: i === 0 ? C.primaryContainer : 'rgba(255,255,255,0.06)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: '14px', fontWeight: 800, color: i === 0 ? C.primary : C.muted }}>
+              fontSize: '14px', fontWeight: 800, color: i === 0 ? C.purple : C.muted }}>
               {name.charAt(0).toUpperCase()}
             </Box>
             <Typography sx={{ flex: 1, fontWeight: 700, fontSize: '15px', color: C.text }}>{name}</Typography>
             <Box sx={{ textAlign: 'right' }}>
               <Typography sx={{ fontSize: '22px', fontWeight: 800,
-                color: i === 0 ? C.primary : C.text,
+                color: i === 0 ? C.purple : C.text,
                 fontFamily: "'MontBlanc', sans-serif", lineHeight: 1 }}>
                 {count}
               </Typography>
@@ -1275,9 +1279,10 @@ function CoachesTab({ t }) {
 
 // ── Dashboard Tab ────────────────────────────────────────────
 function DashboardTab({ t, lang, setTab }) {
-  const { realClients, showSnackbar, setConfirmDelete } = useApp()
-  const { allPlans, loadAllPlans } = useBooking()
+  const { realClients, showSnackbar, setConfirmDelete, updateClientModules } = useApp()
+  const { allPlans, loadAllPlans, activatePlan, extendPlan, adjustCredits } = useBooking()
   const [loaded, setLoaded] = useState(false)
+  const [planDlg, setPlanDlg] = useState(null)
 
   useEffect(() => {
     loadAllPlans().then(() => setLoaded(true))
@@ -1285,6 +1290,36 @@ function DashboardTab({ t, lang, setTab }) {
 
   function getActivePlan(clientId) {
     return allPlans.find(p => p.client_id === clientId && p.status === 'active') || null
+  }
+
+  async function handleAddPlan(client) {
+    // Assign studio modules first, then open plan dialog
+    const studioModules = ['studio_access', 'booking_access', 'weight_tracking', 'nutrition_tracking', 'training_plan_access', 'program_access']
+    await updateClientModules(client.id, studioModules)
+    setPlanDlg({ client: { ...client, modules: studioModules }, plan: null })
+  }
+  async function handleActivate(clientId, planType, from, price, startCredits, isPaid) {
+    const res = await activatePlan(clientId, planType, from, price, startCredits)
+    if (res?.error) { showSnackbar(t('errGeneric') + ': ' + res.error); return res }
+    if (isPaid && res?.id) await DB.update('client_plans', res.id, { is_paid: true })
+    showSnackbar(t('planActivatedMsg'))
+    return { ok: true }
+  }
+  async function handleExtend(planId, date) {
+    const res = await extendPlan(planId, date)
+    if (res?.error) { showSnackbar(t('errGeneric') + ': ' + res.error); return res }
+    showSnackbar(t('planExtendedMsg'))
+    return { ok: true }
+  }
+  async function handleAdjust(planId, credits) {
+    const res = await adjustCredits(planId, credits)
+    if (res?.error) { showSnackbar(t('errGeneric') + ': ' + res.error); return res }
+    showSnackbar(t('creditsAdjustedMsg'))
+    return { ok: true }
+  }
+  async function handleTogglePaid(planId, newValue) {
+    await DB.update('client_plans', planId, { is_paid: newValue })
+    await loadAllPlans()
   }
 
   const newRegs    = realClients.filter(c => !(c.modules || []).length)
@@ -1318,11 +1353,14 @@ function DashboardTab({ t, lang, setTab }) {
             {t('newRegistrations')} ({newRegs.length})
           </Typography>
           <Paper sx={{ borderRadius: '14px', border: '1px solid rgba(96,165,250,0.25)', mb: 2, overflow: 'hidden' }}>
-            {newRegs.slice(0, 5).map(c => (
+            {newRegs.map(c => (
               <Box key={c.id} sx={{ px: 2, py: 1, display: 'flex', alignItems: 'center', gap: 1.5,
                 borderBottom: `1px solid ${C.border}`, '&:last-child': { borderBottom: 'none' } }}>
                 <Typography sx={{ fontWeight: 600, fontSize: '14px', color: C.text, flex: 1 }}>{c.name}</Typography>
-                <Typography sx={{ fontSize: '11px', color: '#60A5FA' }}>{t('newRegHint')}</Typography>
+                <Button size="small" variant="contained" onClick={() => handleAddPlan(c)}
+                  sx={{ fontSize: '11px', minHeight: 0, py: 0.5, px: 1.5 }}>
+                  {lang === 'en' ? '+ Add plan' : '+ Добави план'}
+                </Button>
                 <Tooltip title={t('deleteClientBtn')} arrow>
                   <IconButton size="small" onClick={() => setConfirmDelete({ id: c.id, name: c.name })}
                     sx={{ color: C.muted, '&:hover': { color: '#F87171' } }}>
@@ -1387,6 +1425,12 @@ function DashboardTab({ t, lang, setTab }) {
         </>
       )}
 
+      {planDlg && (
+        <PlanDialog open={!!planDlg} onClose={() => setPlanDlg(null)}
+          onActivate={handleActivate} onExtend={handleExtend}
+          onAdjust={handleAdjust} onTogglePaid={handleTogglePaid}
+          client={planDlg.client} plan={planDlg.plan} t={t} />
+      )}
     </Box>
   )
 }
@@ -1409,7 +1453,7 @@ export default function Admin() {
   return (
     <Box sx={{ maxWidth: 860, mx: 'auto' }}>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2.5 }}>
-        <AdminPanelSettingsIcon sx={{ fontSize: 24, color: C.primary }} />
+        <AdminPanelSettingsIcon sx={{ fontSize: 24, color: C.purple }} />
         <Typography variant="h5" sx={{ fontWeight: 800, color: C.text }}>
           {t('adminTitle')}
         </Typography>
@@ -1418,16 +1462,16 @@ export default function Admin() {
       {/* Tabs */}
       <Box sx={{
         display: 'flex', gap: 0.75, mb: 2.5, flexWrap: 'wrap',
-        borderBottom: `1px solid ${C.border}`, pb: 0.5,
       }}>
         {TABS.map(({ label, key }) => (
           <Box key={key} onClick={() => setTab(key)} sx={{
-            px: 1.75, py: 0.75, borderRadius: '10px 10px 0 0', cursor: 'pointer',
-            fontSize: '13px', fontWeight: tab === key ? 700 : 500,
-            background: tab === key ? C.primaryContainer : 'transparent',
-            color:      tab === key ? C.primary : C.muted,
-            borderBottom: tab === key ? `2px solid ${C.primary}` : '2px solid transparent',
-            transition: 'all 0.15s',
+            px: 2, py: 0.75, borderRadius: '100px', cursor: 'pointer',
+            fontSize: '13px', fontWeight: 700,
+            background: tab === key ? C.primary : 'transparent',
+            color:      tab === key ? C.primaryOn : C.text,
+            border:     `1px solid ${tab === key ? C.primary : C.loganBorder}`,
+            transition: 'all 0.22s',
+            '&:hover': tab === key ? {} : { borderColor: C.logan, background: C.loganDeep },
           }}>
             {label}
           </Box>

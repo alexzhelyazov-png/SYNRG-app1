@@ -180,7 +180,7 @@ export default function FoodModal() {
                 px: 1.5, py: 1,
                 fontSize: '20px',
                 lineHeight: 1,
-                '&:hover': { background: C.accentSoft, borderColor: C.primary, color: C.primary },
+                '&:hover': { background: C.accentSoft, borderColor: C.purple, color: C.purple },
               }}
             >
               <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 15.2a3.2 3.2 0 1 0 0-6.4 3.2 3.2 0 0 0 0 6.4z"/><path d="M9 2 7.17 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2h-3.17L15 2H9zm3 15c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5z"/></svg>
@@ -255,7 +255,7 @@ export default function FoodModal() {
           {!isAiMode && selectedFood && amount && Number(amount) > 0 && (
             <Box sx={{
               background:   C.accentSoft,
-              border:       '1px solid rgba(196,233,191,0.25)',
+              border:       '1px solid rgba(170,169,205,0.25)',
               borderRadius: '10px',
               px: 2, py: 1.5,
               display:      'flex',
@@ -265,7 +265,7 @@ export default function FoodModal() {
                 <Typography sx={{ fontSize: '11px', color: C.muted, textTransform: 'uppercase', letterSpacing: '0.6px' }}>
                   {t('caloriesLbl')}
                 </Typography>
-                <Typography sx={{ fontWeight: 800, color: C.primary }}>
+                <Typography sx={{ fontWeight: 800, color: C.text }}>
                   {Math.round((selectedFood.kcal / 100) * gramsForCalc)} kcal
                 </Typography>
               </Box>
@@ -294,7 +294,7 @@ export default function FoodModal() {
           {isAiMode && aiGrams > 0 && (
             <Box sx={{
               background:   C.accentSoft,
-              border:       '1px solid rgba(196,233,191,0.25)',
+              border:       '1px solid rgba(170,169,205,0.25)',
               borderRadius: '10px',
               px: 2, py: 1.5,
               display:      'flex',
@@ -304,7 +304,7 @@ export default function FoodModal() {
                 <Typography sx={{ fontSize: '11px', color: C.muted, textTransform: 'uppercase', letterSpacing: '0.6px' }}>
                   {t('caloriesLbl')}
                 </Typography>
-                <Typography sx={{ fontWeight: 800, color: C.primary }}>
+                <Typography sx={{ fontWeight: 800, color: C.text }}>
                   {aiKcalPreview} kcal
                 </Typography>
               </Box>

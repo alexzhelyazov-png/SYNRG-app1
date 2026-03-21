@@ -47,7 +47,7 @@ export default function WeightChart({ data }) {
       </div>
 
       <div style={{ display: 'flex', gap: '16px', marginTop: '8px', fontSize: '12px', color: C.muted }}>
-        <span><span style={{ color: C.primary }}>●</span> тегло</span>
+        <span><span style={{ color: C.text }}>●</span> тегло</span>
         <span><span style={{ color: '#B8B4FF' }}>●</span> moving avg</span>
       </div>
     </div>

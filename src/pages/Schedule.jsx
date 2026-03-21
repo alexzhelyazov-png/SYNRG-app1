@@ -149,7 +149,7 @@ function QuickShiftDialog({ open, onClose, onSave, coaches, defaultDate, t }) {
         {/* Preview */}
         {count > 0 && !done && (
           <Box sx={{ p: 1.5, borderRadius: '10px', background: C.primaryContainer, border: `1px solid ${C.primaryA20}` }}>
-            <Typography sx={{ fontSize: '12px', color: C.primary, fontWeight: 700, mb: 0.5 }}>
+            <Typography sx={{ fontSize: '12px', color: C.text, fontWeight: 700, mb: 0.5 }}>
               {t('willCreateSlots')} {count} {t('hoursLbl')}:
             </Typography>
             <Typography sx={{ fontSize: '11px', color: C.muted, lineHeight: 1.6 }}>
@@ -158,8 +158,8 @@ function QuickShiftDialog({ open, onClose, onSave, coaches, defaultDate, t }) {
           </Box>
         )}
         {done !== null && (
-          <Box sx={{ p: 1.5, borderRadius: '10px', background: 'rgba(196,233,191,0.1)', border: `1px solid ${C.primaryA20}` }}>
-            <Typography sx={{ fontSize: '13px', color: C.primary, fontWeight: 700 }}>
+          <Box sx={{ p: 1.5, borderRadius: '10px', background: 'rgba(170,169,205,0.1)', border: `1px solid ${C.primaryA20}` }}>
+            <Typography sx={{ fontSize: '13px', color: C.text, fontWeight: 700 }}>
               ✓ {t('addedSlots')} {done} {t('hoursLbl')}
             </Typography>
           </Box>
@@ -428,12 +428,12 @@ function SlotCell({ slot, adminMode, onEdit, onDelete, onAddClient, bookings = [
         }}>
           <IconButton size="small"
             onClick={e => { e.stopPropagation(); onAddClient(slot) }}
-            sx={{ p: '2px', color: C.muted, '&:hover': { color: C.primary } }}>
+            sx={{ p: '2px', color: C.muted, '&:hover': { color: C.purple } }}>
             <PersonAddIcon sx={{ fontSize: 11 }} />
           </IconButton>
           <IconButton size="small"
             onClick={e => { e.stopPropagation(); onEdit(slot) }}
-            sx={{ p: '2px', color: C.muted, '&:hover': { color: C.primary } }}>
+            sx={{ p: '2px', color: C.muted, '&:hover': { color: C.purple } }}>
             <EditIcon sx={{ fontSize: 11 }} />
           </IconButton>
           <IconButton size="small"
@@ -573,7 +573,7 @@ export default function Schedule() {
       <Box sx={{ borderLeft: `1px solid ${C.border}`, py: 1.25, textAlign: 'center' }}>
         <Typography sx={{
           fontSize: '10px', fontWeight: 700, textTransform: 'uppercase',
-          letterSpacing: '0.5px', color: isToday_ ? C.primary : C.muted, lineHeight: 1,
+          letterSpacing: '0.5px', color: isToday_ ? C.purple : C.muted, lineHeight: 1,
         }}>
           {wd}
         </Typography>

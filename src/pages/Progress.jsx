@@ -45,7 +45,7 @@ const ICON_MAP = {
 /* ═══════════════════════════════════════════════════════════════
    Tier color helpers — metallic Bronze / Silver / Gold
    ═══════════════════════════════════════════════════════════════ */
-const tierColor  = (tier) => tier ? TIER_COLORS[tier] : C.primary
+const tierColor  = (tier) => tier ? TIER_COLORS[tier] : C.purple
 const tierBg     = (tier) => tier ? `${TIER_COLORS[tier]}18` : 'var(--c-primaryContainer)'
 const tierBorder = (tier) => tier ? `${TIER_COLORS[tier]}40` : 'var(--c-primaryA20)'
 
@@ -59,7 +59,7 @@ function BadgeIcon({ muiIcon, size = 24, color: clr = C.muted }) {
    Main Progress page — Gamification v2
    ═══════════════════════════════════════════════════════════════ */
 export default function Progress() {
-  const { client, t, lang, dismissBadge } = useApp()
+  const { client, auth, ranking, t, lang, dismissBadge } = useApp()
   const isMobile = window.innerWidth < 640
   const [selectedBadge, setSelectedBadge] = useState(null)
   const [tab, setTab] = useState('progress') // 'progress' | 'ranking'
@@ -134,12 +134,13 @@ export default function Progress() {
       <Box sx={{ display: 'flex', gap: 0.75, mb: 3 }}>
         {['progress', 'ranking'].map(key => (
           <Box key={key} onClick={() => setTab(key)} sx={{
-            px: 2, py: 1, borderRadius: '12px', cursor: 'pointer',
-            fontSize: '14px', fontWeight: tab === key ? 800 : 600,
-            background: tab === key ? C.primaryContainer : 'transparent',
-            color: tab === key ? C.primary : C.muted,
-            border: `1px solid ${tab === key ? C.primaryA20 : C.border}`,
-            transition: 'all 0.15s',
+            px: 2.5, py: 1, borderRadius: '100px', cursor: 'pointer',
+            fontSize: '14px', fontWeight: 700,
+            background: tab === key ? C.primary : 'transparent',
+            color: tab === key ? C.primaryOn : C.text,
+            border: `1px solid ${tab === key ? C.primary : C.loganBorder}`,
+            transition: 'all 0.22s',
+            '&:hover': tab === key ? {} : { borderColor: C.logan, background: C.loganDeep },
           }}>
             {key === 'progress' ? t('navProgress') : t('navRanking')}
           </Box>
@@ -157,6 +158,47 @@ export default function Progress() {
           {client.name}
         </Typography>
       </Box>
+
+      {/* ── Mini Leaderboard ─────────────────────────────────── */}
+      {ranking.length >= 2 && (
+        <Box onClick={() => setTab('ranking')} sx={{
+          mb: 2, p: 1.5, borderRadius: '14px', cursor: 'pointer',
+          border: `1px solid ${C.border}`,
+          background: 'rgba(255,255,255,0.02)',
+          transition: `all 0.2s ${EASE.standard}`,
+          '&:hover': { borderColor: C.borderHover, transform: 'translateY(-2px)' },
+        }}>
+          <Typography sx={{ fontSize: '10px', fontWeight: 700, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.8px', mb: 1 }}>
+            {lang === 'en' ? 'Leaderboard' : 'Класация'}
+          </Typography>
+          <Box sx={{ display: 'flex', gap: 1 }}>
+            {ranking.slice(0, 5).map((r, i) => {
+              const isMe = r.name === auth.name
+              const medal = i < 3 ? ['#C8C5FF', '#94A3B8', '#CD7F32'][i] : null
+              return (
+                <Box key={r.name} sx={{
+                  flex: 1, textAlign: 'center', py: 0.75, px: 0.5, borderRadius: '10px',
+                  background: isMe ? 'rgba(170,169,205,0.08)' : 'transparent',
+                  border: isMe ? '1px solid rgba(170,169,205,0.2)' : '1px solid transparent',
+                }}>
+                  <Typography sx={{ fontSize: '9px', fontWeight: 700, color: medal || C.muted, mb: 0.25 }}>
+                    #{i + 1}
+                  </Typography>
+                  <Typography sx={{ fontSize: '11px', fontWeight: isMe ? 800 : 600, color: C.text, mb: 0.25,
+                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {r.name?.split(' ')[0]}
+                  </Typography>
+                  <Typography sx={{ fontSize: '13px', fontWeight: 800, color: medal || C.text,
+                    fontFamily: "'MontBlanc', sans-serif", lineHeight: 1 }}>
+                    {r.xp}
+                  </Typography>
+                  <Typography sx={{ fontSize: '8px', color: C.muted, fontWeight: 600 }}>XP</Typography>
+                </Box>
+              )
+            })}
+          </Box>
+        </Box>
+      )}
 
       {/* ── Level Card ───────────────────────────────────────── */}
       <LevelCard levelData={levelData} levelName={levelName} t={t} lang={lang} earnedCount={earnedIds.length} />
@@ -301,7 +343,7 @@ function LevelCard({ levelData, levelName, t, lang, earnedCount }) {
         <Typography sx={{
           fontSize: '48px', fontWeight: 900, fontStyle: 'italic',
           fontFamily: "'MontBlanc', sans-serif",
-          color: C.primary, lineHeight: 1,
+          color: C.text, lineHeight: 1,
           letterSpacing: '-1px',
         }}>
           {levelData.level}
@@ -331,7 +373,7 @@ function LevelCard({ levelData, levelName, t, lang, earnedCount }) {
         <Typography sx={{ fontSize: '12px', color: C.muted, fontWeight: 600 }}>
           {levelData.xpForLevel - levelData.xpIntoLevel} {t('xpLbl')} {lang === 'bg' ? 'до следващо ниво' : 'to next level'}
         </Typography>
-        <Typography sx={{ fontSize: '12px', color: C.primary, fontWeight: 700 }}>
+        <Typography sx={{ fontSize: '12px', color: C.text, fontWeight: 700 }}>
           {levelData.totalXP} {t('xpLbl')}
         </Typography>
       </Box>
@@ -426,32 +468,16 @@ function NextBadgesSection({ items, t, onBadgeClick }) {
    ═══════════════════════════════════════════════════════════════ */
 function BadgeTile({ badge, isEarned, index, t, onClick }) {
   const color = tierColor(badge.tier)
-  const bg    = tierBg(badge.tier)
-  const brd   = tierBorder(badge.tier)
-
-  // ── Locked: light enough to read ──
-  const lockedIcon   = badge.tier ? `${TIER_COLORS[badge.tier]}55` : `${C.primary}55`
-  const lockedBg     = badge.tier ? `${TIER_COLORS[badge.tier]}0C` : `${C.primary}0C`
-  const lockedBorder = badge.tier ? `${TIER_COLORS[badge.tier]}22` : `${C.primary}20`
-  const lockedName   = 'rgba(255,255,255,0.45)'
-  const lockedDesc   = 'rgba(255,255,255,0.28)'
-  const lockedMeta   = badge.tier ? `${TIER_COLORS[badge.tier]}40` : `${C.primary}40`
-
-  // ── Earned: vivid glow + strong colors ──
-  const earnedBrd = badge.tier ? `${TIER_COLORS[badge.tier]}70` : `${C.primary}70`
+  const brd   = badge.tier ? `${TIER_COLORS[badge.tier]}70` : `${C.primary}70`
 
   return (
     <Box onClick={onClick} sx={{
       p: '16px 12px',
       borderRadius: '14px',
       position: 'relative',
-      border: isEarned ? `2px solid ${earnedBrd}` : `1px solid ${lockedBorder}`,
-      background: isEarned
-        ? `linear-gradient(145deg, ${color}28 0%, ${color}12 60%, transparent 100%)`
-        : `linear-gradient(145deg, ${lockedBg} 0%, var(--c-cardDeep) 100%)`,
-      boxShadow: isEarned
-        ? `0 0 18px ${color}30, 0 4px 14px ${color}18, inset 0 1px 0 ${color}20`
-        : 'none',
+      border: `2px solid ${brd}`,
+      background: `linear-gradient(145deg, ${color}28 0%, ${color}12 60%, transparent 100%)`,
+      boxShadow: `0 0 18px ${color}30, 0 4px 14px ${color}18, inset 0 1px 0 ${color}20`,
       cursor: 'pointer',
       textAlign: 'center',
       animation: `fadeIn 0.2s ${EASE.standard} both`,
@@ -459,46 +485,43 @@ function BadgeTile({ badge, isEarned, index, t, onClick }) {
       transition: `all 0.2s ${EASE.standard}`,
       '&:hover': {
         transform: 'translateY(-2px)',
-        boxShadow: isEarned
-          ? `0 0 24px ${color}40, 0 6px 20px ${color}25`
-          : `0 2px 8px rgba(255,255,255,0.06)`,
-        borderColor: isEarned ? earnedBrd : lockedName,
+        boxShadow: `0 0 24px ${color}40, 0 6px 20px ${color}25`,
+        borderColor: brd,
       },
     }}>
-      {/* lock icon for unearned badges */}
-      {!isEarned && (
-        <LockIcon sx={{
-          position: 'absolute',
-          top: 6, right: 6,
-          fontSize: 12,
-          color: lockedIcon,
-        }} />
-      )}
-
-      {/* square icon area */}
+      {/* square icon area with lock overlay for unearned */}
       <Box sx={{
         width: 48, height: 48, borderRadius: '12px', mx: 'auto', mb: 0.75,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        background: isEarned ? `${color}20` : lockedBg,
-        border: isEarned ? `1.5px solid ${earnedBrd}` : `1.5px solid ${lockedBorder}`,
+        position: 'relative',
+        background: `${color}20`,
         transition: `all 0.2s ${EASE.standard}`,
       }}>
-        <BadgeIcon muiIcon={badge.muiIcon} size={24} color={isEarned ? color : lockedIcon} />
+        <BadgeIcon muiIcon={badge.muiIcon} size={24} color={color} />
+        {!isEarned && (
+          <Box sx={{
+            position: 'absolute', inset: 0, borderRadius: '12px',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: 'rgba(0,0,0,0.55)',
+          }}>
+            <LockIcon sx={{ fontSize: 32, color: 'rgba(255,255,255,0.9)' }} />
+          </Box>
+        )}
       </Box>
 
-      {/* badge name (creative title) */}
+      {/* badge name */}
       <Typography sx={{
         fontSize: '11px', fontWeight: 800,
-        color: isEarned ? color : lockedName,
+        color,
         mb: 0.25, lineHeight: 1.3,
       }}>
         {t(`badge_${badge.id}`)}
       </Typography>
 
-      {/* description (what to do) */}
+      {/* description */}
       <Typography sx={{
         fontSize: '9px', fontWeight: 600,
-        color: isEarned ? C.muted : lockedDesc,
+        color: C.muted,
         mb: 0.5, lineHeight: 1.3,
         display: '-webkit-box',
         WebkitLineClamp: 2,
@@ -514,14 +537,14 @@ function BadgeTile({ badge, isEarned, index, t, onClick }) {
           <Typography sx={{
             fontSize: '9px', fontWeight: 800,
             textTransform: 'uppercase', letterSpacing: '0.5px',
-            color: isEarned ? color : lockedMeta,
+            color,
           }}>
             {badge.tier}
           </Typography>
         )}
         <Typography sx={{
           fontSize: '10px', fontWeight: 600,
-          color: isEarned ? color : lockedMeta,
+          color,
         }}>
           +{badge.xp} XP
         </Typography>
@@ -660,58 +683,122 @@ function BadgeDetailDialog({ open, badge, isEarned, client, lang, t, onClose }) 
 
 
 /* ═══════════════════════════════════════════════════════════════
-   BadgeUnlockedToast — elegant bottom notification
+   BadgeUnlockedToast — celebration with confetti burst
    ═══════════════════════════════════════════════════════════════ */
 function BadgeUnlockedToast({ badge, t, onDismiss }) {
   const color = tierColor(badge.tier)
   const bg    = tierBg(badge.tier)
   const brd   = tierBorder(badge.tier)
 
+  // Generate confetti particles once
+  const confetti = useMemo(() =>
+    Array.from({ length: 28 }, (_, i) => {
+      const angle = (i / 28) * Math.PI * 2
+      const dist = 60 + Math.random() * 100
+      const colors = [C.primary, '#D4AF37', '#C0C0C0', '#CD7F32', color, '#fff', '#FF6B9D', '#7C5CFC']
+      return {
+        id: i,
+        tx: Math.cos(angle) * dist,
+        ty: Math.sin(angle) * dist - 40,
+        size: 4 + Math.random() * 5,
+        color: colors[i % colors.length],
+        delay: Math.random() * 0.3,
+        dur: 0.8 + Math.random() * 0.6,
+        rotate: Math.random() * 360,
+        shape: i % 3, // 0=circle, 1=rect, 2=diamond
+      }
+    }),
+  [color])
+
   return (
-    <Box onClick={onDismiss} sx={{
+    <Box sx={{
       position: 'fixed',
       bottom: 96, left: '50%',
       transform: 'translateX(-50%)',
       zIndex: 1400,
-      display: 'flex', alignItems: 'center', gap: 1.5,
-      px: 2.5, py: 1.5,
-      background: 'linear-gradient(145deg, var(--c-card) 0%, var(--c-cardDeep) 100%)',
-      border: `1px solid ${brd}`,
-      borderRadius: '16px',
-      boxShadow: `0 8px 32px ${C.shadow}`,
-      cursor: 'pointer',
-      animation: `scaleIn 0.3s ${EASE.spring} both`,
-      maxWidth: '90vw',
+      // Confetti keyframes
+      '@keyframes confettiBurst': {
+        '0%': { opacity: 1, transform: 'translate(0,0) scale(1) rotate(0deg)' },
+        '100%': { opacity: 0, transform: 'translate(var(--tx), var(--ty)) scale(0.3) rotate(var(--rot))' },
+      },
+      '@keyframes toastGlow': {
+        '0%': { boxShadow: `0 0 20px ${color}50, 0 8px 32px ${C.shadow}` },
+        '50%': { boxShadow: `0 0 40px ${color}60, 0 8px 40px ${color}30` },
+        '100%': { boxShadow: `0 0 15px ${color}30, 0 8px 32px ${C.shadow}` },
+      },
+      '@keyframes toastBounce': {
+        '0%': { opacity: 0, transform: 'translateX(-50%) scale(0.5)' },
+        '50%': { transform: 'translateX(-50%) scale(1.08)' },
+        '70%': { transform: 'translateX(-50%) scale(0.96)' },
+        '100%': { opacity: 1, transform: 'translateX(-50%) scale(1)' },
+      },
+      '@keyframes iconPulse': {
+        '0%, 100%': { transform: 'scale(1)' },
+        '50%': { transform: 'scale(1.2)' },
+      },
     }}>
-      {/* icon */}
-      <Box sx={{
-        width: 36, height: 36, borderRadius: '10px', flexShrink: 0,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        background: bg, border: `1.5px solid ${brd}`,
-      }}>
-        <BadgeIcon muiIcon={badge.muiIcon} size={20} color={color} />
-      </Box>
+      {/* Confetti particles */}
+      {confetti.map(p => (
+        <Box key={p.id} sx={{
+          position: 'absolute',
+          left: '50%', top: '50%',
+          width: p.shape === 2 ? p.size * 0.7 : p.size,
+          height: p.shape === 2 ? p.size * 0.7 : p.size,
+          borderRadius: p.shape === 0 ? '50%' : p.shape === 2 ? '2px' : '1px',
+          background: p.color,
+          transform: p.shape === 2 ? 'rotate(45deg)' : 'none',
+          '--tx': `${p.tx}px`,
+          '--ty': `${p.ty}px`,
+          '--rot': `${p.rotate}deg`,
+          animation: `confettiBurst ${p.dur}s ${EASE.decelerate} forwards`,
+          animationDelay: `${p.delay}s`,
+          pointerEvents: 'none',
+        }} />
+      ))}
 
-      {/* text */}
-      <Box>
-        <Typography sx={{
-          fontSize: '11px', fontWeight: 700, color: C.muted,
-          textTransform: 'uppercase', letterSpacing: '0.5px',
+      {/* Toast card */}
+      <Box onClick={onDismiss} sx={{
+        position: 'relative',
+        display: 'flex', alignItems: 'center', gap: 1.5,
+        px: 2.5, py: 1.5,
+        background: 'linear-gradient(145deg, var(--c-card) 0%, var(--c-cardDeep) 100%)',
+        border: `1.5px solid ${brd}`,
+        borderRadius: '16px',
+        cursor: 'pointer',
+        animation: `toastBounce 0.5s ${EASE.spring} both, toastGlow 1.5s ease 0.3s`,
+        maxWidth: '90vw',
+      }}>
+        {/* icon */}
+        <Box sx={{
+          width: 40, height: 40, borderRadius: '12px', flexShrink: 0,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          background: bg, border: `1.5px solid ${brd}`,
+          animation: `iconPulse 0.6s ${EASE.spring} 0.4s`,
         }}>
-          {t('badgeUnlockedMsg')}
-        </Typography>
-        <Typography sx={{ fontSize: '14px', fontWeight: 800, color: C.text }}>
-          {t(`badge_${badge.id}`)}
+          <BadgeIcon muiIcon={badge.muiIcon} size={22} color={color} />
+        </Box>
+
+        {/* text */}
+        <Box>
+          <Typography sx={{
+            fontSize: '11px', fontWeight: 700, color,
+            textTransform: 'uppercase', letterSpacing: '0.5px',
+          }}>
+            {t('badgeUnlockedMsg')}
+          </Typography>
+          <Typography sx={{ fontSize: '15px', fontWeight: 800, color: C.text }}>
+            {t(`badge_${badge.id}`)}
+          </Typography>
+        </Box>
+
+        {/* xp */}
+        <Typography sx={{
+          fontSize: '15px', fontWeight: 800, color,
+          ml: 1, whiteSpace: 'nowrap',
+        }}>
+          +{badge.xp} XP
         </Typography>
       </Box>
-
-      {/* xp */}
-      <Typography sx={{
-        fontSize: '14px', fontWeight: 800, color,
-        ml: 1, whiteSpace: 'nowrap',
-      }}>
-        +{badge.xp} XP
-      </Typography>
     </Box>
   )
 }
@@ -785,7 +872,7 @@ function LevelUpCelebration({ info, t, onDismiss }) {
         animation: `levelPop 0.5s ${EASE.spring} 0.15s both`,
       }}>
         <ArrowUpwardIcon sx={{
-          fontSize: 36, color: C.primary,
+          fontSize: 36, color: C.purple,
           mb: 1.5, opacity: 0.7,
         }} />
       </Box>
@@ -794,7 +881,7 @@ function LevelUpCelebration({ info, t, onDismiss }) {
       <Typography sx={{
         fontSize: '13px', fontWeight: 800,
         textTransform: 'uppercase', letterSpacing: '3px',
-        color: C.primary,
+        color: C.purple,
         animation: `levelSlideUp 0.4s ${EASE.decelerate} 0.2s both`,
         mb: 1,
       }}>
@@ -814,7 +901,7 @@ function LevelUpCelebration({ info, t, onDismiss }) {
         <Typography sx={{
           fontSize: '64px', fontWeight: 900, fontStyle: 'italic',
           fontFamily: "'MontBlanc', sans-serif",
-          color: C.primary, lineHeight: 1,
+          color: C.purple, lineHeight: 1,
           letterSpacing: '-2px',
         }}>
           {info.level}

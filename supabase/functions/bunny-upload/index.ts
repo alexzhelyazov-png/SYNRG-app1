@@ -22,6 +22,7 @@ Deno.serve(async (req: Request) => {
   try {
     const BUNNY_API_KEY = Deno.env.get("BUNNY_API_KEY");
     const BUNNY_LIBRARY_ID = Deno.env.get("BUNNY_LIBRARY_ID");
+    const BUNNY_CDN_HOST = Deno.env.get("BUNNY_CDN_HOST") || `vz-${BUNNY_LIBRARY_ID}.b-cdn.net`;
 
     if (!BUNNY_API_KEY || !BUNNY_LIBRARY_ID) {
       return new Response(
@@ -74,7 +75,7 @@ Deno.serve(async (req: Request) => {
           videoId: vid,
           uploadUrl: `https://video.bunnycdn.com/library/${BUNNY_LIBRARY_ID}/videos/${vid}`,
           embedUrl: `https://iframe.mediadelivery.net/embed/${BUNNY_LIBRARY_ID}/${vid}`,
-          thumbnailUrl: `https://vz-${BUNNY_LIBRARY_ID}.b-cdn.net/${vid}/thumbnail.jpg`,
+          thumbnailUrl: `https://${BUNNY_CDN_HOST}/${vid}/thumbnail.jpg`,
           apiKey: BUNNY_API_KEY,  // Needed for frontend PUT upload
         }),
         { status: 200, headers: { ...CORS_HEADERS, "Content-Type": "application/json" } }
@@ -105,7 +106,7 @@ Deno.serve(async (req: Request) => {
         length: v.length,  // seconds
         size: v.storageSize,
         embedUrl: `https://iframe.mediadelivery.net/embed/${BUNNY_LIBRARY_ID}/${v.guid}`,
-        thumbnailUrl: `https://vz-${BUNNY_LIBRARY_ID}.b-cdn.net/${v.guid}/thumbnail.jpg`,
+        thumbnailUrl: `https://${BUNNY_CDN_HOST}/${v.guid}/thumbnail.jpg`,
         createdAt: v.dateUploaded,
       }));
 

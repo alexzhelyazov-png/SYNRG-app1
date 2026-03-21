@@ -30,9 +30,9 @@ export default function FoodTracker() {
           display: 'flex', alignItems: 'center', gap: 1,
           mb: 2, px: 2, py: 1, borderRadius: '10px',
           background: viewingCoach === auth.name
-            ? 'linear-gradient(135deg, rgba(196,233,191,0.12) 0%, rgba(196,233,191,0.06) 100%)'
+            ? 'linear-gradient(135deg, rgba(170,169,205,0.12) 0%, rgba(170,169,205,0.06) 100%)'
             : 'rgba(200,197,255,0.08)',
-          border: `1px solid ${viewingCoach === auth.name ? 'rgba(196,233,191,0.25)' : 'rgba(200,197,255,0.2)'}`,
+          border: `1px solid ${viewingCoach === auth.name ? 'rgba(170,169,205,0.25)' : 'rgba(200,197,255,0.2)'}`,
           animation: 'fadeIn 0.2s ease',
         }}>
           <Box sx={{
@@ -40,7 +40,7 @@ export default function FoodTracker() {
             background: viewingCoach === auth.name ? C.primary : C.purple,
             flexShrink: 0,
           }} />
-          <Typography sx={{ fontSize: '12px', fontWeight: 700, color: viewingCoach === auth.name ? C.primary : C.purple }}>
+          <Typography sx={{ fontSize: '12px', fontWeight: 700, color: C.purple }}>
             {viewingCoach === auth.name ? t('viewingOwnTracker') : `${t('viewingClient')}: ${client.name}`}
           </Typography>
         </Box>
@@ -75,12 +75,12 @@ export default function FoodTracker() {
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, flex: 1 }}>
           <Box sx={{ position: 'relative', flexShrink: 0 }}>
             <ProgressRing percent={kcalPct} color={C.primary} size={40} />
-            <Box sx={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '9px', fontWeight: 800, color: C.primary, fontFamily: "'MontBlanc', sans-serif" }}>
+            <Box sx={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '9px', fontWeight: 800, color: C.text, fontFamily: "'MontBlanc', sans-serif" }}>
               {Math.round(kcalPct)}%
             </Box>
           </Box>
           <Box>
-            <Typography sx={{ fontSize: '15px', fontWeight: 800, color: C.primary, lineHeight: 1, fontFamily: "'MontBlanc', sans-serif" }}>
+            <Typography sx={{ fontSize: '15px', fontWeight: 800, color: C.text, lineHeight: 1, fontFamily: "'MontBlanc', sans-serif" }}>
               {fmt1(foodTotals.kcal)}
             </Typography>
             <Typography sx={{ fontSize: '10px', color: C.muted }}>/ {client.calorieTarget} kcal</Typography>
@@ -213,7 +213,7 @@ export default function FoodTracker() {
               flexWrap:   'wrap',
               alignItems: 'center',
             }}>
-              <Typography variant="body2" sx={{ fontWeight: 700, color: C.primary }}>
+              <Typography variant="body2" sx={{ fontWeight: 700, color: C.text }}>
                 {t('totalLbl')}: {foodTotals.kcal} kcal
               </Typography>
               <Typography variant="body2" sx={{ fontWeight: 700, color: C.purple }}>

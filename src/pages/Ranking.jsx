@@ -5,7 +5,7 @@ import { getLevelName } from '../lib/gamification'
 
 // Podium medal colors
 const RANK_LABELS  = ['1', '2', '3']
-const RANK_COLORS  = [C.primary, '#94A3B8', '#CD7F32']
+const RANK_COLORS  = [C.purple, '#94A3B8', '#CD7F32']
 const PODIUM_H     = [130, 110, 90]
 const PODIUM_ORDER = [1, 0, 2] // 2nd, 1st, 3rd in display order
 
@@ -83,15 +83,15 @@ export default function Ranking() {
                     alignItems:    'center',
                     gap:           0.25,
                     ...(isFirst ? {
-                      background: 'linear-gradient(145deg, rgba(196,233,191,0.12) 0%, rgba(196,233,191,0.07) 100%)',
-                      border:     '1px solid rgba(196,233,191,0.3)',
-                      boxShadow:  '0 0 40px rgba(196,233,191,0.15), 0 0 0 1px rgba(196,233,191,0.12)',
+                      background: 'linear-gradient(145deg, rgba(170,169,205,0.12) 0%, rgba(170,169,205,0.07) 100%)',
+                      border:     '1px solid rgba(170,169,205,0.3)',
+                      boxShadow:  '0 0 40px rgba(170,169,205,0.15), 0 0 0 1px rgba(170,169,205,0.12)',
                     } : {}),
                     transition: `box-shadow 0.25s ${EASE.standard}, transform 0.25s ${EASE.standard}`,
                     '&:hover': {
                       transform: 'translateY(-2px)',
                       boxShadow: isFirst
-                        ? '0 0 50px rgba(196,233,191,0.2), 0 8px 32px rgba(0,0,0,0.4)'
+                        ? '0 0 50px rgba(170,169,205,0.2), 0 8px 32px rgba(0,0,0,0.4)'
                         : '0 6px 24px rgba(0,0,0,0.4)',
                     },
                   }}
@@ -100,7 +100,7 @@ export default function Ranking() {
                     fontWeight:    800,
                     fontSize:      isFirst ? '16px' : '15px',
                     mb:            0.25,
-                    color:         isFirst ? C.primary : C.text,
+                    color:         isFirst ? C.purple : C.text,
                     letterSpacing: '-0.1px',
                   }}>
                     {item?.name}
@@ -124,7 +124,7 @@ export default function Ranking() {
                   }}>
                     {item?.xp}
                   </Typography>
-                  <Typography sx={{ color: isFirst ? 'rgba(196,233,191,0.55)' : C.muted, fontSize: '12px' }}>
+                  <Typography sx={{ color: isFirst ? 'rgba(170,169,205,0.55)' : C.muted, fontSize: '12px' }}>
                     XP
                   </Typography>
                 </Paper>
@@ -188,7 +188,7 @@ export default function Ranking() {
                 py:                  isMobile ? '10px' : '14px',
                 borderBottom:        i < ranking.length - 1 ? `1px solid ${C.border}` : 'none',
                 background:          isMe
-                  ? 'linear-gradient(90deg, rgba(196,233,191,0.07) 0%, rgba(196,233,191,0.03) 100%)'
+                  ? 'linear-gradient(90deg, rgba(170,169,205,0.07) 0%, rgba(170,169,205,0.03) 100%)'
                   : 'transparent',
                 alignItems:          'center',
                 transition:          `background-color 0.15s ${EASE.standard}`,
@@ -196,7 +196,7 @@ export default function Ranking() {
                 animationDelay:      `${i * 0.04 + 0.2}s`,
                 '&:hover':           {
                   background: isMe
-                    ? 'rgba(196,233,191,0.09)'
+                    ? 'rgba(170,169,205,0.09)'
                     : 'rgba(255,255,255,0.025)',
                 },
               }}
@@ -210,7 +210,7 @@ export default function Ranking() {
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                 <Typography sx={{
                   fontWeight:    isMe ? 800 : 600,
-                  color:         isMe ? C.primary : C.text,
+                  color:         C.text,
                   fontSize:      '14px',
                   letterSpacing: isFirst ? '-0.1px' : 'normal',
                 }}>
@@ -223,8 +223,8 @@ export default function Ranking() {
                     sx={{
                       fontSize:   '10px',
                       background: C.accentSoft,
-                      color:      C.primary,
-                      border:     '1px solid rgba(196,233,191,0.35)',
+                      color:      C.text,
+                      border:     '1px solid rgba(170,169,205,0.35)',
                       fontWeight: 800,
                       height:     '20px',
                     }}
@@ -237,7 +237,7 @@ export default function Ranking() {
                 textAlign:  'center',
                 fontWeight: 700,
                 fontSize:   '14px',
-                color:      C.primary,
+                color:      C.text,
               }}>
                 {item.level}
               </Typography>
@@ -270,10 +270,10 @@ export default function Ranking() {
                 textAlign:     'center',
                 fontWeight:    800,
                 fontSize:      isFirst ? '18px' : '15px',
-                color:         isFirst ? C.primary : C.text,
+                color:         isFirst ? C.purple : C.text,
                 fontFamily:    "'MontBlanc', sans-serif",
                 letterSpacing: '-0.3px',
-                filter:        isFirst ? 'drop-shadow(0 0 6px rgba(196,233,191,0.25))' : 'none',
+                filter:        isFirst ? 'drop-shadow(0 0 6px rgba(170,169,205,0.25))' : 'none',
               }}>
                 {item.xp}
               </Typography>

@@ -43,19 +43,19 @@ function PlanCard({ plan, t, lang }) {
     <Paper sx={{
       p: 2.5, mb: 2, borderRadius: '16px',
       border: `1px solid ${C.primaryA20}`,
-      background: 'linear-gradient(135deg, rgba(196,233,191,0.08) 0%, rgba(196,233,191,0.04) 100%)',
+      background: 'linear-gradient(135deg, rgba(170,169,205,0.08) 0%, rgba(170,169,205,0.04) 100%)',
     }}>
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <CreditCardIcon sx={{ fontSize: 18, color: C.primary }} />
-          <Typography sx={{ fontWeight: 700, fontSize: '14px', color: C.primary }}>
+          <CreditCardIcon sx={{ fontSize: 18, color: C.purple }} />
+          <Typography sx={{ fontWeight: 700, fontSize: '14px', color: C.text }}>
             {t('myPlanTitle')}
           </Typography>
         </Box>
         <Chip
           label={planLabel(plan.plan_type, t)}
           size="small"
-          sx={{ background: C.primaryContainer, color: C.primary, fontWeight: 700, fontSize: '11px' }}
+          sx={{ background: C.primaryContainer, color: C.text, fontWeight: 700, fontSize: '11px' }}
         />
       </Box>
 
@@ -98,12 +98,12 @@ function NextBookingCard({ slots, myBookings, t, lang }) {
   return (
     <Paper sx={{
       p: 2.5, mb: 2, borderRadius: '16px',
-      border: `1px solid rgba(196,233,191,0.2)`,
-      background: 'linear-gradient(135deg, rgba(196,233,191,0.1) 0%, rgba(196,233,191,0.04) 100%)',
+      border: `1px solid rgba(170,169,205,0.2)`,
+      background: 'linear-gradient(135deg, rgba(170,169,205,0.1) 0%, rgba(170,169,205,0.04) 100%)',
     }}>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-        <EventAvailableIcon sx={{ fontSize: 18, color: C.primary }} />
-        <Typography sx={{ fontWeight: 700, fontSize: '14px', color: C.primary }}>
+        <EventAvailableIcon sx={{ fontSize: 18, color: C.purple }} />
+        <Typography sx={{ fontWeight: 700, fontSize: '14px', color: C.text }}>
           {t('nextTraining')}
         </Typography>
       </Box>
@@ -199,8 +199,8 @@ function SlotRow({ slot, plan, myBookings, onBook, onCancel, busy, t, lang }) {
         ) : isBooked ? (
           <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 0.5 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-              <CheckCircleIcon sx={{ fontSize: 14, color: C.primary }} />
-              <Typography sx={{ fontSize: '11px', color: C.primary, fontWeight: 700 }}>
+              <CheckCircleIcon sx={{ fontSize: 14, color: C.purple }} />
+              <Typography sx={{ fontSize: '11px', color: C.text, fontWeight: 700 }}>
                 {t('bookedLabel')}
               </Typography>
             </Box>
@@ -313,7 +313,7 @@ export default function Booking() {
               <CalendarMonthIcon sx={{ fontSize: 15, color: C.muted }} />
               <Typography sx={{
                 fontWeight: 700, fontSize: '13px',
-                color: date === isoToday() ? C.primary : C.text,
+                color: date === isoToday() ? C.purple : C.text,
                 textTransform: 'capitalize',
               }}>
                 {dayLabel(date, lang)}

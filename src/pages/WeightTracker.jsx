@@ -30,9 +30,9 @@ export default function WeightTracker() {
           display: 'flex', alignItems: 'center', gap: 1,
           mb: 2, px: 2, py: 1, borderRadius: '10px',
           background: viewingCoach === auth.name
-            ? 'linear-gradient(135deg, rgba(196,233,191,0.12) 0%, rgba(196,233,191,0.06) 100%)'
+            ? 'linear-gradient(135deg, rgba(170,169,205,0.12) 0%, rgba(170,169,205,0.06) 100%)'
             : 'rgba(200,197,255,0.08)',
-          border: `1px solid ${viewingCoach === auth.name ? 'rgba(196,233,191,0.25)' : 'rgba(200,197,255,0.2)'}`,
+          border: `1px solid ${viewingCoach === auth.name ? 'rgba(170,169,205,0.25)' : 'rgba(200,197,255,0.2)'}`,
           animation: 'fadeIn 0.2s ease',
         }}>
           <Box sx={{
@@ -40,7 +40,7 @@ export default function WeightTracker() {
             background: viewingCoach === auth.name ? C.primary : C.purple,
             flexShrink: 0,
           }} />
-          <Typography sx={{ fontSize: '12px', fontWeight: 700, color: viewingCoach === auth.name ? C.primary : C.purple }}>
+          <Typography sx={{ fontSize: '12px', fontWeight: 700, color: C.purple }}>
             {viewingCoach === auth.name ? t('viewingOwnTracker') : `${t('viewingClient')}: ${client.name}`}
           </Typography>
         </Box>
@@ -99,13 +99,13 @@ export default function WeightTracker() {
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
           <Typography variant="h3">{t('historyLbl')}</Typography>
           <Typography variant="caption" sx={{
-            color:        C.primary,
+            color:        C.text,
             fontWeight:   700,
             background:   C.primaryContainer,
             px:           1.25,
             py:           0.5,
             borderRadius: '99px',
-            border:       '1px solid rgba(196,233,191,0.15)',
+            border:       '1px solid rgba(170,169,205,0.15)',
           }}>
             {weightPointsLast30} {t('ptsper30')}
           </Typography>

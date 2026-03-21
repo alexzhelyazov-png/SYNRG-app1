@@ -23,12 +23,12 @@ const inputSx = {
 // ── Status chip ──────────────────────────────────────────────
 function StatusChip({ status, t }) {
   const map = {
-    active:      { label: t('statusActive'),     bg: 'rgba(196,233,191,0.15)', color: '#C4E9BF' },
+    active:      { label: t('statusActive'),     bg: 'rgba(170,169,205,0.15)', color: '#C8C5FF' },
     coming_soon: { label: t('statusComingSoon'),  bg: 'rgba(251,146,60,0.15)',  color: '#FB923C' },
     archived:    { label: t('statusArchived'),    bg: 'rgba(138,135,133,0.15)', color: '#8A8785' },
     new:         { label: t('inquiryNew'),        bg: 'rgba(248,113,113,0.15)', color: '#F87171' },
     contacted:   { label: t('inquiryContacted'),  bg: 'rgba(251,146,60,0.15)',  color: '#FB923C' },
-    closed:      { label: t('inquiryClosed'),     bg: 'rgba(196,233,191,0.15)', color: '#C4E9BF' },
+    closed:      { label: t('inquiryClosed'),     bg: 'rgba(170,169,205,0.15)', color: '#C8C5FF' },
   }
   const m = map[status] || map.active
   return <Chip label={m.label} size="small" sx={{ background: m.bg, color: m.color, fontWeight: 700, fontSize: '11px', height: '24px' }} />
@@ -57,7 +57,7 @@ function ProductsTab({ t }) {
     <Box>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
         <Typography sx={{ fontWeight: 700, fontSize: '14px', color: C.text }}>{t('siteProducts')}</Typography>
-        <Button size="small" startIcon={<AddIcon />} onClick={() => setDlg({})} sx={{ color: C.primary, fontSize: '12px' }}>{t('addProduct')}</Button>
+        <Button size="small" startIcon={<AddIcon />} onClick={() => setDlg({})} sx={{ color: C.purple, fontSize: '12px' }}>{t('addProduct')}</Button>
       </Box>
       {items.length === 0 && <Typography sx={{ fontSize: '13px', color: C.muted }}>{t('noProducts')}</Typography>}
       <Paper sx={{ borderRadius: '14px', overflow: 'hidden' }}>
@@ -158,15 +158,15 @@ function PlansTab({ t }) {
     <Box>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
         <Typography sx={{ fontWeight: 700, fontSize: '14px', color: C.text }}>{t('sitePlans')}</Typography>
-        <Button size="small" startIcon={<AddIcon />} onClick={() => setDlg({})} sx={{ color: C.primary, fontSize: '12px' }}>{t('addPlan')}</Button>
+        <Button size="small" startIcon={<AddIcon />} onClick={() => setDlg({})} sx={{ color: C.purple, fontSize: '12px' }}>{t('addPlan')}</Button>
       </Box>
       {items.length === 0 && <Typography sx={{ fontSize: '13px', color: C.muted }}>{t('noPlans')}</Typography>}
       <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
         {items.map(p => (
-          <Paper key={p.id} sx={{ flex: '1 1 200px', maxWidth: 280, p: 2, borderRadius: '16px', border: p.is_featured ? `1px solid rgba(196,233,191,0.3)` : undefined }}>
+          <Paper key={p.id} sx={{ flex: '1 1 200px', maxWidth: 280, p: 2, borderRadius: '16px', border: p.is_featured ? `1px solid rgba(170,169,205,0.3)` : undefined }}>
             {p.badge_bg && <Typography sx={{ fontSize: '10px', fontWeight: 700, color: '#FBBF24', mb: 0.5 }}>{p.badge_bg}</Typography>}
             <Typography sx={{ fontWeight: 700, fontSize: '16px', color: C.text, mb: 0.5 }}>{p.name_bg}</Typography>
-            <Typography sx={{ fontSize: '28px', fontWeight: 800, color: C.primary }}>{p.sessions_count}</Typography>
+            <Typography sx={{ fontSize: '28px', fontWeight: 800, color: C.text }}>{p.sessions_count}</Typography>
             <Typography sx={{ fontSize: '11px', color: C.muted, mb: 1 }}>{p.sessions_label_bg}</Typography>
             <Typography sx={{ fontSize: '20px', fontWeight: 700, color: C.text }}>€{p.price_eur}</Typography>
             <Typography sx={{ fontSize: '11px', color: C.muted, mb: 1.5 }}>{p.price_bgn_text_bg}</Typography>
@@ -238,7 +238,7 @@ function PlanDialog({ t, item, onClose, onSave }) {
             <IconButton size="small" onClick={() => rmFeat(i)}><DeleteOutlineIcon sx={{ fontSize: 16, color: C.danger }} /></IconButton>
           </Box>
         ))}
-        <Button size="small" onClick={addFeat} sx={{ color: C.primary, fontSize: '12px', alignSelf: 'flex-start' }}>{t('addFeature')}</Button>
+        <Button size="small" onClick={addFeat} sx={{ color: C.purple, fontSize: '12px', alignSelf: 'flex-start' }}>{t('addFeature')}</Button>
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose} sx={{ color: C.muted }}>{t('cancelBtn')}</Button>
@@ -271,7 +271,7 @@ function TeamTab({ t }) {
     <Box>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
         <Typography sx={{ fontWeight: 700, fontSize: '14px', color: C.text }}>{t('siteTeam')}</Typography>
-        <Button size="small" startIcon={<AddIcon />} onClick={() => setDlg({})} sx={{ color: C.primary, fontSize: '12px' }}>{t('addTeamMember')}</Button>
+        <Button size="small" startIcon={<AddIcon />} onClick={() => setDlg({})} sx={{ color: C.purple, fontSize: '12px' }}>{t('addTeamMember')}</Button>
       </Box>
       {items.length === 0 && <Typography sx={{ fontSize: '13px', color: C.muted }}>{t('noTeamMembers')}</Typography>}
       <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
@@ -281,7 +281,7 @@ function TeamTab({ t }) {
             {m.photo_url && <Box component="img" src={m.photo_url} sx={{ width: 80, height: 80, borderRadius: '50%', objectFit: 'cover', mb: 1, border: `2px solid ${C.border}` }} />}
             <Typography sx={{ fontWeight: 700, fontSize: '13px', color: C.text }}>{m.name}</Typography>
             <Typography sx={{ fontSize: '11px', color: C.muted, mb: 0.5 }}>{m.role_bg}</Typography>
-            <Chip label={m.badge_text} size="small" sx={{ height: '20px', fontSize: '10px', fontWeight: 700, background: m.badge_style === 'mint' ? 'rgba(196,233,191,0.15)' : 'rgba(255,255,255,0.06)', color: m.badge_style === 'mint' ? C.primary : C.muted }} />
+            <Chip label={m.badge_text} size="small" sx={{ height: '20px', fontSize: '10px', fontWeight: 700, background: m.badge_style === 'mint' ? 'rgba(170,169,205,0.15)' : 'rgba(255,255,255,0.06)', color: m.badge_style === 'mint' ? C.text : C.muted }} />
             <Box sx={{ display: 'flex', justifyContent: 'center', gap: 0.5, mt: 1 }}>
               <IconButton size="small" onClick={() => setDlg(m)}><EditIcon sx={{ fontSize: 14, color: C.muted }} /></IconButton>
               <IconButton size="small" onClick={() => del(m.id)}><DeleteOutlineIcon sx={{ fontSize: 14, color: C.danger }} /></IconButton>
@@ -358,7 +358,7 @@ function ServicesTab({ t }) {
     <Box>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
         <Typography sx={{ fontWeight: 700, fontSize: '14px', color: C.text }}>{t('siteServices')}</Typography>
-        <Button size="small" startIcon={<AddIcon />} onClick={() => setDlg({})} sx={{ color: C.primary, fontSize: '12px' }}>{t('addService')}</Button>
+        <Button size="small" startIcon={<AddIcon />} onClick={() => setDlg({})} sx={{ color: C.purple, fontSize: '12px' }}>{t('addService')}</Button>
       </Box>
       {items.length === 0 && <Typography sx={{ fontSize: '13px', color: C.muted }}>{t('noServices')}</Typography>}
       <Paper sx={{ borderRadius: '14px', overflow: 'hidden' }}>
@@ -456,10 +456,12 @@ function InquiriesTab({ t }) {
       <Box sx={{ display: 'flex', gap: 0.75, mb: 2, flexWrap: 'wrap' }}>
         {filters.map(f => (
           <Box key={f.label} onClick={() => setFilter(f.value)} sx={{
-            px: 1.5, py: 0.5, borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: filter === f.value ? 700 : 500,
-            background: filter === f.value ? C.primaryContainer : 'transparent',
-            color: filter === f.value ? C.primary : C.muted,
-            border: `1px solid ${filter === f.value ? C.primaryA20 : C.border}`,
+            px: 1.5, py: 0.5, borderRadius: '100px', cursor: 'pointer', fontSize: '12px', fontWeight: 700,
+            background: filter === f.value ? C.primary : 'transparent',
+            color: filter === f.value ? C.primaryOn : C.text,
+            border: `1px solid ${filter === f.value ? C.primary : C.loganBorder}`,
+            transition: 'all 0.22s',
+            '&:hover': filter === f.value ? {} : { borderColor: C.logan, background: C.loganDeep },
           }}>{f.label}</Box>
         ))}
       </Box>
@@ -561,7 +563,7 @@ function ContentTab({ t }) {
       {blocks.length === 0 && <Typography sx={{ fontSize: '13px', color: C.muted }}>No content blocks yet. Seed data will appear after running the migration.</Typography>}
       {Object.entries(grouped).map(([page, sections]) => (
         <Box key={page} sx={{ mb: 3 }}>
-          <Typography sx={{ fontWeight: 700, fontSize: '13px', color: C.primary, mb: 1 }}>{page}</Typography>
+          <Typography sx={{ fontWeight: 700, fontSize: '13px', color: C.text, mb: 1 }}>{page}</Typography>
           {Object.entries(sections).map(([section, items]) => (
             <Paper key={section} sx={{ borderRadius: '14px', p: 2, mb: 1.5 }}>
               <Typography sx={{ fontWeight: 700, fontSize: '12px', color: C.muted, mb: 1, textTransform: 'uppercase', letterSpacing: '0.5px' }}>{section}</Typography>
@@ -611,12 +613,13 @@ export default function SiteTab() {
       <Box sx={{ display: 'flex', gap: 0.75, mb: 2.5, flexWrap: 'wrap' }}>
         {SUBS.map(({ label, key }) => (
           <Box key={key} onClick={() => setSub(key)} sx={{
-            px: 1.75, py: 0.75, borderRadius: '10px', cursor: 'pointer',
-            fontSize: '12px', fontWeight: sub === key ? 700 : 500,
-            background: sub === key ? C.primaryContainer : 'transparent',
-            color: sub === key ? C.primary : C.muted,
-            border: `1px solid ${sub === key ? C.primaryA20 : C.border}`,
-            transition: 'all 0.15s',
+            px: 1.75, py: 0.75, borderRadius: '100px', cursor: 'pointer',
+            fontSize: '12px', fontWeight: 700,
+            background: sub === key ? C.primary : 'transparent',
+            color: sub === key ? C.primaryOn : C.text,
+            border: `1px solid ${sub === key ? C.primary : C.loganBorder}`,
+            transition: 'all 0.22s',
+            '&:hover': sub === key ? {} : { borderColor: C.logan, background: C.loganDeep },
           }}>
             {label}
           </Box>

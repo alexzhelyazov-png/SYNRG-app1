@@ -57,7 +57,7 @@ function NavAction({ value, Icon, label, isSelected, onClick, ...rest }) {
             transform: isSelected ? 'scale(1.08)' : 'scale(1)',
             transition: `transform 0.2s ${EASE.spring}`,
           }}>
-            <Icon sx={{ fontSize: '20px', color: isSelected ? C.primary : C.muted }} />
+            <Icon sx={{ fontSize: '20px', color: isSelected ? C.purple : C.muted }} />
           </Box>
         </Box>
       }
@@ -65,7 +65,7 @@ function NavAction({ value, Icon, label, isSelected, onClick, ...rest }) {
         '& .MuiBottomNavigationAction-label': {
           fontSize: '10px !important',
           fontWeight: isSelected ? '700 !important' : '500 !important',
-          color: isSelected ? `${C.primary} !important` : `${C.muted} !important`,
+          color: isSelected ? `${C.purple} !important` : `${C.muted} !important`,
           opacity: '1 !important',
           transition: `color 0.2s ${EASE.standard}`,
         },

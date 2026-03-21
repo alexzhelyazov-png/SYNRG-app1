@@ -113,14 +113,14 @@ export default function Sidebar() {
         <Box sx={{
           mx: 1.5, mb: 1, px: 1.75, py: 1.25,
           background: auth.role === 'coach'
-            ? 'linear-gradient(135deg, rgba(196,233,191,0.1) 0%, rgba(196,233,191,0.06) 100%)'
+            ? 'linear-gradient(135deg, rgba(170,169,205,0.1) 0%, rgba(170,169,205,0.06) 100%)'
             : 'linear-gradient(135deg, rgba(200,197,255,0.1) 0%, rgba(200,197,255,0.06) 100%)',
           borderRadius: '14px',
-          border: `1px solid ${auth.role === 'coach' ? 'rgba(196,233,191,0.15)' : 'rgba(200,197,255,0.15)'}`,
+          border: `1px solid ${auth.role === 'coach' ? 'rgba(170,169,205,0.15)' : 'rgba(200,197,255,0.15)'}`,
           flexShrink: 0, animation: 'fadeIn 0.2s ease',
         }}>
           <Typography variant="overline" sx={{
-            color: auth.role === 'coach' ? C.primary : C.purple,
+            color: C.purple,
             display: 'block', lineHeight: 1, mb: 0.5,
           }}>
             {admin ? 'Admin' : auth.role === 'coach' ? t('coachRole') : t('clientRole')}
@@ -145,13 +145,13 @@ export default function Sidebar() {
                   px: open ? 2 : 0, mx: open ? 1.5 : 1, my: '2px', minHeight: 44,
                 }}
               >
-                <ListItemIcon sx={{ minWidth: open ? 38 : 'unset', justifyContent: 'center', color: isActive ? C.primary : C.muted }}>
+                <ListItemIcon sx={{ minWidth: open ? 38 : 'unset', justifyContent: 'center', color: isActive ? C.purple : C.muted }}>
                   <Icon sx={{ fontSize: '20px' }} />
                 </ListItemIcon>
                 {open && (
                   <ListItemText primary={t(labelKey)} sx={{
                     '& .MuiListItemText-primary': {
-                      color:      isActive ? C.primary : C.text,
+                      color:      isActive ? C.purple : C.text,
                       fontWeight: isActive ? 700 : 500,
                       fontSize:   '14px',
                     }
@@ -175,13 +175,13 @@ export default function Sidebar() {
                   px: open ? 2 : 0, mx: open ? 1.5 : 1, my: '2px', minHeight: 44,
                 }}
               >
-                <ListItemIcon sx={{ minWidth: open ? 38 : 'unset', justifyContent: 'center', color: isTrackerActive ? C.primary : C.muted }}>
+                <ListItemIcon sx={{ minWidth: open ? 38 : 'unset', justifyContent: 'center', color: isTrackerActive ? C.purple : C.muted }}>
                   <PersonIcon sx={{ fontSize: '20px' }} />
                 </ListItemIcon>
                 {open && (
                   <ListItemText primary={t('myTrackerTitle')} sx={{
                     '& .MuiListItemText-primary': {
-                      color:      isTrackerActive ? C.primary : C.text,
+                      color:      isTrackerActive ? C.purple : C.text,
                       fontWeight: isTrackerActive ? 700 : 500,
                       fontSize:   '14px',
                     }
@@ -202,12 +202,12 @@ export default function Sidebar() {
                 onClick={() => { setView('notifications'); setViewingCoach(null); setCoachClientMode(false) }}
                 sx={{ justifyContent: open ? 'flex-start' : 'center', px: open ? 2 : 0, mx: open ? 1.5 : 1, my: '2px', minHeight: 44 }}
               >
-                <ListItemIcon sx={{ minWidth: open ? 38 : 'unset', justifyContent: 'center', color: isActive ? C.primary : (unreadNotifCount > 0 ? '#F87171' : C.muted) }}>
+                <ListItemIcon sx={{ minWidth: open ? 38 : 'unset', justifyContent: 'center', color: isActive ? C.purple : (unreadNotifCount > 0 ? '#F87171' : C.muted) }}>
                   <Badge badgeContent={unreadNotifCount} color="error" max={9}>
                     <NotificationsNoneIcon sx={{ fontSize: '20px' }} />
                   </Badge>
                 </ListItemIcon>
-                {open && <ListItemText primary={t('navNotifications')} sx={{ '& .MuiListItemText-primary': { color: isActive ? C.primary : (unreadNotifCount > 0 ? C.text : C.muted), fontWeight: isActive || unreadNotifCount > 0 ? 700 : 500, fontSize: '14px' } }} />}
+                {open && <ListItemText primary={t('navNotifications')} sx={{ '& .MuiListItemText-primary': { color: isActive ? C.purple : (unreadNotifCount > 0 ? C.text : C.muted), fontWeight: isActive || unreadNotifCount > 0 ? 700 : 500, fontSize: '14px' } }} />}
               </ListItemButton>
             </Tooltip>
           )
@@ -221,9 +221,9 @@ export default function Sidebar() {
                 flex: 1, py: '5px', minWidth: 0, fontSize: '11px', fontWeight: 700,
                 borderRadius: '8px',
                 background: lang === l ? C.accentSoft : 'transparent',
-                color:      lang === l ? C.primary    : C.muted,
+                color:      lang === l ? C.purple    : C.muted,
                 border:     `1px solid ${lang === l ? C.primaryA20 : C.border}`,
-                '&:hover':  { background: C.accentSoft, color: C.primary, borderColor: C.primaryA20 },
+                '&:hover':  { background: C.accentSoft, color: C.purple, borderColor: C.primaryA20 },
               }}>
                 {l.toUpperCase()}
               </Button>

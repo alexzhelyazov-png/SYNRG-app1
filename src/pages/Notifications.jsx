@@ -33,7 +33,7 @@ export default function Notifications() {
     <Box sx={{ maxWidth: '640px', mx: 'auto' }}>
       {/* Header */}
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 3 }}>
-        <NotificationsNoneIcon sx={{ fontSize: '28px', color: C.primary }} />
+        <NotificationsNoneIcon sx={{ fontSize: '28px', color: C.purple }} />
         <Typography variant="h2">{t('navNotifications')}</Typography>
       </Box>
 
@@ -67,19 +67,19 @@ export default function Notifications() {
                   width: 40, height: 40, borderRadius: '12px', flexShrink: 0,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   background: n.action_type === 'registration'
-                    ? 'rgba(196,233,191,0.12)'
+                    ? 'rgba(170,169,205,0.12)'
                     : n.action_type === 'task'
                       ? 'rgba(200,197,255,0.12)'
                       : 'rgba(255,255,255,0.05)',
                   border: `1px solid ${
-                    n.action_type === 'registration' ? 'rgba(196,233,191,0.2)'
+                    n.action_type === 'registration' ? 'rgba(170,169,205,0.2)'
                     : n.action_type === 'task' ? 'rgba(200,197,255,0.2)'
                     : C.border
                   }`,
                 }}>
                   <Icon sx={{
                     fontSize: '20px',
-                    color: n.action_type === 'registration' ? C.primary
+                    color: n.action_type === 'registration' ? C.purple
                          : n.action_type === 'task' ? C.purple
                          : C.muted,
                   }} />
@@ -88,7 +88,7 @@ export default function Notifications() {
                 {/* Content */}
                 <Box sx={{ flex: 1, minWidth: 0 }}>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.25 }}>
-                    <Typography sx={{ fontSize: '13px', fontWeight: 700, color: isNew ? C.primary : C.text }}>
+                    <Typography sx={{ fontSize: '13px', fontWeight: 700, color: isNew ? C.purple : C.text }}>
                       {n.from_coach}
                     </Typography>
                     <Typography sx={{ fontSize: '11px', color: C.muted }}>
@@ -98,7 +98,7 @@ export default function Notifications() {
                   <Typography sx={{ fontSize: '13px', color: C.text, mb: 0.5 }}>
                     {n.action_type === 'task' && <Box component="span" sx={{ color: C.purple, fontWeight: 600 }}>{t('taskNotifLbl')}: </Box>}
                     {n.action_type === 'reaction' && <Box component="span" sx={{ color: C.muted, fontWeight: 600 }}>{t('reactionNotifLbl')}: </Box>}
-                    {n.action_type === 'registration' && <Box component="span" sx={{ color: C.primary, fontWeight: 600 }}>{t('registrationNotifLbl')}: </Box>}
+                    {n.action_type === 'registration' && <Box component="span" sx={{ color: C.text, fontWeight: 600 }}>{t('registrationNotifLbl')}: </Box>}
                     {n.content}
                   </Typography>
                   {n.created_at && (

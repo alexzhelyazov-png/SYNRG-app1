@@ -77,12 +77,12 @@ export default function InstallScreen({ onSkip }) {
 
         {isIOS && (
           <Box sx={{
-            background:   'rgba(196,233,191,0.1)',
-            border:       '1px solid rgba(196,233,191,0.2)',
+            background:   'rgba(170,169,205,0.1)',
+            border:       '1px solid rgba(170,169,205,0.2)',
             borderRadius: '12px',
             p:            1.75,
             fontSize:     '13px',
-            color:        C.primary,
+            color:        C.text,
             lineHeight:   1.6,
             textAlign:    'center',
           }}>

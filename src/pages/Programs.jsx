@@ -21,7 +21,7 @@ const CartSvg = () => (
 )
 import { useApp }          from '../context/AppContext'
 import { DB }              from '../lib/db'
-import { parseVideoUrl }   from '../lib/videoUtils'
+import { parseVideoUrl, getVideoThumbnail } from '../lib/videoUtils'
 import { hasModule }       from '../lib/modules'
 import { C, EASE }         from '../theme'
 
@@ -80,7 +80,7 @@ function ProgramsList({ programs, progress, lessons, purchases, onSelect, onBuy,
 
   return (
     <Box>
-      <Typography variant="overline" sx={{ color: C.primary, display: 'block', mb: 0.5 }}>
+      <Typography variant="overline" sx={{ color: C.text, display: 'block', mb: 0.5 }}>
         {t('programsOverline')}
       </Typography>
       <Typography variant="h2" sx={{ color: C.text, mb: 3 }}>
@@ -198,7 +198,7 @@ function ProgramsList({ programs, progress, lessons, purchases, onSelect, onBuy,
                         },
                       }}
                     />
-                    <Typography sx={{ fontSize: '12px', fontWeight: 700, color: pct > 0 ? C.primary : C.muted, whiteSpace: 'nowrap' }}>
+                    <Typography sx={{ fontSize: '12px', fontWeight: 700, color: pct > 0 ? C.purple : C.muted, whiteSpace: 'nowrap' }}>
                       {completedCount}/{totalCount}
                     </Typography>
                   </Box>
@@ -310,7 +310,7 @@ function ProgramDetail({ program, modules, lessons, progress, onBack, onLesson, 
           </Typography>
         </Box>
         {pct === 100 && (
-          <Chip label={t('allLessonsComplete')} sx={{ background: C.primaryContainer, color: C.primary, fontWeight: 700 }} />
+          <Chip label={t('allLessonsComplete')} sx={{ background: C.primaryContainer, color: C.text, fontWeight: 700 }} />
         )}
       </Paper>
 
@@ -335,7 +335,7 @@ function ProgramDetail({ program, modules, lessons, progress, onBack, onLesson, 
                 background: modCompleted === modLessons.length && modLessons.length > 0 ? C.primaryContainer : C.border,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 fontWeight: 800, fontSize: '13px',
-                color: modCompleted === modLessons.length && modLessons.length > 0 ? C.primary : C.muted,
+                color: modCompleted === modLessons.length && modLessons.length > 0 ? C.purple : C.muted,
               }}>
                 {mi + 1}
               </Box>
@@ -373,7 +373,7 @@ function ProgramDetail({ program, modules, lessons, progress, onBack, onLesson, 
                         sx={{ p: 0.25 }}
                       >
                         {isDone
-                          ? <CheckCircleIcon sx={{ fontSize: 22, color: C.primary }} />
+                          ? <CheckCircleIcon sx={{ fontSize: 22, color: C.purple }} />
                           : <RadioButtonUncheckedIcon sx={{ fontSize: 22, color: C.muted }} />
                         }
                       </IconButton>
@@ -403,7 +403,7 @@ function ProgramDetail({ program, modules, lessons, progress, onBack, onLesson, 
                             </Typography>
                           </Box>
                         )}
-                        <IconButton size="small" onClick={() => onLesson(lesson)} sx={{ color: C.primary }}>
+                        <IconButton size="small" onClick={() => onLesson(lesson)} sx={{ color: C.purple }}>
                           <PlayCircleIcon sx={{ fontSize: 22 }} />
                         </IconButton>
                       </Box>
@@ -515,7 +515,7 @@ function ResourcesList({ resources, resourceSteps, resourceProgress, hasAccess, 
 
   return (
     <Box>
-      <Typography variant="overline" sx={{ color: C.primary, display: 'block', mb: 0.5 }}>{t('resourcesOverline')}</Typography>
+      <Typography variant="overline" sx={{ color: C.text, display: 'block', mb: 0.5 }}>{t('resourcesOverline')}</Typography>
       <Typography variant="h2" sx={{ color: C.text, mb: 3 }}>{t('resourcesTitle')}</Typography>
 
       {!hasAccess && (
@@ -534,7 +534,7 @@ function ResourcesList({ resources, resourceSteps, resourceProgress, hasAccess, 
       {categories.map(([category, items]) => (
         <Box key={category} sx={{ mb: 3 }}>
           {category && (
-            <Typography sx={{ fontSize: '12px', fontWeight: 700, color: C.primary, letterSpacing: '0.08em', textTransform: 'uppercase', mb: 1.5 }}>
+            <Typography sx={{ fontSize: '12px', fontWeight: 700, color: C.text, letterSpacing: '0.08em', textTransform: 'uppercase', mb: 1.5 }}>
               {category}
             </Typography>
           )}
@@ -544,6 +544,12 @@ function ResourcesList({ resources, resourceSteps, resourceProgress, hasAccess, 
               const doneCount = steps.filter(s => completedSet.has(s.id)).length
               const totalCount = steps.length
               const pct = totalCount > 0 ? Math.round((doneCount / totalCount) * 100) : 0
+
+              // Derive thumbnail: resource thumbnail_url > resource video > first step video
+              const thumb = res.thumbnail_url
+                || getVideoThumbnail(res.video_url)
+                || (steps.length > 0 && getVideoThumbnail(steps[0].video_url))
+                || null
 
               return (
                 <Paper key={res.id} onClick={() => hasAccess && onSelect(res)}
@@ -555,7 +561,7 @@ function ResourcesList({ resources, resourceSteps, resourceProgress, hasAccess, 
                   }}>
                   <Box sx={{
                     width: '100%', pt: '50%', position: 'relative',
-                    background: res.thumbnail_url ? `url(${res.thumbnail_url}) center/cover`
+                    background: thumb ? `url(${thumb}) center/cover`
                       : `linear-gradient(135deg, ${C.primaryContainer} 0%, ${C.purpleSoft} 100%)`,
                   }}>
                     {!hasAccess && (
@@ -580,7 +586,7 @@ function ResourcesList({ resources, resourceSteps, resourceProgress, hasAccess, 
                         <LinearProgress variant="determinate" value={pct}
                           sx={{ flex: 1, height: 6, borderRadius: 3, backgroundColor: C.border,
                             '& .MuiLinearProgress-bar': { borderRadius: 3, background: pct === 100 ? `linear-gradient(90deg, ${C.primary}, ${C.primaryDeep})` : C.primary } }} />
-                        <Typography sx={{ fontSize: '12px', fontWeight: 700, color: pct > 0 ? C.primary : C.muted, whiteSpace: 'nowrap' }}>
+                        <Typography sx={{ fontSize: '12px', fontWeight: 700, color: pct > 0 ? C.purple : C.muted, whiteSpace: 'nowrap' }}>
                           {doneCount}/{totalCount}
                         </Typography>
                       </Box>
@@ -604,6 +610,12 @@ function ResourceDetail({ resource, steps, progress, onBack, onStep, onToggleSte
   const doneCount = steps.filter(s => completedSet.has(s.id)).length
   const pct = steps.length > 0 ? Math.round((doneCount / steps.length) * 100) : 0
 
+  // Derive thumbnail: resource thumbnail_url > resource video > first step video
+  const thumb = resource.thumbnail_url
+    || getVideoThumbnail(resource.video_url)
+    || (steps.length > 0 && getVideoThumbnail(steps[0].video_url))
+    || null
+
   return (
     <Box sx={{ animation: 'fadeInUp 0.25s ease both' }}>
       <Button startIcon={<ArrowBackIcon />} onClick={onBack}
@@ -612,7 +624,7 @@ function ResourceDetail({ resource, steps, progress, onBack, onStep, onToggleSte
       {/* Hero */}
       <Box sx={{
         width: '100%', pt: '35%', position: 'relative', borderRadius: '20px', overflow: 'hidden', mb: 3,
-        background: resource.thumbnail_url ? `url(${resource.thumbnail_url}) center/cover`
+        background: thumb ? `url(${thumb}) center/cover`
           : `linear-gradient(135deg, ${C.primaryContainer} 0%, ${C.purpleSoft} 100%)`,
       }}>
         <Box sx={{ position: 'absolute', inset: 0, background: 'linear-gradient(0deg, rgba(0,0,0,0.7) 0%, transparent 50%)',
@@ -649,7 +661,7 @@ function ResourceDetail({ resource, steps, progress, onBack, onStep, onToggleSte
               animation: `fadeInUp 0.2s ${EASE.standard} both`, animationDelay: `${i * 0.04}s`,
             }}>
               <IconButton size="small" onClick={(e) => { e.stopPropagation(); onToggleStep(step.id) }} sx={{ p: 0.25 }}>
-                {isDone ? <CheckCircleIcon sx={{ fontSize: 22, color: C.primary }} />
+                {isDone ? <CheckCircleIcon sx={{ fontSize: 22, color: C.purple }} />
                   : <RadioButtonUncheckedIcon sx={{ fontSize: 22, color: C.muted }} />}
               </IconButton>
               <Box sx={{ flex: 1, minWidth: 0 }} onClick={() => onStep(step)}>
@@ -665,7 +677,7 @@ function ResourceDetail({ resource, steps, progress, onBack, onStep, onToggleSte
                     <Typography sx={{ fontSize: '12px', color: C.muted, fontWeight: 600 }}>{step.duration_min} {t('minutesShort')}</Typography>
                   </Box>
                 )}
-                <IconButton size="small" onClick={() => onStep(step)} sx={{ color: C.primary }}>
+                <IconButton size="small" onClick={() => onStep(step)} sx={{ color: C.purple }}>
                   <PlayCircleIcon sx={{ fontSize: 22 }} />
                 </IconButton>
               </Box>
@@ -903,12 +915,13 @@ export default function Programs() {
       <Box sx={{ display: 'flex', gap: 0.75, mb: 3 }}>
         {['programs', 'resources'].map(key => (
           <Box key={key} onClick={() => setTab(key)} sx={{
-            px: 2, py: 1, borderRadius: '12px', cursor: 'pointer',
-            fontSize: '14px', fontWeight: tab === key ? 800 : 600,
-            background: tab === key ? C.primaryContainer : 'transparent',
-            color: tab === key ? C.primary : C.muted,
-            border: `1px solid ${tab === key ? C.primaryA20 : C.border}`,
-            transition: 'all 0.15s',
+            px: 2.5, py: 1, borderRadius: '100px', cursor: 'pointer',
+            fontSize: '14px', fontWeight: 700,
+            background: tab === key ? C.primary : 'transparent',
+            color: tab === key ? C.primaryOn : C.text,
+            border: `1px solid ${tab === key ? C.primary : C.loganBorder}`,
+            transition: 'all 0.22s',
+            '&:hover': tab === key ? {} : { borderColor: C.logan, background: C.loganDeep },
           }}>
             {key === 'programs' ? t('tabMyPrograms') : t('tabResources')}
           </Box>

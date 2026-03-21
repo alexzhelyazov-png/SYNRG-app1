@@ -16,7 +16,7 @@ const UploadSvg = () => (
 import { C }             from '../theme'
 import { DB, isUsingSupabase } from '../lib/db'
 import { useApp }        from '../context/AppContext'
-import { parseVideoUrl } from '../lib/videoUtils'
+import { parseVideoUrl, getVideoThumbnail } from '../lib/videoUtils'
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL
 const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
@@ -29,7 +29,7 @@ const inputSx = {
 
 function StatusChip({ status, t }) {
   const map = {
-    active:   { label: t('statusActive'),   bg: 'rgba(196,233,191,0.15)', color: '#C4E9BF' },
+    active:   { label: t('statusActive'),   bg: 'rgba(170,169,205,0.15)', color: '#C8C5FF' },
     draft:    { label: t('statusDraft'),     bg: 'rgba(251,146,60,0.15)',  color: '#FB923C' },
     archived: { label: t('statusArchived'),  bg: 'rgba(138,135,133,0.15)', color: '#8A8785' },
   }
@@ -60,7 +60,7 @@ function ProgramsSubTab({ t, onSelectProgram, selectedProgramId }) {
     <Box>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
         <Typography sx={{ fontWeight: 700, fontSize: '14px', color: C.text }}>{t('adminPrograms')}</Typography>
-        <Button size="small" startIcon={<AddIcon />} onClick={() => setDlg({})} sx={{ color: C.primary, fontSize: '12px' }}>{t('addProgram')}</Button>
+        <Button size="small" startIcon={<AddIcon />} onClick={() => setDlg({})} sx={{ color: C.purple, fontSize: '12px' }}>{t('addProgram')}</Button>
       </Box>
       {items.length === 0 && <Typography sx={{ fontSize: '13px', color: C.muted }}>{t('noPrograms')}</Typography>}
       <Paper sx={{ borderRadius: '14px', overflow: 'hidden' }}>
@@ -79,7 +79,7 @@ function ProgramsSubTab({ t, onSelectProgram, selectedProgramId }) {
               <Typography sx={{ fontSize: '11px', color: C.muted }}>{p.name_en}</Typography>
             </Box>
             {p.price_cents > 0 && (
-              <Typography sx={{ fontSize: '12px', fontWeight: 700, color: C.primary }}>
+              <Typography sx={{ fontSize: '12px', fontWeight: 700, color: C.text }}>
                 {(p.price_cents / 100).toFixed(2)} {p.currency || 'BGN'}
               </Typography>
             )}
@@ -177,7 +177,7 @@ function ModulesSubTab({ t, programId }) {
     <Box>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
         <Typography sx={{ fontWeight: 700, fontSize: '14px', color: C.text }}>{t('programModules')}</Typography>
-        <Button size="small" startIcon={<AddIcon />} onClick={() => setDlg({})} sx={{ color: C.primary, fontSize: '12px' }}>{t('addModule')}</Button>
+        <Button size="small" startIcon={<AddIcon />} onClick={() => setDlg({})} sx={{ color: C.purple, fontSize: '12px' }}>{t('addModule')}</Button>
       </Box>
       {items.length === 0 && <Typography sx={{ fontSize: '13px', color: C.muted }}>{t('noModules')}</Typography>}
       <Paper sx={{ borderRadius: '14px', overflow: 'hidden' }}>
@@ -260,26 +260,30 @@ function LessonsSubTab({ t, programId, modules }) {
     <Box>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5, flexWrap: 'wrap', gap: 1 }}>
         <Typography sx={{ fontWeight: 700, fontSize: '14px', color: C.text }}>{t('programLessons')}</Typography>
-        <Button size="small" startIcon={<AddIcon />} onClick={() => setDlg({})} sx={{ color: C.primary, fontSize: '12px' }}>{t('addLesson')}</Button>
+        <Button size="small" startIcon={<AddIcon />} onClick={() => setDlg({})} sx={{ color: C.purple, fontSize: '12px' }}>{t('addLesson')}</Button>
       </Box>
 
       {/* Module filter */}
       {modules.length > 0 && (
         <Box sx={{ display: 'flex', gap: 0.75, mb: 2, flexWrap: 'wrap' }}>
           <Box onClick={() => setFilterMod('')} sx={{
-            px: 1.5, py: 0.5, borderRadius: '8px', cursor: 'pointer', fontSize: '12px',
-            fontWeight: !filterMod ? 700 : 500,
-            background: !filterMod ? C.primaryContainer : 'transparent',
-            color: !filterMod ? C.primary : C.muted,
-            border: `1px solid ${!filterMod ? C.primaryA20 : C.border}`,
+            px: 1.5, py: 0.5, borderRadius: '100px', cursor: 'pointer', fontSize: '12px',
+            fontWeight: 700,
+            background: !filterMod ? C.primary : 'transparent',
+            color: !filterMod ? C.primaryOn : C.text,
+            border: `1px solid ${!filterMod ? C.primary : C.loganBorder}`,
+            transition: 'all 0.22s',
+            '&:hover': !filterMod ? {} : { borderColor: C.logan, background: C.loganDeep },
           }}>{t('allLabel')}</Box>
           {modules.map(m => (
             <Box key={m.id} onClick={() => setFilterMod(m.id)} sx={{
-              px: 1.5, py: 0.5, borderRadius: '8px', cursor: 'pointer', fontSize: '12px',
-              fontWeight: filterMod === m.id ? 700 : 500,
-              background: filterMod === m.id ? C.primaryContainer : 'transparent',
-              color: filterMod === m.id ? C.primary : C.muted,
-              border: `1px solid ${filterMod === m.id ? C.primaryA20 : C.border}`,
+              px: 1.5, py: 0.5, borderRadius: '100px', cursor: 'pointer', fontSize: '12px',
+              fontWeight: 700,
+              background: filterMod === m.id ? C.primary : 'transparent',
+              color: filterMod === m.id ? C.primaryOn : C.text,
+              border: `1px solid ${filterMod === m.id ? C.primary : C.loganBorder}`,
+              transition: 'all 0.22s',
+              '&:hover': filterMod === m.id ? {} : { borderColor: C.logan, background: C.loganDeep },
             }}>{m.name_bg}</Box>
           ))}
         </Box>
@@ -294,7 +298,7 @@ function LessonsSubTab({ t, programId, modules }) {
               px: 2, py: 1.5, display: 'flex', alignItems: 'center', gap: 1.5,
               borderBottom: i < filtered.length - 1 ? `1px solid ${C.border}` : 'none',
             }}>
-              <PlayCircleIcon sx={{ fontSize: 20, color: l.video_url ? C.primary : C.muted, flexShrink: 0 }} />
+              <PlayCircleIcon sx={{ fontSize: 20, color: l.video_url ? C.purple : C.muted, flexShrink: 0 }} />
               <Box sx={{ flex: 1 }}>
                 <Typography sx={{ fontWeight: 600, fontSize: '14px', color: C.text }}>{l.name_bg}</Typography>
                 <Typography sx={{ fontSize: '11px', color: C.muted }}>
@@ -324,7 +328,16 @@ function LessonDialog({ t, item, modules, onClose, onSave }) {
     duration_min: 0, is_free_preview: false, display_order: 0,
     ...item,
   })
-  const set = (k, v) => setF(p => ({ ...p, [k]: v }))
+  const set = (k, v) => {
+    setF(p => {
+      const next = { ...p, [k]: v }
+      if (k === 'video_url' && !p.thumbnail_url) {
+        const thumb = getVideoThumbnail(v)
+        if (thumb) next.thumbnail_url = thumb
+      }
+      return next
+    })
+  }
   const parsed = parseVideoUrl(f.video_url)
 
   // Bunny upload state
@@ -406,7 +419,7 @@ function LessonDialog({ t, item, modules, onClose, onSave }) {
             sx={{
               mt: 0.5, minWidth: 'auto', whiteSpace: 'nowrap',
               borderColor: C.border, color: C.muted, px: 1.5,
-              '&:hover': { borderColor: C.primary, color: C.primary },
+              '&:hover': { borderColor: C.purple, color: C.purple },
             }}
           >
             {t('uploadVideoBtn')}
@@ -475,7 +488,7 @@ function ResourcesSubTab({ t, onSelectResource }) {
     <Box>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
         <Typography sx={{ fontWeight: 700, fontSize: '14px', color: C.text }}>{t('adminResources')}</Typography>
-        <Button size="small" startIcon={<AddIcon />} onClick={() => setDlg({})} sx={{ color: C.primary, fontSize: '12px' }}>{t('addResource')}</Button>
+        <Button size="small" startIcon={<AddIcon />} onClick={() => setDlg({})} sx={{ color: C.purple, fontSize: '12px' }}>{t('addResource')}</Button>
       </Box>
       {items.length === 0 && <Typography sx={{ fontSize: '13px', color: C.muted }}>{t('noResources')}</Typography>}
       <Paper sx={{ borderRadius: '14px', overflow: 'hidden' }}>
@@ -485,7 +498,7 @@ function ResourcesSubTab({ t, onSelectResource }) {
             borderBottom: i < items.length - 1 ? `1px solid ${C.border}` : 'none',
             cursor: 'pointer', '&:hover': { background: C.listHover },
           }}>
-            <PlayCircleIcon sx={{ fontSize: 20, color: r.video_url ? C.primary : C.muted, flexShrink: 0 }} />
+            <PlayCircleIcon sx={{ fontSize: 20, color: r.video_url ? C.purple : C.muted, flexShrink: 0 }} />
             <Box sx={{ flex: 1 }}>
               <Typography sx={{ fontWeight: 600, fontSize: '14px', color: C.text }}>{r.name_bg}</Typography>
               <Typography sx={{ fontSize: '11px', color: C.muted }}>
@@ -510,7 +523,17 @@ function ResourceDialog({ t, item, onClose, onSave }) {
     duration_min: 0, display_order: 0, status: 'active',
     ...item,
   })
-  const set = (k, v) => setF(p => ({ ...p, [k]: v }))
+  const set = (k, v) => {
+    setF(p => {
+      const next = { ...p, [k]: v }
+      // Auto-fill thumbnail when video URL changes and no thumbnail set
+      if (k === 'video_url' && !p.thumbnail_url) {
+        const thumb = getVideoThumbnail(v)
+        if (thumb) next.thumbnail_url = thumb
+      }
+      return next
+    })
+  }
   const parsed = parseVideoUrl(f.video_url)
 
   // Bunny upload state
@@ -565,7 +588,7 @@ function ResourceDialog({ t, item, onClose, onSave }) {
             helperText={parsed ? `${parsed.type} ✓` : t('videoUrlHint')} />
           <input ref={fileRef} type="file" accept="video/*" style={{ display: 'none' }} onChange={handleBunnyUpload} />
           <Button variant="outlined" size="small" disabled={uploading} onClick={() => fileRef.current?.click()} startIcon={<UploadSvg />}
-            sx={{ mt: 0.5, minWidth: 'auto', whiteSpace: 'nowrap', borderColor: C.border, color: C.muted, px: 1.5, '&:hover': { borderColor: C.primary, color: C.primary } }}>
+            sx={{ mt: 0.5, minWidth: 'auto', whiteSpace: 'nowrap', borderColor: C.border, color: C.muted, px: 1.5, '&:hover': { borderColor: C.purple, color: C.purple } }}>
             {t('uploadVideoBtn')}
           </Button>
         </Box>
@@ -580,6 +603,13 @@ function ResourceDialog({ t, item, onClose, onSave }) {
           <Box sx={{ position: 'relative', width: '100%', pt: '56.25%', borderRadius: '12px', overflow: 'hidden', background: '#000' }}>
             <iframe src={parsed.embedUrl} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: 'none' }} allow="autoplay; fullscreen" allowFullScreen />
           </Box>
+        )}
+        {/* Thumbnail URL (auto-generated or manual) */}
+        <TextField label="Thumbnail URL" value={f.thumbnail_url || ''} onChange={e => set('thumbnail_url', e.target.value)} fullWidth size="small" sx={inputSx}
+          helperText={f.thumbnail_url ? '' : 'Auto-generated from video URL'} />
+        {f.thumbnail_url && (
+          <Box component="img" src={f.thumbnail_url} sx={{ width: '100%', maxHeight: 120, objectFit: 'cover', borderRadius: '10px' }}
+            onError={(e) => { e.target.style.display = 'none' }} />
         )}
         <Box sx={{ display: 'flex', gap: 1.5 }}>
           <TextField label={t('durationMin')} type="number" value={f.duration_min} onChange={e => set('duration_min', +e.target.value)} sx={{ ...inputSx, width: 140 }} size="small" />
@@ -629,14 +659,14 @@ function ResourceStepsSubTab({ t, resourceId }) {
     <Box>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
         <Typography sx={{ fontWeight: 700, fontSize: '14px', color: C.text }}>Стъпки</Typography>
-        <Button size="small" startIcon={<AddIcon />} onClick={() => setDlg({ display_order: items.length })} sx={{ color: C.primary, fontSize: '12px' }}>Нова стъпка</Button>
+        <Button size="small" startIcon={<AddIcon />} onClick={() => setDlg({ display_order: items.length })} sx={{ color: C.purple, fontSize: '12px' }}>Нова стъпка</Button>
       </Box>
       {items.length === 0 && <Typography sx={{ fontSize: '13px', color: C.muted }}>Няма стъпки</Typography>}
       <Paper sx={{ borderRadius: '14px', overflow: 'hidden' }}>
         {items.map((s, i) => (
           <Box key={s.id} sx={{ px: 2, py: 1.5, display: 'flex', alignItems: 'center', gap: 1.5,
             borderBottom: i < items.length - 1 ? `1px solid ${C.border}` : 'none' }}>
-            <PlayCircleIcon sx={{ fontSize: 20, color: s.video_url ? C.primary : C.muted, flexShrink: 0 }} />
+            <PlayCircleIcon sx={{ fontSize: 20, color: s.video_url ? C.purple : C.muted, flexShrink: 0 }} />
             <Box sx={{ flex: 1 }}>
               <Typography sx={{ fontWeight: 600, fontSize: '14px', color: C.text }}>{s.name_bg}</Typography>
               <Typography sx={{ fontSize: '11px', color: C.muted }}>{s.duration_min || 0} {t('minutesShort')} {s.video_url && '· video'}</Typography>
@@ -657,7 +687,16 @@ function StepDialog({ t, item, onClose, onSave }) {
     video_url: '', thumbnail_url: '', duration_min: 0, display_order: 0,
     ...item,
   })
-  const set = (k, v) => setF(p => ({ ...p, [k]: v }))
+  const set = (k, v) => {
+    setF(p => {
+      const next = { ...p, [k]: v }
+      if (k === 'video_url' && !p.thumbnail_url) {
+        const thumb = getVideoThumbnail(v)
+        if (thumb) next.thumbnail_url = thumb
+      }
+      return next
+    })
+  }
   const parsed = parseVideoUrl(f.video_url)
   const [uploading, setUploading] = useState(false)
   const [uploadPct, setUploadPct] = useState(0)
@@ -761,12 +800,13 @@ export default function AdminProgramsTab() {
       <Box sx={{ display: 'flex', gap: 0.75, mb: 2.5, flexWrap: 'wrap', alignItems: 'center' }}>
         {SUBS.map(({ label, key }) => (
           <Box key={key} onClick={() => setSub(key)} sx={{
-            px: 1.75, py: 0.75, borderRadius: '10px', cursor: 'pointer',
-            fontSize: '12px', fontWeight: sub === key ? 700 : 500,
-            background: sub === key ? C.primaryContainer : 'transparent',
-            color: sub === key ? C.primary : C.muted,
-            border: `1px solid ${sub === key ? C.primaryA20 : C.border}`,
-            transition: 'all 0.15s',
+            px: 1.75, py: 0.75, borderRadius: '100px', cursor: 'pointer',
+            fontSize: '12px', fontWeight: 700,
+            background: sub === key ? C.primary : 'transparent',
+            color: sub === key ? C.primaryOn : C.text,
+            border: `1px solid ${sub === key ? C.primary : C.loganBorder}`,
+            transition: 'all 0.22s',
+            '&:hover': sub === key ? {} : { borderColor: C.logan, background: C.loganDeep },
           }}>
             {label}
           </Box>
@@ -774,7 +814,7 @@ export default function AdminProgramsTab() {
 
         {selectedProgram && (
           <Chip label={selectedProgram.name_bg} size="small" onDelete={() => setSelectedProgram(null)}
-            sx={{ ml: 1, background: C.primaryContainer, color: C.primary, fontWeight: 700 }} />
+            sx={{ ml: 1, background: C.primaryContainer, color: C.text, fontWeight: 700 }} />
         )}
         {selectedResource && (
           <Chip label={selectedResource.name_bg} size="small" onDelete={() => setSelectedResource(null)}
