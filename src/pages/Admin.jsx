@@ -26,6 +26,7 @@ import Switch                from '@mui/material/Switch'
 import { useApp }            from '../context/AppContext'
 import SiteTab               from './AdminSiteTab'
 import ProgramsTab           from './AdminProgramsTab'
+import SubscriptionsTab      from './AdminSubscriptionsTab'
 import { useBooking }        from '../context/BookingContext'
 import { C }                 from '../theme'
 import { DB }                from '../lib/db'
@@ -1448,6 +1449,7 @@ export default function Admin() {
     { label: t('expensesTab'),     key: 4 },
     { label: t('siteTab'),         key: 5 },
     { label: t('adminPrograms'),   key: 6 },
+    { label: t('subscriptionsTab'), key: 7 },
   ]
 
   return (
@@ -1486,6 +1488,7 @@ export default function Admin() {
       {tab === 4 && <ExpensesTab t={t} />}
       {tab === 5 && <SiteTab />}
       {tab === 6 && <ProgramsTab />}
+      {tab === 7 && <SubscriptionsTab t={t} lang={lang} />}
     </Box>
   )
 }
