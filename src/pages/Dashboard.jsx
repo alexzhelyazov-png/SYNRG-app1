@@ -14,7 +14,7 @@ import { WORKOUT_CATEGORIES } from '../lib/constants'
 import { C, EASE } from '../theme'
 import FoodTracker from './FoodTracker'
 import WeightTracker from './WeightTracker'
-import { todayDate, fmt1 } from '../lib/utils'
+import { todayDate, fmt1, parseDate } from '../lib/utils'
 import { computeReminders } from '../lib/reminders'
 import {
   creditsRemaining, isoToday, isoDatePlusDays, daysUntilExpiry, fmtValidTo,
@@ -432,10 +432,10 @@ export function ClientDetail() {
     .filter(({ booking }) => !!booking)
     .sort((a, b) => (a.slot.slot_date + a.slot.start_time).localeCompare(b.slot.slot_date + b.slot.start_time))[0] || null
 
-  // Aggregate meals by date (last 7 days)
+  // Aggregate meals by date (last 7 days) — DD.MM.YYYY to match stored format
   const last7 = Array.from({ length: 7 }, (_, i) => {
     const d = new Date(); d.setDate(d.getDate() - (6 - i))
-    return d.toISOString().slice(0, 10)
+    return `${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')}.${d.getFullYear()}`
   })
   const mealsByDate = {}
   ;(client.meals || []).forEach(m => {
@@ -646,7 +646,7 @@ export function ClientDetail() {
         const avgSteps = stepsWithData.length > 0 ? Math.round(stepsWithData.reduce((s, x) => s + x.value, 0) / stepsWithData.length) : 0
         const dayNames = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Нд']
         const barData = stepsLast7.map(s => {
-          const dt = new Date(s.date)
+          const dt = parseDate(s.date)
           const dow = dt.getDay() === 0 ? 6 : dt.getDay() - 1
           return { value: s.value, label: dayNames[dow] }
         })
@@ -770,7 +770,7 @@ export function ClientDetail() {
               </Box>
               {[...last7].reverse().map((date, i) => {
                 const hasMeals = !!mealsByDate[date]
-                const dayStr = new Date(date).toLocaleDateString('bg-BG', { day: 'numeric', month: 'short', weekday: 'short' })
+                const dayStr = parseDate(date).toLocaleDateString('bg-BG', { day: 'numeric', month: 'short', weekday: 'short' })
                 return (
                   <Box key={date} sx={{
                     display: 'flex', justifyContent: 'space-between', alignItems: 'center',

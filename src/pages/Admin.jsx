@@ -231,7 +231,7 @@ function PlanDialog({ open, onClose, onActivate, onExtend, onAdjust, onTogglePai
   const [extendTo,      setExtendTo]     = useState('')
   const [credUsed,      setCredUsed]     = useState(plan?.credits_used ?? 0)
   const [price,         setPrice]        = useState(plan?.price ?? 0)
-  const [isPaid,        setIsPaid]       = useState(plan?.is_paid ?? false)
+  const [isPaid,        setIsPaid]       = useState(plan?.is_paid ?? true)
   const [startCredits,  setStartCredits] = useState('')
   const [saving,        setSaving]       = useState(false)
 

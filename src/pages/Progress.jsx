@@ -685,66 +685,70 @@ function BadgeDetailDialog({ open, badge, isEarned, client, lang, t, onClose }) 
 /* ═══════════════════════════════════════════════════════════════
    BadgeUnlockedToast — celebration with confetti burst
    ═══════════════════════════════════════════════════════════════ */
-function BadgeUnlockedToast({ badge, t, onDismiss }) {
+export function BadgeUnlockedToast({ badge, t, onDismiss }) {
   const color = tierColor(badge.tier)
   const bg    = tierBg(badge.tier)
   const brd   = tierBorder(badge.tier)
 
-  // Generate confetti particles once
+  // Big confetti burst — 60 particles spread across screen
   const confetti = useMemo(() =>
-    Array.from({ length: 28 }, (_, i) => {
-      const angle = (i / 28) * Math.PI * 2
-      const dist = 60 + Math.random() * 100
-      const colors = [C.primary, '#D4AF37', '#C0C0C0', '#CD7F32', color, '#fff', '#FF6B9D', '#7C5CFC']
+    Array.from({ length: 60 }, (_, i) => {
+      const angle = (i / 60) * Math.PI * 2 + (Math.random() - 0.5) * 0.4
+      const dist = 120 + Math.random() * 280
+      const colors = [C.primary, '#D4AF37', '#C0C0C0', '#CD7F32', color, '#fff', '#FF6B9D', '#7C5CFC', '#4ADE80', '#FACC15']
       return {
         id: i,
         tx: Math.cos(angle) * dist,
-        ty: Math.sin(angle) * dist - 40,
-        size: 4 + Math.random() * 5,
+        ty: Math.sin(angle) * dist - 60,
+        size: 8 + Math.random() * 12,
         color: colors[i % colors.length],
-        delay: Math.random() * 0.3,
-        dur: 0.8 + Math.random() * 0.6,
-        rotate: Math.random() * 360,
-        shape: i % 3, // 0=circle, 1=rect, 2=diamond
+        delay: Math.random() * 0.5,
+        dur: 1.2 + Math.random() * 1.0,
+        rotate: Math.random() * 720,
+        shape: i % 3,
       }
     }),
   [color])
 
   return (
-    <Box sx={{
-      position: 'fixed',
-      bottom: 96, left: '50%',
-      transform: 'translateX(-50%)',
-      zIndex: 1400,
-      // Confetti keyframes
+    <Box onClick={onDismiss} sx={{
+      position: 'fixed', inset: 0, zIndex: 1500,
+      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+      background: 'rgba(0,0,0,0.85)',
+      backdropFilter: 'blur(12px)',
+      cursor: 'pointer',
+      animation: `badgeOverlayIn 0.3s ease both`,
+      '@keyframes badgeOverlayIn': {
+        '0%': { opacity: 0 },
+        '100%': { opacity: 1 },
+      },
       '@keyframes confettiBurst': {
         '0%': { opacity: 1, transform: 'translate(0,0) scale(1) rotate(0deg)' },
-        '100%': { opacity: 0, transform: 'translate(var(--tx), var(--ty)) scale(0.3) rotate(var(--rot))' },
+        '100%': { opacity: 0, transform: 'translate(var(--tx), var(--ty)) scale(0.2) rotate(var(--rot))' },
       },
-      '@keyframes toastGlow': {
-        '0%': { boxShadow: `0 0 20px ${color}50, 0 8px 32px ${C.shadow}` },
-        '50%': { boxShadow: `0 0 40px ${color}60, 0 8px 40px ${color}30` },
-        '100%': { boxShadow: `0 0 15px ${color}30, 0 8px 32px ${C.shadow}` },
+      '@keyframes badgeIconIn': {
+        '0%': { opacity: 0, transform: 'scale(0)' },
+        '50%': { transform: 'scale(1.15)' },
+        '70%': { transform: 'scale(0.92)' },
+        '100%': { opacity: 1, transform: 'scale(1)' },
       },
-      '@keyframes toastBounce': {
-        '0%': { opacity: 0, transform: 'translateX(-50%) scale(0.5)' },
-        '50%': { transform: 'translateX(-50%) scale(1.08)' },
-        '70%': { transform: 'translateX(-50%) scale(0.96)' },
-        '100%': { opacity: 1, transform: 'translateX(-50%) scale(1)' },
+      '@keyframes badgeGlow': {
+        '0%, 100%': { boxShadow: `0 0 40px ${color}40, 0 0 80px ${color}20` },
+        '50%': { boxShadow: `0 0 60px ${color}60, 0 0 120px ${color}35` },
       },
-      '@keyframes iconPulse': {
-        '0%, 100%': { transform: 'scale(1)' },
-        '50%': { transform: 'scale(1.2)' },
+      '@keyframes textFadeUp': {
+        '0%': { opacity: 0, transform: 'translateY(20px)' },
+        '100%': { opacity: 1, transform: 'translateY(0)' },
       },
     }}>
-      {/* Confetti particles */}
+      {/* Confetti particles — centered on icon */}
       {confetti.map(p => (
         <Box key={p.id} sx={{
           position: 'absolute',
-          left: '50%', top: '50%',
+          left: '50%', top: '40%',
           width: p.shape === 2 ? p.size * 0.7 : p.size,
-          height: p.shape === 2 ? p.size * 0.7 : p.size,
-          borderRadius: p.shape === 0 ? '50%' : p.shape === 2 ? '2px' : '1px',
+          height: p.shape === 0 ? p.size : p.size * 0.5,
+          borderRadius: p.shape === 0 ? '50%' : p.shape === 2 ? '3px' : '2px',
           background: p.color,
           transform: p.shape === 2 ? 'rotate(45deg)' : 'none',
           '--tx': `${p.tx}px`,
@@ -756,49 +760,37 @@ function BadgeUnlockedToast({ badge, t, onDismiss }) {
         }} />
       ))}
 
-      {/* Toast card */}
-      <Box onClick={onDismiss} sx={{
-        position: 'relative',
-        display: 'flex', alignItems: 'center', gap: 1.5,
-        px: 2.5, py: 1.5,
-        background: 'linear-gradient(145deg, var(--c-card) 0%, var(--c-cardDeep) 100%)',
-        border: `1.5px solid ${brd}`,
-        borderRadius: '16px',
-        cursor: 'pointer',
-        animation: `toastBounce 0.5s ${EASE.spring} both, toastGlow 1.5s ease 0.3s`,
-        maxWidth: '90vw',
+      {/* Big badge icon — 40% of viewport width */}
+      <Box sx={{
+        width: '40vw', height: '40vw', maxWidth: 280, maxHeight: 280,
+        borderRadius: '32px',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        background: bg, border: `3px solid ${brd}`,
+        animation: `badgeIconIn 0.6s ${EASE.spring} 0.1s both, badgeGlow 2s ease 0.5s infinite`,
+        mb: 3,
       }}>
-        {/* icon */}
-        <Box sx={{
-          width: 40, height: 40, borderRadius: '12px', flexShrink: 0,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          background: bg, border: `1.5px solid ${brd}`,
-          animation: `iconPulse 0.6s ${EASE.spring} 0.4s`,
-        }}>
-          <BadgeIcon muiIcon={badge.muiIcon} size={22} color={color} />
-        </Box>
-
-        {/* text */}
-        <Box>
-          <Typography sx={{
-            fontSize: '11px', fontWeight: 700, color,
-            textTransform: 'uppercase', letterSpacing: '0.5px',
-          }}>
-            {t('badgeUnlockedMsg')}
-          </Typography>
-          <Typography sx={{ fontSize: '15px', fontWeight: 800, color: C.text }}>
-            {t(`badge_${badge.id}`)}
-          </Typography>
-        </Box>
-
-        {/* xp */}
-        <Typography sx={{
-          fontSize: '15px', fontWeight: 800, color,
-          ml: 1, whiteSpace: 'nowrap',
-        }}>
-          +{badge.xp} XP
-        </Typography>
+        <BadgeIcon muiIcon={badge.muiIcon} size={120} color={color} />
       </Box>
+
+      {/* Badge name */}
+      <Typography sx={{
+        fontSize: '24px', fontWeight: 800, color: C.text,
+        fontFamily: "'MontBlanc', sans-serif", fontStyle: 'italic',
+        textAlign: 'center', px: 3,
+        animation: `textFadeUp 0.4s ease 0.3s both`,
+      }}>
+        {t(`badge_${badge.id}`)}
+      </Typography>
+
+      {/* "СПЕЧЕЛИ БАДЖ +XP" */}
+      <Typography sx={{
+        fontSize: '18px', fontWeight: 800, color,
+        textTransform: 'uppercase', letterSpacing: '1.5px',
+        mt: 1.5,
+        animation: `textFadeUp 0.4s ease 0.5s both`,
+      }}>
+        {t('badgeUnlockedMsg')} +{badge.xp} XP
+      </Typography>
     </Box>
   )
 }
@@ -807,7 +799,7 @@ function BadgeUnlockedToast({ badge, t, onDismiss }) {
 /* ═══════════════════════════════════════════════════════════════
    LevelUpCelebration — fullscreen overlay with particles
    ═══════════════════════════════════════════════════════════════ */
-function LevelUpCelebration({ info, t, onDismiss }) {
+export function LevelUpCelebration({ info, t, onDismiss }) {
   // Generate sparkle particles once
   const particles = useMemo(() =>
     Array.from({ length: 24 }, (_, i) => ({

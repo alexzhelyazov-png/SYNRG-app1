@@ -174,7 +174,7 @@ export const T = {
     levelLbl:           'Ниво',
     xpLbl:              'XP',
     earnedLbl:          'Спечелена',
-    badgeUnlockedMsg:   'Нова значка!',
+    badgeUnlockedMsg:   'Спечели бадж',
     levelUpMsg:         'НИВО НАГОРЕ!',
     levelUpSub:         'Продължавай така!',
     badgeCat_special:   'Специални',
