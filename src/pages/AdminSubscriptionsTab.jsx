@@ -1,7 +1,6 @@
-import { useState, useEffect } from 'react'
-import { Box, Typography } from '@mui/material'
+import { useState, useEffect, useCallback } from 'react'
+import { Box, Typography, IconButton, Tooltip } from '@mui/material'
 import { useApp } from '../context/AppContext'
-import { useBooking } from '../context/BookingContext'
 import { C } from '../theme'
 import { DB } from '../lib/db'
 
@@ -9,16 +8,18 @@ const PLAN_LABELS = { '8': 'FLEX', '12': 'PROGRESS', 'unlimited': 'PLUS' }
 const PLAN_COLORS = { '8': C.logan, '12': C.primary, 'unlimited': '#c4e9bf' }
 
 export default function SubscriptionsTab({ t, lang }) {
-  const { realClients } = useApp()
+  const { realClients, showSnackbar } = useApp()
   const [allPlans, setAllPlans] = useState([])
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
+  const reload = useCallback(() => {
     DB.selectAll('client_plans').then(plans => {
       setAllPlans(plans.sort((a, b) => (b.created_at || '').localeCompare(a.created_at || '')))
       setLoading(false)
     })
   }, [])
+
+  useEffect(() => { reload() }, [reload])
 
   const getName = (clientId) => {
     const c = realClients.find(c => c.id === clientId)
@@ -41,7 +42,24 @@ export default function SubscriptionsTab({ t, lang }) {
     return `${days} ${lang === 'en' ? 'd ago' : 'д'}`
   }
 
-  // Find duplicates: clients with more than 1 active plan
+  async function handleDeactivate(planId) {
+    await DB.update('client_plans', planId, { status: 'expired' })
+    showSnackbar(lang === 'en' ? 'Plan deactivated' : 'Планът е деактивиран')
+    reload()
+  }
+
+  async function handleDelete(planId) {
+    await DB.deleteById('client_plans', planId)
+    showSnackbar(lang === 'en' ? 'Plan deleted' : 'Планът е изтрит')
+    reload()
+  }
+
+  async function handleTogglePaid(planId, currentValue) {
+    await DB.update('client_plans', planId, { is_paid: !currentValue })
+    reload()
+  }
+
+  // Find duplicates
   const activePlans = allPlans.filter(p => p.status === 'active')
   const clientPlanCount = {}
   activePlans.forEach(p => {
@@ -62,7 +80,7 @@ export default function SubscriptionsTab({ t, lang }) {
           background: 'rgba(224,82,82,0.08)', border: '1px solid rgba(224,82,82,0.3)',
         }}>
           <Typography sx={{ fontSize: '13px', fontWeight: 700, color: '#e05252', mb: 1 }}>
-            {lang === 'en' ? 'Duplicate active plans detected:' : 'Открити дублирани активни планове:'}
+            {lang === 'en' ? 'Duplicate active plans detected:' : 'Дублирани активни планове:'}
           </Typography>
           {duplicateClientIds.map(id => {
             const plans = activePlans.filter(p => p.client_id === id)
@@ -82,7 +100,7 @@ export default function SubscriptionsTab({ t, lang }) {
         </Box>
       )}
 
-      {/* All plans - newest first */}
+      {/* All plans */}
       <Typography sx={{ fontSize: '11px', fontWeight: 700, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.8px', mb: 1.5 }}>
         {lang === 'en' ? `All subscriptions (${allPlans.length})` : `Всички абонаменти (${allPlans.length})`}
       </Typography>
@@ -96,11 +114,11 @@ export default function SubscriptionsTab({ t, lang }) {
 
           return (
             <Box key={p.id} sx={{
-              display: 'flex', alignItems: 'center', gap: 1.5,
-              px: 2, py: 1.2, borderRadius: '10px',
+              display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap',
+              px: 2, py: 1, borderRadius: '10px',
               background: isDuplicate ? 'rgba(224,82,82,0.06)' : isActive ? 'rgba(255,255,255,0.02)' : 'transparent',
               border: `1px solid ${isDuplicate ? 'rgba(224,82,82,0.25)' : isActive ? C.border : 'rgba(255,255,255,0.03)'}`,
-              opacity: isActive ? 1 : 0.5,
+              opacity: isActive ? 1 : 0.45,
             }}>
               {/* Status dot */}
               <Box sx={{
@@ -117,7 +135,7 @@ export default function SubscriptionsTab({ t, lang }) {
               </Box>
 
               {/* Client name */}
-              <Typography sx={{ fontSize: '13px', fontWeight: 700, color: C.text, flex: 1, minWidth: 0,
+              <Typography sx={{ fontSize: '13px', fontWeight: 700, color: C.text, flex: 1, minWidth: 80,
                 overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {getName(p.client_id)}
               </Typography>
@@ -130,24 +148,48 @@ export default function SubscriptionsTab({ t, lang }) {
                 }
               </Typography>
 
-              {/* Paid indicator */}
-              <Box sx={{
-                fontSize: '10px', fontWeight: 700, px: 0.75, py: 0.15, borderRadius: '4px',
-                background: p.is_paid ? 'rgba(74,222,128,0.12)' : 'rgba(224,82,82,0.12)',
-                color: p.is_paid ? '#4ade80' : '#e05252',
-              }}>
-                {p.is_paid ? (lang === 'en' ? 'PAID' : 'ПЛ.') : (lang === 'en' ? 'UNPAID' : 'НЕПЛ.')}
-              </Box>
+              {/* Paid - clickable toggle */}
+              <Tooltip title={lang === 'en' ? 'Toggle paid status' : 'Смени статус платено'} arrow>
+                <Box onClick={() => handleTogglePaid(p.id, p.is_paid)} sx={{
+                  fontSize: '10px', fontWeight: 700, px: 0.75, py: 0.15, borderRadius: '4px', cursor: 'pointer',
+                  background: p.is_paid ? 'rgba(74,222,128,0.12)' : 'rgba(224,82,82,0.12)',
+                  color: p.is_paid ? '#4ade80' : '#e05252',
+                  '&:hover': { opacity: 0.7 },
+                }}>
+                  {p.is_paid ? (lang === 'en' ? 'PAID' : 'ПЛ.') : (lang === 'en' ? 'UNPAID' : 'НЕПЛ.')}
+                </Box>
+              </Tooltip>
 
               {/* Date */}
               <Typography sx={{ fontSize: '11px', color: C.muted, whiteSpace: 'nowrap' }}>
-                {formatDate(p.valid_from)} - {formatDate(p.valid_to)}
+                {formatDate(p.valid_from)}
               </Typography>
 
-              {/* Time since created */}
-              <Typography sx={{ fontSize: '10px', color: C.muted, whiteSpace: 'nowrap', minWidth: 40 }}>
+              {/* Time since */}
+              <Typography sx={{ fontSize: '10px', color: C.muted, whiteSpace: 'nowrap', minWidth: 35 }}>
                 {timeSince(p.created_at)}
               </Typography>
+
+              {/* Actions */}
+              {isActive && (
+                <Tooltip title={lang === 'en' ? 'Deactivate' : 'Деактивирай'} arrow>
+                  <IconButton size="small" onClick={() => handleDeactivate(p.id)}
+                    sx={{ color: '#FB923C', p: 0.4, fontSize: '14px' }}>
+                    &#x23F8;
+                  </IconButton>
+                </Tooltip>
+              )}
+              <Tooltip title={lang === 'en' ? 'Delete' : 'Изтрий'} arrow>
+                <IconButton size="small" onClick={() => {
+                  if (window.confirm(lang === 'en'
+                    ? `Delete plan for ${getName(p.client_id)}?`
+                    : `Изтрий план на ${getName(p.client_id)}?`
+                  )) handleDelete(p.id)
+                }}
+                  sx={{ color: '#e05252', p: 0.4, fontSize: '14px' }}>
+                  &#x2715;
+                </IconButton>
+              </Tooltip>
             </Box>
           )
         })}

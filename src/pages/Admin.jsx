@@ -723,10 +723,8 @@ function PlansTab({ t }) {
   }
 
   async function handleActivate(clientId, planType, from, price, startCredits, isPaid) {
-    const res = await activatePlan(clientId, planType, from, price, startCredits)
+    const res = await activatePlan(clientId, planType, from, price, startCredits, isPaid)
     if (res?.error) { showSnackbar('Грешка: ' + res.error); return res }
-    // Set is_paid on the newly created plan
-    if (isPaid && res?.id) await DB.update('client_plans', res.id, { is_paid: true })
     showSnackbar(t('planActivatedMsg'))
     return { ok: true }
   }
@@ -902,10 +900,8 @@ function ClientsTab({ t }) {
   })
 
   async function handleActivate(clientId, planType, from, price, startCredits, isPaid) {
-    const res = await activatePlan(clientId, planType, from, price, startCredits)
+    const res = await activatePlan(clientId, planType, from, price, startCredits, isPaid)
     if (res?.error) { showSnackbar('Грешка: ' + res.error); return res }
-    // Set is_paid on the newly created plan
-    if (isPaid && res?.id) await DB.update('client_plans', res.id, { is_paid: true })
     showSnackbar(t('planActivatedMsg'))
     return { ok: true }
   }

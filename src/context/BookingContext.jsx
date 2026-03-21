@@ -221,7 +221,7 @@ export function BookingProvider({ children }) {
   }, [loadSlots])
 
   // ── Admin: activate plan for client ──────────────────────
-  const activatePlan = useCallback(async (clientId, planType, validFrom, price = 0, startCredits = null) => {
+  const activatePlan = useCallback(async (clientId, planType, validFrom, price = 0, startCredits = null, isPaid = false) => {
     try {
       const creditsTotal = planType === '8' ? 8 : planType === '12' ? 12 : null
       // If startCredits provided (migration), compute credits_used = total - remaining
@@ -246,6 +246,7 @@ export function BookingProvider({ children }) {
         status:        'active',
         activated_by:  auth.name,
         price:         Number(price) || 0,
+        is_paid:       !!isPaid,
       })
       // Auto-enable ALL modules when activating a plan
       const targetClient = realClients.find(c => c.id === clientId)
