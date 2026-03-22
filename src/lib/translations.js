@@ -276,6 +276,10 @@ export const T = {
     installStep1IOS:    'Натисни бутона за споделяне долу',
     installStep2IOS:    'Избери "Добави към начален екран"',
     installStep3IOS:    'Натисни "Добави"',
+    // ── Android Install Guide ────────────────────────
+    installStep1Android: 'Натисни менюто горе вдясно',
+    installStep2Android: 'Избери "Добави към начален екран"',
+    installStep3Android: 'Натисни "Инсталирай"',
 
     // ── Profile / Mobile Header ──────────────────────
     profileTab:         'Профил',
@@ -1047,6 +1051,10 @@ export const T = {
     installStep1IOS:    'Tap the Share button below',
     installStep2IOS:    'Select "Add to Home Screen"',
     installStep3IOS:    'Tap "Add"',
+    // ── Android Install Guide ────────────────────────
+    installStep1Android: 'Tap the menu in the top right',
+    installStep2Android: 'Select "Add to Home Screen"',
+    installStep3Android: 'Tap "Install"',
 
     // ── Profile / Mobile Header ──────────────────────
     profileTab:         'Profile',

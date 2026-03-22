@@ -469,24 +469,46 @@ export default function Auth() {
             </Box>
           </Box>
         ) : (
-          <Box sx={{ display: 'grid', gap: 2 }}>
-            {[1, 2, 3].map(step => (
-              <Box key={step} sx={{ display: 'flex', gap: 1.5, alignItems: 'flex-start' }}>
-                <Box sx={{ minWidth: 28, height: 28, borderRadius: '50%', background: C.accentSoft, color: C.text,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', fontWeight: 800 }}>{step}</Box>
-                <Box>
-                  <Typography sx={{ fontSize: '14px', color: C.text, pt: '3px', lineHeight: 1.5 }}>
-                    {t(`installStep${step}Android`)}
-                  </Typography>
-                  {step === 1 && (
-                    <Box sx={{ mt: 1, display: 'inline-flex', alignItems: 'center', px: 1.5, py: 0.75,
-                      border: `1px solid ${C.border}`, borderRadius: '10px', background: 'rgba(255,255,255,0.05)' }}>
-                      <Typography sx={{ fontSize: '18px', fontWeight: 800, color: C.muted, letterSpacing: '2px' }}>⋮</Typography>
-                    </Box>
-                  )}
-                </Box>
+          <Box sx={{ display: 'grid', gap: 2.5 }}>
+            {/* Step 1: Tap menu */}
+            <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center' }}>
+              <Box sx={{ minWidth: 28, height: 28, borderRadius: '50%', background: C.accentSoft, color: C.text,
+                display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', fontWeight: 800 }}>1</Box>
+              <Typography sx={{ fontSize: '14px', color: C.text, flex: 1 }}>
+                {t('installStep1Android')}
+              </Typography>
+              <Box sx={{ minWidth: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                border: `1px solid ${C.border}`, borderRadius: '8px', background: 'rgba(255,255,255,0.05)' }}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                  <circle cx="12" cy="5" r="2" fill="#999"/>
+                  <circle cx="12" cy="12" r="2" fill="#999"/>
+                  <circle cx="12" cy="19" r="2" fill="#999"/>
+                </svg>
               </Box>
-            ))}
+            </Box>
+            {/* Step 2: Add to Home Screen */}
+            <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center' }}>
+              <Box sx={{ minWidth: 28, height: 28, borderRadius: '50%', background: C.accentSoft, color: C.text,
+                display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', fontWeight: 800 }}>2</Box>
+              <Typography sx={{ fontSize: '14px', color: C.text, flex: 1 }}>
+                {t('installStep2Android')}
+              </Typography>
+              <Box sx={{ minWidth: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                border: `1px solid ${C.border}`, borderRadius: '8px', background: 'rgba(255,255,255,0.05)' }}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                  <rect x="3" y="3" width="18" height="18" rx="4" stroke="#999" strokeWidth="1.5"/>
+                  <path d="M12 8V16M8 12H16" stroke="#999" strokeWidth="2" strokeLinecap="round"/>
+                </svg>
+              </Box>
+            </Box>
+            {/* Step 3: Install */}
+            <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center' }}>
+              <Box sx={{ minWidth: 28, height: 28, borderRadius: '50%', background: C.accentSoft, color: C.text,
+                display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', fontWeight: 800 }}>3</Box>
+              <Typography sx={{ fontSize: '14px', color: C.text, fontWeight: 700 }}>
+                {t('installStep3Android')}
+              </Typography>
+            </Box>
             {deferredPrompt && (
               <Button variant="contained" color="primary" fullWidth
                 onClick={async () => { deferredPrompt.prompt(); await deferredPrompt.userChoice; setDeferredPrompt(null); setShowInstall(false) }}
