@@ -10,7 +10,7 @@ import { isAdmin }             from './lib/bookingUtils'
 import { hasModule }           from './lib/modules'
 import {
   evaluateBadges, evaluateMonthlyBadgesForMonth, getCurrentMonthKey,
-  ALLTIME_BADGES, MONTHLY_BADGES,
+  ALLTIME_BADGES, MONTHLY_BADGES, PR_EXERCISES, getCurrentPRs,
   computeTotalXP, computeLevel, getLevelName,
 } from './lib/gamification'
 
@@ -145,6 +145,38 @@ function BadgeUnlockWatcher() {
     prevEarnedRef.current = { a: [...earnedIds], m: [...monthlyEarnedIds] }
   }, [earnedIds, monthlyEarnedIds, client.dismissedBadges, unlockedBadge])
 
+  // Detect PR milestones (uses dismissed_badges, works on first load too)
+  const currentPRs = useMemo(() => getCurrentPRs(client.workouts), [client.workouts])
+  const [prCelebration, setPrCelebration] = useState(null)
+
+  useEffect(() => {
+    if (!client.workouts || client.workouts.length === 0) return
+    if (unlockedBadge || prCelebration) return // don't overlap with badge celebration
+    const dismissed = client.dismissedBadges || []
+    for (const ex of PR_EXERCISES) {
+      const pr = currentPRs[ex.id]
+      if (!pr || pr.highestMilestone === undefined) continue
+      // Check each unlocked milestone
+      for (const idx of (pr.unlockedIdx || [])) {
+        const m = ex.milestones[idx]
+        const key = `${ex.id}:${m.v}`
+        if (!dismissed.includes(key)) {
+          setPrCelebration({ exercise: ex, value: m.v })
+          return
+        }
+      }
+    }
+  }, [currentPRs, client.dismissedBadges, unlockedBadge, prCelebration])
+
+  useEffect(() => {
+    if (!prCelebration) return
+    const timer = setTimeout(() => {
+      dismissBadge(prCelebration.exercise.id, String(prCelebration.value))
+      setPrCelebration(null)
+    }, 4000)
+    return () => clearTimeout(timer)
+  }, [prCelebration])
+
   // Detect level up
   useEffect(() => {
     const curLevel = levelData.level
@@ -173,6 +205,27 @@ function BadgeUnlockWatcher() {
           else dismissBadge(unlockedBadge.id)
           setUnlockedBadge(null)
         }} />
+      )}
+      {prCelebration && (
+        <Box onClick={() => { dismissBadge(prCelebration.exercise.id, String(prCelebration.value)); setPrCelebration(null) }}
+          sx={{
+            position: 'fixed', inset: 0, zIndex: 1500,
+            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+            background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(12px)', cursor: 'pointer',
+            animation: 'badgeOverlayIn 0.3s ease both',
+            '@keyframes badgeOverlayIn': { '0%': { opacity: 0 }, '100%': { opacity: 1 } },
+          }}>
+          <Typography sx={{ fontSize: '14px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '3px', color: '#D4AF37', mb: 2 }}>
+            {lang === 'bg' ? 'НОВ ЛИЧЕН РЕКОРД!' : 'NEW PERSONAL RECORD!'}
+          </Typography>
+          <Typography sx={{ fontSize: '22px', fontWeight: 800, fontStyle: 'italic', fontFamily: "'MontBlanc', sans-serif", color: '#fff', mb: 1 }}>
+            {lang === 'bg' ? prCelebration.exercise.labelBg : prCelebration.exercise.labelEn}
+          </Typography>
+          <Typography sx={{ fontSize: '48px', fontWeight: 900, color: '#D4AF37', fontFamily: "'MontBlanc', sans-serif", lineHeight: 1 }}>
+            {prCelebration.value === 0 ? (lang === 'bg' ? 'Без тежест' : 'Bodyweight') :
+              `${prCelebration.value}${prCelebration.exercise.type === 'weight' ? ' kg' : (lang === 'bg' ? ' пъти' : ' reps')}`}
+          </Typography>
+        </Box>
       )}
       {levelUpInfo && (
         <LevelUpCelebration info={levelUpInfo} t={t} onDismiss={() => setLevelUpInfo(null)} />
