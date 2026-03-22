@@ -4,7 +4,7 @@ import Ranking from './Ranking'
 import { useApp } from '../context/AppContext'
 import { C, EASE } from '../theme'
 import {
-  ALLTIME_BADGES, MONTHLY_BADGES, BADGES,
+  ALLTIME_BADGES, MONTHLY_BADGES, BADGES, PR_EXERCISES, getCurrentPRs,
   TIER_COLORS, TIER_ORDER,
   evaluateBadges, evaluateMonthlyBadgesForMonth,
   computeTotalXP, computeMonthlyXP, computeLevel, getLevelName,
@@ -89,6 +89,13 @@ export default function Progress() {
     }
     return seen
   }, [])
+
+  // ── Personal Records (display only, no celebration logic) ──
+  const currentPRs = useMemo(() => getCurrentPRs(client.workouts), [client.workouts])
+  const [prDialogOpen, setPrDialogOpen] = useState(false)
+  const prTotalUnlocked = useMemo(() => Object.values(currentPRs).reduce((s, p) => s + p.count, 0), [currentPRs])
+  const prTotalAll = useMemo(() => Object.values(currentPRs).reduce((s, p) => s + p.total, 0), [currentPRs])
+  const prTotalXP = useMemo(() => Object.values(currentPRs).reduce((s, p) => s + p.totalXP, 0), [currentPRs])
 
   // ── Badge unlock notification ────────────────────────────────
   const [unlockedBadge, setUnlockedBadge] = useState(null)
@@ -324,11 +331,42 @@ export default function Progress() {
         gap: 1.25,
         mb: 3,
       }}>
+        {/* PR Badge Tile */}
+        <Box onClick={() => setPrDialogOpen(true)} sx={{
+          p: '16px 12px', borderRadius: '14px', position: 'relative',
+          border: '2px solid rgba(212,175,55,0.7)',
+          background: 'linear-gradient(145deg, rgba(212,175,55,0.28) 0%, rgba(212,175,55,0.12) 60%, transparent 100%)',
+          boxShadow: '0 0 18px rgba(212,175,55,0.30), 0 4px 14px rgba(212,175,55,0.18), inset 0 1px 0 rgba(212,175,55,0.20)',
+          cursor: 'pointer', textAlign: 'center',
+          transition: `all 0.2s ${EASE.standard}`,
+          '&:hover': { transform: 'translateY(-2px)', boxShadow: '0 0 24px rgba(212,175,55,0.40), 0 6px 20px rgba(212,175,55,0.25)' },
+        }}>
+          <Box sx={{
+            width: 48, height: 48, borderRadius: '12px', mx: 'auto', mb: 0.75,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: 'rgba(212,175,55,0.20)',
+          }}>
+            <BadgeIcon muiIcon="EmojiEvents" size={24} color="#D4AF37" />
+          </Box>
+          <Typography sx={{ fontSize: '11px', fontWeight: 800, color: '#D4AF37', mb: 0.25, lineHeight: 1.3 }}>
+            {lang === 'bg' ? 'Лични рекорди' : 'Personal Records'}
+          </Typography>
+          <Typography sx={{ fontSize: '9px', fontWeight: 600, color: C.muted, mb: 0.5 }}>
+            {prTotalUnlocked}/{prTotalAll}
+          </Typography>
+          <Typography sx={{ fontSize: '10px', fontWeight: 600, color: '#D4AF37' }}>
+            +{prTotalXP} XP
+          </Typography>
+        </Box>
+
         {ALLTIME_BADGES.map((badge, i) => (
           <BadgeTile key={badge.id} badge={badge} isEarned={earnedSet.has(badge.id)}
-            index={i} t={t} onClick={() => setSelectedBadge(badge)} />
+            index={i + 1} t={t} onClick={() => setSelectedBadge(badge)} />
         ))}
       </Box>
+
+      {/* ── PR Dialog ────────────────────────────────────────── */}
+      <PRDialog open={prDialogOpen} onClose={() => setPrDialogOpen(false)} currentPRs={currentPRs} lang={lang} />
 
       {/* ── Badge Detail Dialog ──────────────────────────────── */}
       <BadgeDetailDialog
@@ -971,5 +1009,77 @@ export function LevelUpCelebration({ info, t, onDismiss }) {
         {t('levelUpSub')}
       </Typography>
     </Box>
+  )
+}
+
+
+/* ═══════════════════════════════════════════════════════════════
+   PRDialog — expandable personal records dialog
+   ═══════════════════════════════════════════════════════════════ */
+function PRDialog({ open, onClose, currentPRs, lang }) {
+  const gold = '#D4AF37'
+  return (
+    <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth
+      PaperProps={{ sx: {
+        background: 'linear-gradient(145deg, var(--c-card) 0%, var(--c-cardDeep) 100%)',
+        border: `1px solid ${gold}30`, borderRadius: '20px', p: 3,
+      }}}>
+      <IconButton onClick={onClose} sx={{ position: 'absolute', top: 8, right: 8, color: C.muted }}>
+        <span style={{ fontSize: '18px', lineHeight: 1 }}>x</span>
+      </IconButton>
+
+      <Box sx={{ textAlign: 'center', mb: 2.5 }}>
+        <Box sx={{
+          width: 56, height: 56, borderRadius: '14px', mx: 'auto', mb: 1.5,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          background: `${gold}18`, border: `2px solid ${gold}35`,
+        }}>
+          <BadgeIcon muiIcon="EmojiEvents" size={30} color={gold} />
+        </Box>
+        <Typography sx={{ fontSize: '20px', fontWeight: 800, fontStyle: 'italic', fontFamily: "'MontBlanc', sans-serif", color: C.text }}>
+          {lang === 'bg' ? 'Лични рекорди' : 'Personal Records'}
+        </Typography>
+      </Box>
+
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+        {PR_EXERCISES.map(ex => {
+          const pr = currentPRs[ex.id]
+          const best = pr?.best || 0
+          const hasData = best >= 0 && pr?.count > 0
+          const suffix = ex.type === 'weight' ? ' kg' : (lang === 'bg' ? ' пъти' : ' reps')
+          return (
+            <Box key={ex.id} sx={{
+              display: 'flex', alignItems: 'center', gap: 1.5,
+              px: 2, py: 1.5, borderRadius: '12px',
+              background: hasData ? `${gold}10` : 'rgba(255,255,255,0.03)',
+              border: `1px solid ${hasData ? `${gold}25` : 'rgba(255,255,255,0.06)'}`,
+            }}>
+              <Box sx={{
+                width: 40, height: 40, borderRadius: '10px', flexShrink: 0,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                background: hasData ? `${gold}18` : 'rgba(255,255,255,0.06)',
+              }}>
+                <BadgeIcon muiIcon={ex.muiIcon} size={20} color={hasData ? gold : C.muted} />
+              </Box>
+              <Box sx={{ flex: 1 }}>
+                <Typography sx={{ fontSize: '14px', fontWeight: 700, color: hasData ? C.text : C.muted }}>
+                  {lang === 'bg' ? ex.labelBg : ex.labelEn}
+                </Typography>
+                <Typography sx={{ fontSize: '10px', color: C.muted }}>
+                  +{pr?.totalXP || 0} XP
+                </Typography>
+              </Box>
+              <Typography sx={{
+                fontSize: hasData ? '22px' : '14px',
+                fontWeight: 800, color: hasData ? gold : C.muted,
+                fontFamily: "'MontBlanc', sans-serif",
+              }}>
+                {hasData ? `${best}${suffix}` : '—'}
+              </Typography>
+            </Box>
+          )
+        })}
+      </Box>
+    </Dialog>
   )
 }

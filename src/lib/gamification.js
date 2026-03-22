@@ -69,7 +69,6 @@ export const ALLTIME_BADGES = [
   { id: 'first_steps',  category: 'consistency', xp: 5,  tier: null, series: null, muiIcon: 'DirectionsWalk', condType: 'count', condField: 'stepsCount',  condValue: 1 },
 
   // ── Standalone ──
-  { id: 'first_pr',     category: 'strength', xp: 25, tier: null, series: null, muiIcon: 'EmojiEvents',  condType: 'strength_pr', condValue: 1   },
   { id: 'all_rounder',  category: 'special',  xp: 40, tier: null, series: null, muiIcon: 'AutoAwesome',  condType: 'compound',    condValue: 1   },
   { id: 'century_club', category: 'special',  xp: 50, tier: null, series: null, muiIcon: 'MilitaryTech', condType: 'meta',        condValue: 100 },
 ]
@@ -243,6 +242,109 @@ function getDistinctMonthKeys(client) {
   ;(client.workouts   || []).forEach(w => addDate(w.date))
   ;(client.stepsLogs  || []).forEach(s => addDate(s.date))
   return [...keys].sort()
+}
+
+
+/* ═══════════════════════════════════════════════════════════════
+   Personal Records (PR) — 4 tracked exercises, re-earnable
+   ═══════════════════════════════════════════════════════════════ */
+
+export const PR_EXERCISES = [
+  { id: 'pr_squat', labelBg: 'Клек', labelEn: 'Squat', keywords: ['клек'], muiIcon: 'FitnessCenter', type: 'weight', unit: 'kg',
+    milestones: [
+      { v: 0,   label: 'Без тежест', xp: 5 },
+      { v: 5,   label: '5kg',   xp: 5 },
+      { v: 10,  label: '10kg',  xp: 5 },
+      { v: 20,  label: '20kg',  xp: 10 },
+      { v: 30,  label: '30kg',  xp: 10 },
+      { v: 40,  label: '40kg',  xp: 10 },
+      { v: 50,  label: '50kg',  xp: 15 },
+      { v: 60,  label: '60kg',  xp: 15 },
+      { v: 70,  label: '70kg',  xp: 15 },
+      { v: 80,  label: '80kg',  xp: 20 },
+      { v: 90,  label: '90kg',  xp: 20 },
+      { v: 100, label: '100kg', xp: 25 },
+    ],
+  },
+  { id: 'pr_bench', labelBg: 'Лежанка', labelEn: 'Bench Press', keywords: ['лежанка', 'лег', 'полулег', 'bench'], muiIcon: 'FitnessCenter', type: 'weight', unit: 'kg',
+    milestones: [
+      { v: 20, label: '20kg', xp: 10 },
+      { v: 30, label: '30kg', xp: 10 },
+      { v: 40, label: '40kg', xp: 15 },
+      { v: 50, label: '50kg', xp: 15 },
+      { v: 60, label: '60kg', xp: 20 },
+    ],
+  },
+  { id: 'pr_pushups', labelBg: 'Лицеви опори', labelEn: 'Push-ups', keywords: ['лицеви', 'л.о', 'pushup', 'push-up'], muiIcon: 'FitnessCenter', type: 'reps', unit: '',
+    milestones: [
+      { v: 3,  label: '3п',  xp: 5 },
+      { v: 5,  label: '5п',  xp: 5 },
+      { v: 8,  label: '8п',  xp: 10 },
+      { v: 10, label: '10п', xp: 10 },
+      { v: 12, label: '12п', xp: 10 },
+      { v: 15, label: '15п', xp: 15 },
+      { v: 20, label: '20п', xp: 20 },
+    ],
+  },
+  { id: 'pr_pullups', labelBg: 'Набирания', labelEn: 'Pull-ups', keywords: ['набирания', 'набиране', 'pullup', 'pull-up', 'ластик'], muiIcon: 'FitnessCenter', type: 'reps', unit: '',
+    milestones: [
+      { v: 1,  label: '1п',  xp: 5 },
+      { v: 3,  label: '3п',  xp: 10 },
+      { v: 5,  label: '5п',  xp: 10 },
+      { v: 10, label: '10п', xp: 15 },
+      { v: 15, label: '15п', xp: 20 },
+      { v: 20, label: '20п', xp: 25 },
+    ],
+  },
+]
+
+/** Get best weight for a PR exercise (fuzzy keyword match). Returns -1 if exercise never done. */
+function getBestWeight(workouts, keywords) {
+  let best = -1
+  for (const w of (workouts || [])) {
+    for (const item of (w.items || [])) {
+      const name = (item.exercise || '').toLowerCase().trim()
+      if (!name) continue
+      if (!keywords.some(kw => name.includes(kw))) continue
+      const weight = parseFloat(item.weight) || 0
+      if (weight > best) best = weight
+    }
+  }
+  return best
+}
+
+/** Get best reps for a bodyweight PR exercise (parse scheme like "3x15" or "3х15"). Returns -1 if never done. */
+function getBestReps(workouts, keywords) {
+  let best = -1
+  for (const w of (workouts || [])) {
+    for (const item of (w.items || [])) {
+      const name = (item.exercise || '').toLowerCase().trim()
+      if (!name) continue
+      if (!keywords.some(kw => name.includes(kw))) continue
+      // Parse reps from scheme (e.g. "3x15", "3х15", "15")
+      const scheme = (item.scheme || '').toLowerCase().trim()
+      const match = scheme.match(/[xх](\d+)/)
+      const reps = match ? parseInt(match[1]) : parseInt(scheme) || 0
+      if (reps > best) best = reps
+    }
+  }
+  return best
+}
+
+/** Get current best value for each PR exercise + unlocked milestone indices.
+ *  Any milestone whose value <= best is unlocked (non-sequential). */
+export function getCurrentPRs(workouts) {
+  const result = {}
+  for (const ex of PR_EXERCISES) {
+    const best = ex.type === 'weight' ? getBestWeight(workouts, ex.keywords) : getBestReps(workouts, ex.keywords)
+    const unlockedIdx = []
+    for (let i = 0; i < ex.milestones.length; i++) {
+      if (best >= ex.milestones[i].v) unlockedIdx.push(i)
+    }
+    const totalXP = unlockedIdx.reduce((s, i) => s + ex.milestones[i].xp, 0)
+    result[ex.id] = { best, unlockedIdx, totalXP, count: unlockedIdx.length, total: ex.milestones.length }
+  }
+  return result
 }
 
 
@@ -439,7 +541,7 @@ function checkBadge(badge, stats) {
       return (stats[badge.condField] || 0) >= badge.condValue
     case 'weight_loss':
       return stats.weightLoss >= badge.condValue
-    case 'strength_pr':
+    case 'strength_pr':  // legacy, kept for compatibility
       return stats.hasPR
     case 'streak':
       return stats.streak >= badge.condValue
