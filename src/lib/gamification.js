@@ -283,9 +283,15 @@ function findExerciseKey(name, bestByExercise) {
 
 function hasStrengthPR(workouts) {
   if (workouts.length < 2) return false
-  const sorted = [...workouts].sort((a, b) => parseDate(a.date) - parseDate(b.date))
+  // Sort ascending: by date, then reverse original index (original array is desc by created_at)
+  const indexed = workouts.map((w, i) => ({ ...w, _i: i }))
+  indexed.sort((a, b) => {
+    const d = parseDate(a.date) - parseDate(b.date)
+    if (d !== 0) return d
+    return b._i - a._i // same date: higher original index = older = comes first
+  })
   const bestByExercise = {}
-  for (const w of sorted) {
+  for (const w of indexed) {
     for (const item of (w.items || [])) {
       const name = (item.exercise || '').toLowerCase().trim()
       if (!name) continue
