@@ -46,26 +46,18 @@ export default function FoodTracker() {
         </Box>
       )}
 
-      {/* ── + Добави храна ─────────────────────────── */}
+      {/* ── Header ─────────────────────────── */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2, flexWrap: 'wrap', gap: 1 }}>
         <Typography variant="h2">{t('foodTrackerTitle')}</Typography>
-        <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
-          {auth.role !== 'client' && (
-            <TextField
-              type="date"
-              value={foodDate}
-              onChange={e => setFoodDate(e.target.value)}
-              sx={{ width: '140px' }}
-              size="small"
-            />
-          )}
-          {!isTrackerReadOnly && (
-            <Button variant="contained" color="primary" size="small" onClick={() => setFoodModalOpen(true)}
-              sx={{ py: '8px', px: 2, fontSize: '13px', fontWeight: 700 }}>
-              {t('addFoodBtn')}
-            </Button>
-          )}
-        </Box>
+        {auth.role !== 'client' && (
+          <TextField
+            type="date"
+            value={foodDate}
+            onChange={e => setFoodDate(e.target.value)}
+            sx={{ width: '140px' }}
+            size="small"
+          />
+        )}
       </Box>
 
       {/* ── Compact progress row: Calories | Protein ── */}
@@ -106,6 +98,14 @@ export default function FoodTracker() {
           </Box>
         </Box>
       </Paper>
+
+      {/* ── + Добави храна button ──────────────────── */}
+      {!isTrackerReadOnly && (
+        <Button variant="contained" color="primary" fullWidth onClick={() => setFoodModalOpen(true)}
+          sx={{ py: 1.5, mb: 2, fontSize: '14px', fontWeight: 700, borderRadius: '12px' }}>
+          {t('addFoodBtn')}
+        </Button>
+      )}
 
       {/* ── Quick-add chips (own tracker only) ──────── */}
       {!isTrackerReadOnly && (
