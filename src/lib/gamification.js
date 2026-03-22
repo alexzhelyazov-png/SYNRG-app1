@@ -271,7 +271,16 @@ function weightLossFromPeak(weightLogs) {
 }
 
 
-/* ── Strength PR detection ───────────────────────────────────── */
+/* ── Strength PR detection (fuzzy name matching) ─────────────── */
+// Find canonical key: if "клек" already exists and new name is "клек с щанга",
+// return "клек". Works both ways — shorter name wins.
+function findExerciseKey(name, bestByExercise) {
+  for (const existing of Object.keys(bestByExercise)) {
+    if (name.includes(existing) || existing.includes(name)) return existing
+  }
+  return name
+}
+
 function hasStrengthPR(workouts) {
   if (workouts.length < 2) return false
   const sorted = [...workouts].sort((a, b) => parseDate(a.date) - parseDate(b.date))
@@ -282,9 +291,10 @@ function hasStrengthPR(workouts) {
       if (!name) continue
       const weight = parseFloat(item.weight) || 0
       if (weight <= 0) continue
-      if (bestByExercise[name] !== undefined && weight > bestByExercise[name]) return true
-      if (bestByExercise[name] === undefined || weight > bestByExercise[name]) {
-        bestByExercise[name] = weight
+      const key = findExerciseKey(name, bestByExercise)
+      if (bestByExercise[key] !== undefined && weight > bestByExercise[key]) return true
+      if (bestByExercise[key] === undefined || weight > bestByExercise[key]) {
+        bestByExercise[key] = weight
       }
     }
   }

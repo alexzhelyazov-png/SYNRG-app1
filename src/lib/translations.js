@@ -101,7 +101,7 @@ export const T = {
 
     // ── Dashboard — Client ────────────────────────────
     greeting:           'Здравей',
-    yourProgress:       'Твоят прогрес',
+    yourProgress:       'Твоята рутина',
     calTargetLbl:       'Калории цел',
     protTargetLbl:      'Протеин цел',
     todayCalLbl:        'Днес калории',

@@ -263,6 +263,7 @@ function DashboardCoach() {
   } = useApp()
 
   const [recentIds, setRecentIds] = useState(_recentClientIds)
+  const [clientSearch, setClientSearch] = useState('')
 
   const selectClient = (ri, clientId) => {
     const updated = [clientId, ..._recentClientIds.filter(id => id !== clientId)]
@@ -278,8 +279,13 @@ function DashboardCoach() {
   // Only show studio clients (those with studio_access module)
   const studioClients = visibleClients.filter(c => hasModule(c.modules, 'studio_access'))
 
+  // Filter by search
+  const filteredClients = clientSearch
+    ? studioClients.filter(c => c.name.toLowerCase().includes(clientSearch.toLowerCase()))
+    : studioClients
+
   // Sort: recently clicked clients float to top in click order
-  const sortedClients = [...studioClients].sort((a, b) => {
+  const sortedClients = [...filteredClients].sort((a, b) => {
     const ai = recentIds.indexOf(a.id), bi = recentIds.indexOf(b.id)
     if (ai === -1 && bi === -1) return 0
     if (ai === -1) return 1
@@ -295,6 +301,18 @@ function DashboardCoach() {
           <Typography variant="h3">{t('clientsHeader')}</Typography>
           <Typography sx={{ fontSize: '12px', color: C.muted }}>{studioClients.length} {t('ofClients')}</Typography>
         </Box>
+        {studioClients.length > 5 && (
+          <TextField
+            fullWidth size="small"
+            placeholder={t('searchClientPh')}
+            value={clientSearch}
+            onChange={e => setClientSearch(e.target.value)}
+            sx={{ mb: 1.25,
+              '& .MuiInputBase-input': { fontSize: '13px', py: '8px' },
+              '& .MuiOutlinedInput-notchedOutline': { borderColor: C.border },
+            }}
+          />
+        )}
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
           {sortedClients.map((c, i) => {
             const ri = realClients.findIndex(x => x.name === c.name)

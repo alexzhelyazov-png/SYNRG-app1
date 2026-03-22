@@ -886,6 +886,7 @@ function ClientsTab({ t }) {
   const { allPlans, loadAllPlans, activatePlan, extendPlan, adjustCredits, deactivatePlan } = useBooking()
   const [planDlg, setPlanDlg] = useState(null)
   const [loaded, setLoaded]   = useState(false)
+  const [clientSearch, setClientSearch] = useState('')
 
   useEffect(() => { loadAllPlans().then(() => setLoaded(true)) }, [])
 
@@ -893,13 +894,16 @@ function ClientsTab({ t }) {
     return allPlans.find(p => p.client_id === clientId && p.status === 'active') || null
   }
 
+  const searchMatch = (c) => !clientSearch || c.name.toLowerCase().includes(clientSearch.toLowerCase())
+
   const pending  = realClients.filter(c => {
+    if (!searchMatch(c)) return false
     const p = getClientPlan(c.id)
     if (!p) return (c.modules || []).includes('studio_access')
-    // Credits exhausted = needs reactivation
     return !isPlanActive(p)
   })
   const active   = realClients.filter(c => {
+    if (!searchMatch(c)) return false
     const p = getClientPlan(c.id)
     return p && isPlanActive(p)
   })
@@ -929,6 +933,18 @@ function ClientsTab({ t }) {
 
   return (
     <Box>
+      {realClients.length > 5 && (
+        <TextField
+          fullWidth size="small"
+          placeholder={t('searchClientPh')}
+          value={clientSearch}
+          onChange={e => setClientSearch(e.target.value)}
+          sx={{ mb: 2,
+            '& .MuiInputBase-input': { fontSize: '13px', py: '8px' },
+            '& .MuiOutlinedInput-notchedOutline': { borderColor: C.border },
+          }}
+        />
+      )}
       {/* Pending activation (studio clients without plan) */}
       <Typography sx={{ fontWeight: 700, fontSize: '14px', color: '#F87171', mb: 1 }}>
         {t('pendingActivation')} ({pending.length})
