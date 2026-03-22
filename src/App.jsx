@@ -8,7 +8,11 @@ import { BookingProvider }     from './context/BookingContext'
 import { C, EASE, makeTheme }  from './theme'
 import { isAdmin }             from './lib/bookingUtils'
 import { hasModule }           from './lib/modules'
-import { evaluateBadges, BADGES, computeTotalXP, computeLevel, getLevelName } from './lib/gamification'
+import {
+  evaluateBadges, evaluateMonthlyBadgesForMonth, getCurrentMonthKey,
+  ALLTIME_BADGES, MONTHLY_BADGES, BADGES,
+  computeTotalXP, computeLevel, getLevelName,
+} from './lib/gamification'
 
 import SiteHeader     from './layout/SiteHeader'
 import Sidebar        from './layout/Sidebar'
@@ -110,26 +114,43 @@ function BadgeUnlockWatcher() {
   const { client, t, lang, dismissBadge } = useApp()
   const [unlockedBadge, setUnlockedBadge] = useState(null)
   const [levelUpInfo, setLevelUpInfo]     = useState(null)
-  const prevEarnedRef = useRef(null)
-  const prevLevelRef  = useRef(null)
+  const prevEarnedRef  = useRef(null)
+  const prevMonthlyRef = useRef(null)
+  const prevLevelRef   = useRef(null)
 
-  const earnedIds = useMemo(() => evaluateBadges(client), [client.meals, client.weightLogs, client.workouts, client.stepsLogs])
-  const totalXP   = useMemo(() => computeTotalXP(earnedIds, client), [earnedIds, client])
-  const levelData = useMemo(() => computeLevel(totalXP), [totalXP])
+  const currentMonthKey = useMemo(() => getCurrentMonthKey(), [])
+  const earnedIds       = useMemo(() => evaluateBadges(client), [client.meals, client.weightLogs, client.workouts, client.stepsLogs])
+  const monthlyEarnedIds = useMemo(() => evaluateMonthlyBadgesForMonth(client, currentMonthKey), [client, currentMonthKey])
+  const totalXP         = useMemo(() => computeTotalXP(earnedIds, client), [earnedIds, client])
+  const levelData       = useMemo(() => computeLevel(totalXP), [totalXP])
 
-  // Detect new badges
+  // Detect new all-time badges
   useEffect(() => {
     const dismissed = new Set(client.dismissedBadges || [])
-    const undismissed = earnedIds.filter(id => !dismissed.has(id))
-    if (undismissed.length > 0 && prevEarnedRef.current !== null) {
-      const newOnes = undismissed.filter(id => !prevEarnedRef.current.includes(id))
+    if (prevEarnedRef.current !== null) {
+      const newOnes = earnedIds.filter(id => !prevEarnedRef.current.includes(id) && !dismissed.has(id))
       if (newOnes.length > 0) {
-        const badge = BADGES.find(b => b.id === newOnes[0])
+        const badge = ALLTIME_BADGES.find(b => b.id === newOnes[0])
         if (badge) setUnlockedBadge(badge)
       }
     }
     prevEarnedRef.current = earnedIds
   }, [earnedIds, client.dismissedBadges])
+
+  // Detect new monthly badges
+  useEffect(() => {
+    const dismissed = new Set(client.dismissedBadges || [])
+    if (prevMonthlyRef.current !== null) {
+      const newOnes = monthlyEarnedIds.filter(id =>
+        !prevMonthlyRef.current.includes(id) && !dismissed.has(`${id}:${currentMonthKey}`)
+      )
+      if (newOnes.length > 0) {
+        const badge = MONTHLY_BADGES.find(b => b.id === newOnes[0])
+        if (badge) setUnlockedBadge(badge)
+      }
+    }
+    prevMonthlyRef.current = monthlyEarnedIds
+  }, [monthlyEarnedIds, client.dismissedBadges])
 
   // Detect level up
   useEffect(() => {
@@ -144,7 +165,11 @@ function BadgeUnlockWatcher() {
   useEffect(() => {
     if (!unlockedBadge) return
     const timer = setTimeout(() => {
-      dismissBadge(unlockedBadge.id)
+      if (unlockedBadge.monthly) {
+        dismissBadge(unlockedBadge.id, currentMonthKey)
+      } else {
+        dismissBadge(unlockedBadge.id)
+      }
       setUnlockedBadge(null)
     }, 4000)
     return () => clearTimeout(timer)
@@ -154,7 +179,11 @@ function BadgeUnlockWatcher() {
     <>
       {unlockedBadge && (
         <BadgeUnlockedToast badge={unlockedBadge} t={t} onDismiss={() => {
-          dismissBadge(unlockedBadge.id)
+          if (unlockedBadge.monthly) {
+            dismissBadge(unlockedBadge.id, currentMonthKey)
+          } else {
+            dismissBadge(unlockedBadge.id)
+          }
           setUnlockedBadge(null)
         }} />
       )}

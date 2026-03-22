@@ -744,10 +744,11 @@ export function AppProvider({ children }) {
     }
   }
 
-  async function dismissBadge(badgeId) {
+  async function dismissBadge(badgeId, monthKey = null) {
     const cl = clients[actualIdx]
     if (!cl) return
-    const updated = [...(cl.dismissedBadges || []), badgeId]
+    const key = monthKey ? `${badgeId}:${monthKey}` : badgeId
+    const updated = [...(cl.dismissedBadges || []), key]
     await DB.update('clients', cl.id, { dismissed_badges: updated })
     setClients(prev => prev.map(c => c.id === cl.id ? { ...c, dismissedBadges: updated } : c))
   }

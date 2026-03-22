@@ -214,6 +214,41 @@ export default function FoodModal() {
               <Typography sx={{ color: C.muted, fontSize: '12px' }}>
                 AI: ~{aiFood.grams}{t('gUnit')} · {aiFood.kcalPer100} kcal · {aiFood.proteinPer100}{t('gUnit')} {t('proteinShortLbl')} / 100{t('gUnit')}
               </Typography>
+
+              {/* Cooking method choice */}
+              {aiFood.cookingOptions && aiFood.cookingOptions.length > 0 && (
+                <Box sx={{ display: 'flex', gap: 1, mt: 1.5 }}>
+                  {aiFood.cookingOptions.map((opt, i) => {
+                    const isSelected = aiFood.kcalPer100 === opt.kcalPer100
+                    return (
+                      <Box key={i} onClick={() => {
+                        const grams = Number(String(amount).replace(',', '.')) || aiFood.grams
+                        setAiFood(prev => ({
+                          ...prev,
+                          kcalPer100: opt.kcalPer100,
+                          proteinPer100: opt.proteinPer100,
+                          kcal: Math.round((opt.kcalPer100 / 100) * grams),
+                          protein: Math.round((opt.proteinPer100 / 100) * grams * 10) / 10,
+                        }))
+                      }} sx={{
+                        flex: 1, textAlign: 'center',
+                        px: 1.5, py: 1, borderRadius: '8px', cursor: 'pointer',
+                        background: isSelected ? 'rgba(170,169,205,0.18)' : 'rgba(255,255,255,0.04)',
+                        border: `1.5px solid ${isSelected ? 'rgba(170,169,205,0.5)' : C.border}`,
+                        transition: 'all 0.15s',
+                        '&:hover': { borderColor: 'rgba(170,169,205,0.4)' },
+                      }}>
+                        <Typography sx={{ fontSize: '13px', fontWeight: isSelected ? 800 : 600, color: isSelected ? C.purple : C.text }}>
+                          {isEn ? opt.labelEn : opt.label}
+                        </Typography>
+                        <Typography sx={{ fontSize: '11px', color: C.muted, mt: 0.25 }}>
+                          {opt.kcalPer100} kcal/100{t('gUnit')}
+                        </Typography>
+                      </Box>
+                    )
+                  })}
+                </Box>
+              )}
             </Box>
           )}
 

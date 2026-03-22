@@ -1,7 +1,7 @@
 /* ═══════════════════════════════════════════════════════════════
-   SYNRG Gamification Engine v2
-   Tiered badges (Bronze/Silver/Gold) + XP + 20 Levels
-   Monthly step badges + XP-based ranking
+   SYNRG Gamification Engine v3
+   All-time badges (gold only) + Monthly badges (bronze/silver/gold)
+   Monthly XP ranking + All-time levels
    ═══════════════════════════════════════════════════════════════ */
 
 import { parseDate } from './utils'
@@ -43,91 +43,101 @@ export const BADGE_CATEGORIES = [
   { key: 'special',      labelBg: 'Специални',          labelEn: 'Special',         accent: 'purple'  },
 ]
 
-// ── Badge definitions ───────────────────────────────────────
-//  Fields: id, category, xp, tier (bronze/silver/gold/null),
-//          series (group name/null), muiIcon (MUI icon name),
-//          condType, condField, condValue
-//
-//  condType values:
-//    count         – compare condField stat against condValue
-//    weight_loss   – peak weight minus latest weight
-//    strength_pr   – boolean (has any exercise PR)
-//    streak        – longest consecutive-day streak
-//    target_days   – days where daily total >= client target
-//    compound      – custom multi-field check
-//    meta          – depends on other badges' total XP
-//    monthly_steps – total steps in a calendar month
 
-export const BADGES = [
-  // ── WORKOUTS series ──
-  { id: 'workouts_bronze', category: 'consistency', xp: 10, tier: 'bronze', series: 'workouts', muiIcon: 'FitnessCenter', condType: 'count', condField: 'workoutCount', condValue: 5  },
-  { id: 'workouts_silver', category: 'consistency', xp: 25, tier: 'silver', series: 'workouts', muiIcon: 'FitnessCenter', condType: 'count', condField: 'workoutCount', condValue: 20 },
-  { id: 'workouts_gold',   category: 'consistency', xp: 50, tier: 'gold',   series: 'workouts', muiIcon: 'FitnessCenter', condType: 'count', condField: 'workoutCount', condValue: 50 },
+/* ═══════════════════════════════════════════════════════════════
+   ALL-TIME BADGES — gold only, earned once forever
+   ═══════════════════════════════════════════════════════════════ */
 
-  // ── MEALS series ──
-  { id: 'meals_bronze', category: 'consistency', xp: 10, tier: 'bronze', series: 'meals', muiIcon: 'Restaurant', condType: 'count', condField: 'mealCount', condValue: 20  },
-  { id: 'meals_silver', category: 'consistency', xp: 25, tier: 'silver', series: 'meals', muiIcon: 'Restaurant', condType: 'count', condField: 'mealCount', condValue: 50  },
-  { id: 'meals_gold',   category: 'consistency', xp: 50, tier: 'gold',   series: 'meals', muiIcon: 'Restaurant', condType: 'count', condField: 'mealCount', condValue: 100 },
+export const ALLTIME_BADGES = [
+  // ── Workouts milestones (bronze → silver → gold) ──
+  { id: 'workouts_30',      category: 'consistency',  xp: 20, tier: 'bronze', series: null, muiIcon: 'FitnessCenter', condType: 'count', condField: 'workoutCount', condValue: 30  },
+  { id: 'workouts_50',      category: 'consistency',  xp: 35, tier: 'silver', series: null, muiIcon: 'FitnessCenter', condType: 'count', condField: 'workoutCount', condValue: 50  },
+  { id: 'workouts_gold',    category: 'consistency',  xp: 50, tier: 'gold',   series: null, muiIcon: 'FitnessCenter', condType: 'count', condField: 'workoutCount', condValue: 100 },
+  // ── Weight loss milestones (bronze → silver → gold) ──
+  { id: 'weight_loss_5',    category: 'weight_loss',  xp: 20, tier: 'bronze', series: null, muiIcon: 'TrendingDown', condType: 'weight_loss', condValue: 5  },
+  { id: 'weight_loss_10',   category: 'weight_loss',  xp: 40, tier: 'silver', series: null, muiIcon: 'TrendingDown', condType: 'weight_loss', condValue: 10 },
+  { id: 'weight_loss_gold', category: 'weight_loss',  xp: 60, tier: 'gold',   series: null, muiIcon: 'TrendingDown', condType: 'weight_loss', condValue: 20 },
+  // ── Other big goals ──
+  { id: 'cal_days_gold',    category: 'special',      xp: 50, tier: 'gold', series: null, muiIcon: 'LocalDining',         condType: 'target_days',   condField: 'calTargetDays', condValue: 50  },
+  { id: 'training_3m',      category: 'consistency',  xp: 50, tier: 'gold', series: null, muiIcon: 'FitnessCenter',       condType: 'consecutive_workout_months',                 condValue: 3   },
+  { id: 'streak_gold',      category: 'special',      xp: 50, tier: 'gold', series: null, muiIcon: 'LocalFireDepartment', condType: 'streak',                                    condValue: 90  },
+  { id: 'active_days_gold', category: 'consistency',  xp: 50, tier: 'gold', series: null, muiIcon: 'EventAvailable',      condType: 'count',         condField: 'activeDays',    condValue: 120 },
 
-  // ── WEIGHT LOGS series ──
-  { id: 'weight_logs_bronze', category: 'consistency', xp: 10, tier: 'bronze', series: 'weight_logs', muiIcon: 'MonitorWeight', condType: 'count', condField: 'weightCount', condValue: 5  },
-  { id: 'weight_logs_silver', category: 'consistency', xp: 20, tier: 'silver', series: 'weight_logs', muiIcon: 'MonitorWeight', condType: 'count', condField: 'weightCount', condValue: 15 },
-  { id: 'weight_logs_gold',   category: 'consistency', xp: 40, tier: 'gold',   series: 'weight_logs', muiIcon: 'MonitorWeight', condType: 'count', condField: 'weightCount', condValue: 30 },
+  // ── First entry (instant gratification) ──
+  { id: 'first_meal',   category: 'consistency', xp: 5,  tier: null, series: null, muiIcon: 'Restaurant',     condType: 'count', condField: 'mealCount',   condValue: 1 },
+  { id: 'first_weight', category: 'consistency', xp: 5,  tier: null, series: null, muiIcon: 'MonitorWeight',  condType: 'count', condField: 'weightCount', condValue: 1 },
+  { id: 'first_steps',  category: 'consistency', xp: 5,  tier: null, series: null, muiIcon: 'DirectionsWalk', condType: 'count', condField: 'stepsCount',  condValue: 1 },
 
-  // ── STEPS DAYS series ──
-  { id: 'steps_days_bronze', category: 'consistency', xp: 10, tier: 'bronze', series: 'steps_days', muiIcon: 'DirectionsRun', condType: 'count', condField: 'stepsDays', condValue: 7  },
-  { id: 'steps_days_silver', category: 'consistency', xp: 20, tier: 'silver', series: 'steps_days', muiIcon: 'DirectionsRun', condType: 'count', condField: 'stepsDays', condValue: 15 },
-  { id: 'steps_days_gold',   category: 'consistency', xp: 40, tier: 'gold',   series: 'steps_days', muiIcon: 'DirectionsRun', condType: 'count', condField: 'stepsDays', condValue: 30 },
-
-  // ── WEIGHT LOSS series ──
-  { id: 'weight_loss_bronze', category: 'weight_loss', xp: 15, tier: 'bronze', series: 'weight_loss', muiIcon: 'TrendingDown', condType: 'weight_loss', condValue: 1  },
-  { id: 'weight_loss_silver', category: 'weight_loss', xp: 35, tier: 'silver', series: 'weight_loss', muiIcon: 'TrendingDown', condType: 'weight_loss', condValue: 5  },
-  { id: 'weight_loss_gold',   category: 'weight_loss', xp: 60, tier: 'gold',   series: 'weight_loss', muiIcon: 'TrendingDown', condType: 'weight_loss', condValue: 10 },
-
-  // ── SETS series ──
-  { id: 'sets_bronze', category: 'strength', xp: 10, tier: 'bronze', series: 'sets', muiIcon: 'FitnessCenter', condType: 'count', condField: 'totalSets', condValue: 50  },
-  { id: 'sets_silver', category: 'strength', xp: 25, tier: 'silver', series: 'sets', muiIcon: 'FitnessCenter', condType: 'count', condField: 'totalSets', condValue: 150 },
-  { id: 'sets_gold',   category: 'strength', xp: 50, tier: 'gold',   series: 'sets', muiIcon: 'FitnessCenter', condType: 'count', condField: 'totalSets', condValue: 300 },
-
-  // ── STREAK series ──
-  { id: 'streak_bronze', category: 'special', xp: 15, tier: 'bronze', series: 'streak', muiIcon: 'LocalFireDepartment', condType: 'streak', condValue: 7  },
-  { id: 'streak_silver', category: 'special', xp: 30, tier: 'silver', series: 'streak', muiIcon: 'LocalFireDepartment', condType: 'streak', condValue: 14 },
-  { id: 'streak_gold',   category: 'special', xp: 50, tier: 'gold',   series: 'streak', muiIcon: 'LocalFireDepartment', condType: 'streak', condValue: 30 },
-
-  // ── ACTIVE DAYS series ──
-  { id: 'active_days_bronze', category: 'consistency', xp: 10, tier: 'bronze', series: 'active_days', muiIcon: 'EventAvailable', condType: 'count', condField: 'activeDays', condValue: 10 },
-  { id: 'active_days_silver', category: 'consistency', xp: 25, tier: 'silver', series: 'active_days', muiIcon: 'EventAvailable', condType: 'count', condField: 'activeDays', condValue: 30 },
-  { id: 'active_days_gold',   category: 'consistency', xp: 50, tier: 'gold',   series: 'active_days', muiIcon: 'EventAvailable', condType: 'count', condField: 'activeDays', condValue: 60 },
-
-  // ── CAL TARGET series ──
-  { id: 'cal_target_bronze', category: 'special', xp: 15, tier: 'bronze', series: 'cal_target', muiIcon: 'LocalDining', condType: 'target_days', condField: 'calTargetDays', condValue: 7  },
-  { id: 'cal_target_silver', category: 'special', xp: 30, tier: 'silver', series: 'cal_target', muiIcon: 'LocalDining', condType: 'target_days', condField: 'calTargetDays', condValue: 14 },
-  { id: 'cal_target_gold',   category: 'special', xp: 50, tier: 'gold',   series: 'cal_target', muiIcon: 'LocalDining', condType: 'target_days', condField: 'calTargetDays', condValue: 30 },
-
-  // ── PROTEIN TARGET series ──
-  { id: 'prot_target_bronze', category: 'special', xp: 15, tier: 'bronze', series: 'prot_target', muiIcon: 'Egg', condType: 'target_days', condField: 'protTargetDays', condValue: 7  },
-  { id: 'prot_target_silver', category: 'special', xp: 30, tier: 'silver', series: 'prot_target', muiIcon: 'Egg', condType: 'target_days', condField: 'protTargetDays', condValue: 14 },
-  { id: 'prot_target_gold',   category: 'special', xp: 50, tier: 'gold',   series: 'prot_target', muiIcon: 'Egg', condType: 'target_days', condField: 'protTargetDays', condValue: 30 },
-
-  // ── MONTHLY STEPS series (resettable each month) ──
-  { id: 'monthly_steps_bronze', category: 'special', xp: 20, tier: 'bronze', series: 'monthly_steps', muiIcon: 'DirectionsWalk', condType: 'monthly_steps', condValue: 200000 },
-  { id: 'monthly_steps_silver', category: 'special', xp: 35, tier: 'silver', series: 'monthly_steps', muiIcon: 'DirectionsWalk', condType: 'monthly_steps', condValue: 300000 },
-  { id: 'monthly_steps_gold',   category: 'special', xp: 50, tier: 'gold',   series: 'monthly_steps', muiIcon: 'DirectionsWalk', condType: 'monthly_steps', condValue: 450000 },
-
-  // ── FIRST ENTRY (instant gratification) ──
-  { id: 'first_meal',   category: 'consistency', xp: 5,  tier: null, series: null, muiIcon: 'Restaurant',    condType: 'count', condField: 'mealCount',   condValue: 1 },
-  { id: 'first_weight', category: 'consistency', xp: 5,  tier: null, series: null, muiIcon: 'MonitorWeight', condType: 'count', condField: 'weightCount', condValue: 1 },
-  { id: 'first_steps',  category: 'consistency', xp: 5,  tier: null, series: null, muiIcon: 'DirectionsWalk', condType: 'count', condField: 'stepsCount', condValue: 1 },
-
-  // ── STANDALONE ──
-  { id: 'first_pr',     category: 'strength', xp: 25, tier: null, series: null, muiIcon: 'EmojiEvents', condType: 'strength_pr', condValue: 1   },
-  { id: 'all_rounder',  category: 'special',  xp: 40, tier: null, series: null, muiIcon: 'AutoAwesome', condType: 'compound',    condValue: 1   },
-  { id: 'century_club', category: 'special',  xp: 50, tier: null, series: null, muiIcon: 'MilitaryTech', condType: 'meta',       condValue: 100 },
+  // ── Standalone ──
+  { id: 'first_pr',     category: 'strength', xp: 25, tier: null, series: null, muiIcon: 'EmojiEvents',  condType: 'strength_pr', condValue: 1   },
+  { id: 'all_rounder',  category: 'special',  xp: 40, tier: null, series: null, muiIcon: 'AutoAwesome',  condType: 'compound',    condValue: 1   },
+  { id: 'century_club', category: 'special',  xp: 50, tier: null, series: null, muiIcon: 'MilitaryTech', condType: 'meta',        condValue: 100 },
 ]
 
 
+/* ═══════════════════════════════════════════════════════════════
+   MONTHLY BADGES — earned per calendar month, repeatable
+   condType: monthly_count | monthly_streak | monthly_steps
+   ═══════════════════════════════════════════════════════════════ */
+
+export const MONTHLY_BADGES = [
+  // ── m_workouts series ──
+  { id: 'm_workouts_bronze', monthly: true, xp: 10, tier: 'bronze', series: 'm_workouts', muiIcon: 'FitnessCenter', condType: 'monthly_count', condField: 'workoutCount', condValue: 8  },
+  { id: 'm_workouts_silver', monthly: true, xp: 20, tier: 'silver', series: 'm_workouts', muiIcon: 'FitnessCenter', condType: 'monthly_count', condField: 'workoutCount', condValue: 12 },
+  { id: 'm_workouts_gold',   monthly: true, xp: 35, tier: 'gold',   series: 'm_workouts', muiIcon: 'FitnessCenter', condType: 'monthly_count', condField: 'workoutCount', condValue: 16 },
+
+  // ── m_meals series ──
+  { id: 'm_meals_bronze', monthly: true, xp: 10, tier: 'bronze', series: 'm_meals', muiIcon: 'Restaurant', condType: 'monthly_count', condField: 'mealCount', condValue: 20 },
+  { id: 'm_meals_silver', monthly: true, xp: 20, tier: 'silver', series: 'm_meals', muiIcon: 'Restaurant', condType: 'monthly_count', condField: 'mealCount', condValue: 40 },
+  { id: 'm_meals_gold',   monthly: true, xp: 35, tier: 'gold',   series: 'm_meals', muiIcon: 'Restaurant', condType: 'monthly_count', condField: 'mealCount', condValue: 60 },
+
+  // ── m_weights series ──
+  { id: 'm_weights_bronze', monthly: true, xp: 10, tier: 'bronze', series: 'm_weights', muiIcon: 'MonitorWeight', condType: 'monthly_count', condField: 'weightCount', condValue: 7  },
+  { id: 'm_weights_silver', monthly: true, xp: 20, tier: 'silver', series: 'm_weights', muiIcon: 'MonitorWeight', condType: 'monthly_count', condField: 'weightCount', condValue: 20 },
+  { id: 'm_weights_gold',   monthly: true, xp: 35, tier: 'gold',   series: 'm_weights', muiIcon: 'MonitorWeight', condType: 'monthly_count', condField: 'weightCount', condValue: 30 },
+
+  // ── m_streak series ──
+  { id: 'm_streak_bronze', monthly: true, xp: 10, tier: 'bronze', series: 'm_streak', muiIcon: 'LocalFireDepartment', condType: 'monthly_streak', condValue: 7  },
+  { id: 'm_streak_silver', monthly: true, xp: 20, tier: 'silver', series: 'm_streak', muiIcon: 'LocalFireDepartment', condType: 'monthly_streak', condValue: 20 },
+  { id: 'm_streak_gold',   monthly: true, xp: 35, tier: 'gold',   series: 'm_streak', muiIcon: 'LocalFireDepartment', condType: 'monthly_streak', condValue: 30 },
+
+  // ── m_steps series ──
+  { id: 'm_steps_bronze', monthly: true, xp: 10, tier: 'bronze', series: 'm_steps', muiIcon: 'DirectionsWalk', condType: 'monthly_steps', condValue: 200000 },
+  { id: 'm_steps_silver', monthly: true, xp: 20, tier: 'silver', series: 'm_steps', muiIcon: 'DirectionsWalk', condType: 'monthly_steps', condValue: 300000 },
+  { id: 'm_steps_gold',   monthly: true, xp: 35, tier: 'gold',   series: 'm_steps', muiIcon: 'DirectionsWalk', condType: 'monthly_steps', condValue: 450000 },
+
+  // ── m_steps_days series ──
+  { id: 'm_steps_days_bronze', monthly: true, xp: 10, tier: 'bronze', series: 'm_steps_days', muiIcon: 'DirectionsRun', condType: 'monthly_count', condField: 'stepsDays', condValue: 7  },
+  { id: 'm_steps_days_silver', monthly: true, xp: 20, tier: 'silver', series: 'm_steps_days', muiIcon: 'DirectionsRun', condType: 'monthly_count', condField: 'stepsDays', condValue: 15 },
+  { id: 'm_steps_days_gold',   monthly: true, xp: 35, tier: 'gold',   series: 'm_steps_days', muiIcon: 'DirectionsRun', condType: 'monthly_count', condField: 'stepsDays', condValue: 30 },
+
+  // ── m_cal_target series ──
+  { id: 'm_cal_target_bronze', monthly: true, xp: 10, tier: 'bronze', series: 'm_cal_target', muiIcon: 'LocalDining', condType: 'monthly_target', condField: 'calTargetDays', condValue: 7  },
+  { id: 'm_cal_target_silver', monthly: true, xp: 20, tier: 'silver', series: 'm_cal_target', muiIcon: 'LocalDining', condType: 'monthly_target', condField: 'calTargetDays', condValue: 15 },
+  { id: 'm_cal_target_gold',   monthly: true, xp: 35, tier: 'gold',   series: 'm_cal_target', muiIcon: 'LocalDining', condType: 'monthly_target', condField: 'calTargetDays', condValue: 30 },
+
+  // ── m_prot_target series ──
+  { id: 'm_prot_target_bronze', monthly: true, xp: 10, tier: 'bronze', series: 'm_prot_target', muiIcon: 'Egg', condType: 'monthly_target', condField: 'protTargetDays', condValue: 7  },
+  { id: 'm_prot_target_silver', monthly: true, xp: 20, tier: 'silver', series: 'm_prot_target', muiIcon: 'Egg', condType: 'monthly_target', condField: 'protTargetDays', condValue: 15 },
+  { id: 'm_prot_target_gold',   monthly: true, xp: 35, tier: 'gold',   series: 'm_prot_target', muiIcon: 'Egg', condType: 'monthly_target', condField: 'protTargetDays', condValue: 30 },
+]
+
+// Combined for backward compatibility
+export const BADGES = [...ALLTIME_BADGES, ...MONTHLY_BADGES]
+
+
 /* ───────────────────────────────────────────────────────────────
-   Helper: collect stats from a client object
+   Helper: current month key
+   ─────────────────────────────────────────────────────────────── */
+
+export function getCurrentMonthKey() {
+  const now = new Date()
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+}
+
+
+/* ───────────────────────────────────────────────────────────────
+   Helper: collect ALL-TIME stats from a client object
    ─────────────────────────────────────────────────────────────── */
 
 function collectStats(client) {
@@ -136,32 +146,20 @@ function collectStats(client) {
   const workouts = client.workouts   || []
   const steps    = client.stepsLogs  || []
 
-  // unique dates per data source
   const mealDateSet    = new Set(meals.map(m => m.date))
   const weightDateSet  = new Set(weights.map(w => w.date))
   const workoutDateSet = new Set(workouts.map(w => w.date))
   const stepsDateSet   = new Set(steps.map(s => s.date))
 
-  // combined unique activity dates
   const allDateSet = new Set([...mealDateSet, ...weightDateSet, ...workoutDateSet, ...stepsDateSet])
 
-  // total exercise items (sets) across all workouts
   let totalSets = 0
   for (const w of workouts) totalSets += (w.items || []).length
 
-  // best 7-day window
-  const bestWindowOf7 = bestWindow(allDateSet, 7)
-
-  // longest consecutive streak
   const streak = longestStreak(allDateSet)
+  const wLoss  = weightLossFromPeak(weights)
+  const hasPR  = hasStrengthPR(workouts)
 
-  // weight loss from peak
-  const wLoss = weightLossFromPeak(weights)
-
-  // strength PR check
-  const hasPR = hasStrengthPR(workouts)
-
-  // calorie / protein target days
   const calTargetDays  = targetDaysCount(meals, client.calorieTarget || 99999, 'kcal')
   const protTargetDays = targetDaysCount(meals, client.proteinTarget || 99999, 'protein')
 
@@ -175,29 +173,76 @@ function collectStats(client) {
     stepsDays:      stepsDateSet.size,
     activeDays:     allDateSet.size,
     totalSets,
-    bestWindowOf7,
     streak,
     weightLoss:     wLoss,
     hasPR,
     calTargetDays,
     protTargetDays,
+    consecutiveWorkoutMonths: consecutiveWorkoutMonths(workouts),
     hasAllRounder:  workouts.length >= 5 && meals.length >= 20 && weights.length >= 5,
   }
 }
 
 
-/* ── Sliding window: max distinct dates in any N-day window ──── */
-function bestWindow(dateSet, windowSize) {
-  if (dateSet.size === 0) return 0
-  const sorted = [...dateSet].map(d => parseDate(d).getTime()).sort((a, b) => a - b)
-  const windowMs = (windowSize - 1) * 86400000
-  let best = 1
-  let left = 0
-  for (let right = 0; right < sorted.length; right++) {
-    while (sorted[right] - sorted[left] > windowMs) left++
-    best = Math.max(best, right - left + 1)
+/* ───────────────────────────────────────────────────────────────
+   Helper: collect MONTHLY stats for a single calendar month
+   monthKey format: "YYYY-MM"
+   ─────────────────────────────────────────────────────────────── */
+
+function collectMonthlyStats(client, monthKey) {
+  const [year, month] = monthKey.split('-')
+  const matchMonth = (dateStr) => {
+    const parts = String(dateStr || '').split('.')
+    return parts.length === 3 && parts[1] === month && parts[2] === year
   }
-  return best
+
+  const meals    = (client.meals      || []).filter(m => matchMonth(m.date))
+  const weights  = (client.weightLogs || []).filter(w => matchMonth(w.date))
+  const workouts = (client.workouts   || []).filter(w => matchMonth(w.date))
+  const steps    = (client.stepsLogs  || []).filter(s => matchMonth(s.date))
+
+  const stepsDateSet = new Set(steps.map(s => s.date))
+  const allDateSet = new Set([
+    ...meals.map(m => m.date),
+    ...weights.map(w => w.date),
+    ...workouts.map(w => w.date),
+    ...stepsDateSet,
+  ])
+
+  const totalSteps = steps.reduce((sum, s) => sum + Number(s.steps || 0), 0)
+  const streak     = longestStreak(allDateSet)
+
+  const calTargetDays  = targetDaysCount(meals, client.calorieTarget || 99999, 'kcal')
+  const protTargetDays = targetDaysCount(meals, client.proteinTarget || 99999, 'protein')
+
+  return {
+    workoutCount: workouts.length,
+    mealCount:    meals.length,
+    weightCount:  weights.length,
+    stepsDays:    stepsDateSet.size,
+    totalSteps,
+    streak,
+    calTargetDays,
+    protTargetDays,
+  }
+}
+
+
+/* ───────────────────────────────────────────────────────────────
+   Helper: extract all distinct month keys from client data
+   ─────────────────────────────────────────────────────────────── */
+
+function getDistinctMonthKeys(client) {
+  const keys = new Set()
+  const addDate = (dateStr) => {
+    const parts = String(dateStr || '').split('.')
+    if (parts.length === 3) keys.add(`${parts[2]}-${parts[1]}`)
+  }
+  ;(client.meals      || []).forEach(m => addDate(m.date))
+  ;(client.weightLogs || []).forEach(w => addDate(w.date))
+  ;(client.workouts   || []).forEach(w => addDate(w.date))
+  ;(client.stepsLogs  || []).forEach(s => addDate(s.date))
+  return [...keys].sort()
 }
 
 
@@ -257,80 +302,116 @@ function targetDaysCount(meals, target, field) {
 }
 
 
-/* ── Monthly step totals from stepsLogs ──────────────────────── */
-function computeMonthlySteps(stepsLogs) {
+/* ── Consecutive months with at least 8 workouts each ─────────── */
+function consecutiveWorkoutMonths(workouts) {
+  if (workouts.length === 0) return 0
   const byMonth = {}
-  for (const s of stepsLogs) {
-    const parts = String(s.date || '').split('.')
-    if (parts.length !== 3) continue
-    const monthKey = `${parts[2]}-${parts[1]}` // YYYY-MM
-    byMonth[monthKey] = (byMonth[monthKey] || 0) + Number(s.steps || 0)
+  for (const w of workouts) {
+    const parts = String(w.date || '').split('.')
+    if (parts.length === 3) {
+      const mk = `${parts[2]}-${parts[1]}`
+      byMonth[mk] = (byMonth[mk] || 0) + 1
+    }
   }
-  return byMonth
+  // Only months with 8+ workouts qualify
+  const qualifying = Object.keys(byMonth).filter(mk => byMonth[mk] >= 8).sort()
+  if (qualifying.length === 0) return 0
+  let max = 1, cur = 1
+  for (let i = 1; i < qualifying.length; i++) {
+    const [py, pm] = qualifying[i - 1].split('-').map(Number)
+    const expected = pm === 12 ? `${py + 1}-01` : `${py}-${String(pm + 1).padStart(2, '0')}`
+    if (qualifying[i] === expected) { cur++; if (cur > max) max = cur }
+    else cur = 1
+  }
+  return max
 }
 
 
-/* ── Evaluate monthly step badges ────────────────────────────── */
-export function evaluateMonthlyStepBadges(client) {
-  const steps = client.stepsLogs || []
-  const monthlySteps = computeMonthlySteps(steps)
+/* ═══════════════════════════════════════════════════════════════
+   Monthly badge evaluation
+   ═══════════════════════════════════════════════════════════════ */
+
+function checkMonthlyBadge(badge, monthStats) {
+  switch (badge.condType) {
+    case 'monthly_count':
+      return (monthStats[badge.condField] || 0) >= badge.condValue
+    case 'monthly_streak':
+      return monthStats.streak >= badge.condValue
+    case 'monthly_steps':
+      return monthStats.totalSteps >= badge.condValue
+    case 'monthly_target':
+      return (monthStats[badge.condField] || 0) >= badge.condValue
+    default:
+      return false
+  }
+}
+
+/** Evaluate which monthly badges are earned for a specific month */
+export function evaluateMonthlyBadgesForMonth(client, monthKey) {
+  const stats = collectMonthlyStats(client, monthKey)
+  const earned = []
+  for (const b of MONTHLY_BADGES) {
+    if (checkMonthlyBadge(b, stats)) earned.push(b.id)
+  }
+  return earned
+}
+
+/** Evaluate ALL monthly badges across ALL months → [{ badgeId, monthKey }] */
+export function evaluateAllMonthlyBadges(client) {
+  const monthKeys = getDistinctMonthKeys(client)
   const results = []
-  for (const [monthKey, total] of Object.entries(monthlySteps)) {
-    for (const b of BADGES) {
-      if (b.condType !== 'monthly_steps') continue
-      if (total >= b.condValue) results.push({ badgeId: b.id, monthKey })
+  for (const mk of monthKeys) {
+    const earned = evaluateMonthlyBadgesForMonth(client, mk)
+    for (const badgeId of earned) {
+      results.push({ badgeId, monthKey: mk })
     }
   }
   return results
 }
 
-
-/* ── Monthly step badge history for display ──────────────────── */
-export function getMonthlyStepHistory(client) {
-  const results = evaluateMonthlyStepBadges(client)
+/** Generalized monthly badge history grouped by month */
+export function getMonthlyBadgeHistory(client) {
+  const results = evaluateAllMonthlyBadges(client)
   const byMonth = {}
   for (const r of results) {
-    const b = BADGES.find(x => x.id === r.badgeId)
+    const b = MONTHLY_BADGES.find(x => x.id === r.badgeId)
     if (!b) continue
-    const existing = byMonth[r.monthKey]
-    if (!existing || TIER_ORDER.indexOf(b.tier) > TIER_ORDER.indexOf(existing.tier)) {
-      byMonth[r.monthKey] = { tier: b.tier, badgeId: r.badgeId, monthKey: r.monthKey }
-    }
+    if (!byMonth[r.monthKey]) byMonth[r.monthKey] = []
+    byMonth[r.monthKey].push({ badgeId: r.badgeId, monthKey: r.monthKey, tier: b.tier, series: b.series, xp: b.xp })
   }
-  return Object.values(byMonth).sort((a, b) => b.monthKey.localeCompare(a.monthKey))
+  return byMonth
 }
 
 
 /* ═══════════════════════════════════════════════════════════════
-   evaluateBadges — returns array of earned badge IDs
+   evaluateBadges — returns array of ALL-TIME earned badge IDs
    ═══════════════════════════════════════════════════════════════ */
 
 export function evaluateBadges(client) {
   const stats = collectStats(client)
   const earned = []
 
-  // first pass: all non-meta, non-monthly_steps badges
-  for (const b of BADGES) {
-    if (b.condType === 'meta' || b.condType === 'monthly_steps') continue
+  // all-time badges (non-meta)
+  for (const b of ALLTIME_BADGES) {
+    if (b.condType === 'meta') continue
     if (checkBadge(b, stats)) earned.push(b.id)
   }
 
-  // monthly steps: earn for current month only
-  const monthlyResults = evaluateMonthlyStepBadges(client)
-  const now = new Date()
-  const currentMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
-  for (const r of monthlyResults) {
-    if (r.monthKey === currentMonthKey) earned.push(r.badgeId)
-  }
-
-  // second pass: meta badges (depend on earned XP from first pass)
-  const xpSoFar = earned.reduce((s, id) => {
-    const b = BADGES.find(x => x.id === id)
+  // meta badges: depend on combined all-time + all historical monthly XP
+  const alltimeXP = earned.reduce((s, id) => {
+    const b = ALLTIME_BADGES.find(x => x.id === id)
     return s + (b ? b.xp : 0)
   }, 0)
-  for (const b of BADGES) {
+  const allMonthly = evaluateAllMonthlyBadges(client)
+  const monthlyXPTotal = allMonthly.reduce((s, r) => {
+    const b = MONTHLY_BADGES.find(x => x.id === r.badgeId)
+    return s + (b ? b.xp : 0)
+  }, 0)
+  const combinedXP = alltimeXP + monthlyXPTotal
+
+  for (const b of ALLTIME_BADGES) {
     if (b.condType !== 'meta') continue
-    if (xpSoFar >= b.condValue) earned.push(b.id)
+    if (combinedXP >= b.condValue) earned.push(b.id)
   }
 
   return earned
@@ -350,6 +431,8 @@ function checkBadge(badge, stats) {
       return (stats[badge.condField] || 0) >= badge.condValue
     case 'compound':
       return stats.hasAllRounder
+    case 'consecutive_workout_months':
+      return stats.consecutiveWorkoutMonths >= badge.condValue
     default:
       return false
   }
@@ -361,6 +444,25 @@ function checkBadge(badge, stats) {
    ═══════════════════════════════════════════════════════════════ */
 
 export function getBadgeProgress(badge, client) {
+  // Monthly badges use current month stats
+  if (badge.monthly) {
+    const mk    = getCurrentMonthKey()
+    const stats = collectMonthlyStats(client, mk)
+    switch (badge.condType) {
+      case 'monthly_count':
+        return { current: Math.min(stats[badge.condField] || 0, badge.condValue), target: badge.condValue }
+      case 'monthly_streak':
+        return { current: Math.min(stats.streak, badge.condValue), target: badge.condValue }
+      case 'monthly_steps':
+        return { current: Math.min(stats.totalSteps, badge.condValue), target: badge.condValue }
+      case 'monthly_target':
+        return { current: Math.min(stats[badge.condField] || 0, badge.condValue), target: badge.condValue }
+      default:
+        return { current: 0, target: 1 }
+    }
+  }
+
+  // All-time badges
   const stats = collectStats(client)
   switch (badge.condType) {
     case 'count':
@@ -375,17 +477,15 @@ export function getBadgeProgress(badge, client) {
       return { current: Math.min(stats[badge.condField] || 0, badge.condValue), target: badge.condValue }
     case 'compound':
       return { current: stats.hasAllRounder ? 1 : 0, target: 1 }
-    case 'monthly_steps': {
-      const monthlySteps = computeMonthlySteps(client.stepsLogs || [])
-      const now = new Date()
-      const key = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
-      const total = monthlySteps[key] || 0
-      return { current: Math.min(total, badge.condValue), target: badge.condValue }
-    }
+    case 'consecutive_workout_months':
+      return { current: Math.min(stats.consecutiveWorkoutMonths, badge.condValue), target: badge.condValue }
     case 'meta': {
       const earned = evaluateBadges(client).filter(id => id !== badge.id)
-      const xp = earned.reduce((s, id) => { const b = BADGES.find(x => x.id === id); return s + (b ? b.xp : 0) }, 0)
-      return { current: Math.min(xp, badge.condValue), target: badge.condValue }
+      const alltimeXP = earned.reduce((s, id) => { const b = ALLTIME_BADGES.find(x => x.id === id); return s + (b ? b.xp : 0) }, 0)
+      const allMonthly = evaluateAllMonthlyBadges(client)
+      const monthlyXP = allMonthly.reduce((s, r) => { const b = MONTHLY_BADGES.find(x => x.id === r.badgeId); return s + (b ? b.xp : 0) }, 0)
+      const total = alltimeXP + monthlyXP
+      return { current: Math.min(total, badge.condValue), target: badge.condValue }
     }
     default:
       return { current: 0, target: 1 }
@@ -397,27 +497,34 @@ export function getBadgeProgress(badge, client) {
    XP & Level
    ═══════════════════════════════════════════════════════════════ */
 
+/** All-time XP = all-time badge XP + ALL historical monthly badge XP */
 export function computeTotalXP(earnedIds, client) {
-  // Standard badge XP
+  // XP from all-time badges
   let total = earnedIds.reduce((sum, id) => {
-    const b = BADGES.find(x => x.id === id)
+    const b = ALLTIME_BADGES.find(x => x.id === id)
     return sum + (b ? b.xp : 0)
   }, 0)
 
-  // Monthly step XP from historical months (current month already in earnedIds)
+  // XP from ALL monthly badges across ALL months
   if (client) {
-    const monthlyResults = evaluateMonthlyStepBadges(client)
-    const now = new Date()
-    const currentMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
-    for (const r of monthlyResults) {
-      if (r.monthKey !== currentMonthKey) {
-        const b = BADGES.find(x => x.id === r.badgeId)
-        if (b) total += b.xp
-      }
+    const allMonthly = evaluateAllMonthlyBadges(client)
+    for (const r of allMonthly) {
+      const b = MONTHLY_BADGES.find(x => x.id === r.badgeId)
+      if (b) total += b.xp
     }
   }
 
   return total
+}
+
+/** Monthly XP = XP from current month's monthly badges only */
+export function computeMonthlyXP(client) {
+  const mk = getCurrentMonthKey()
+  const earned = evaluateMonthlyBadgesForMonth(client, mk)
+  return earned.reduce((sum, id) => {
+    const b = MONTHLY_BADGES.find(x => x.id === id)
+    return sum + (b ? b.xp : 0)
+  }, 0)
 }
 
 export function computeLevel(totalXP) {
@@ -442,20 +549,28 @@ export function getLevelName(level, lang) {
 
 
 /* ═══════════════════════════════════════════════════════════════
-   getNextBadges — closest-to-unlock unearned badges
+   getNextBadges — closest-to-unlock unearned badges (all-time + monthly)
    ═══════════════════════════════════════════════════════════════ */
 
 export function getNextBadges(client, earnedIds, limit = 3) {
   const earnedSet = new Set(earnedIds)
-  const unearned = BADGES.filter(b => !earnedSet.has(b.id) && b.condType !== 'monthly_steps')
 
-  const withProgress = unearned.map(badge => {
+  // Unearned all-time badges
+  const unearnedAllTime = ALLTIME_BADGES.filter(b => !earnedSet.has(b.id))
+
+  // Unearned monthly badges for current month
+  const mk = getCurrentMonthKey()
+  const monthlyEarned = new Set(evaluateMonthlyBadgesForMonth(client, mk))
+  const unearnedMonthly = MONTHLY_BADGES.filter(b => !monthlyEarned.has(b.id))
+
+  const allUnearned = [...unearnedAllTime, ...unearnedMonthly]
+
+  const withProgress = allUnearned.map(badge => {
     const { current, target } = getBadgeProgress(badge, client)
     const ratio = target > 0 ? current / target : 0
     return { badge, current, target, progress: ratio }
   })
 
-  // sort by progress descending (closest first), then by XP ascending (easier first)
   withProgress.sort((a, b) => {
     if (b.progress !== a.progress) return b.progress - a.progress
     return a.badge.xp - b.badge.xp
@@ -466,21 +581,26 @@ export function getNextBadges(client, earnedIds, limit = 3) {
 
 
 /* ═══════════════════════════════════════════════════════════════
-   computeXPRanking — replaces old points-based ranking
+   computeXPRanking — ranked by MONTHLY XP
    ═══════════════════════════════════════════════════════════════ */
 
 export function computeXPRanking(clients) {
+  const mk = getCurrentMonthKey()
   return clients.map(c => {
-    const earnedIds = evaluateBadges(c)
-    const totalXP   = computeTotalXP(earnedIds, c)
-    const levelData = computeLevel(totalXP)
+    const earnedIds       = evaluateBadges(c)
+    const totalXP         = computeTotalXP(earnedIds, c)
+    const monthlyXP       = computeMonthlyXP(c)
+    const levelData       = computeLevel(totalXP)
+    const monthlyEarnedIds = evaluateMonthlyBadgesForMonth(c, mk)
     return {
-      name:       c.name,
-      clientId:   c.id,
-      xp:         totalXP,
-      level:      levelData.level,
-      badgeCount: earnedIds.length,
+      name:             c.name,
+      clientId:         c.id,
+      xp:               monthlyXP,       // ranking uses monthly XP
+      totalXP,                            // for profile dialog
+      level:            levelData.level,
+      badgeCount:       earnedIds.length,
       earnedIds,
+      monthlyEarnedIds,
     }
   }).sort((a, b) => b.xp - a.xp)
 }

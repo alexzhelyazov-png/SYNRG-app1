@@ -4,7 +4,7 @@ import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline'
 import SendIcon from '@mui/icons-material/Send'
 import { useApp } from '../context/AppContext'
 import { C, EASE } from '../theme'
-import { BADGES, TIER_COLORS, getLevelName } from '../lib/gamification'
+import { ALLTIME_BADGES, MONTHLY_BADGES, TIER_COLORS, getLevelName } from '../lib/gamification'
 import MonitorWeightIcon        from '@mui/icons-material/MonitorWeight'
 import RestaurantIcon           from '@mui/icons-material/Restaurant'
 import DirectionsWalkIcon       from '@mui/icons-material/DirectionsWalk'
@@ -18,7 +18,6 @@ import EggIcon                  from '@mui/icons-material/Egg'
 import EmojiEventsIcon          from '@mui/icons-material/EmojiEvents'
 import AutoAwesomeIcon          from '@mui/icons-material/AutoAwesome'
 import MilitaryTechIcon         from '@mui/icons-material/MilitaryTech'
-import LockIcon                 from '@mui/icons-material/Lock'
 
 const ICON_MAP = {
   MonitorWeight: MonitorWeightIcon, Restaurant: RestaurantIcon,
@@ -302,7 +301,7 @@ export default function Ranking() {
                 </>
               )}
 
-              {/* XP */}
+              {/* XP (monthly) */}
               <Typography sx={{
                 textAlign:     'center',
                 fontWeight:    800,
@@ -419,8 +418,10 @@ export default function Ranking() {
 
       {/* ── Badge Profile Dialog ── */}
       {viewProfile && (() => {
-        const earnedSet = new Set(viewProfile.earnedIds || [])
-        const earned = BADGES.filter(b => earnedSet.has(b.id))
+        const allTimeEarnedSet = new Set(viewProfile.earnedIds || [])
+        const monthlyEarnedSet = new Set(viewProfile.monthlyEarnedIds || [])
+        const allTimeEarned = ALLTIME_BADGES.filter(b => allTimeEarnedSet.has(b.id))
+        const monthlyEarned = MONTHLY_BADGES.filter(b => monthlyEarnedSet.has(b.id))
         return (
           <Dialog open onClose={() => setViewProfile(null)} maxWidth="xs" fullWidth
             PaperProps={{ sx: { borderRadius: '20px', background: C.card, border: `1px solid ${C.border}`, p: 3 } }}>
@@ -450,34 +451,64 @@ export default function Ranking() {
                   <Typography sx={{ fontSize: '24px', fontWeight: 800, color: C.text, fontFamily: "'MontBlanc', sans-serif" }}>
                     {viewProfile.xp}
                   </Typography>
-                  <Typography sx={{ fontSize: '11px', color: C.muted }}>XP</Typography>
+                  <Typography sx={{ fontSize: '11px', color: C.muted }}>{t('monthlyXpLbl')}</Typography>
                 </Box>
                 <Box sx={{ textAlign: 'center' }}>
                   <Typography sx={{ fontSize: '24px', fontWeight: 800, color: C.text, fontFamily: "'MontBlanc', sans-serif" }}>
-                    {earned.length}
+                    {viewProfile.totalXP}
                   </Typography>
-                  <Typography sx={{ fontSize: '11px', color: C.muted }}>{t('badgesLbl')}</Typography>
+                  <Typography sx={{ fontSize: '11px', color: C.muted }}>{t('totalXpLbl')}</Typography>
                 </Box>
               </Box>
             </Box>
 
-            {/* Earned badges grid */}
-            {earned.length > 0 ? (
-              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, justifyContent: 'center' }}>
-                {earned.map(b => {
-                  const color = tierColor(b.tier)
-                  return (
-                    <Box key={b.id} sx={{
-                      width: 56, height: 56, borderRadius: '14px',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      background: `${color}15`, border: `1.5px solid ${color}35`,
-                    }}>
-                      <BadgeIcon muiIcon={b.muiIcon} size={26} color={color} />
-                    </Box>
-                  )
-                })}
+            {/* Monthly earned badges */}
+            {monthlyEarned.length > 0 && (
+              <Box sx={{ mb: 2 }}>
+                <Typography sx={{ fontSize: '11px', fontWeight: 700, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.5px', mb: 1, textAlign: 'center' }}>
+                  {t('monthlyBadgesTitle')}
+                </Typography>
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, justifyContent: 'center' }}>
+                  {monthlyEarned.map(b => {
+                    const color = tierColor(b.tier)
+                    return (
+                      <Box key={b.id} sx={{
+                        width: 56, height: 56, borderRadius: '14px',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        background: `${color}15`, border: `1.5px solid ${color}35`,
+                      }}>
+                        <BadgeIcon muiIcon={b.muiIcon} size={26} color={color} />
+                      </Box>
+                    )
+                  })}
+                </Box>
               </Box>
-            ) : (
+            )}
+
+            {/* All-time earned badges */}
+            {allTimeEarned.length > 0 && (
+              <Box>
+                <Typography sx={{ fontSize: '11px', fontWeight: 700, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.5px', mb: 1, textAlign: 'center' }}>
+                  {t('allTimeBadgesTitle')}
+                </Typography>
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, justifyContent: 'center' }}>
+                  {allTimeEarned.map(b => {
+                    const color = tierColor(b.tier)
+                    return (
+                      <Box key={b.id} sx={{
+                        width: 56, height: 56, borderRadius: '14px',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        background: `${color}15`, border: `1.5px solid ${color}35`,
+                      }}>
+                        <BadgeIcon muiIcon={b.muiIcon} size={26} color={color} />
+                      </Box>
+                    )
+                  })}
+                </Box>
+              </Box>
+            )}
+
+            {allTimeEarned.length === 0 && monthlyEarned.length === 0 && (
               <Typography sx={{ textAlign: 'center', color: C.muted, fontSize: '13px' }}>
                 {t('noBadgesYet')}
               </Typography>

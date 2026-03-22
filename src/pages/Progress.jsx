@@ -4,9 +4,12 @@ import Ranking from './Ranking'
 import { useApp } from '../context/AppContext'
 import { C, EASE } from '../theme'
 import {
-  BADGES, BADGE_CATEGORIES, TIER_COLORS, TIER_ORDER,
-  evaluateBadges, computeTotalXP, computeLevel, getLevelName,
-  getNextBadges, getBadgeProgress, getMonthlyStepHistory,
+  ALLTIME_BADGES, MONTHLY_BADGES, BADGES,
+  TIER_COLORS, TIER_ORDER,
+  evaluateBadges, evaluateMonthlyBadgesForMonth,
+  computeTotalXP, computeMonthlyXP, computeLevel, getLevelName,
+  getNextBadges, getBadgeProgress, getMonthlyBadgeHistory,
+  getCurrentMonthKey,
 } from '../lib/gamification'
 
 // ── MUI Icon imports ────────────────────────────────────────
@@ -56,7 +59,7 @@ function BadgeIcon({ muiIcon, size = 24, color: clr = C.muted }) {
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   Main Progress page — Gamification v2
+   Main Progress page — Gamification v3
    ═══════════════════════════════════════════════════════════════ */
 export default function Progress() {
   const { client, auth, ranking, t, lang, dismissBadge } = useApp()
@@ -64,7 +67,7 @@ export default function Progress() {
   const [selectedBadge, setSelectedBadge] = useState(null)
   const [tab, setTab] = useState('progress') // 'progress' | 'ranking'
 
-  // ── Compute gamification data ────────────────────────────────
+  // ── All-time gamification data ─────────────────────────────
   const earnedIds  = useMemo(() => evaluateBadges(client), [client.meals, client.weightLogs, client.workouts, client.stepsLogs])
   const earnedSet  = useMemo(() => new Set(earnedIds), [earnedIds])
   const totalXP    = useMemo(() => computeTotalXP(earnedIds, client), [earnedIds, client])
@@ -72,34 +75,62 @@ export default function Progress() {
   const levelName  = getLevelName(levelData.level, lang)
   const nextBadges = useMemo(() => getNextBadges(client, earnedIds, 3), [client, earnedIds])
 
-  // ── Badge series for grid ──────────────────────────────────
-  const seriesKeys = useMemo(() => {
+  // ── Monthly gamification data ──────────────────────────────
+  const currentMonthKey   = useMemo(() => getCurrentMonthKey(), [])
+  const monthlyEarnedIds  = useMemo(() => evaluateMonthlyBadgesForMonth(client, currentMonthKey), [client, currentMonthKey])
+  const monthlyEarnedSet  = useMemo(() => new Set(monthlyEarnedIds), [monthlyEarnedIds])
+  const monthlyXP         = useMemo(() => computeMonthlyXP(client), [client])
+
+  // ── Monthly badge series for grid ──────────────────────────
+  const monthlySeriesKeys = useMemo(() => {
     const seen = []
-    for (const b of BADGES) {
+    for (const b of MONTHLY_BADGES) {
       if (b.series && !seen.includes(b.series)) seen.push(b.series)
     }
     return seen
   }, [])
 
-  const standaloneBadges  = useMemo(() => BADGES.filter(b => b.series === null), [])
-
   // ── Badge unlock notification ────────────────────────────────
   const [unlockedBadge, setUnlockedBadge] = useState(null)
   const prevEarnedRef = useRef(null)
+  const prevMonthlyRef = useRef(null)
 
+  // Detect new all-time badges
   useEffect(() => {
     const dismissed = new Set(client.dismissedBadges || [])
     const undismissed = earnedIds.filter(id => !dismissed.has(id))
     if (undismissed.length > 0 && prevEarnedRef.current !== null) {
-      const badge = BADGES.find(b => b.id === undismissed[0])
-      if (badge) setUnlockedBadge(badge)
+      const newOnes = undismissed.filter(id => !prevEarnedRef.current.includes(id))
+      if (newOnes.length > 0) {
+        const badge = ALLTIME_BADGES.find(b => b.id === newOnes[0])
+        if (badge) setUnlockedBadge(badge)
+      }
     }
     prevEarnedRef.current = earnedIds
   }, [earnedIds, client.dismissedBadges])
 
+  // Detect new monthly badges
+  useEffect(() => {
+    const dismissed = new Set(client.dismissedBadges || [])
+    if (prevMonthlyRef.current !== null) {
+      const newOnes = monthlyEarnedIds.filter(id =>
+        !prevMonthlyRef.current.includes(id) && !dismissed.has(`${id}:${currentMonthKey}`)
+      )
+      if (newOnes.length > 0) {
+        const badge = MONTHLY_BADGES.find(b => b.id === newOnes[0])
+        if (badge) setUnlockedBadge(badge)
+      }
+    }
+    prevMonthlyRef.current = monthlyEarnedIds
+  }, [monthlyEarnedIds, client.dismissedBadges])
+
   const handleDismissUnlock = () => {
     if (unlockedBadge) {
-      dismissBadge(unlockedBadge.id)
+      if (unlockedBadge.monthly) {
+        dismissBadge(unlockedBadge.id, currentMonthKey)
+      } else {
+        dismissBadge(unlockedBadge.id)
+      }
       setUnlockedBadge(null)
     }
   }
@@ -169,7 +200,7 @@ export default function Progress() {
           '&:hover': { borderColor: C.borderHover, transform: 'translateY(-2px)' },
         }}>
           <Typography sx={{ fontSize: '12px', fontWeight: 700, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.8px', mb: 1.5 }}>
-            {lang === 'en' ? 'Leaderboard' : 'Класация'}
+            {t('monthlyXpLbl')}
           </Typography>
           <Box sx={{ display: 'flex', gap: 1 }}>
             {ranking.slice(0, 5).map((r, i) => {
@@ -208,96 +239,93 @@ export default function Progress() {
         <NextBadgesSection items={nextBadges} t={t} lang={lang} onBadgeClick={setSelectedBadge} />
       )}
 
-      {/* ── All Badges ───────────────────────────────────────── */}
-      <Typography variant="h3" sx={{ mb: 2, fontStyle: 'italic' }}>
-        {t('allBadgesTitle')}
-      </Typography>
-
-      {/* Tiered badge series */}
-      {seriesKeys.filter(s => s !== 'monthly_steps').map(seriesKey => {
-        const seriesBadges = BADGES.filter(b => b.series === seriesKey)
-        return (
-          <Box key={seriesKey} sx={{ mb: 2.5 }}>
-            <Typography sx={{
-              fontSize: '11px', fontWeight: 700, textTransform: 'uppercase',
-              letterSpacing: '0.9px', color: C.muted, mb: 1,
-            }}>
-              {t(`series_${seriesKey}`)}
+      {/* ═══════════════════════════════════════════════════════
+          МЕСЕЧНИ ЗНАЧКИ — Monthly badges (earn ranking XP)
+          ═══════════════════════════════════════════════════════ */}
+      <Box sx={{
+        background: 'linear-gradient(145deg, rgba(170,169,205,0.06) 0%, rgba(170,169,205,0.02) 100%)',
+        border: `1px solid rgba(170,169,205,0.15)`,
+        borderRadius: '20px',
+        p: '20px 16px',
+        mb: 3,
+      }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+          <Box>
+            <Typography variant="h3" sx={{ fontStyle: 'italic', mb: 0.25 }}>
+              {t('monthlyBadgesTitle')}
             </Typography>
-            <Box sx={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(3, 1fr)',
-              gap: 1.25,
-            }}>
-              {seriesBadges.map((badge, i) => (
-                <BadgeTile key={badge.id} badge={badge} isEarned={earnedSet.has(badge.id)}
-                  index={i} t={t} onClick={() => setSelectedBadge(badge)} />
-              ))}
-            </Box>
+            <Typography sx={{ fontSize: '11px', color: C.muted, fontWeight: 600 }}>
+              {t('monthlyBadgesDesc')}
+            </Typography>
           </Box>
-        )
-      })}
-
-      {/* Monthly steps section */}
-      <Box sx={{ mb: 2.5 }}>
-        <Typography sx={{
-          fontSize: '11px', fontWeight: 700, textTransform: 'uppercase',
-          letterSpacing: '0.9px', color: C.muted, mb: 1,
-        }}>
-          {t('series_monthly_steps')}
-        </Typography>
-        <Box sx={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(3, 1fr)',
-          gap: 1.25,
-        }}>
-          {BADGES.filter(b => b.series === 'monthly_steps').map((badge, i) => (
-            <BadgeTile key={badge.id} badge={badge} isEarned={earnedSet.has(badge.id)}
-              index={i} t={t} onClick={() => setSelectedBadge(badge)} />
-          ))}
-        </Box>
-        {/* Monthly step history count */}
-        {(() => {
-          const history = getMonthlyStepHistory(client)
-          if (history.length === 0) return null
-          return (
-            <Typography sx={{
-              fontSize: '11px', fontWeight: 600, color: C.muted,
-              mt: 1, textAlign: 'center', fontStyle: 'italic',
-            }}>
-              {lang === 'bg' ? `Спечелен ${history.length} пъти — може всеки месец` : `Earned ${history.length} time${history.length === 1 ? '' : 's'} — resets monthly`}
+          <Box sx={{
+            display: 'flex', alignItems: 'center', gap: 0.5,
+            px: 1.5, py: 0.5, borderRadius: '8px',
+            background: `${C.primary}15`, border: `1px solid ${C.primary}25`,
+          }}>
+            <Typography sx={{ fontSize: '18px', fontWeight: 800, color: C.purple, fontFamily: "'MontBlanc', sans-serif" }}>
+              {monthlyXP}
             </Typography>
+            <Typography sx={{ fontSize: '10px', fontWeight: 700, color: C.muted }}>XP</Typography>
+          </Box>
+        </Box>
+
+        {/* Monthly badge series */}
+        {monthlySeriesKeys.map(seriesKey => {
+          const seriesBadges = MONTHLY_BADGES.filter(b => b.series === seriesKey)
+          return (
+            <Box key={seriesKey} sx={{ mb: 2.5, '&:last-child': { mb: 0 } }}>
+              <Typography sx={{
+                fontSize: '11px', fontWeight: 700, textTransform: 'uppercase',
+                letterSpacing: '0.9px', color: C.muted, mb: 1,
+              }}>
+                {t(`series_${seriesKey}`)}
+              </Typography>
+              <Box sx={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(3, 1fr)',
+                gap: 1.25,
+              }}>
+                {seriesBadges.map((badge, i) => (
+                  <BadgeTile key={badge.id} badge={badge} isEarned={monthlyEarnedSet.has(badge.id)}
+                    index={i} t={t} onClick={() => setSelectedBadge(badge)} />
+                ))}
+              </Box>
+            </Box>
           )
-        })()}
+        })}
       </Box>
 
-      {/* Special standalone badges */}
-      {standaloneBadges.length > 0 && (
-        <Box sx={{ mb: 3 }}>
-          <Typography sx={{
-            fontSize: '11px', fontWeight: 700, textTransform: 'uppercase',
-            letterSpacing: '0.9px', color: C.muted, mb: 1.5,
-          }}>
-            {t('badgeCat_special')}
-          </Typography>
-          <Box sx={{
-            display: 'grid',
-            gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(3, 1fr)',
-            gap: 1.25,
-          }}>
-            {standaloneBadges.map((badge, i) => (
-              <BadgeTile key={badge.id} badge={badge} isEarned={earnedSet.has(badge.id)}
-                index={i} t={t} onClick={() => setSelectedBadge(badge)} />
-            ))}
-          </Box>
-        </Box>
-      )}
+      {/* ═══════════════════════════════════════════════════════
+          ALL-TIME ЗНАЧКИ — Permanent achievements
+          ═══════════════════════════════════════════════════════ */}
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2, mt: 1 }}>
+        <Box sx={{ flex: 1, height: '1px', background: `linear-gradient(90deg, transparent, ${C.border}, transparent)` }} />
+        <Typography variant="h3" sx={{ fontStyle: 'italic', whiteSpace: 'nowrap', flexShrink: 0 }}>
+          {t('allTimeBadgesTitle')}
+        </Typography>
+        <Box sx={{ flex: 1, height: '1px', background: `linear-gradient(90deg, transparent, ${C.border}, transparent)` }} />
+      </Box>
+
+      <Box sx={{
+        display: 'grid',
+        gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(3, 1fr)',
+        gap: 1.25,
+        mb: 3,
+      }}>
+        {ALLTIME_BADGES.map((badge, i) => (
+          <BadgeTile key={badge.id} badge={badge} isEarned={earnedSet.has(badge.id)}
+            index={i} t={t} onClick={() => setSelectedBadge(badge)} />
+        ))}
+      </Box>
 
       {/* ── Badge Detail Dialog ──────────────────────────────── */}
       <BadgeDetailDialog
         open={!!selectedBadge}
         badge={selectedBadge}
-        isEarned={selectedBadge ? earnedSet.has(selectedBadge.id) : false}
+        isEarned={selectedBadge
+          ? (selectedBadge.monthly ? monthlyEarnedSet.has(selectedBadge.id) : earnedSet.has(selectedBadge.id))
+          : false}
         client={client}
         lang={lang}
         t={t}
@@ -385,7 +413,7 @@ function LevelCard({ levelData, levelName, t, lang, earnedCount }) {
 /* ═══════════════════════════════════════════════════════════════
    NextBadgesSection — 2-3 closest-to-unlock badges
    ═══════════════════════════════════════════════════════════════ */
-function NextBadgesSection({ items, t, onBadgeClick }) {
+function NextBadgesSection({ items, t, lang, onBadgeClick }) {
   return (
     <Box sx={{ mb: 3 }}>
       <Typography variant="h3" sx={{ mb: 1.5, fontStyle: 'italic' }}>
@@ -431,6 +459,14 @@ function NextBadgesSection({ items, t, onBadgeClick }) {
                     color, letterSpacing: '0.4px',
                   }}>
                     {t(`tier${badge.tier.charAt(0).toUpperCase() + badge.tier.slice(1)}`)}
+                  </Typography>
+                )}
+                {badge.monthly && (
+                  <Typography sx={{
+                    fontSize: '8px', fontWeight: 700, textTransform: 'uppercase',
+                    color: C.primary, letterSpacing: '0.3px', opacity: 0.7,
+                  }}>
+                    {lang === 'bg' ? 'МЕСЕЧНА' : 'MONTHLY'}
                   </Typography>
                 )}
               </Box>
@@ -600,6 +636,16 @@ function BadgeDetailDialog({ open, badge, isEarned, client, lang, t, onClose }) 
         <BadgeIcon muiIcon={badge.muiIcon} size={36} color={isEarned ? color : lockedColor} />
       </Box>
 
+      {/* monthly indicator */}
+      {badge.monthly && (
+        <Typography sx={{
+          fontSize: '10px', fontWeight: 700, textTransform: 'uppercase',
+          letterSpacing: '1px', color: C.primary, mb: 0.5, opacity: 0.7,
+        }}>
+          {lang === 'bg' ? 'МЕСЕЧНА ЗНАЧКА' : 'MONTHLY BADGE'}
+        </Typography>
+      )}
+
       {/* tier label */}
       {badge.tier && (
         <Typography sx={{
@@ -665,39 +711,12 @@ function BadgeDetailDialog({ open, badge, isEarned, client, lang, t, onClose }) 
         </Typography>
       )}
 
-      {/* Monthly steps history */}
-      {badge.condType === 'monthly_steps' && (() => {
-        const history = getMonthlyStepHistory(client)
-        if (history.length === 0) return (
-          <Typography sx={{ fontSize: '11px', color: C.muted, mt: 1.5, fontWeight: 600, fontStyle: 'italic' }}>
-            {lang === 'bg' ? 'Може да се печели всеки месец' : 'Can be earned every month'}
-          </Typography>
-        )
-        const MONTHS_BG = ['', 'Яну', 'Фев', 'Мар', 'Апр', 'Май', 'Юни', 'Юли', 'Авг', 'Сеп', 'Окт', 'Ное', 'Дек']
-        const MONTHS_EN = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-        const months = lang === 'bg' ? MONTHS_BG : MONTHS_EN
-        return (
-          <Box sx={{ mt: 1.5 }}>
-            <Typography sx={{ fontSize: '11px', color: C.muted, fontWeight: 700, mb: 0.5, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-              {lang === 'bg' ? 'Спечелен:' : 'Earned:'}
-            </Typography>
-            <Box sx={{ display: 'flex', gap: 0.75, flexWrap: 'wrap' }}>
-              {history.map(h => {
-                const [y, m] = h.monthKey.split('-').map(Number)
-                return (
-                  <Box key={h.monthKey} sx={{
-                    px: 1, py: 0.25, borderRadius: '6px', fontSize: '11px', fontWeight: 700,
-                    background: `${TIER_COLORS[h.tier]}18`, color: TIER_COLORS[h.tier],
-                    border: `1px solid ${TIER_COLORS[h.tier]}30`,
-                  }}>
-                    {months[m]} {y}
-                  </Box>
-                )
-              })}
-            </Box>
-          </Box>
-        )
-      })()}
+      {/* Monthly badge: can be earned every month note */}
+      {badge.monthly && (
+        <Typography sx={{ fontSize: '11px', color: C.muted, mt: 1.5, fontWeight: 600, fontStyle: 'italic' }}>
+          {lang === 'bg' ? 'Може да се печели всеки месец' : 'Can be earned every month'}
+        </Typography>
+      )}
     </Dialog>
   )
 }
