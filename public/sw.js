@@ -1,5 +1,6 @@
-const CACHE = 'synrg-v5';
-const ASSETS = ['/synrg-app/', '/synrg-app/index.html', '/synrg-app/manifest.json', '/synrg-app/app-compiled.js'];
+const CACHE = 'synrg-v6';
+const BASE = '/synrg-website/app/';
+const ASSETS = [BASE, BASE + 'index.html'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS).catch(() => {})));
@@ -22,6 +23,6 @@ self.addEventListener('fetch', e => {
         caches.open(CACHE).then(c => c.put(e.request, clone));
         return r;
       })
-      .catch(() => caches.match(e.request).then(r => r || caches.match('/index.html')))
+      .catch(() => caches.match(e.request).then(r => r || caches.match(BASE + 'index.html')))
   );
 });
