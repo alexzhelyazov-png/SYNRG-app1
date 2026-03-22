@@ -34,7 +34,7 @@ function getSiteLinks(t) {
 }
 
 export default function MobileHeader() {
-  const { auth, logout, client, lang, setLang, setView, setCoachClientMode, setViewingCoach, unreadNotifCount, t } = useApp()
+  const { auth, logout, client, lang, setLang, setView, coachClientMode, setCoachClientMode, setViewingCoach, unreadNotifCount, t, saveWorkoutDraft } = useApp()
   const { myPlan } = useBooking()
   const [siteMenuOpen, setSiteMenuOpen] = useState(false)
   const [showProfile, setShowProfile] = useState(false)
@@ -115,7 +115,7 @@ export default function MobileHeader() {
           {/* ── Notifications (coach only) ──────────────────── */}
           {auth.role === 'coach' && (
             <IconButton
-              onClick={() => { setView('notifications'); setCoachClientMode(false); setViewingCoach(null) }}
+              onClick={() => { if (coachClientMode && client?.id) saveWorkoutDraft(client.id); setView('notifications'); setCoachClientMode(false); setViewingCoach(null) }}
               size="small"
               aria-label={t('navNotifications')}
               sx={{

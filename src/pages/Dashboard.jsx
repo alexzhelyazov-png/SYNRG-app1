@@ -258,20 +258,22 @@ let _recentClientIds = []
 // ─── Coach dashboard (schedule + client list) ───────────────────
 function DashboardCoach() {
   const {
-    t, visibleClients, realClients, actualIdx, setSelIdx,
-    setCurrentWorkout, setCoachClientMode, setShowClientMenu, setViewingCoach,
-    setConfirmDelete,
+    t, visibleClients, realClients, actualIdx, setSelIdx, client,
+    setCoachClientMode, setShowClientMenu, setViewingCoach,
+    setConfirmDelete, saveWorkoutDraft, restoreWorkoutDraft,
   } = useApp()
 
   const [recentIds, setRecentIds] = useState(_recentClientIds)
   const [clientSearch, setClientSearch] = useState('')
 
   const selectClient = (ri, clientId) => {
+    // Save draft for current client before switching
+    if (client?.id) saveWorkoutDraft(client.id)
     const updated = [clientId, ..._recentClientIds.filter(id => id !== clientId)]
     _recentClientIds = updated
     setRecentIds(updated)
     setSelIdx(ri)
-    setCurrentWorkout([])
+    restoreWorkoutDraft(clientId)
     setViewingCoach(null)
     setCoachClientMode(true)
     setShowClientMenu(false)
@@ -425,7 +427,7 @@ function MiniBarChart({ data, width = 200, height = 48, color = C.purple }) {
 export function ClientDetail() {
   const {
     client, auth, t, lang, weeklyRate,
-    setCoachClientMode, updateClientTargets,
+    setCoachClientMode, updateClientTargets, saveWorkoutDraft,
     exName, setExName, exScheme, setExScheme, exWeight, setExWeight,
     workoutCategory, setWorkoutCategory,
     currentWorkout, setCurrentWorkout,
@@ -475,7 +477,7 @@ export function ClientDetail() {
       <Box sx={{ mb: 2, animation: `fadeInUp 0.18s ${EASE.decelerate} both` }}>
         <Button
           size="small"
-          onClick={() => setCoachClientMode(false)}
+          onClick={() => { if (client?.id) saveWorkoutDraft(client.id); setCoachClientMode(false) }}
           startIcon={<ArrowBackIcon />}
           sx={{ color: C.muted, '&:hover': { color: C.purple }, pl: 0, mb: 1 }}
         >
@@ -712,8 +714,10 @@ export function ClientDetail() {
                             sx={{ color: C.muted, '&:hover': { color: '#F87171' } }}><DeleteOutlineIcon sx={{ fontSize: 14 }} /></IconButton>
                         </Box>
                       ))}
+                      <Button size="small" onClick={() => setEditingWorkout({ ...editingWorkout, items: [...editingWorkout.items, { exercise: '', scheme: '', weight: '' }] })}
+                        sx={{ fontSize: '12px', color: C.primary, mt: 0.5 }}>+ {t('addExerciseBtn') || 'Упражнение'}</Button>
                       <Box sx={{ display: 'flex', gap: 1, mt: 1 }}>
-                        <Button size="small" variant="contained" onClick={() => { updateWorkout(editingWorkout.id, editingWorkout.items); setEditingWorkout(null) }}
+                        <Button size="small" variant="contained" onClick={() => { updateWorkout(editingWorkout.id, editingWorkout.items.filter(ex => ex.exercise.trim())); setEditingWorkout(null) }}
                           sx={{ fontSize: '12px', fontWeight: 700, background: C.primary, color: C.primaryOn }}>{t('saveBtn') || 'Запази'}</Button>
                         <Button size="small" onClick={() => setEditingWorkout(null)}
                           sx={{ fontSize: '12px', color: C.muted }}>{t('cancelBtn') || 'Откажи'}</Button>

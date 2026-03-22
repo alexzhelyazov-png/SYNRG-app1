@@ -254,15 +254,17 @@ export default function Progress() {
         p: '20px 16px',
         mb: 3,
       }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-          <Box>
-            <Typography variant="h3" sx={{ fontStyle: 'italic', mb: 0.25 }}>
-              {t('monthlyBadgesTitle')}
-            </Typography>
-            <Typography sx={{ fontSize: '11px', color: C.muted, fontWeight: 600 }}>
-              {t('monthlyBadgesDesc')}
-            </Typography>
-          </Box>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+          <Box sx={{ flex: 1, height: '1px', background: `linear-gradient(90deg, transparent, ${C.border}, transparent)` }} />
+          <Typography variant="h3" sx={{ fontStyle: 'italic', whiteSpace: 'nowrap', flexShrink: 0 }}>
+            {t('monthlyBadgesTitle')}
+          </Typography>
+          <Box sx={{ flex: 1, height: '1px', background: `linear-gradient(90deg, transparent, ${C.border}, transparent)` }} />
+        </Box>
+        <Typography sx={{ fontSize: '14px', color: C.muted, fontWeight: 600, textAlign: 'center', mb: 2 }}>
+          {t('monthlyBadgesDesc')}
+        </Typography>
+        <Box sx={{ display: 'flex', justifyContent: 'center', mb: 2 }}>
           <Box sx={{
             display: 'flex', alignItems: 'center', gap: 0.5,
             px: 1.5, py: 0.5, borderRadius: '8px',

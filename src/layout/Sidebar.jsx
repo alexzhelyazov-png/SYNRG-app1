@@ -58,6 +58,7 @@ export default function Sidebar() {
     coachClientMode, setCoachClientMode,
     unreadNotifCount,
     lang, setLang, t,
+    client, saveWorkoutDraft,
   } = useApp()
 
   const admin = isAdmin(auth)
@@ -66,6 +67,7 @@ export default function Sidebar() {
   const navItems = getNavItems(auth, admin)
 
   function selectCoachTracker(coachName) {
+    if (coachClientMode && client?.id) saveWorkoutDraft(client.id)
     setViewingCoach(coachName)
     setView('dashboard')
   }
@@ -139,7 +141,7 @@ export default function Sidebar() {
             <Tooltip key={v} title={!open ? t(labelKey) : ''} placement="right" arrow>
               <ListItemButton
                 selected={isActive}
-                onClick={() => { setView(v); setViewingCoach(null); setCoachClientMode(false) }}
+                onClick={() => { if (coachClientMode && client?.id) saveWorkoutDraft(client.id); setView(v); setViewingCoach(null); setCoachClientMode(false) }}
                 sx={{
                   justifyContent: open ? 'flex-start' : 'center',
                   px: open ? 2 : 0, mx: open ? 1.5 : 1, my: '2px', minHeight: 44,
@@ -199,7 +201,7 @@ export default function Sidebar() {
             <Tooltip title={!open ? t('navNotifications') : ''} placement="right" arrow>
               <ListItemButton
                 selected={isActive}
-                onClick={() => { setView('notifications'); setViewingCoach(null); setCoachClientMode(false) }}
+                onClick={() => { if (coachClientMode && client?.id) saveWorkoutDraft(client.id); setView('notifications'); setViewingCoach(null); setCoachClientMode(false) }}
                 sx={{ justifyContent: open ? 'flex-start' : 'center', px: open ? 2 : 0, mx: open ? 1.5 : 1, my: '2px', minHeight: 44 }}
               >
                 <ListItemIcon sx={{ minWidth: open ? 38 : 'unset', justifyContent: 'center', color: isActive ? C.purple : (unreadNotifCount > 0 ? '#F87171' : C.muted) }}>

@@ -64,6 +64,10 @@ export function AppProvider({ children }) {
   const [currentWorkout,  setCurrentWorkout]  = useState([])
   const [workoutDate,     setWorkoutDate]     = useState(dateToInput(todayDate()))
   const [selCoach,        setSelCoach]        = useState('')
+  const workoutDraftsRef = useRef({})  // { [clientId]: { exercises, category, date, exName, exScheme, exWeight } }
+  // Keep refs in sync with latest state so saveWorkoutDraft always reads fresh values
+  const workoutStateRef = useRef({ currentWorkout: [], exName: '', exScheme: '', exWeight: '', workoutCategory: 'Предна верига', workoutDate: '' })
+  workoutStateRef.current = { currentWorkout, exName, exScheme, exWeight, workoutCategory, workoutDate }
 
   // ── Food state ────────────────────────────────────────────────
   const [foodDate,      setFoodDate]      = useState(dateToInput(todayDate()))
@@ -721,8 +725,39 @@ export function AppProvider({ children }) {
     setExName(''); setExScheme(''); setExWeight('')
   }
 
+  function saveWorkoutDraft(clientId) {
+    if (!clientId) return
+    const s = workoutStateRef.current
+    const hasData = s.currentWorkout.length || s.exName || s.exScheme || s.exWeight
+    if (hasData) {
+      workoutDraftsRef.current[clientId] = {
+        exercises: [...s.currentWorkout], category: s.workoutCategory,
+        date: s.workoutDate, exName: s.exName, exScheme: s.exScheme, exWeight: s.exWeight,
+      }
+    }
+  }
+
+  function restoreWorkoutDraft(clientId) {
+    const draft = workoutDraftsRef.current[clientId]
+    if (draft) {
+      setCurrentWorkout(draft.exercises)
+      setWorkoutCategory(draft.category)
+      setWorkoutDate(draft.date)
+      setExName(draft.exName || '')
+      setExScheme(draft.exScheme || '')
+      setExWeight(draft.exWeight || '')
+      delete workoutDraftsRef.current[clientId]
+    } else {
+      setCurrentWorkout([])
+      setExName(''); setExScheme(''); setExWeight('')
+      setWorkoutCategory('Предна верига')
+      setWorkoutDate(dateToInput(todayDate()))
+    }
+  }
+
   function saveWorkout() {
     if (!currentWorkout.length) return
+    delete workoutDraftsRef.current[client.id]
     saveWorkoutToClient(client.id, {
       date:     inputToDate(workoutDate),
       coach:    auth.name,
@@ -797,6 +832,7 @@ export function AppProvider({ children }) {
     currentWorkout, setCurrentWorkout,
     workoutDate, setWorkoutDate,
     selCoach, setSelCoach,
+    saveWorkoutDraft, restoreWorkoutDraft,
     // Food
     foodDate, setFoodDate,
     foodModalOpen, setFoodModalOpen,

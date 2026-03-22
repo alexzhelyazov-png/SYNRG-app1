@@ -473,11 +473,14 @@ export default function Ranking() {
                     const color = tierColor(b.tier)
                     return (
                       <Box key={b.id} sx={{
-                        width: 56, height: 56, borderRadius: '14px',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        background: `${color}15`, border: `1.5px solid ${color}35`,
+                        width: 64, borderRadius: '14px',
+                        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                        background: `${color}15`, border: `1.5px solid ${color}35`, py: 0.75,
                       }}>
-                        <BadgeIcon muiIcon={b.muiIcon} size={26} color={color} />
+                        <BadgeIcon muiIcon={b.muiIcon} size={24} color={color} />
+                        <Typography sx={{ fontSize: '8px', fontWeight: 700, color, mt: 0.25, textAlign: 'center', lineHeight: 1.2, px: 0.25 }}>
+                          {t(`badge_${b.id}`)}
+                        </Typography>
                       </Box>
                     )
                   })}
@@ -496,11 +499,14 @@ export default function Ranking() {
                     const color = tierColor(b.tier)
                     return (
                       <Box key={b.id} sx={{
-                        width: 56, height: 56, borderRadius: '14px',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        background: `${color}15`, border: `1.5px solid ${color}35`,
+                        width: 64, borderRadius: '14px',
+                        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                        background: `${color}15`, border: `1.5px solid ${color}35`, py: 0.75,
                       }}>
-                        <BadgeIcon muiIcon={b.muiIcon} size={26} color={color} />
+                        <BadgeIcon muiIcon={b.muiIcon} size={24} color={color} />
+                        <Typography sx={{ fontSize: '8px', fontWeight: 700, color, mt: 0.25, textAlign: 'center', lineHeight: 1.2, px: 0.25 }}>
+                          {t(`badge_${b.id}`)}
+                        </Typography>
                       </Box>
                     )
                   })}

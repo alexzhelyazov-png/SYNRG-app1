@@ -80,7 +80,8 @@ export default function MobileNav() {
     auth, view, setView, t,
     setShowClientMenu,
     viewingCoach, setViewingCoach,
-    setCoachClientMode,
+    coachClientMode, setCoachClientMode,
+    client, saveWorkoutDraft,
   } = useApp()
 
   const admin = isAdmin(auth)
@@ -99,6 +100,7 @@ export default function MobileNav() {
           showLabels
           onChange={(_, newView) => {
             if (newView === '__clients__' || newView === '__tracker__') return
+            if (coachClientMode && client?.id) saveWorkoutDraft(client.id)
             setView(newView)
             setShowClientMenu(false)
             setViewingCoach(null)
@@ -125,6 +127,7 @@ export default function MobileNav() {
               label={t('myTrackerTitle')}
               isSelected={view === 'dashboard' && viewingCoach === auth.name}
               onClick={() => {
+                if (coachClientMode && client?.id) saveWorkoutDraft(client.id)
                 setViewingCoach(auth.name)
                 setView('dashboard')
                 setShowClientMenu(false)

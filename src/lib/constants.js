@@ -337,6 +337,7 @@ export const WORKOUT_CATEGORIES = [
   { key: 'Горна част'    },
   { key: 'Крака'         },
   { key: 'Кардио'        },
+  { key: 'Цяло тяло'     },
 ]
 
 // icon field removed — use MUI icons in Sidebar/MobileNav

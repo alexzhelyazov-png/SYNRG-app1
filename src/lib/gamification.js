@@ -111,14 +111,14 @@ export const MONTHLY_BADGES = [
   { id: 'm_steps_days_gold',   monthly: true, xp: 35, tier: 'gold',   series: 'm_steps_days', muiIcon: 'DirectionsRun', condType: 'monthly_count', condField: 'stepsDays', condValue: 30 },
 
   // ── m_cal_target series ──
-  { id: 'm_cal_target_bronze', monthly: true, xp: 10, tier: 'bronze', series: 'm_cal_target', muiIcon: 'LocalDining', condType: 'monthly_target', condField: 'calTargetDays', condValue: 7  },
-  { id: 'm_cal_target_silver', monthly: true, xp: 20, tier: 'silver', series: 'm_cal_target', muiIcon: 'LocalDining', condType: 'monthly_target', condField: 'calTargetDays', condValue: 15 },
-  { id: 'm_cal_target_gold',   monthly: true, xp: 35, tier: 'gold',   series: 'm_cal_target', muiIcon: 'LocalDining', condType: 'monthly_target', condField: 'calTargetDays', condValue: 30 },
+  { id: 'm_cal_target_bronze', monthly: true, xp: 15, tier: 'bronze', series: 'm_cal_target', muiIcon: 'LocalDining', condType: 'monthly_target', condField: 'calTargetDays', condValue: 7  },
+  { id: 'm_cal_target_silver', monthly: true, xp: 30, tier: 'silver', series: 'm_cal_target', muiIcon: 'LocalDining', condType: 'monthly_target', condField: 'calTargetDays', condValue: 15 },
+  { id: 'm_cal_target_gold',   monthly: true, xp: 50, tier: 'gold',   series: 'm_cal_target', muiIcon: 'LocalDining', condType: 'monthly_target', condField: 'calTargetDays', condValue: 30 },
 
   // ── m_prot_target series ──
-  { id: 'm_prot_target_bronze', monthly: true, xp: 10, tier: 'bronze', series: 'm_prot_target', muiIcon: 'Egg', condType: 'monthly_target', condField: 'protTargetDays', condValue: 7  },
-  { id: 'm_prot_target_silver', monthly: true, xp: 20, tier: 'silver', series: 'm_prot_target', muiIcon: 'Egg', condType: 'monthly_target', condField: 'protTargetDays', condValue: 15 },
-  { id: 'm_prot_target_gold',   monthly: true, xp: 35, tier: 'gold',   series: 'm_prot_target', muiIcon: 'Egg', condType: 'monthly_target', condField: 'protTargetDays', condValue: 30 },
+  { id: 'm_prot_target_bronze', monthly: true, xp: 15, tier: 'bronze', series: 'm_prot_target', muiIcon: 'Egg', condType: 'monthly_target', condField: 'protTargetDays', condValue: 7  },
+  { id: 'm_prot_target_silver', monthly: true, xp: 30, tier: 'silver', series: 'm_prot_target', muiIcon: 'Egg', condType: 'monthly_target', condField: 'protTargetDays', condValue: 15 },
+  { id: 'm_prot_target_gold',   monthly: true, xp: 50, tier: 'gold',   series: 'm_prot_target', muiIcon: 'Egg', condType: 'monthly_target', condField: 'protTargetDays', condValue: 30 },
 ]
 
 // Combined for backward compatibility
