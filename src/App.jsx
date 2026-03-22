@@ -124,44 +124,37 @@ function BadgeUnlockWatcher() {
   const totalXP         = useMemo(() => computeTotalXP(earnedIds, client), [earnedIds, client])
   const levelData       = useMemo(() => computeLevel(totalXP), [totalXP])
 
-  // Detect all-time badges (including earned while offline)
+  // Detect new all-time badges (only AFTER initial load)
   useEffect(() => {
-    if (earnedIds.length === 0) return // data not loaded yet
-    const dismissed = new Set(client.dismissedBadges || [])
-    const undismissed = earnedIds.filter(id => !dismissed.has(id))
+    if (earnedIds.length === 0) return
     if (prevEarnedRef.current === null) {
-      // First load: show celebration for any earned-but-unseen badge
-      if (undismissed.length > 0) {
-        const badge = ALLTIME_BADGES.find(b => b.id === undismissed[0])
-        if (badge) setUnlockedBadge(badge)
-      }
-    } else {
-      // Live update: show celebration for newly earned badge
-      const newOnes = undismissed.filter(id => !prevEarnedRef.current.includes(id))
-      if (newOnes.length > 0) {
-        const badge = ALLTIME_BADGES.find(b => b.id === newOnes[0])
-        if (badge) setUnlockedBadge(badge)
-      }
+      // First load: just store current state, no celebration
+      prevEarnedRef.current = earnedIds
+      return
+    }
+    const dismissed = new Set(client.dismissedBadges || [])
+    const newOnes = earnedIds.filter(id => !prevEarnedRef.current.includes(id) && !dismissed.has(id))
+    if (newOnes.length > 0) {
+      const badge = ALLTIME_BADGES.find(b => b.id === newOnes[0])
+      if (badge) setUnlockedBadge(badge)
     }
     prevEarnedRef.current = earnedIds
   }, [earnedIds, client.dismissedBadges])
 
-  // Detect monthly badges (including earned while offline)
+  // Detect new monthly badges (only AFTER initial load)
   useEffect(() => {
     if (monthlyEarnedIds.length === 0 && earnedIds.length === 0) return
-    const dismissed = new Set(client.dismissedBadges || [])
-    const undismissed = monthlyEarnedIds.filter(id => !dismissed.has(`${id}:${currentMonthKey}`))
     if (prevMonthlyRef.current === null) {
-      if (undismissed.length > 0) {
-        const badge = MONTHLY_BADGES.find(b => b.id === undismissed[0])
-        if (badge) setUnlockedBadge(badge)
-      }
-    } else {
-      const newOnes = undismissed.filter(id => !prevMonthlyRef.current.includes(id))
-      if (newOnes.length > 0) {
-        const badge = MONTHLY_BADGES.find(b => b.id === newOnes[0])
-        if (badge) setUnlockedBadge(badge)
-      }
+      prevMonthlyRef.current = monthlyEarnedIds
+      return
+    }
+    const dismissed = new Set(client.dismissedBadges || [])
+    const newOnes = monthlyEarnedIds.filter(id =>
+      !prevMonthlyRef.current.includes(id) && !dismissed.has(`${id}:${currentMonthKey}`)
+    )
+    if (newOnes.length > 0) {
+      const badge = MONTHLY_BADGES.find(b => b.id === newOnes[0])
+      if (badge) setUnlockedBadge(badge)
     }
     prevMonthlyRef.current = monthlyEarnedIds
   }, [monthlyEarnedIds, client.dismissedBadges])
