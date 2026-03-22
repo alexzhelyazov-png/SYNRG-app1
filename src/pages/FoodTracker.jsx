@@ -50,13 +50,15 @@ export default function FoodTracker() {
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2, flexWrap: 'wrap', gap: 1 }}>
         <Typography variant="h2">{t('foodTrackerTitle')}</Typography>
         <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
-          <TextField
-            type="date"
-            value={foodDate}
-            onChange={e => setFoodDate(e.target.value)}
-            sx={{ width: '140px' }}
-            size="small"
-          />
+          {auth.role !== 'client' && (
+            <TextField
+              type="date"
+              value={foodDate}
+              onChange={e => setFoodDate(e.target.value)}
+              sx={{ width: '140px' }}
+              size="small"
+            />
+          )}
           {!isTrackerReadOnly && (
             <Button variant="contained" color="primary" size="small" onClick={() => setFoodModalOpen(true)}
               sx={{ py: '8px', px: 2, fontSize: '13px', fontWeight: 700 }}>

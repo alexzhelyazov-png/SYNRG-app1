@@ -55,12 +55,14 @@ export default function StepsTracker() {
         <Paper sx={{ p: 3, mb: 2.5 }}>
           <Typography variant="h3" sx={{ mb: 2.25 }}>{t('logStepsLbl')}</Typography>
           <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center', flexWrap: 'wrap' }}>
-            <TextField
-              type="date"
-              value={stepsDate}
-              onChange={e => setStepsDate(e.target.value)}
-              sx={{ width: '160px' }}
-            />
+            {auth.role !== 'client' && (
+              <TextField
+                type="date"
+                value={stepsDate}
+                onChange={e => setStepsDate(e.target.value)}
+                sx={{ width: '160px' }}
+              />
+            )}
             <TextField
               placeholder={t('stepsPlaceholder')}
               value={stepsInput}

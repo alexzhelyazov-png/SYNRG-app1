@@ -68,12 +68,14 @@ export default function WeightTracker() {
         <Paper sx={{ p: 3, mb: 2.5 }}>
           <Typography variant="h3" sx={{ mb: 2.25 }}>{t('logWeightLbl')}</Typography>
           <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center', flexWrap: 'wrap' }}>
-            <TextField
-              type="date"
-              value={weightDate}
-              onChange={e => setWeightDate(e.target.value)}
-              sx={{ width: '160px' }}
-            />
+            {auth.role !== 'client' && (
+              <TextField
+                type="date"
+                value={weightDate}
+                onChange={e => setWeightDate(e.target.value)}
+                sx={{ width: '160px' }}
+              />
+            )}
             <TextField
               placeholder={t('weightInKg')}
               value={weightInput}
