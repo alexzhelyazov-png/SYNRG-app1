@@ -360,7 +360,7 @@ function PlanDialog({ open, onClose, onActivate, onExtend, onAdjust, onTogglePai
               />
             </Box>
             {/* Migration override: remaining sessions from old platform */}
-            {planType !== 'unlimited' && (() => {
+            {planType && planType !== 'unlimited' && (() => {
               const total = planType === '8' ? 8 : 12
               const remaining = startCredits !== '' ? Number(startCredits) : total
               return (
@@ -421,7 +421,7 @@ function PlanDialog({ open, onClose, onActivate, onExtend, onAdjust, onTogglePai
       </DialogContent>
       <DialogActions sx={{ px: 3, pb: 2 }}>
         <Button onClick={onClose} sx={{ color: C.muted }}>{t('cancelBtn')}</Button>
-        <Button variant="contained" onClick={handleSave} disabled={saving}
+        <Button variant="contained" onClick={handleSave} disabled={saving || (mode === 'activate' && !planType)}
           sx={{ background: C.primary, color: '#0f1c11', fontWeight: 700 }}>
           {saving ? <CircularProgress size={16} /> : t('saveBtn')}
         </Button>
