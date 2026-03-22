@@ -745,8 +745,8 @@ export function AppProvider({ children }) {
   }
 
   async function dismissBadge(badgeId, monthKey = null) {
-    const cl = clients[actualIdx]
-    if (!cl) return
+    const cl = client
+    if (!cl?.id) return
     const key = monthKey ? `${badgeId}:${monthKey}` : badgeId
     const updated = [...(cl.dismissedBadges || []), key]
     await DB.update('clients', cl.id, { dismissed_badges: updated })

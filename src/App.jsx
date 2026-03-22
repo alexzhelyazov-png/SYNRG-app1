@@ -155,23 +155,22 @@ function BadgeUnlockWatcher() {
     const dismissed = client.dismissedBadges || []
     for (const ex of PR_EXERCISES) {
       const pr = currentPRs[ex.id]
-      if (!pr || pr.highestMilestone === undefined) continue
-      // Check each unlocked milestone
-      for (const idx of (pr.unlockedIdx || [])) {
-        const m = ex.milestones[idx]
-        const key = `${ex.id}:${m.v}`
-        if (!dismissed.includes(key)) {
-          setPrCelebration({ exercise: ex, value: m.v })
-          return
-        }
+      if (!pr || pr.unlockedIdx.length === 0) continue
+      // Show only the HIGHEST unlocked milestone (not the lowest)
+      const highestIdx = pr.unlockedIdx[pr.unlockedIdx.length - 1]
+      const m = ex.milestones[highestIdx]
+      const key = `${ex.id}:${m.v}`
+      if (!dismissed.includes(key)) {
+        setPrCelebration({ exercise: ex, value: m.v })
+        return
       }
     }
   }, [currentPRs, client.dismissedBadges, unlockedBadge, prCelebration])
 
   useEffect(() => {
     if (!prCelebration) return
-    const timer = setTimeout(() => {
-      dismissBadge(prCelebration.exercise.id, String(prCelebration.value))
+    const timer = setTimeout(async () => {
+      await dismissBadge(prCelebration.exercise.id, String(prCelebration.value))
       setPrCelebration(null)
     }, 4000)
     return () => clearTimeout(timer)
@@ -207,7 +206,7 @@ function BadgeUnlockWatcher() {
         }} />
       )}
       {prCelebration && (
-        <Box onClick={() => { dismissBadge(prCelebration.exercise.id, String(prCelebration.value)); setPrCelebration(null) }}
+        <Box onClick={async () => { await dismissBadge(prCelebration.exercise.id, String(prCelebration.value)); setPrCelebration(null) }}
           sx={{
             position: 'fixed', inset: 0, zIndex: 1500,
             display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
@@ -222,8 +221,9 @@ function BadgeUnlockWatcher() {
             {lang === 'bg' ? prCelebration.exercise.labelBg : prCelebration.exercise.labelEn}
           </Typography>
           <Typography sx={{ fontSize: '48px', fontWeight: 900, color: '#D4AF37', fontFamily: "'MontBlanc', sans-serif", lineHeight: 1 }}>
-            {prCelebration.value === 0 ? (lang === 'bg' ? 'Без тежест' : 'Bodyweight') :
-              `${prCelebration.value}${prCelebration.exercise.type === 'weight' ? ' kg' : (lang === 'bg' ? ' пъти' : ' reps')}`}
+            {prCelebration.value === 0 && prCelebration.exercise.type === 'weight'
+              ? (lang === 'bg' ? 'Без тежест' : 'Bodyweight')
+              : `${prCelebration.value}${prCelebration.exercise.type === 'weight' ? ' kg' : (lang === 'bg' ? ' пъти' : ' reps')}`}
           </Typography>
         </Box>
       )}
