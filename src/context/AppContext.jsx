@@ -62,6 +62,7 @@ export function AppProvider({ children }) {
   const [exWeight,        setExWeight]        = useState('')
   const [workoutCategory, setWorkoutCategory] = useState('Предна верига')
   const [currentWorkout,  setCurrentWorkout]  = useState([])
+  const [workoutDate,     setWorkoutDate]     = useState(dateToInput(todayDate()))
   const [selCoach,        setSelCoach]        = useState('')
 
   // ── Food state ────────────────────────────────────────────────
@@ -723,13 +724,27 @@ export function AppProvider({ children }) {
   function saveWorkout() {
     if (!currentWorkout.length) return
     saveWorkoutToClient(client.id, {
-      date:     todayDate(),
+      date:     inputToDate(workoutDate),
       coach:    auth.name,
       category: workoutCategory,
       items:    currentWorkout,
     })
     setCurrentWorkout([])
     showSnackbar(t('workoutSavedMsg'))
+  }
+
+  async function deleteWorkout(workoutId) {
+    if (!workoutId || workoutId.startsWith?.('tmp_')) return
+    setClients(prev => prev.map(c => ({ ...c, workouts: c.workouts.filter(w => w.id !== workoutId) })))
+    try { await DB.deleteById('workouts', workoutId) } catch (e) { console.error('deleteWorkout:', e) }
+  }
+
+  async function updateWorkout(workoutId, updatedItems) {
+    if (!workoutId) return
+    setClients(prev => prev.map(c => ({
+      ...c, workouts: c.workouts.map(w => w.id === workoutId ? { ...w, items: updatedItems } : w)
+    })))
+    try { await DB.update('workouts', workoutId, { items: updatedItems }) } catch (e) { console.error('updateWorkout:', e) }
   }
 
   // ── Module management (admin) ─────────────────────────────────
@@ -780,6 +795,7 @@ export function AppProvider({ children }) {
     exWeight, setExWeight,
     workoutCategory, setWorkoutCategory,
     currentWorkout, setCurrentWorkout,
+    workoutDate, setWorkoutDate,
     selCoach, setSelCoach,
     // Food
     foodDate, setFoodDate,
@@ -812,7 +828,7 @@ export function AppProvider({ children }) {
     feedPosts, addFeedPost, deleteFeedPost,
     deleteClient,
     addFoodFromModal, addQuickFood, addBarcodeFood,
-    saveWeight, saveSteps, addExercise, saveWorkout,
+    saveWeight, saveSteps, addExercise, saveWorkout, deleteWorkout, updateWorkout,
     addTask, addTaskForClient, toggleTaskDone, deleteTask, addTaskComment,
     sendReaction, dismissReaction,
     updateReminderSettings,

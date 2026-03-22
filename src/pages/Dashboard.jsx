@@ -15,7 +15,7 @@ import { WORKOUT_CATEGORIES } from '../lib/constants'
 import { C, EASE } from '../theme'
 import FoodTracker from './FoodTracker'
 import WeightTracker from './WeightTracker'
-import { todayDate, fmt1, parseDate } from '../lib/utils'
+import { todayDate, fmt1, parseDate, inputToDate } from '../lib/utils'
 import { computeReminders } from '../lib/reminders'
 import {
   creditsRemaining, effectiveValidTo, isoToday, isoDatePlusDays, daysUntilExpiry, fmtValidTo,
@@ -429,7 +429,8 @@ export function ClientDetail() {
     exName, setExName, exScheme, setExScheme, exWeight, setExWeight,
     workoutCategory, setWorkoutCategory,
     currentWorkout, setCurrentWorkout,
-    addExercise, saveWorkout,
+    workoutDate, setWorkoutDate,
+    addExercise, saveWorkout, deleteWorkout, updateWorkout,
   } = useApp()
   const { allPlans, loadAllPlans, slots, slotBookings, extendPlan, adjustCredits } = useBooking()
 
@@ -437,6 +438,7 @@ export function ClientDetail() {
   const [editingTargets, setEditingTargets] = useState(null) // { cal, prot }
   const [editCredits, setEditCredits] = useState(null)   // credits_used value or null
   const [editValidTo, setEditValidTo] = useState(null)   // date string or null
+  const [editingWorkout, setEditingWorkout] = useState(null) // { id, items: [...] } or null
   const isMobile = window.innerWidth < 640
   const isCoach = auth.role === 'coach' || auth.role === 'admin'
 
@@ -517,13 +519,18 @@ export function ClientDetail() {
             background:   'linear-gradient(145deg, rgba(170,169,205,0.04) 0%, #1C1A19 100%)',
             boxShadow:    '0 0 0 1px rgba(170,169,205,0.08), 0 8px 32px rgba(0,0,0,0.3)',
           }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, mb: 2.25 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, mb: 2.25, flexWrap: 'wrap' }}>
               <Box sx={{
                 width: 8, height: 8, borderRadius: '99px',
                 background: C.primary, boxShadow: `0 0 10px ${C.primaryGlow}`,
                 flexShrink: 0, animation: `pulse 2.5s ${EASE.standard} infinite`,
               }} />
-              <Typography variant="h3">{t('workout')} — {todayDate()}</Typography>
+              <Typography variant="h3">{t('workout')} — {inputToDate(workoutDate)}</Typography>
+              {isCoach && (
+                <TextField type="date" size="small" value={workoutDate} onChange={e => setWorkoutDate(e.target.value)}
+                  sx={{ ml: 'auto', width: '150px', '& .MuiInputBase-input': { fontSize: '13px', p: '6px 10px', color: C.text }, '& .MuiOutlinedInput-notchedOutline': { borderColor: C.border }, '& .MuiInputBase-input::-webkit-calendar-picker-indicator': { filter: 'invert(0.7)' } }}
+                />
+              )}
             </Box>
 
             {/* Category chips */}
@@ -671,7 +678,7 @@ export function ClientDetail() {
             <Box sx={{ mt: 3 }}>
               <Typography variant="h3" sx={{ mb: 1.5, px: 0.5 }}>{t('workoutHistory')}</Typography>
               {client.workouts.map((w, i) => (
-                <Paper key={i} sx={{ mb: 1.5, p: 2, border: `1px solid ${C.border}`, borderRadius: '14px' }}>
+                <Paper key={w.id || i} sx={{ mb: 1.5, p: 2, border: `1px solid ${C.border}`, borderRadius: '14px' }}>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1, alignItems: 'center', flexWrap: 'wrap', gap: 1 }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
                       <Typography sx={{ fontWeight: 700, fontSize: '14px', color: i === 0 ? C.purple : C.text }}>{w.date}</Typography>
@@ -679,15 +686,48 @@ export function ClientDetail() {
                         <Chip label={t(w.category)} size="small" sx={{ background: C.purpleSoft, color: C.purple, border: '1px solid rgba(200,197,255,0.2)', fontSize: '11px', fontWeight: 600 }} />
                       )}
                     </Box>
-                    <Typography sx={{ color: C.muted, fontSize: '12px' }}>{w.coach || '—'}</Typography>
-                  </Box>
-                  {w.items.map((ex, j) => (
-                    <Box key={j} sx={{ display: 'grid', gridTemplateColumns: '1fr 90px 60px', gap: 1, py: 0.6, borderBottom: j < w.items.length - 1 ? `1px solid ${C.border}` : 'none' }}>
-                      <Typography sx={{ color: C.text, fontWeight: 600, fontSize: '13px' }}>{ex.exercise}</Typography>
-                      <Typography sx={{ color: C.muted, fontSize: '12.5px' }}>{ex.scheme}</Typography>
-                      <Typography sx={{ color: C.muted, fontSize: '12.5px', textAlign: 'right' }}>{ex.weight} {t('kgUnit')}</Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                      <Typography sx={{ color: C.muted, fontSize: '12px' }}>{w.coach || '—'}</Typography>
+                      {isCoach && (
+                        <>
+                          <IconButton size="small" onClick={() => setEditingWorkout(editingWorkout?.id === w.id ? null : { id: w.id, items: w.items.map(ex => ({ ...ex })) })}
+                            sx={{ color: editingWorkout?.id === w.id ? C.primary : C.muted }}><EditIcon sx={{ fontSize: 14 }} /></IconButton>
+                          <IconButton size="small" onClick={() => deleteWorkout(w.id)}
+                            sx={{ color: C.muted, '&:hover': { color: '#F87171' } }}><DeleteOutlineIcon sx={{ fontSize: 14 }} /></IconButton>
+                        </>
+                      )}
                     </Box>
-                  ))}
+                  </Box>
+                  {editingWorkout?.id === w.id ? (
+                    <>
+                      {editingWorkout.items.map((ex, j) => (
+                        <Box key={j} sx={{ display: 'grid', gridTemplateColumns: '1fr 80px 60px auto', gap: 0.75, py: 0.5, alignItems: 'center' }}>
+                          <TextField size="small" value={ex.exercise} onChange={e => { const items = [...editingWorkout.items]; items[j] = { ...items[j], exercise: e.target.value }; setEditingWorkout({ ...editingWorkout, items }) }}
+                            inputProps={{ style: { fontSize: '12px', padding: '6px 8px' } }} />
+                          <TextField size="small" value={ex.scheme} onChange={e => { const items = [...editingWorkout.items]; items[j] = { ...items[j], scheme: e.target.value }; setEditingWorkout({ ...editingWorkout, items }) }}
+                            inputProps={{ style: { fontSize: '12px', padding: '6px 8px' } }} />
+                          <TextField size="small" value={ex.weight} onChange={e => { const items = [...editingWorkout.items]; items[j] = { ...items[j], weight: e.target.value }; setEditingWorkout({ ...editingWorkout, items }) }}
+                            inputProps={{ style: { fontSize: '12px', padding: '6px 8px' } }} />
+                          <IconButton size="small" onClick={() => { const items = editingWorkout.items.filter((_, k) => k !== j); setEditingWorkout({ ...editingWorkout, items }) }}
+                            sx={{ color: C.muted, '&:hover': { color: '#F87171' } }}><DeleteOutlineIcon sx={{ fontSize: 14 }} /></IconButton>
+                        </Box>
+                      ))}
+                      <Box sx={{ display: 'flex', gap: 1, mt: 1 }}>
+                        <Button size="small" variant="contained" onClick={() => { updateWorkout(editingWorkout.id, editingWorkout.items); setEditingWorkout(null) }}
+                          sx={{ fontSize: '12px', fontWeight: 700, background: C.primary, color: C.primaryOn }}>{t('saveBtn') || 'Запази'}</Button>
+                        <Button size="small" onClick={() => setEditingWorkout(null)}
+                          sx={{ fontSize: '12px', color: C.muted }}>{t('cancelBtn') || 'Откажи'}</Button>
+                      </Box>
+                    </>
+                  ) : (
+                    (w.items || []).map((ex, j) => (
+                      <Box key={j} sx={{ display: 'grid', gridTemplateColumns: '1fr 90px 60px', gap: 1, py: 0.6, borderBottom: j < w.items.length - 1 ? `1px solid ${C.border}` : 'none' }}>
+                        <Typography sx={{ color: C.text, fontWeight: 600, fontSize: '13px' }}>{ex.exercise}</Typography>
+                        <Typography sx={{ color: C.muted, fontSize: '12.5px' }}>{ex.scheme}</Typography>
+                        <Typography sx={{ color: C.muted, fontSize: '12.5px', textAlign: 'right' }}>{ex.weight} {t('kgUnit')}</Typography>
+                      </Box>
+                    ))
+                  )}
                 </Paper>
               ))}
             </Box>
