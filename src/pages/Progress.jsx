@@ -95,11 +95,17 @@ export default function Progress() {
   const prevEarnedRef = useRef(null)
   const prevMonthlyRef = useRef(null)
 
-  // Detect new all-time badges
+  // Detect all-time badges (including earned while offline)
   useEffect(() => {
+    if (earnedIds.length === 0) return
     const dismissed = new Set(client.dismissedBadges || [])
     const undismissed = earnedIds.filter(id => !dismissed.has(id))
-    if (undismissed.length > 0 && prevEarnedRef.current !== null) {
+    if (prevEarnedRef.current === null) {
+      if (undismissed.length > 0) {
+        const badge = ALLTIME_BADGES.find(b => b.id === undismissed[0])
+        if (badge) setUnlockedBadge(badge)
+      }
+    } else {
       const newOnes = undismissed.filter(id => !prevEarnedRef.current.includes(id))
       if (newOnes.length > 0) {
         const badge = ALLTIME_BADGES.find(b => b.id === newOnes[0])
@@ -109,13 +115,18 @@ export default function Progress() {
     prevEarnedRef.current = earnedIds
   }, [earnedIds, client.dismissedBadges])
 
-  // Detect new monthly badges
+  // Detect monthly badges (including earned while offline)
   useEffect(() => {
+    if (monthlyEarnedIds.length === 0 && earnedIds.length === 0) return
     const dismissed = new Set(client.dismissedBadges || [])
-    if (prevMonthlyRef.current !== null) {
-      const newOnes = monthlyEarnedIds.filter(id =>
-        !prevMonthlyRef.current.includes(id) && !dismissed.has(`${id}:${currentMonthKey}`)
-      )
+    const undismissed = monthlyEarnedIds.filter(id => !dismissed.has(`${id}:${currentMonthKey}`))
+    if (prevMonthlyRef.current === null) {
+      if (undismissed.length > 0) {
+        const badge = MONTHLY_BADGES.find(b => b.id === undismissed[0])
+        if (badge) setUnlockedBadge(badge)
+      }
+    } else {
+      const newOnes = undismissed.filter(id => !prevMonthlyRef.current.includes(id))
       if (newOnes.length > 0) {
         const badge = MONTHLY_BADGES.find(b => b.id === newOnes[0])
         if (badge) setUnlockedBadge(badge)
