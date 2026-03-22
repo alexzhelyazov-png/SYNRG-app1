@@ -100,21 +100,33 @@ export default function Progress() {
   // ── Badge unlock notification ────────────────────────────────
   const [unlockedBadge, setUnlockedBadge] = useState(null)
 
-  // Detect undismissed badges (first load + live updates)
+  const prevEarnedRef = useRef(null)
+
+  // Detect NEW badges only (not already-earned ones on first load)
   useEffect(() => {
     if (earnedIds.length === 0) return
     if (unlockedBadge) return
+    if (prevEarnedRef.current === null) {
+      // First load: store current state, no celebration
+      prevEarnedRef.current = { alltime: [...earnedIds], monthly: [...monthlyEarnedIds] }
+      return
+    }
+    // Check for newly earned all-time badges
     const dismissed = new Set(client.dismissedBadges || [])
-    const undismissed = earnedIds.find(id => !dismissed.has(id))
-    if (undismissed) {
-      const badge = ALLTIME_BADGES.find(b => b.id === undismissed)
-      if (badge) { setUnlockedBadge(badge); return }
+    const newAlltime = earnedIds.find(id => !prevEarnedRef.current.alltime.includes(id) && !dismissed.has(id))
+    if (newAlltime) {
+      const badge = ALLTIME_BADGES.find(b => b.id === newAlltime)
+      if (badge) { setUnlockedBadge(badge); prevEarnedRef.current.alltime = [...earnedIds]; return }
     }
-    const undismissedMonthly = monthlyEarnedIds.find(id => !dismissed.has(`${id}:${currentMonthKey}`))
-    if (undismissedMonthly) {
-      const badge = MONTHLY_BADGES.find(b => b.id === undismissedMonthly)
-      if (badge) setUnlockedBadge(badge)
+    // Check for newly earned monthly badges
+    const newMonthly = monthlyEarnedIds.find(id =>
+      !prevEarnedRef.current.monthly.includes(id) && !dismissed.has(`${id}:${currentMonthKey}`)
+    )
+    if (newMonthly) {
+      const badge = MONTHLY_BADGES.find(b => b.id === newMonthly)
+      if (badge) { setUnlockedBadge(badge); prevEarnedRef.current.monthly = [...monthlyEarnedIds]; return }
     }
+    prevEarnedRef.current = { alltime: [...earnedIds], monthly: [...monthlyEarnedIds] }
   }, [earnedIds, monthlyEarnedIds, client.dismissedBadges, unlockedBadge])
 
   const handleDismissUnlock = () => {

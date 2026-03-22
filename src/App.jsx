@@ -10,7 +10,7 @@ import { isAdmin }             from './lib/bookingUtils'
 import { hasModule }           from './lib/modules'
 import {
   evaluateBadges, evaluateMonthlyBadgesForMonth, getCurrentMonthKey,
-  ALLTIME_BADGES, MONTHLY_BADGES, BADGES,
+  ALLTIME_BADGES, MONTHLY_BADGES,
   computeTotalXP, computeLevel, getLevelName,
 } from './lib/gamification'
 
@@ -109,36 +109,40 @@ function PageTransition({ children, viewKey }) {
   )
 }
 
-// ── Global badge unlock watcher ──────────────────────────────────
+// ── Global badge + level-up watcher ──────────────────────────────
 function BadgeUnlockWatcher() {
   const { client, t, lang, dismissBadge } = useApp()
   const [unlockedBadge, setUnlockedBadge] = useState(null)
   const [levelUpInfo, setLevelUpInfo]     = useState(null)
+  const prevEarnedRef  = useRef(null)
   const prevLevelRef   = useRef(null)
 
-  const currentMonthKey = useMemo(() => getCurrentMonthKey(), [])
-  const earnedIds       = useMemo(() => evaluateBadges(client), [client.meals, client.weightLogs, client.workouts, client.stepsLogs])
+  const currentMonthKey  = useMemo(() => getCurrentMonthKey(), [])
+  const earnedIds        = useMemo(() => evaluateBadges(client), [client.meals, client.weightLogs, client.workouts, client.stepsLogs])
   const monthlyEarnedIds = useMemo(() => evaluateMonthlyBadgesForMonth(client, currentMonthKey), [client.meals, client.weightLogs, client.workouts, client.stepsLogs, currentMonthKey])
-  const totalXP         = useMemo(() => computeTotalXP(earnedIds, client), [earnedIds, client])
-  const levelData       = useMemo(() => computeLevel(totalXP), [totalXP])
+  const totalXP          = useMemo(() => computeTotalXP(earnedIds, client), [earnedIds, client])
+  const levelData        = useMemo(() => computeLevel(totalXP), [totalXP])
 
-  // Detect undismissed badges (first load + live updates)
+  // Detect NEW badges (not on first load — only live changes)
   useEffect(() => {
     if (earnedIds.length === 0) return
-    if (unlockedBadge) return // already showing one, wait for dismiss
+    if (unlockedBadge) return
+    if (prevEarnedRef.current === null) {
+      prevEarnedRef.current = { a: [...earnedIds], m: [...monthlyEarnedIds] }
+      return
+    }
     const dismissed = new Set(client.dismissedBadges || [])
-    // Find first undismissed all-time badge
-    const undismissed = earnedIds.find(id => !dismissed.has(id))
-    if (undismissed) {
-      const badge = ALLTIME_BADGES.find(b => b.id === undismissed)
-      if (badge) { setUnlockedBadge(badge); return }
+    const newA = earnedIds.find(id => !prevEarnedRef.current.a.includes(id) && !dismissed.has(id))
+    if (newA) {
+      const badge = ALLTIME_BADGES.find(b => b.id === newA)
+      if (badge) { setUnlockedBadge(badge); prevEarnedRef.current.a = [...earnedIds]; return }
     }
-    // Find first undismissed monthly badge
-    const undismissedMonthly = monthlyEarnedIds.find(id => !dismissed.has(`${id}:${currentMonthKey}`))
-    if (undismissedMonthly) {
-      const badge = MONTHLY_BADGES.find(b => b.id === undismissedMonthly)
-      if (badge) setUnlockedBadge(badge)
+    const newM = monthlyEarnedIds.find(id => !prevEarnedRef.current.m.includes(id) && !dismissed.has(`${id}:${currentMonthKey}`))
+    if (newM) {
+      const badge = MONTHLY_BADGES.find(b => b.id === newM)
+      if (badge) { setUnlockedBadge(badge); prevEarnedRef.current.m = [...monthlyEarnedIds]; return }
     }
+    prevEarnedRef.current = { a: [...earnedIds], m: [...monthlyEarnedIds] }
   }, [earnedIds, monthlyEarnedIds, client.dismissedBadges, unlockedBadge])
 
   // Detect level up
@@ -150,15 +154,12 @@ function BadgeUnlockWatcher() {
     prevLevelRef.current = curLevel
   }, [levelData.level, lang])
 
-  // Auto-dismiss badge toast
+  // Auto-dismiss after 4s
   useEffect(() => {
     if (!unlockedBadge) return
     const timer = setTimeout(() => {
-      if (unlockedBadge.monthly) {
-        dismissBadge(unlockedBadge.id, currentMonthKey)
-      } else {
-        dismissBadge(unlockedBadge.id)
-      }
+      if (unlockedBadge.monthly) dismissBadge(unlockedBadge.id, currentMonthKey)
+      else dismissBadge(unlockedBadge.id)
       setUnlockedBadge(null)
     }, 4000)
     return () => clearTimeout(timer)
@@ -168,11 +169,8 @@ function BadgeUnlockWatcher() {
     <>
       {unlockedBadge && (
         <BadgeUnlockedToast badge={unlockedBadge} t={t} onDismiss={() => {
-          if (unlockedBadge.monthly) {
-            dismissBadge(unlockedBadge.id, currentMonthKey)
-          } else {
-            dismissBadge(unlockedBadge.id)
-          }
+          if (unlockedBadge.monthly) dismissBadge(unlockedBadge.id, currentMonthKey)
+          else dismissBadge(unlockedBadge.id)
           setUnlockedBadge(null)
         }} />
       )}
