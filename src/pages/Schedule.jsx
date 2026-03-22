@@ -20,7 +20,7 @@ import { C }              from '../theme'
 import { isAdmin, fmtTime, occupancyStr, isoToday } from '../lib/bookingUtils'
 
 // ── Constants ──────────────────────────────────────────────────
-const HOURS       = [8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]
+const HOURS       = [8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]
 const WEEKDAYS_BG = ['Нед', 'Пон', 'Вт', 'Ср', 'Чет', 'Пет', 'Съб']
 const WEEKDAYS_EN = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
@@ -663,7 +663,7 @@ export default function Schedule() {
               gridTemplateColumns: '48px repeat(3, 1fr)',
               borderBottom: `1px solid ${C.border}`,
               '&:last-child': { borderBottom: 'none' },
-              minHeight: 56,
+              minHeight: 44,
             }}>
               {/* Time label */}
               <Box sx={{
@@ -689,7 +689,7 @@ export default function Schedule() {
                     sx={{
                       borderLeft: `1px solid ${C.border}`,
                       p: '4px 5px',
-                      minHeight: 44,
+                      minHeight: 34,
                       cursor: admin && isEmpty ? 'pointer' : 'default',
                       '&:hover': admin && isEmpty ? { background: C.primaryA5 } : {},
                       display: 'flex', flexDirection: 'column', position: 'relative',
