@@ -221,7 +221,7 @@ export function BookingProvider({ children }) {
   }, [loadSlots])
 
   // ── Admin: activate plan for client ──────────────────────
-  const activatePlan = useCallback(async (clientId, planType, validFrom, price = 0, startCredits = null, isPaid = false) => {
+  const activatePlan = useCallback(async (clientId, planType, validFrom, price = 0, startCredits = null, isPaid = false, validTo = null) => {
     try {
       const creditsTotal = planType === '8' ? 8 : planType === '12' ? 12 : null
       // If startCredits provided (migration), compute credits_used = total - remaining
@@ -229,9 +229,8 @@ export function BookingProvider({ children }) {
         ? Math.max(0, creditsTotal - Number(startCredits))
         : 0
       const from = validFrom || isoToday()
-      const toDate = new Date(from + 'T00:00:00')
-      toDate.setDate(toDate.getDate() + 30)
-      const to = toDate.toISOString().slice(0, 10)
+      let to = validTo
+      if (!to) { const toDate = new Date(from + 'T00:00:00'); toDate.setDate(toDate.getDate() + 30); to = toDate.toISOString().slice(0, 10) }
       const existing = await DB.getClientActivePlan(clientId)
       if (existing) {
         await DB.update('client_plans', existing.id, { status: 'expired' })

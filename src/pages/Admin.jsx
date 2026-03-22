@@ -227,8 +227,9 @@ function SlotDialog({ open, onClose, onSave, coaches, t }) {
 // ── Activate/manage plan dialog ──────────────────────────────
 function PlanDialog({ open, onClose, onActivate, onExtend, onAdjust, onTogglePaid, client, plan, t }) {
   const [mode,          setMode]         = useState('activate') // 'activate' | 'extend' | 'adjust'
-  const [planType,      setPlanType]     = useState('8')
+  const [planType,      setPlanType]     = useState('')
   const [validFrom,     setValidFrom]    = useState(isoToday())
+  const [validTo,       setValidTo]      = useState(() => isoDatePlusDays(30))
   const [extendTo,      setExtendTo]     = useState('')
   const [credUsed,      setCredUsed]     = useState(plan?.credits_used ?? 0)
   const [price,         setPrice]        = useState(plan?.price ?? DEFAULT_PRICES['8'])
@@ -241,6 +242,12 @@ function PlanDialog({ open, onClose, onActivate, onExtend, onAdjust, onTogglePai
     setStartCredits('')
     if (!plan) setPrice(DEFAULT_PRICES[planType] ?? 0)
   }, [planType])
+
+  // When validFrom changes, update validTo to 30 days later
+  useEffect(() => {
+    const d = new Date(validFrom + 'T00:00:00'); d.setDate(d.getDate() + 30)
+    setValidTo(d.toISOString().slice(0, 10))
+  }, [validFrom])
 
   useEffect(() => {
     if (plan) {
@@ -255,7 +262,7 @@ function PlanDialog({ open, onClose, onActivate, onExtend, onAdjust, onTogglePai
     let res
     if (mode === 'activate') {
       const sc = startCredits !== '' ? Number(startCredits) : null
-      res = await onActivate(client.id, planType, validFrom, price, sc, isPaid)
+      res = await onActivate(client.id, planType, validFrom, price, sc, isPaid, validTo)
     } else if (mode === 'extend') {
       res = await onExtend(plan.id, extendTo)
     } else if (mode === 'adjust') {
@@ -329,7 +336,9 @@ function PlanDialog({ open, onClose, onActivate, onExtend, onAdjust, onTogglePai
             <FormControl fullWidth size="small">
               <InputLabel sx={{ color: C.muted }}>{t('selectPlanType')}</InputLabel>
               <Select value={planType} onChange={e => setPlanType(e.target.value)} label={t('selectPlanType')}
-                sx={{ color: C.text, '.MuiOutlinedInput-notchedOutline': { borderColor: C.border } }}>
+                displayEmpty
+                sx={{ color: planType ? C.text : C.muted, '.MuiOutlinedInput-notchedOutline': { borderColor: C.border } }}>
+                <MenuItem value="" disabled><em>{t('selectPlanType')}</em></MenuItem>
                 {PLAN_TYPES.map(pt => <MenuItem key={pt} value={pt}>{planLabel(pt, t)}</MenuItem>)}
               </Select>
             </FormControl>
@@ -374,12 +383,9 @@ function PlanDialog({ open, onClose, onActivate, onExtend, onAdjust, onTogglePai
               )
             })()}
 
-            <Typography sx={{ fontSize: '12px', color: C.muted }}>
-              {t('validUntil')}: {(() => {
-                const d = new Date(validFrom + 'T00:00:00'); d.setDate(d.getDate() + 30)
-                return d.toLocaleDateString('bg-BG', { day: 'numeric', month: 'long', year: 'numeric' })
-              })()}
-            </Typography>
+            <TextField label={t('validUntil')} type="date" size="small"
+              value={validTo} onChange={e => setValidTo(e.target.value)}
+              sx={inputSx} InputLabelProps={{ shrink: true }} />
           </>
         )}
 
@@ -727,8 +733,8 @@ function PlansTab({ t }) {
     return allPlans.find(p => p.client_id === clientId && p.status === 'active') || null
   }
 
-  async function handleActivate(clientId, planType, from, price, startCredits, isPaid) {
-    const res = await activatePlan(clientId, planType, from, price, startCredits, isPaid)
+  async function handleActivate(clientId, planType, from, price, startCredits, isPaid, validTo) {
+    const res = await activatePlan(clientId, planType, from, price, startCredits, isPaid, validTo)
     if (res?.error) { showSnackbar('Грешка: ' + res.error); return res }
     showSnackbar(t('planActivatedMsg'))
     return { ok: true }
@@ -908,8 +914,8 @@ function ClientsTab({ t }) {
     return p && isPlanActive(p)
   })
 
-  async function handleActivate(clientId, planType, from, price, startCredits, isPaid) {
-    const res = await activatePlan(clientId, planType, from, price, startCredits, isPaid)
+  async function handleActivate(clientId, planType, from, price, startCredits, isPaid, validTo) {
+    const res = await activatePlan(clientId, planType, from, price, startCredits, isPaid, validTo)
     if (res?.error) { showSnackbar('Грешка: ' + res.error); return res }
     showSnackbar(t('planActivatedMsg'))
     return { ok: true }
