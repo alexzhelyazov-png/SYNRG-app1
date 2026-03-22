@@ -300,10 +300,10 @@ function AppShell() {
               <ClientDetail />
             ) : (
               <>
-                {view !== 'dashboard' && (
+                {auth.isLoggedIn && view !== 'dashboard' && (
                   <Button size="small" startIcon={<ArrowBackIcon />} onClick={() => setView('dashboard')}
                     sx={{ color: C.muted, '&:hover': { color: C.purple }, pl: 0, mb: 1 }}>
-                    {t?.('backBtn') || 'Back'}
+                    {t('backBtn')}
                   </Button>
                 )}
                 {view === 'dashboard' && <Dashboard />}
