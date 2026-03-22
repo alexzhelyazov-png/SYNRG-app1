@@ -275,7 +275,14 @@ export const PR_EXERCISES = [
       { v: 60, label: '60kg', xp: 20 },
     ],
   },
-  { id: 'pr_pushups', labelBg: 'Лицеви опори', labelEn: 'Push-ups', keywords: ['лицеви', 'л.о', 'pushup', 'push-up'], muiIcon: 'FitnessCenter', type: 'reps', unit: '',
+  { id: 'pr_pushups_knee', labelBg: 'Л.О. от колене', labelEn: 'Knee Push-ups', keywords: ['колене'], muiIcon: 'FitnessCenter', type: 'reps', unit: '',
+    milestones: [
+      { v: 5,  label: '5п',  xp: 5 },
+      { v: 10, label: '10п', xp: 5 },
+      { v: 15, label: '15п', xp: 10 },
+    ],
+  },
+  { id: 'pr_pushups', labelBg: 'Лицеви опори', labelEn: 'Push-ups', keywords: ['лицеви', 'л.о'], excludeKeywords: ['колене', 'пейка'], muiIcon: 'FitnessCenter', type: 'reps', unit: '',
     milestones: [
       { v: 3,  label: '3п',  xp: 5 },
       { v: 5,  label: '5п',  xp: 5 },
@@ -286,7 +293,13 @@ export const PR_EXERCISES = [
       { v: 20, label: '20п', xp: 20 },
     ],
   },
-  { id: 'pr_pullups', labelBg: 'Набирания', labelEn: 'Pull-ups', keywords: ['набирания', 'набиране', 'pullup', 'pull-up', 'ластик'], muiIcon: 'FitnessCenter', type: 'reps', unit: '',
+  { id: 'pr_pullups_band', labelBg: 'Набирания с ластик', labelEn: 'Band Pull-ups', keywords: ['ластик'], muiIcon: 'FitnessCenter', type: 'reps', unit: '',
+    milestones: [
+      { v: 5,  label: '5п',  xp: 5 },
+      { v: 10, label: '10п', xp: 5 },
+    ],
+  },
+  { id: 'pr_pullups', labelBg: 'Набирания', labelEn: 'Pull-ups', keywords: ['набирания', 'набиране'], excludeKeywords: ['ластик'], muiIcon: 'FitnessCenter', type: 'reps', unit: '',
     milestones: [
       { v: 1,  label: '1п',  xp: 5 },
       { v: 3,  label: '3п',  xp: 10 },
@@ -298,14 +311,21 @@ export const PR_EXERCISES = [
   },
 ]
 
+/** Check if exercise name matches keywords but not excludeKeywords */
+function matchesExercise(name, keywords, excludeKeywords) {
+  if (!keywords.some(kw => name.includes(kw))) return false
+  if (excludeKeywords && excludeKeywords.some(kw => name.includes(kw))) return false
+  return true
+}
+
 /** Get best weight for a PR exercise (fuzzy keyword match). Returns -1 if exercise never done. */
-function getBestWeight(workouts, keywords) {
+function getBestWeight(workouts, keywords, excludeKeywords) {
   let best = -1
   for (const w of (workouts || [])) {
     for (const item of (w.items || [])) {
       const name = (item.exercise || '').toLowerCase().trim()
       if (!name) continue
-      if (!keywords.some(kw => name.includes(kw))) continue
+      if (!matchesExercise(name, keywords, excludeKeywords)) continue
       const weight = parseFloat(item.weight) || 0
       if (weight > best) best = weight
     }
@@ -314,14 +334,13 @@ function getBestWeight(workouts, keywords) {
 }
 
 /** Get best reps for a bodyweight PR exercise (parse scheme like "3x15" or "3х15"). Returns -1 if never done. */
-function getBestReps(workouts, keywords) {
+function getBestReps(workouts, keywords, excludeKeywords) {
   let best = -1
   for (const w of (workouts || [])) {
     for (const item of (w.items || [])) {
       const name = (item.exercise || '').toLowerCase().trim()
       if (!name) continue
-      if (!keywords.some(kw => name.includes(kw))) continue
-      // Parse reps from scheme (e.g. "3x15", "3х15", "15")
+      if (!matchesExercise(name, keywords, excludeKeywords)) continue
       const scheme = (item.scheme || '').toLowerCase().trim()
       const match = scheme.match(/[xх](\d+)/)
       const reps = match ? parseInt(match[1]) : parseInt(scheme) || 0
@@ -336,7 +355,7 @@ function getBestReps(workouts, keywords) {
 export function getCurrentPRs(workouts) {
   const result = {}
   for (const ex of PR_EXERCISES) {
-    const best = ex.type === 'weight' ? getBestWeight(workouts, ex.keywords) : getBestReps(workouts, ex.keywords)
+    const best = ex.type === 'weight' ? getBestWeight(workouts, ex.keywords, ex.excludeKeywords) : getBestReps(workouts, ex.keywords, ex.excludeKeywords)
     const unlockedIdx = []
     for (let i = 0; i < ex.milestones.length; i++) {
       if (best >= ex.milestones[i].v) unlockedIdx.push(i)
