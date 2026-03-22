@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect, useRef } from 'react'
-import { Box, CircularProgress, Typography, Button, Alert, Snackbar, useMediaQuery } from '@mui/material'
+import { Box, CircularProgress, Typography, Button, Alert, Snackbar, IconButton, useMediaQuery } from '@mui/material'
 import WarningAmberIcon from '@mui/icons-material/WarningAmber'
+import ArrowBackIcon from '@mui/icons-material/ArrowBack'
 import { ThemeProvider, useTheme } from '@mui/material/styles'
 import CssBaseline from '@mui/material/CssBaseline'
 import { AppProvider, useApp } from './context/AppContext'
@@ -237,7 +238,7 @@ function BadgeUnlockWatcher() {
 // ── Main logged-in layout ────────────────────────────────────────
 function AppShell() {
   const {
-    auth, view, client,
+    auth, view, setView, client,
     loading, loadError, loadAll,
     snackbar, closeSnackbar,
     coachClientMode,
@@ -299,6 +300,12 @@ function AppShell() {
               <ClientDetail />
             ) : (
               <>
+                {view !== 'dashboard' && (
+                  <Button size="small" startIcon={<ArrowBackIcon />} onClick={() => setView('dashboard')}
+                    sx={{ color: C.muted, '&:hover': { color: C.purple }, pl: 0, mb: 1 }}>
+                    {t?.('backBtn') || 'Back'}
+                  </Button>
+                )}
                 {view === 'dashboard' && <Dashboard />}
                 {view === 'progress'  && (auth.role !== 'client' || hasModule(auth.modules, 'nutrition_tracking') || hasModule(auth.modules, 'weight_tracking')) && <Progress />}
                 {view === 'food'      && (auth.role !== 'client' || hasModule(auth.modules, 'nutrition_tracking')) && <FoodTracker />}
