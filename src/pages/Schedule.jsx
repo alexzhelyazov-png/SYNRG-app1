@@ -20,7 +20,7 @@ import { C }              from '../theme'
 import { isAdmin, fmtTime, occupancyStr, isoToday } from '../lib/bookingUtils'
 
 // ── Constants ──────────────────────────────────────────────────
-const HOURS       = [8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]
+const HOURS       = [9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]
 const WEEKDAYS_BG = ['Нед', 'Пон', 'Вт', 'Ср', 'Чет', 'Пет', 'Съб']
 const WEEKDAYS_EN = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
@@ -428,18 +428,18 @@ function SlotCell({ slot, adminMode, onEdit, onDelete, onAddClient, bookings = [
         }}>
           <IconButton size="small"
             onClick={e => { e.stopPropagation(); onAddClient(slot) }}
-            sx={{ p: '2px', color: C.muted, '&:hover': { color: C.purple } }}>
-            <PersonAddIcon sx={{ fontSize: 11 }} />
+            sx={{ p: '3px', color: C.muted, '&:hover': { color: C.purple } }}>
+            <PersonAddIcon sx={{ fontSize: 16 }} />
           </IconButton>
           <IconButton size="small"
             onClick={e => { e.stopPropagation(); onEdit(slot) }}
-            sx={{ p: '2px', color: C.muted, '&:hover': { color: C.purple } }}>
-            <EditIcon sx={{ fontSize: 11 }} />
+            sx={{ p: '3px', color: C.muted, '&:hover': { color: C.purple } }}>
+            <EditIcon sx={{ fontSize: 16 }} />
           </IconButton>
           <IconButton size="small"
             onClick={e => { e.stopPropagation(); setConfirmDel(true) }}
-            sx={{ p: '2px', color: C.muted, '&:hover': { color: '#F87171' } }}>
-            <DeleteOutlineIcon sx={{ fontSize: 11 }} />
+            sx={{ p: '3px', color: C.muted, '&:hover': { color: '#F87171' } }}>
+            <DeleteOutlineIcon sx={{ fontSize: 16 }} />
           </IconButton>
         </Box>
       )}
@@ -663,7 +663,7 @@ export default function Schedule() {
               gridTemplateColumns: '48px repeat(3, 1fr)',
               borderBottom: `1px solid ${C.border}`,
               '&:last-child': { borderBottom: 'none' },
-              minHeight: 44,
+              minHeight: 40,
             }}>
               {/* Time label */}
               <Box sx={{
@@ -688,8 +688,8 @@ export default function Schedule() {
                     onClick={admin && isEmpty ? () => { setCellTarget({ date, hour }); setShowCellDlg(true) } : undefined}
                     sx={{
                       borderLeft: `1px solid ${C.border}`,
-                      p: '4px 5px',
-                      minHeight: 34,
+                      p: '3px 4px',
+                      minHeight: 30,
                       cursor: admin && isEmpty ? 'pointer' : 'default',
                       '&:hover': admin && isEmpty ? { background: C.primaryA5 } : {},
                       display: 'flex', flexDirection: 'column', position: 'relative',
