@@ -419,8 +419,8 @@ function SlotCell({ slot, adminMode, onEdit, onDelete, onAddClient, bookings = [
         ))}
       </Box>
 
-      {/* Admin action buttons (shown on hover) */}
-      {adminMode && hover && !confirmDel && (
+      {/* Admin action buttons (always visible for easier mobile use) */}
+      {adminMode && !confirmDel && (
         <Box sx={{
           position: 'absolute', top: 2, right: 2, zIndex: 10,
           display: 'flex', gap: '2px',
@@ -706,15 +706,14 @@ export default function Schedule() {
                         onAddClient={s => { setAddTarget(s); setShowAddDlg(true) }}
                       />
                     ))}
-                    {/* Faint "+" hint for empty admin cells */}
+                    {/* "+" hint for empty admin cells — always visible */}
                     {admin && isEmpty && (
                       <Box sx={{
                         position: 'absolute', inset: 0,
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        opacity: 0, transition: 'opacity 0.15s',
-                        '.MuiBox-root:hover > &': { opacity: 1 },
+                        opacity: 0.4,
                       }}>
-                        <AddIcon sx={{ fontSize: 14, color: C.muted }} />
+                        <AddIcon sx={{ fontSize: 18, color: C.muted }} />
                       </Box>
                     )}
                   </Box>
