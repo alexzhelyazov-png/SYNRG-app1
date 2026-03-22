@@ -125,12 +125,12 @@ function BadgeUnlockWatcher() {
 
   // Detect NEW badges (not on first load — only live changes)
   useEffect(() => {
-    if (earnedIds.length === 0) return
     if (unlockedBadge) return
     if (prevEarnedRef.current === null) {
       prevEarnedRef.current = { a: [...earnedIds], m: [...monthlyEarnedIds] }
       return
     }
+    if (earnedIds.length === 0) return
     const dismissed = new Set(client.dismissedBadges || [])
     const newA = earnedIds.find(id => !prevEarnedRef.current.a.includes(id) && !dismissed.has(id))
     if (newA) {
