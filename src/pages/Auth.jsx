@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react'
-import { Box, Paper, Typography, TextField, Button, Alert, Dialog, useMediaQuery, useTheme } from '@mui/material'
+import { Box, Paper, Typography, TextField, Button, Alert, Dialog, useMediaQuery, useTheme, InputAdornment, IconButton } from '@mui/material'
 import ArrowBackIcon from '@mui/icons-material/ArrowBack'
 import GetAppIcon from '@mui/icons-material/GetApp'
+import VisibilityIcon from '@mui/icons-material/Visibility'
+import VisibilityOffIcon from '@mui/icons-material/VisibilityOff'
 import { useApp } from '../context/AppContext'
 import { DB, isUsingSupabase } from '../lib/db'
 import { C, EASE } from '../theme'
@@ -23,6 +25,7 @@ export default function Auth() {
   const [email,   setEmail]   = useState('')
   const [pass,    setPass]    = useState('')
   const [pass2,   setPass2]   = useState('')
+  const [showPass, setShowPass] = useState(false)
   const [resetCode, setResetCode] = useState('')
   const [resetEmail, setResetEmail] = useState('')
   const [error,   setError]   = useState('')
@@ -310,12 +313,13 @@ export default function Auth() {
               inputProps={{ style: { fontSize: '15px', padding: '13px 14px', letterSpacing: '4px', textAlign: 'center' } }}
             />
             <TextField
-              fullWidth type="password"
+              fullWidth type={showPass ? 'text' : 'password'}
               placeholder={t('newPassPlaceholder')}
               value={pass}
               onChange={e => setPass(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && handleForgotVerify()}
               inputProps={{ style: { fontSize: '15px', padding: '13px 14px' } }}
+              InputProps={{ endAdornment: <InputAdornment position="end"><IconButton onClick={() => setShowPass(p => !p)} edge="end" sx={{ color: C.muted }}>{showPass ? <VisibilityOffIcon /> : <VisibilityIcon />}</IconButton></InputAdornment> }}
               autoComplete="new-password"
             />
             {error && <Alert severity="error" sx={{ borderRadius: '12px', fontSize: '13px', py: 0.75 }}>{error}</Alert>}
@@ -357,23 +361,25 @@ export default function Auth() {
             )}
             <TextField
               fullWidth
-              type="password"
+              type={showPass ? 'text' : 'password'}
               placeholder={t('passPlaceholder')}
               value={pass}
               onChange={e => setPass(e.target.value)}
               onKeyDown={e => !isRegister && e.key === 'Enter' && handleSubmit()}
               inputProps={{ style: { fontSize: '15px', padding: '13px 14px' } }}
+              InputProps={{ endAdornment: <InputAdornment position="end"><IconButton onClick={() => setShowPass(p => !p)} edge="end" sx={{ color: C.muted }}>{showPass ? <VisibilityOffIcon /> : <VisibilityIcon />}</IconButton></InputAdornment> }}
               autoComplete={isRegister ? 'new-password' : 'current-password'}
             />
             {isRegister && (
               <TextField
                 fullWidth
-                type="password"
+                type={showPass ? 'text' : 'password'}
                 placeholder={t('repeatPass')}
                 value={pass2}
                 onChange={e => setPass2(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && handleSubmit()}
                 inputProps={{ style: { fontSize: '15px', padding: '13px 14px' } }}
+                InputProps={{ endAdornment: <InputAdornment position="end"><IconButton onClick={() => setShowPass(p => !p)} edge="end" sx={{ color: C.muted }}>{showPass ? <VisibilityOffIcon /> : <VisibilityIcon />}</IconButton></InputAdornment> }}
                 autoComplete="new-password"
               />
             )}
