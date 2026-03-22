@@ -389,16 +389,16 @@ function SlotCell({ slot, adminMode, onEdit, onDelete, onAddClient, bookings = [
             >
               <Box onClick={() => openClient(booking)} sx={{
                 borderRadius: '6px',
-                px: '6px', py: '5px',
+                px: '4px', py: '3px',
                 background: hexRgba(base, 0.30),
                 border: `1px solid ${hexRgba(base, 0.58)}`,
                 overflow: 'hidden',
                 cursor: auth.role !== 'client' ? 'pointer' : 'default',
               }}>
                 <Typography sx={{
-                  fontSize: '12px', fontWeight: 800,
+                  fontSize: '10px', fontWeight: 700,
                   color: base,
-                  lineHeight: 1.3,
+                  lineHeight: 1.2,
                   display: '-webkit-box',
                   WebkitLineClamp: 2,
                   WebkitBoxOrient: 'vertical',
@@ -663,7 +663,7 @@ export default function Schedule() {
               gridTemplateColumns: '48px repeat(3, 1fr)',
               borderBottom: `1px solid ${C.border}`,
               '&:last-child': { borderBottom: 'none' },
-              minHeight: 72,
+              minHeight: 56,
             }}>
               {/* Time label */}
               <Box sx={{
@@ -689,7 +689,7 @@ export default function Schedule() {
                     sx={{
                       borderLeft: `1px solid ${C.border}`,
                       p: '4px 5px',
-                      minHeight: 58,
+                      minHeight: 44,
                       cursor: admin && isEmpty ? 'pointer' : 'default',
                       '&:hover': admin && isEmpty ? { background: C.primaryA5 } : {},
                       display: 'flex', flexDirection: 'column', position: 'relative',
