@@ -120,7 +120,7 @@ function BadgeUnlockWatcher() {
 
   const currentMonthKey = useMemo(() => getCurrentMonthKey(), [])
   const earnedIds       = useMemo(() => evaluateBadges(client), [client.meals, client.weightLogs, client.workouts, client.stepsLogs])
-  const monthlyEarnedIds = useMemo(() => evaluateMonthlyBadgesForMonth(client, currentMonthKey), [client, currentMonthKey])
+  const monthlyEarnedIds = useMemo(() => evaluateMonthlyBadgesForMonth(client, currentMonthKey), [client.meals, client.weightLogs, client.workouts, client.stepsLogs, currentMonthKey])
   const totalXP         = useMemo(() => computeTotalXP(earnedIds, client), [earnedIds, client])
   const levelData       = useMemo(() => computeLevel(totalXP), [totalXP])
 
