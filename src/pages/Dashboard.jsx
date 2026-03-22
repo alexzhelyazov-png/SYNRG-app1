@@ -3,6 +3,7 @@ import { Box, Typography, TextField, Button, Chip, Paper, Switch, Collapse, Tabs
 import ArrowBackIcon from '@mui/icons-material/ArrowBack'
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline'
 import EditIcon from '@mui/icons-material/Edit'
+import CheckIcon from '@mui/icons-material/Check'
 import RestaurantIcon from '@mui/icons-material/Restaurant'
 import MonitorWeightIcon from '@mui/icons-material/MonitorWeight'
 import DirectionsWalkIcon from '@mui/icons-material/DirectionsWalk'
@@ -17,7 +18,7 @@ import WeightTracker from './WeightTracker'
 import { todayDate, fmt1, parseDate } from '../lib/utils'
 import { computeReminders } from '../lib/reminders'
 import {
-  creditsRemaining, isoToday, isoDatePlusDays, daysUntilExpiry, fmtValidTo,
+  creditsRemaining, effectiveValidTo, isoToday, isoDatePlusDays, daysUntilExpiry, fmtValidTo,
   groupByDate, dayLabel, fmtTime, canClientBook, canClientCancel, isPlanActive,
 } from '../lib/bookingUtils'
 import { hasModule, hasAnyModule } from '../lib/modules'
@@ -430,10 +431,12 @@ export function ClientDetail() {
     currentWorkout, setCurrentWorkout,
     addExercise, saveWorkout,
   } = useApp()
-  const { allPlans, loadAllPlans, slots, slotBookings } = useBooking()
+  const { allPlans, loadAllPlans, slots, slotBookings, extendPlan, adjustCredits } = useBooking()
 
   const [tab, setTab] = useState(0)
   const [editingTargets, setEditingTargets] = useState(null) // { cal, prot }
+  const [editCredits, setEditCredits] = useState(null)   // credits_used value or null
+  const [editValidTo, setEditValidTo] = useState(null)   // date string or null
   const isMobile = window.innerWidth < 640
   const isCoach = auth.role === 'coach' || auth.role === 'admin'
 
@@ -732,9 +735,31 @@ export function ClientDetail() {
                   </Box>
                 )}
               </Box>
-              <Typography sx={{ fontSize: '36px', fontWeight: 800, color: C.text, lineHeight: 1, fontFamily: "'MontBlanc', sans-serif", mb: 2 }}>
-                {!plan ? '—' : plan.plan_type === 'unlimited' ? '∞' : `${remCred} / ${plan.credits_total}`}
-              </Typography>
+
+              {/* Credits display / edit */}
+              {editCredits !== null && plan && plan.plan_type !== 'unlimited' ? (
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                  <TextField type="number" size="small" value={editCredits}
+                    onChange={e => setEditCredits(e.target.value)}
+                    inputProps={{ min: 0, max: plan.credits_total || 99 }}
+                    sx={{ width: 80, '& .MuiInputBase-input': { fontSize: '15px', p: '8px 12px', color: C.text }, '& .MuiOutlinedInput-notchedOutline': { borderColor: C.border } }}
+                  />
+                  <Typography sx={{ fontSize: '13px', color: C.muted }}>/ {plan.credits_total} {t('usedLbl') || 'използвани'}</Typography>
+                  <IconButton size="small" onClick={async () => { await adjustCredits(plan.id, Number(editCredits)); setEditCredits(null) }}
+                    sx={{ color: C.primary }}><CheckIcon sx={{ fontSize: 18 }} /></IconButton>
+                </Box>
+              ) : (
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                  <Typography sx={{ fontSize: '36px', fontWeight: 800, color: C.text, lineHeight: 1, fontFamily: "'MontBlanc', sans-serif" }}>
+                    {!plan ? '—' : plan.plan_type === 'unlimited' ? '∞' : `${remCred} / ${plan.credits_total}`}
+                  </Typography>
+                  {isCoach && plan && plan.plan_type !== 'unlimited' && (
+                    <IconButton size="small" onClick={() => setEditCredits(plan.credits_used || 0)}
+                      sx={{ color: C.muted, ml: 0.5 }}><EditIcon sx={{ fontSize: 14 }} /></IconButton>
+                  )}
+                </Box>
+              )}
+
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75 }}>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <Typography sx={{ fontSize: '13px', color: C.muted }}>{t('nextSessionLbl')}</Typography>
@@ -743,12 +768,30 @@ export function ClientDetail() {
                   </Typography>
                 </Box>
                 {plan && (
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Typography sx={{ fontSize: '13px', color: C.muted }}>{t('validToLbl') || 'Валиден до'}</Typography>
-                    <Typography sx={{ fontSize: '14px', fontWeight: 700, color: C.text }}>
-                      {fmtValidTo(plan, lang)}
-                    </Typography>
-                  </Box>
+                  editValidTo !== null ? (
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Typography sx={{ fontSize: '13px', color: C.muted, flexShrink: 0 }}>{t('validToLbl') || 'Валиден до'}</Typography>
+                      <TextField type="date" size="small" value={editValidTo}
+                        onChange={e => setEditValidTo(e.target.value)}
+                        sx={{ flex: 1, '& .MuiInputBase-input': { fontSize: '13px', p: '6px 10px', color: C.text }, '& .MuiOutlinedInput-notchedOutline': { borderColor: C.border }, '& .MuiInputBase-input::-webkit-calendar-picker-indicator': { filter: 'invert(0.7)' } }}
+                      />
+                      <IconButton size="small" onClick={async () => { await extendPlan(plan.id, editValidTo); setEditValidTo(null) }}
+                        sx={{ color: C.primary }}><CheckIcon sx={{ fontSize: 18 }} /></IconButton>
+                    </Box>
+                  ) : (
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <Typography sx={{ fontSize: '13px', color: C.muted }}>{t('validToLbl') || 'Валиден до'}</Typography>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                        <Typography sx={{ fontSize: '14px', fontWeight: 700, color: C.text }}>
+                          {fmtValidTo(plan, lang)}
+                        </Typography>
+                        {isCoach && (
+                          <IconButton size="small" onClick={() => setEditValidTo(effectiveValidTo(plan) || '')}
+                            sx={{ color: C.muted }}><EditIcon sx={{ fontSize: 14 }} /></IconButton>
+                        )}
+                      </Box>
+                    </Box>
+                  )
                 )}
               </Box>
             </Paper>
