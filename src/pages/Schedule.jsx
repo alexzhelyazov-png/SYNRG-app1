@@ -369,45 +369,37 @@ function SlotCell({ slot, adminMode, onEdit, onDelete, onAddClient, bookings = [
     if (idx >= 0) { setSelIdx(idx); setCoachClientMode(true) }
   }
 
+  const [showActions, setShowActions] = useState(false)
+
   return (
     <Box
-      onMouseEnter={() => setHover(true)}
-      onMouseLeave={() => { setHover(false); setConfirmDel(false) }}
-      sx={{ position: 'relative', mb: '3px', userSelect: 'none' }}
+      onClick={adminMode ? (e) => { e.stopPropagation(); setShowActions(s => !s); setConfirmDel(false) } : undefined}
+      onMouseLeave={() => { setShowActions(false); setConfirmDel(false) }}
+      sx={{ position: 'relative', mb: '3px', userSelect: 'none', cursor: adminMode ? 'pointer' : 'default' }}
     >
       {/* Pills stacked vertically — booked=full card, empty=thin line */}
       <Box sx={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
         {cells.map((booking, i) => (
           booking ? (
-            <Tooltip
-              key={i}
-              title={booking.client_name}
-              placement="top"
-              enterTouchDelay={0}
-              leaveTouchDelay={2000}
-              arrow
-            >
-              <Box onClick={() => openClient(booking)} sx={{
-                borderRadius: '6px',
-                px: '4px', py: '3px',
-                background: hexRgba(base, 0.30),
-                border: `1px solid ${hexRgba(base, 0.58)}`,
+            <Box key={i} onClick={!adminMode ? () => openClient(booking) : undefined} sx={{
+              borderRadius: '6px',
+              px: '4px', py: '3px',
+              background: hexRgba(base, 0.30),
+              border: `1px solid ${hexRgba(base, 0.58)}`,
+              overflow: 'hidden',
+            }}>
+              <Typography sx={{
+                fontSize: '10px', fontWeight: 700,
+                color: base,
+                lineHeight: 1.2,
+                display: '-webkit-box',
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: 'vertical',
                 overflow: 'hidden',
-                cursor: auth.role !== 'client' ? 'pointer' : 'default',
               }}>
-                <Typography sx={{
-                  fontSize: '10px', fontWeight: 700,
-                  color: base,
-                  lineHeight: 1.2,
-                  display: '-webkit-box',
-                  WebkitLineClamp: 2,
-                  WebkitBoxOrient: 'vertical',
-                  overflow: 'hidden',
-                }}>
-                  {booking.client_name}
-                </Typography>
-              </Box>
-            </Tooltip>
+                {booking.client_name}
+              </Typography>
+            </Box>
           ) : (
             <Box key={i} sx={{
               borderRadius: '4px',
@@ -419,27 +411,28 @@ function SlotCell({ slot, adminMode, onEdit, onDelete, onAddClient, bookings = [
         ))}
       </Box>
 
-      {/* Admin action buttons (always visible for easier mobile use) */}
-      {adminMode && !confirmDel && (
+      {/* Admin action buttons — shown on tap (mobile) or hover (desktop) */}
+      {adminMode && showActions && !confirmDel && (
         <Box sx={{
-          position: 'absolute', top: 2, right: 2, zIndex: 10,
-          display: 'flex', gap: '2px',
-          background: 'rgba(12,10,9,0.85)', borderRadius: '6px', p: '2px',
+          position: 'absolute', inset: 0, borderRadius: '5px',
+          background: 'rgba(12,10,9,0.88)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1,
+          zIndex: 10,
         }}>
           <IconButton size="small"
-            onClick={e => { e.stopPropagation(); onAddClient(slot) }}
-            sx={{ p: '3px', color: C.muted, '&:hover': { color: C.purple } }}>
-            <PersonAddIcon sx={{ fontSize: 16 }} />
+            onClick={e => { e.stopPropagation(); onAddClient(slot); setShowActions(false) }}
+            sx={{ p: '6px', color: C.purple, background: 'rgba(200,197,255,0.12)', borderRadius: '8px' }}>
+            <PersonAddIcon sx={{ fontSize: 20 }} />
           </IconButton>
           <IconButton size="small"
-            onClick={e => { e.stopPropagation(); onEdit(slot) }}
-            sx={{ p: '3px', color: C.muted, '&:hover': { color: C.purple } }}>
-            <EditIcon sx={{ fontSize: 16 }} />
+            onClick={e => { e.stopPropagation(); onEdit(slot); setShowActions(false) }}
+            sx={{ p: '6px', color: C.purple, background: 'rgba(200,197,255,0.12)', borderRadius: '8px' }}>
+            <EditIcon sx={{ fontSize: 20 }} />
           </IconButton>
           <IconButton size="small"
-            onClick={e => { e.stopPropagation(); setConfirmDel(true) }}
-            sx={{ p: '3px', color: C.muted, '&:hover': { color: '#F87171' } }}>
-            <DeleteOutlineIcon sx={{ fontSize: 16 }} />
+            onClick={e => { e.stopPropagation(); setConfirmDel(true); setShowActions(false) }}
+            sx={{ p: '6px', color: '#F87171', background: 'rgba(248,113,113,0.12)', borderRadius: '8px' }}>
+            <DeleteOutlineIcon sx={{ fontSize: 20 }} />
           </IconButton>
         </Box>
       )}
