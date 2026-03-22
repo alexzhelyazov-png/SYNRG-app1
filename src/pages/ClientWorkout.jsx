@@ -81,7 +81,7 @@ export default function ClientWorkout() {
             {t('setsReps')}
           </Typography>
           <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', mb: 0.75 }}>
-            {['3x8','3x10','3x12','3x15','3x20','4x8','4x10','4x12','4x15','4x20'].map(s => (
+            {['3x6','3x8','3x10','3x12','3x15','3x20','4x6','4x8','4x10','4x12','4x15','4x20'].map(s => (
               <Chip key={s} label={s} size="small" onClick={() => setExScheme(s)}
                 sx={{
                   fontWeight: 700, fontSize: '12px',
@@ -107,7 +107,7 @@ export default function ClientWorkout() {
             {t('kgLbl')}
           </Typography>
           <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(8, 1fr)', gap: 0.5, mb: 0.75 }}>
-            {[0,5,10,15,20,25,30,35,40,45,50,55,60,65,70,75,80,90,100,120].map(w => (
+            {[0,'2x2','2x4',10,15,20,25,30,35,40,45,50,55,60,65,70,75,80].map(w => (
               <Chip key={w} label={w === 0 ? '0' : w} size="small" onClick={() => setExWeight(String(w))}
                 sx={{
                   fontWeight: 700, fontSize: '11px', justifyContent: 'center',
