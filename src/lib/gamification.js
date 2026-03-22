@@ -476,9 +476,11 @@ export function computeXPRanking(clients) {
     const levelData = computeLevel(totalXP)
     return {
       name:       c.name,
+      clientId:   c.id,
       xp:         totalXP,
       level:      levelData.level,
       badgeCount: earnedIds.length,
+      earnedIds,
     }
   }).sort((a, b) => b.xp - a.xp)
 }

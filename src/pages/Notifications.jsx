@@ -3,12 +3,14 @@ import { Box, Typography, Paper } from '@mui/material'
 import NotificationsNoneIcon from '@mui/icons-material/NotificationsNone'
 import PersonAddAlt1Icon from '@mui/icons-material/PersonAddAlt1'
 import AssignmentIcon from '@mui/icons-material/Assignment'
+import ChatBubbleOutlineIcon from '@mui/icons-material/ChatBubbleOutline'
 import ThumbUpAltIcon from '@mui/icons-material/ThumbUpAlt'
 import { useApp } from '../context/AppContext'
 import { C, EASE } from '../theme'
 
 const ACTION_ICONS = {
   task:         AssignmentIcon,
+  task_comment: ChatBubbleOutlineIcon,
   reaction:     ThumbUpAltIcon,
   registration: PersonAddAlt1Icon,
 }
@@ -70,10 +72,13 @@ export default function Notifications() {
                     ? 'rgba(170,169,205,0.12)'
                     : n.action_type === 'task'
                       ? 'rgba(200,197,255,0.12)'
-                      : 'rgba(255,255,255,0.05)',
+                      : n.action_type === 'task_comment'
+                        ? 'rgba(94,198,208,0.12)'
+                        : 'rgba(255,255,255,0.05)',
                   border: `1px solid ${
                     n.action_type === 'registration' ? 'rgba(170,169,205,0.2)'
                     : n.action_type === 'task' ? 'rgba(200,197,255,0.2)'
+                    : n.action_type === 'task_comment' ? 'rgba(94,198,208,0.2)'
                     : C.border
                   }`,
                 }}>
@@ -81,6 +86,7 @@ export default function Notifications() {
                     fontSize: '20px',
                     color: n.action_type === 'registration' ? C.purple
                          : n.action_type === 'task' ? C.purple
+                         : n.action_type === 'task_comment' ? '#5EC6D0'
                          : C.muted,
                   }} />
                 </Box>
@@ -97,6 +103,7 @@ export default function Notifications() {
                   </Box>
                   <Typography sx={{ fontSize: '13px', color: C.text, mb: 0.5 }}>
                     {n.action_type === 'task' && <Box component="span" sx={{ color: C.purple, fontWeight: 600 }}>{t('taskNotifLbl')}: </Box>}
+                    {n.action_type === 'task_comment' && <Box component="span" sx={{ color: '#5EC6D0', fontWeight: 600 }}>{t('taskCommentNotifLbl')}: </Box>}
                     {n.action_type === 'reaction' && <Box component="span" sx={{ color: C.muted, fontWeight: 600 }}>{t('reactionNotifLbl')}: </Box>}
                     {n.action_type === 'registration' && <Box component="span" sx={{ color: C.text, fontWeight: 600 }}>{t('registrationNotifLbl')}: </Box>}
                     {n.content}

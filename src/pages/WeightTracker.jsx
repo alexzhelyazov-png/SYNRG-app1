@@ -141,7 +141,7 @@ export default function WeightTracker() {
               }}>
                 {fmt1(item.weight)} {t('kgUnit')}
               </Typography>
-              {auth.role === 'coach' && !isTrackerReadOnly && (
+              {!isTrackerReadOnly && (
                 <Button
                   size="small"
                   onClick={() => deleteWeightLog(client.id, item.id)}

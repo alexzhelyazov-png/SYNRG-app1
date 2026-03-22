@@ -1023,9 +1023,16 @@ function DashboardClient({ isCoachView = false }) {
           hasModule(auth.modules, 'weight_tracking') && { key: 'weight', view: 'weight', color: '#C8C5FF', Icon: MonitorWeightIcon, label: t('addWeightBtn') },
           (hasModule(auth.modules, 'nutrition_tracking') || hasModule(auth.modules, 'weight_tracking')) && { key: 'steps', view: 'steps', color: '#FFD070', Icon: DirectionsWalkIcon, label: t('addStepsBtn') },
           { key: 'workout', view: 'workout', color: '#A78BFA', Icon: FitnessCenterIcon, label: t('addWorkoutBtn') },
-          { key: 'tasks', view: 'tasks', color: '#F87171', Icon: AssignmentIcon, label: t('navTasks') },
-        ].filter(Boolean).map(({ key, view, color, Icon, label }) => (
-          <Paper key={key} onClick={() => setView(view)}
+          { key: 'tasks', view: 'tasks', color: '#F87171', Icon: AssignmentIcon, label: t('navTasks'),
+            badge: (() => {
+              const seen = localStorage.getItem(`tasksLastSeen_${client.id}`) || '1970'
+              return (client.tasks || []).filter(tk => tk.status === 'pending' && (tk.created_at || '') > seen).length
+            })() },
+        ].filter(Boolean).map(({ key, view, color, Icon, label, badge }) => (
+          <Paper key={key} onClick={() => {
+            if (key === 'tasks') localStorage.setItem(`tasksLastSeen_${client.id}`, new Date().toISOString())
+            setView(view)
+          }}
             sx={{
               p: '16px 12px', borderRadius: '14px', cursor: 'pointer',
               border: `1px solid ${color}25`,
@@ -1033,14 +1040,28 @@ function DashboardClient({ isCoachView = false }) {
               transition: `all 0.2s ${EASE.standard}`,
               '&:hover': { transform: 'translateY(-2px)', borderColor: `${color}50`, boxShadow: `0 0 20px ${color}20` },
               display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1, textAlign: 'center',
+              position: 'relative',
             }}>
             <Box sx={{
               width: 48, height: 48, borderRadius: '12px', mx: 'auto',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               background: `${color}28`, border: `2px solid ${color}70`,
               boxShadow: `0 0 14px ${color}22`,
+              position: 'relative',
             }}>
               <Icon sx={{ fontSize: 24, color }} />
+              {badge > 0 && (
+                <Box sx={{
+                  position: 'absolute', top: -6, right: -6,
+                  width: 20, height: 20, borderRadius: '50%',
+                  background: '#F87171', color: '#fff',
+                  fontSize: '11px', fontWeight: 800,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  boxShadow: '0 2px 6px rgba(248,113,113,0.5)',
+                }}>
+                  {badge}
+                </Box>
+              )}
             </Box>
             <Typography sx={{ fontSize: '13px', fontWeight: 800, color: C.text, lineHeight: 1.3 }}>
               {label}

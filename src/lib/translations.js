@@ -77,6 +77,7 @@ export const T = {
     noNotifications:    'Няма известия',
     newNotifications:   'нови известия',
     taskNotifLbl:       'Задача',
+    taskCommentNotifLbl:'Коментар по задача',
     reactionNotifLbl:   'Реакция',
 
     // ── Mobile ───────────────────────────────────────
@@ -165,6 +166,7 @@ export const T = {
     youBadge:           'ТИ',
     levelNameLbl:       'Ниво',
     badgesLbl:          'Значки',
+    noBadgesYet:        'Все още няма значки',
     rankFooterXP:       'Класация по XP',
 
     // ── Gamification ─────────────────────────────────
@@ -824,6 +826,7 @@ export const T = {
     noNotifications:    'No notifications',
     newNotifications:   'new notifications',
     taskNotifLbl:       'Task',
+    taskCommentNotifLbl:'Task comment',
     reactionNotifLbl:   'Reaction',
 
     // ── Mobile ───────────────────────────────────────
@@ -912,6 +915,7 @@ export const T = {
     youBadge:           'YOU',
     levelNameLbl:       'Level',
     badgesLbl:          'Badges',
+    noBadgesYet:        'No badges yet',
     rankFooterXP:       'XP Ranking',
 
     // ── Gamification ─────────────────────────────────

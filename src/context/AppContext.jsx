@@ -513,7 +513,6 @@ export function AppProvider({ children }) {
 
   // ── Send notification to other coaches ────────────────────────
   async function sendCoachNotification(actionType, clientName, content) {
-    if (auth.role !== 'coach') return
     await DB.insertNotification(auth.name, clientName, actionType, content)
     // Refresh local notifications
     const fresh = await DB.getNotifications(48)
@@ -590,6 +589,9 @@ export function AppProvider({ children }) {
       ),
     })))
     showSnackbar(t('commentSavedMsg'))
+    const task = (client.tasks || []).find(tk => tk.id === taskId)
+    const taskTitle = task?.title || ''
+    await sendCoachNotification('task_comment', client.name, `${taskTitle}: ${text}`)
   }
 
   // ── Reaction / coach message actions ──────────────────────────

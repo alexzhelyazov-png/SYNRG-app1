@@ -179,7 +179,7 @@ export default function FoodTracker() {
                     {item.protein}{t('gUnit')}
                   </Typography>
                 )}
-                {auth.role === 'coach' && !isTrackerReadOnly && (
+                {!isTrackerReadOnly && (
                   <Button
                     size="small"
                     onClick={() => deleteMealFromClient(client.id, item.id)}

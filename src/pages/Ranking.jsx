@@ -1,7 +1,36 @@
-import { Box, Typography, Paper, Chip } from '@mui/material'
+import { useState } from 'react'
+import { Box, Typography, Paper, Chip, Dialog } from '@mui/material'
 import { useApp } from '../context/AppContext'
 import { C, EASE } from '../theme'
-import { getLevelName } from '../lib/gamification'
+import { BADGES, TIER_COLORS, getLevelName } from '../lib/gamification'
+import MonitorWeightIcon        from '@mui/icons-material/MonitorWeight'
+import RestaurantIcon           from '@mui/icons-material/Restaurant'
+import DirectionsWalkIcon       from '@mui/icons-material/DirectionsWalk'
+import FitnessCenterIcon        from '@mui/icons-material/FitnessCenter'
+import DirectionsRunIcon        from '@mui/icons-material/DirectionsRun'
+import TrendingDownIcon         from '@mui/icons-material/TrendingDown'
+import LocalFireDepartmentIcon  from '@mui/icons-material/LocalFireDepartment'
+import EventAvailableIcon       from '@mui/icons-material/EventAvailable'
+import LocalDiningIcon          from '@mui/icons-material/LocalDining'
+import EggIcon                  from '@mui/icons-material/Egg'
+import EmojiEventsIcon          from '@mui/icons-material/EmojiEvents'
+import AutoAwesomeIcon          from '@mui/icons-material/AutoAwesome'
+import MilitaryTechIcon         from '@mui/icons-material/MilitaryTech'
+import LockIcon                 from '@mui/icons-material/Lock'
+
+const ICON_MAP = {
+  MonitorWeight: MonitorWeightIcon, Restaurant: RestaurantIcon,
+  DirectionsWalk: DirectionsWalkIcon, FitnessCenter: FitnessCenterIcon,
+  DirectionsRun: DirectionsRunIcon, TrendingDown: TrendingDownIcon,
+  LocalFireDepartment: LocalFireDepartmentIcon, EventAvailable: EventAvailableIcon,
+  LocalDining: LocalDiningIcon, Egg: EggIcon, EmojiEvents: EmojiEventsIcon,
+  AutoAwesome: AutoAwesomeIcon, MilitaryTech: MilitaryTechIcon,
+}
+function BadgeIcon({ muiIcon, size = 24, color = C.muted }) {
+  const Comp = ICON_MAP[muiIcon]; if (!Comp) return null
+  return <Comp sx={{ fontSize: size, color }} />
+}
+const tierColor = (tier) => tier ? TIER_COLORS[tier] : C.purple
 
 // Podium medal colors
 const RANK_LABELS  = ['1', '2', '3']
@@ -12,6 +41,7 @@ const PODIUM_ORDER = [1, 0, 2] // 2nd, 1st, 3rd in display order
 export default function Ranking() {
   const { auth, ranking, t, lang } = useApp()
   const isMobile = window.innerWidth < 640
+  const [viewProfile, setViewProfile] = useState(null) // ranking item
 
   return (
     <>
@@ -43,10 +73,12 @@ export default function Ranking() {
             return (
               <Box
                 key={rank}
+                onClick={() => setViewProfile(item)}
                 sx={{
                   textAlign: 'center',
                   flex:      1,
                   maxWidth:  isFirst ? '200px' : '180px',
+                  cursor:    'pointer',
                   animation: `scaleIn 0.3s ${EASE.spring} ${displayIdx * 0.06 + 0.15}s both`,
                 }}
               >
@@ -181,10 +213,12 @@ export default function Ranking() {
           return (
             <Box
               key={item.name}
+              onClick={() => setViewProfile(item)}
               sx={{
                 display:             'grid',
                 gridTemplateColumns: isMobile ? '35px 1fr 40px 60px' : '50px 1fr 50px 140px 70px 80px',
                 px:                  isMobile ? '12px' : '20px',
+                cursor:              'pointer',
                 py:                  isMobile ? '10px' : '14px',
                 borderBottom:        i < ranking.length - 1 ? `1px solid ${C.border}` : 'none',
                 background:          isMe
@@ -292,6 +326,75 @@ export default function Ranking() {
       }}>
         {t('rankFooterXP')}
       </Typography>
+
+      {/* ── Badge Profile Dialog ── */}
+      {viewProfile && (() => {
+        const earnedSet = new Set(viewProfile.earnedIds || [])
+        const earned = BADGES.filter(b => earnedSet.has(b.id))
+        return (
+          <Dialog open onClose={() => setViewProfile(null)} maxWidth="xs" fullWidth
+            PaperProps={{ sx: { borderRadius: '20px', background: C.card, border: `1px solid ${C.border}`, p: 3 } }}>
+            {/* Header */}
+            <Box sx={{ textAlign: 'center', mb: 2.5 }}>
+              <Box sx={{
+                width: 56, height: 56, borderRadius: '50%', mx: 'auto', mb: 1.5,
+                background: C.primaryContainer, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: '22px', fontWeight: 800, color: C.purple,
+              }}>
+                {viewProfile.name.charAt(0).toUpperCase()}
+              </Box>
+              <Typography sx={{ fontSize: '20px', fontWeight: 800, color: C.text, fontFamily: "'MontBlanc', sans-serif", fontStyle: 'italic' }}>
+                {viewProfile.name}
+              </Typography>
+              <Typography sx={{ fontSize: '13px', color: C.muted, fontStyle: 'italic', mt: 0.25 }}>
+                {getLevelName(viewProfile.level, lang)}
+              </Typography>
+              <Box sx={{ display: 'flex', justifyContent: 'center', gap: 3, mt: 1.5 }}>
+                <Box sx={{ textAlign: 'center' }}>
+                  <Typography sx={{ fontSize: '24px', fontWeight: 800, color: C.purple, fontFamily: "'MontBlanc', sans-serif" }}>
+                    {viewProfile.level}
+                  </Typography>
+                  <Typography sx={{ fontSize: '11px', color: C.muted }}>{t('levelLbl')}</Typography>
+                </Box>
+                <Box sx={{ textAlign: 'center' }}>
+                  <Typography sx={{ fontSize: '24px', fontWeight: 800, color: C.text, fontFamily: "'MontBlanc', sans-serif" }}>
+                    {viewProfile.xp}
+                  </Typography>
+                  <Typography sx={{ fontSize: '11px', color: C.muted }}>XP</Typography>
+                </Box>
+                <Box sx={{ textAlign: 'center' }}>
+                  <Typography sx={{ fontSize: '24px', fontWeight: 800, color: C.text, fontFamily: "'MontBlanc', sans-serif" }}>
+                    {earned.length}
+                  </Typography>
+                  <Typography sx={{ fontSize: '11px', color: C.muted }}>{t('badgesLbl')}</Typography>
+                </Box>
+              </Box>
+            </Box>
+
+            {/* Earned badges grid */}
+            {earned.length > 0 ? (
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, justifyContent: 'center' }}>
+                {earned.map(b => {
+                  const color = tierColor(b.tier)
+                  return (
+                    <Box key={b.id} sx={{
+                      width: 56, height: 56, borderRadius: '14px',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      background: `${color}15`, border: `1.5px solid ${color}35`,
+                    }}>
+                      <BadgeIcon muiIcon={b.muiIcon} size={26} color={color} />
+                    </Box>
+                  )
+                })}
+              </Box>
+            ) : (
+              <Typography sx={{ textAlign: 'center', color: C.muted, fontSize: '13px' }}>
+                {t('noBadgesYet')}
+              </Typography>
+            )}
+          </Dialog>
+        )
+      })()}
     </>
   )
 }

@@ -120,7 +120,7 @@ export default function StepsTracker() {
               }}>
                 {item.steps.toLocaleString()} {t('stepsUnit')}
               </Typography>
-              {auth.role === 'coach' && !isTrackerReadOnly && (
+              {!isTrackerReadOnly && (
                 <Button
                   size="small"
                   onClick={() => deleteStepsLog(client.id, item.id)}

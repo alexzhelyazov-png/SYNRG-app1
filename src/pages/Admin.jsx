@@ -38,6 +38,7 @@ import {
 } from '../lib/bookingUtils'
 
 const PLAN_TYPES = ['8', '12', 'unlimited']
+const DEFAULT_PRICES = { '8': 154, '12': 179, 'unlimited': 202 }
 const WEEKDAY_KEYS = [1, 2, 3, 4, 5, 6, 0] // Mon–Sun display order
 
 // ── Stat Card (dashboard) ────────────────────────────────────
@@ -230,13 +231,16 @@ function PlanDialog({ open, onClose, onActivate, onExtend, onAdjust, onTogglePai
   const [validFrom,     setValidFrom]    = useState(isoToday())
   const [extendTo,      setExtendTo]     = useState('')
   const [credUsed,      setCredUsed]     = useState(plan?.credits_used ?? 0)
-  const [price,         setPrice]        = useState(plan?.price ?? 0)
+  const [price,         setPrice]        = useState(plan?.price ?? DEFAULT_PRICES['8'])
   const [isPaid,        setIsPaid]       = useState(plan?.is_paid ?? true)
   const [startCredits,  setStartCredits] = useState('')
   const [saving,        setSaving]       = useState(false)
 
-  // When planType changes, reset startCredits to full plan (no override)
-  useEffect(() => { setStartCredits('') }, [planType])
+  // When planType changes, reset startCredits and update default price
+  useEffect(() => {
+    setStartCredits('')
+    if (!plan) setPrice(DEFAULT_PRICES[planType] ?? 0)
+  }, [planType])
 
   useEffect(() => {
     if (plan) {
