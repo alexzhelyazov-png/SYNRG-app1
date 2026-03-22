@@ -99,42 +99,23 @@ export default function Progress() {
 
   // ── Badge unlock notification ────────────────────────────────
   const [unlockedBadge, setUnlockedBadge] = useState(null)
-  const prevEarnedRef = useRef(null)
-  const prevMonthlyRef = useRef(null)
 
-  // Detect new all-time badges (only AFTER initial load)
+  // Detect undismissed badges (first load + live updates)
   useEffect(() => {
     if (earnedIds.length === 0) return
-    if (prevEarnedRef.current === null) {
-      prevEarnedRef.current = earnedIds
-      return
-    }
+    if (unlockedBadge) return
     const dismissed = new Set(client.dismissedBadges || [])
-    const newOnes = earnedIds.filter(id => !prevEarnedRef.current.includes(id) && !dismissed.has(id))
-    if (newOnes.length > 0) {
-      const badge = ALLTIME_BADGES.find(b => b.id === newOnes[0])
+    const undismissed = earnedIds.find(id => !dismissed.has(id))
+    if (undismissed) {
+      const badge = ALLTIME_BADGES.find(b => b.id === undismissed)
+      if (badge) { setUnlockedBadge(badge); return }
+    }
+    const undismissedMonthly = monthlyEarnedIds.find(id => !dismissed.has(`${id}:${currentMonthKey}`))
+    if (undismissedMonthly) {
+      const badge = MONTHLY_BADGES.find(b => b.id === undismissedMonthly)
       if (badge) setUnlockedBadge(badge)
     }
-    prevEarnedRef.current = earnedIds
-  }, [earnedIds, client.dismissedBadges])
-
-  // Detect new monthly badges (only AFTER initial load)
-  useEffect(() => {
-    if (monthlyEarnedIds.length === 0 && earnedIds.length === 0) return
-    if (prevMonthlyRef.current === null) {
-      prevMonthlyRef.current = monthlyEarnedIds
-      return
-    }
-    const dismissed = new Set(client.dismissedBadges || [])
-    const newOnes = monthlyEarnedIds.filter(id =>
-      !prevMonthlyRef.current.includes(id) && !dismissed.has(`${id}:${currentMonthKey}`)
-    )
-    if (newOnes.length > 0) {
-      const badge = MONTHLY_BADGES.find(b => b.id === newOnes[0])
-      if (badge) setUnlockedBadge(badge)
-    }
-    prevMonthlyRef.current = monthlyEarnedIds
-  }, [monthlyEarnedIds, client.dismissedBadges])
+  }, [earnedIds, monthlyEarnedIds, client.dismissedBadges, unlockedBadge])
 
   const handleDismissUnlock = () => {
     if (unlockedBadge) {

@@ -114,8 +114,6 @@ function BadgeUnlockWatcher() {
   const { client, t, lang, dismissBadge } = useApp()
   const [unlockedBadge, setUnlockedBadge] = useState(null)
   const [levelUpInfo, setLevelUpInfo]     = useState(null)
-  const prevEarnedRef  = useRef(null)
-  const prevMonthlyRef = useRef(null)
   const prevLevelRef   = useRef(null)
 
   const currentMonthKey = useMemo(() => getCurrentMonthKey(), [])
@@ -124,40 +122,24 @@ function BadgeUnlockWatcher() {
   const totalXP         = useMemo(() => computeTotalXP(earnedIds, client), [earnedIds, client])
   const levelData       = useMemo(() => computeLevel(totalXP), [totalXP])
 
-  // Detect new all-time badges (only AFTER initial load)
+  // Detect undismissed badges (first load + live updates)
   useEffect(() => {
     if (earnedIds.length === 0) return
-    if (prevEarnedRef.current === null) {
-      // First load: just store current state, no celebration
-      prevEarnedRef.current = earnedIds
-      return
-    }
+    if (unlockedBadge) return // already showing one, wait for dismiss
     const dismissed = new Set(client.dismissedBadges || [])
-    const newOnes = earnedIds.filter(id => !prevEarnedRef.current.includes(id) && !dismissed.has(id))
-    if (newOnes.length > 0) {
-      const badge = ALLTIME_BADGES.find(b => b.id === newOnes[0])
+    // Find first undismissed all-time badge
+    const undismissed = earnedIds.find(id => !dismissed.has(id))
+    if (undismissed) {
+      const badge = ALLTIME_BADGES.find(b => b.id === undismissed)
+      if (badge) { setUnlockedBadge(badge); return }
+    }
+    // Find first undismissed monthly badge
+    const undismissedMonthly = monthlyEarnedIds.find(id => !dismissed.has(`${id}:${currentMonthKey}`))
+    if (undismissedMonthly) {
+      const badge = MONTHLY_BADGES.find(b => b.id === undismissedMonthly)
       if (badge) setUnlockedBadge(badge)
     }
-    prevEarnedRef.current = earnedIds
-  }, [earnedIds, client.dismissedBadges])
-
-  // Detect new monthly badges (only AFTER initial load)
-  useEffect(() => {
-    if (monthlyEarnedIds.length === 0 && earnedIds.length === 0) return
-    if (prevMonthlyRef.current === null) {
-      prevMonthlyRef.current = monthlyEarnedIds
-      return
-    }
-    const dismissed = new Set(client.dismissedBadges || [])
-    const newOnes = monthlyEarnedIds.filter(id =>
-      !prevMonthlyRef.current.includes(id) && !dismissed.has(`${id}:${currentMonthKey}`)
-    )
-    if (newOnes.length > 0) {
-      const badge = MONTHLY_BADGES.find(b => b.id === newOnes[0])
-      if (badge) setUnlockedBadge(badge)
-    }
-    prevMonthlyRef.current = monthlyEarnedIds
-  }, [monthlyEarnedIds, client.dismissedBadges])
+  }, [earnedIds, monthlyEarnedIds, client.dismissedBadges, unlockedBadge])
 
   // Detect level up
   useEffect(() => {
