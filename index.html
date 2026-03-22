@@ -48,7 +48,13 @@
   <script type="module" src="/src/main.jsx"></script>
   <script>
     if('serviceWorker' in navigator){
-      window.addEventListener('load',()=>navigator.serviceWorker.register('/sw.js').catch(()=>{}));
+      window.addEventListener('load',()=>{
+        // Unregister any old SW at wrong scope
+        navigator.serviceWorker.getRegistrations().then(regs=>{
+          regs.forEach(r=>{if(!r.scope.includes('/synrg-website/app/'))r.unregister()});
+        });
+        navigator.serviceWorker.register('/synrg-website/app/sw.js').catch(()=>{});
+      });
     }
   </script>
 </body>
