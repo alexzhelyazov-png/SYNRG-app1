@@ -263,9 +263,9 @@ export default function Progress() {
           return (
             <Typography sx={{
               fontSize: '11px', fontWeight: 600, color: C.muted,
-              mt: 1, textAlign: 'center',
+              mt: 1, textAlign: 'center', fontStyle: 'italic',
             }}>
-              {lang === 'bg' ? `${history.length} месец${history.length === 1 ? '' : 'а'} с постижение` : `${history.length} month${history.length === 1 ? '' : 's'} achieved`}
+              {lang === 'bg' ? `Спечелен ${history.length} пъти — може всеки месец` : `Earned ${history.length} time${history.length === 1 ? '' : 's'} — resets monthly`}
             </Typography>
           )
         })()}
@@ -668,13 +668,34 @@ function BadgeDetailDialog({ open, badge, isEarned, client, lang, t, onClose }) 
       {/* Monthly steps history */}
       {badge.condType === 'monthly_steps' && (() => {
         const history = getMonthlyStepHistory(client)
-        if (history.length === 0) return null
-        return (
-          <Typography sx={{ fontSize: '11px', color: C.muted, mt: 1.5, fontWeight: 600 }}>
-            {lang === 'bg'
-              ? `Спечелен ${history.length} месец${history.length === 1 ? '' : 'а'}`
-              : `Earned ${history.length} month${history.length === 1 ? '' : 's'}`}
+        if (history.length === 0) return (
+          <Typography sx={{ fontSize: '11px', color: C.muted, mt: 1.5, fontWeight: 600, fontStyle: 'italic' }}>
+            {lang === 'bg' ? 'Може да се печели всеки месец' : 'Can be earned every month'}
           </Typography>
+        )
+        const MONTHS_BG = ['', 'Яну', 'Фев', 'Мар', 'Апр', 'Май', 'Юни', 'Юли', 'Авг', 'Сеп', 'Окт', 'Ное', 'Дек']
+        const MONTHS_EN = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+        const months = lang === 'bg' ? MONTHS_BG : MONTHS_EN
+        return (
+          <Box sx={{ mt: 1.5 }}>
+            <Typography sx={{ fontSize: '11px', color: C.muted, fontWeight: 700, mb: 0.5, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              {lang === 'bg' ? 'Спечелен:' : 'Earned:'}
+            </Typography>
+            <Box sx={{ display: 'flex', gap: 0.75, flexWrap: 'wrap' }}>
+              {history.map(h => {
+                const [y, m] = h.monthKey.split('-').map(Number)
+                return (
+                  <Box key={h.monthKey} sx={{
+                    px: 1, py: 0.25, borderRadius: '6px', fontSize: '11px', fontWeight: 700,
+                    background: `${TIER_COLORS[h.tier]}18`, color: TIER_COLORS[h.tier],
+                    border: `1px solid ${TIER_COLORS[h.tier]}30`,
+                  }}>
+                    {months[m]} {y}
+                  </Box>
+                )
+              })}
+            </Box>
+          </Box>
         )
       })()}
     </Dialog>

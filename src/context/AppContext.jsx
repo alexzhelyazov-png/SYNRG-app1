@@ -53,6 +53,9 @@ export function AppProvider({ children }) {
     setSnackbar(s => ({ ...s, open: false }))
   }, [])
 
+  // ── Feed state ──────────────────────────────────────────────
+  const [feedPosts, setFeedPosts] = useState([])
+
   // ── Workout form state ────────────────────────────────────────
   const [exName,          setExName]          = useState('')
   const [exScheme,        setExScheme]        = useState('')
@@ -81,7 +84,7 @@ export function AppProvider({ children }) {
     setLoadError('')
     try {
       await DB.seedIfEmpty()
-      const [rawCoaches, rawClients, meals, workouts, weights, tasks, taskComments, reactions, stepsRaw] = await Promise.all([
+      const [rawCoaches, rawClients, meals, workouts, weights, tasks, taskComments, reactions, stepsRaw, postsRaw] = await Promise.all([
         DB.selectAll('coaches'),
         DB.selectAll('clients'),
         DB.selectAll('meals'),
@@ -91,6 +94,7 @@ export function AppProvider({ children }) {
         DB.selectAll('task_comments'),
         DB.selectAll('reactions'),
         DB.selectAll('steps_logs').catch(() => []),
+        DB.selectAll('community_posts').catch(() => []),
       ])
 
       setCoaches(rawCoaches.map(c => ({ name: c.name, password: c.password, id: c.id })))
@@ -137,6 +141,7 @@ export function AppProvider({ children }) {
               : c.reminder_settings)
           : { protein: true, weight: true, foodLog: true, coach: true },
       })))
+      setFeedPosts((postsRaw || []).sort((a, b) => (b.created_at || '').localeCompare(a.created_at || '')))
     } catch(e) {
       console.error('loadAll error:', JSON.stringify(e), e?.message)
       setLoadError(`${e?.name || 'Error'}: ${e?.message || JSON.stringify(e)}`)
@@ -473,6 +478,21 @@ export function AppProvider({ children }) {
     ))
   }
 
+  // ── Feed actions ────────────────────────────────────────────
+  async function addFeedPost(content) {
+    const data = await DB.insert('community_posts', {
+      client_id: auth.id,
+      author_name: auth.name,
+      content,
+    })
+    setFeedPosts(prev => [data, ...prev])
+  }
+
+  async function deleteFeedPost(postId) {
+    await DB.deleteById('community_posts', postId)
+    setFeedPosts(prev => prev.filter(p => p.id !== postId))
+  }
+
   async function deleteClient(clientId) {
     const [clientMeals, clientWorkouts, clientWeights, clientTasks, clientReactions, clientSteps, clientPlans, clientBookings] = await Promise.all([
       DB.findWhere('meals',          'client_id', clientId),
@@ -788,6 +808,7 @@ export function AppProvider({ children }) {
     saveWorkoutToClient,
     saveWeightLog, deleteWeightLog,
     saveStepsLog, deleteStepsLog,
+    feedPosts, addFeedPost, deleteFeedPost,
     deleteClient,
     addFoodFromModal, addQuickFood, addBarcodeFood,
     saveWeight, saveSteps, addExercise, saveWorkout,
