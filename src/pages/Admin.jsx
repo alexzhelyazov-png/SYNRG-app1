@@ -433,144 +433,211 @@ function PlanDialog({ open, onClose, onActivate, onExtend, onAdjust, onTogglePai
   )
 }
 
-// ── Plan Detail Panel (expanded view) ─────────────────────────
-function PlanDetailPanel({ plan, history, t }) {
+// ── Client Info Dialog (popup) ─────────────────────────────────
+function ClientInfoDialog({ open, onClose, client, plan, allClientPlans, workouts, t }) {
+  const history = (allClientPlans || []).filter(p => p.id !== plan?.id)
+
   const infoRow = (label, value, color) => (
-    <Box sx={{ display: 'flex', justifyContent: 'space-between', py: 0.4 }}>
-      <Typography sx={{ fontSize: '11px', color: C.muted, fontWeight: 600 }}>{label}</Typography>
-      <Typography sx={{ fontSize: '11px', color: color || C.text, fontWeight: 700 }}>{value}</Typography>
+    <Box sx={{ display: 'flex', justifyContent: 'space-between', py: 0.5 }}>
+      <Typography sx={{ fontSize: '12px', color: C.muted, fontWeight: 600 }}>{label}</Typography>
+      <Typography sx={{ fontSize: '12px', color: color || C.text, fontWeight: 700 }}>{value}</Typography>
     </Box>
   )
 
+  if (!client) return null
   return (
-    <Box sx={{ px: 1.5, pb: 1.5 }}>
-      {/* Current plan */}
-      {plan ? (
-        <Box sx={{ p: 1.25, borderRadius: '10px', background: 'rgba(255,255,255,0.03)', border: `1px solid ${C.border}`, mb: history.length ? 1.25 : 0 }}>
-          <Typography sx={{ fontSize: '10px', fontWeight: 800, color: C.purple, textTransform: 'uppercase', letterSpacing: '0.7px', mb: 0.75 }}>
+    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth
+      PaperProps={{ sx: { borderRadius: '20px', background: C.card, border: `1px solid ${C.border}`, maxHeight: '85vh' } }}>
+      <DialogTitle sx={{ fontWeight: 800, color: C.text, pb: 0.5, display: 'flex', alignItems: 'center', gap: 1.5 }}>
+        <Box sx={{
+          width: 38, height: 38, borderRadius: '50%', flexShrink: 0,
+          background: plan ? C.primaryContainer : 'rgba(248,113,113,0.15)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: '15px', fontWeight: 800, color: plan ? C.purple : '#F87171',
+        }}>
+          {client.name.charAt(0).toUpperCase()}
+        </Box>
+        <Box>
+          <Typography sx={{ fontWeight: 800, fontSize: '16px' }}>{client.name}</Typography>
+          {client.email && <Typography sx={{ fontSize: '11px', color: C.muted }}>{client.email}</Typography>}
+        </Box>
+      </DialogTitle>
+      <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: '8px !important' }}>
+
+        {/* ── Current plan ── */}
+        <Box sx={{ p: 1.5, borderRadius: '14px', background: 'rgba(255,255,255,0.03)', border: `1px solid ${C.border}` }}>
+          <Typography sx={{ fontSize: '10px', fontWeight: 800, color: C.purple, textTransform: 'uppercase', letterSpacing: '0.7px', mb: 1 }}>
             {t('planDetailsLbl')}
           </Typography>
-          {infoRow(t('planTypeLbl'), planLabel(plan.plan_type, t))}
-          {plan.plan_type !== 'unlimited' && infoRow(t('creditsRemaining'), `${creditsRemaining(plan)} / ${plan.credits_total}`)}
-          {infoRow(t('validFromLbl'), plan.valid_from || '—')}
-          {infoRow(t('validUntilLbl'), (plan.extended_to || plan.valid_to) || '—')}
-          {infoRow(t('priceLbl'), plan.price ? `${plan.price} EUR` : t('freeLbl'))}
-          {infoRow(plan.is_paid ? t('paidLbl') : t('unpaidLbl'), '', plan.is_paid ? C.primary : '#F87171')}
-          {plan.activated_by && infoRow(t('activatedByLbl'), plan.activated_by)}
-          {plan.created_at && infoRow(t('createdAtLbl'), plan.created_at.slice(0, 10))}
+          {plan ? (
+            <>
+              {infoRow(t('planTypeLbl'), planLabel(plan.plan_type, t))}
+              {plan.plan_type !== 'unlimited' && infoRow(t('creditsRemaining'), `${creditsRemaining(plan)} / ${plan.credits_total}`)}
+              {infoRow(t('validFromLbl'), plan.valid_from || '—')}
+              {infoRow(t('validUntilLbl'), (plan.extended_to || plan.valid_to) || '—')}
+              {infoRow(t('priceLbl'), plan.price ? `${plan.price} EUR` : t('freeLbl'))}
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mt: 0.5 }}>
+                <Box sx={{ width: 8, height: 8, borderRadius: '50%', background: plan.is_paid ? C.primary : '#F87171' }} />
+                <Typography sx={{ fontSize: '12px', fontWeight: 700, color: plan.is_paid ? C.primary : '#F87171' }}>
+                  {plan.is_paid ? t('paidLbl') : t('unpaidLbl')}
+                </Typography>
+              </Box>
+              {plan.activated_by && infoRow(t('activatedByLbl'), plan.activated_by)}
+              {plan.created_at && infoRow(t('createdAtLbl'), plan.created_at.slice(0, 10))}
+            </>
+          ) : (
+            <Typography sx={{ fontSize: '12px', color: '#F87171', fontWeight: 700 }}>{t('hasNoPlan')}</Typography>
+          )}
         </Box>
-      ) : (
-        <Box sx={{ p: 1.25, borderRadius: '10px', background: 'rgba(248,113,113,0.06)', border: '1px solid rgba(248,113,113,0.2)', mb: history.length ? 1.25 : 0 }}>
-          <Typography sx={{ fontSize: '11px', color: '#F87171', fontWeight: 700 }}>{t('hasNoPlan')}</Typography>
-        </Box>
-      )}
 
-      {/* Plan history */}
-      {history.length > 0 && (
-        <Box>
-          <Typography sx={{ fontSize: '10px', fontWeight: 800, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.7px', mb: 0.75 }}>
-            {t('planHistoryLbl')}
-          </Typography>
-          {history.map((h, i) => (
-            <Box key={h.id || i} sx={{
-              display: 'flex', alignItems: 'center', gap: 1, py: 0.5,
-              borderBottom: i < history.length - 1 ? `1px solid rgba(255,255,255,0.04)` : 'none',
-            }}>
-              <Chip label={planLabel(h.plan_type, t)} size="small"
-                sx={{ fontSize: '10px', fontWeight: 700, height: 20, background: 'rgba(255,255,255,0.06)', color: C.muted }} />
-              <Typography sx={{ fontSize: '10px', color: C.muted }}>
-                {h.valid_from || '?'} — {h.extended_to || h.valid_to || '?'}
+        {/* ── Upcoming workouts (future dates) ── */}
+        {workouts.filter(w => w.date >= new Date().toISOString().slice(0, 10)).length > 0 && (
+          <Box sx={{ p: 1.5, borderRadius: '14px', background: 'rgba(255,255,255,0.03)', border: `1px solid ${C.border}` }}>
+            <Typography sx={{ fontSize: '10px', fontWeight: 800, color: C.primary, textTransform: 'uppercase', letterSpacing: '0.7px', mb: 1 }}>
+              {t('upcomingWorkoutsLbl') || 'Предстоящи тренировки'}
+            </Typography>
+            {workouts.filter(w => w.date >= new Date().toISOString().slice(0, 10)).map((w, i) => (
+              <Box key={w.id || i} sx={{ py: 0.5, borderBottom: i < workouts.length - 1 ? `1px solid rgba(255,255,255,0.04)` : 'none' }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.25 }}>
+                  <Typography sx={{ fontSize: '12px', fontWeight: 700, color: C.text }}>{w.date}</Typography>
+                  {w.category && <Chip label={t(w.category)} size="small" sx={{ fontSize: '10px', fontWeight: 700, height: 20, background: C.purpleSoft, color: C.purple }} />}
+                  <Typography sx={{ fontSize: '10px', color: C.muted, ml: 'auto' }}>{w.items?.length || 0} {t('exercisesLbl')}</Typography>
+                </Box>
+              </Box>
+            ))}
+          </Box>
+        )}
+
+        {/* ── Workout history ── */}
+        {workouts.length > 0 && (
+          <Box sx={{ p: 1.5, borderRadius: '14px', background: 'rgba(255,255,255,0.03)', border: `1px solid ${C.border}` }}>
+            <Typography sx={{ fontSize: '10px', fontWeight: 800, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.7px', mb: 1 }}>
+              {t('workoutHistory')}
+            </Typography>
+            {workouts.slice(0, 20).map((w, i) => (
+              <Box key={w.id || i} sx={{ py: 0.5, borderBottom: i < Math.min(workouts.length, 20) - 1 ? `1px solid rgba(255,255,255,0.04)` : 'none' }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Typography sx={{ fontSize: '12px', fontWeight: 700, color: C.text }}>{w.date}</Typography>
+                  {w.category && <Chip label={t(w.category)} size="small" sx={{ fontSize: '10px', fontWeight: 700, height: 20, background: C.purpleSoft, color: C.purple }} />}
+                  {w.coach && <Typography sx={{ fontSize: '10px', color: C.muted, ml: 'auto' }}>{w.coach}</Typography>}
+                </Box>
+                {(w.items || []).map((ex, j) => (
+                  <Box key={j} sx={{ display: 'flex', gap: 1.5, pl: 1.5, py: 0.15 }}>
+                    <Typography sx={{ fontSize: '11px', color: C.text, fontWeight: 600, flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ex.exercise}</Typography>
+                    <Typography sx={{ fontSize: '11px', color: C.muted, flexShrink: 0 }}>{ex.scheme}</Typography>
+                    <Typography sx={{ fontSize: '11px', color: C.muted, flexShrink: 0 }}>{ex.weight}{ex.weight ? ' kg' : ''}</Typography>
+                  </Box>
+                ))}
+              </Box>
+            ))}
+            {workouts.length > 20 && (
+              <Typography sx={{ fontSize: '11px', color: C.muted, mt: 0.5, textAlign: 'center' }}>
+                +{workouts.length - 20} {t('moreWorkoutsLbl') || 'още'}
               </Typography>
-              <Typography sx={{ fontSize: '10px', color: C.muted, ml: 'auto' }}>
-                {h.price ? `${h.price} EUR` : '—'}
-              </Typography>
-              <Box sx={{ width: 6, height: 6, borderRadius: '50%', background: h.is_paid ? 'rgba(74,222,128,0.5)' : 'rgba(248,113,113,0.5)' }} />
-            </Box>
-          ))}
-        </Box>
-      )}
-      {!plan && history.length === 0 && (
-        <Typography sx={{ fontSize: '11px', color: C.muted, mt: 0.5 }}>{t('noPlanHistory')}</Typography>
-      )}
-    </Box>
+            )}
+          </Box>
+        )}
+
+        {/* ── Plan history ── */}
+        {history.length > 0 && (
+          <Box sx={{ p: 1.5, borderRadius: '14px', background: 'rgba(255,255,255,0.03)', border: `1px solid ${C.border}` }}>
+            <Typography sx={{ fontSize: '10px', fontWeight: 800, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.7px', mb: 1 }}>
+              {t('planHistoryLbl')}
+            </Typography>
+            {history.map((h, i) => (
+              <Box key={h.id || i} sx={{
+                display: 'flex', alignItems: 'center', gap: 1, py: 0.6,
+                borderBottom: i < history.length - 1 ? `1px solid rgba(255,255,255,0.04)` : 'none',
+              }}>
+                <Chip label={planLabel(h.plan_type, t)} size="small"
+                  sx={{ fontSize: '10px', fontWeight: 700, height: 22, background: 'rgba(255,255,255,0.06)', color: C.muted }} />
+                <Typography sx={{ fontSize: '11px', color: C.muted }}>
+                  {h.valid_from || '?'} — {h.extended_to || h.valid_to || '?'}
+                </Typography>
+                <Typography sx={{ fontSize: '11px', color: C.muted, ml: 'auto' }}>
+                  {h.price ? `${h.price} EUR` : '—'}
+                </Typography>
+                <Box sx={{ width: 7, height: 7, borderRadius: '50%', background: h.is_paid ? 'rgba(74,222,128,0.6)' : 'rgba(248,113,113,0.6)' }} />
+              </Box>
+            ))}
+          </Box>
+        )}
+
+      </DialogContent>
+      <DialogActions sx={{ px: 3, pb: 2 }}>
+        <Button onClick={onClose} sx={{ color: C.muted }}>{t('cancelBtn') || 'Затвори'}</Button>
+      </DialogActions>
+    </Dialog>
   )
 }
 
 // ── Client Plan Row (compact) ─────────────────────────────────
-function ClientPlanRow({ client, plan, allClientPlans, expanded, onToggle, onManage, onDeactivate, onDelete, t, lang }) {
+function ClientPlanRow({ client, plan, onOpen, onManage, onDelete, t, lang }) {
   const active   = isPlanActive(plan)
   const credits  = plan ? creditsRemaining(plan) : null
   const isLow    = plan && plan.plan_type !== 'unlimited' && credits !== null && credits <= 2
   const isPaid   = plan?.is_paid
-  const history  = (allClientPlans || []).filter(p => p.id !== plan?.id)
 
   return (
-    <Box sx={{ borderBottom: `1px solid ${C.border}`, '&:last-child': { borderBottom: 'none' } }}>
-      <Box onClick={onToggle} sx={{
-        display: 'flex', alignItems: 'center', gap: 1.25, py: 1, px: 1.5,
-        cursor: 'pointer', '&:hover': { background: 'rgba(255,255,255,0.02)' },
-        transition: 'background 0.15s',
+    <Box sx={{
+      display: 'flex', alignItems: 'center', gap: 1.25, py: 1, px: 1.5,
+      borderBottom: `1px solid ${C.border}`, '&:last-child': { borderBottom: 'none' },
+      cursor: 'pointer', '&:hover': { background: 'rgba(255,255,255,0.02)' },
+      transition: 'background 0.15s',
+    }} onClick={onOpen}>
+      {/* Avatar */}
+      <Box sx={{
+        width: 32, height: 32, borderRadius: '50%', flexShrink: 0,
+        background: active ? C.primaryContainer : 'rgba(255,255,255,0.06)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        fontSize: '13px', fontWeight: 800, color: active ? C.purple : C.muted,
       }}>
-        {/* Avatar */}
-        <Box sx={{
-          width: 32, height: 32, borderRadius: '50%', flexShrink: 0,
-          background: active ? C.primaryContainer : 'rgba(255,255,255,0.06)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: '13px', fontWeight: 800, color: active ? C.purple : C.muted,
-        }}>
-          {client.name.charAt(0).toUpperCase()}
-        </Box>
-
-        {/* Name */}
-        <Typography sx={{ fontWeight: 700, fontSize: '13px', color: C.text, flex: 1, minWidth: 0,
-          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {client.name}
-        </Typography>
-
-        {/* Plan info: credits remaining */}
-        {plan ? (
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, flexShrink: 0 }}>
-            {plan.plan_type !== 'unlimited' ? (
-              <Typography sx={{ fontSize: '12px', fontWeight: 800,
-                color: isLow ? '#FB923C' : C.purple }}>
-                {credits}
-              </Typography>
-            ) : (
-              <Typography sx={{ fontSize: '10px', fontWeight: 700, color: C.text }}>
-                ∞
-              </Typography>
-            )}
-            {/* Paid indicator: green = paid, red = unpaid */}
-            <Tooltip title={isPaid ? t('markedPaid') : t('markedUnpaid')} arrow>
-              <Box sx={{
-                width: 8, height: 8, borderRadius: '50%', flexShrink: 0,
-                background: isPaid ? C.primary : '#F87171',
-              }} />
-            </Tooltip>
-          </Box>
-        ) : (
-          <Typography sx={{ fontSize: '10px', color: '#F87171', fontWeight: 700, flexShrink: 0 }}>—</Typography>
-        )}
-
-        {/* Actions */}
-        <Box sx={{ display: 'flex', gap: 0.25, flexShrink: 0 }}>
-          <IconButton size="small" onClick={e => { e.stopPropagation(); onManage(client, plan) }}
-            sx={{ color: C.muted, '&:hover': { color: C.purple } }}>
-            <EditIcon sx={{ fontSize: 14 }} />
-          </IconButton>
-          {onDelete && (
-            <IconButton size="small" onClick={e => { e.stopPropagation(); onDelete(client) }}
-              sx={{ color: C.muted, '&:hover': { color: '#F87171' } }}>
-              <DeleteOutlineIcon sx={{ fontSize: 14 }} />
-            </IconButton>
-          )}
-        </Box>
+        {client.name.charAt(0).toUpperCase()}
       </Box>
 
-      {/* Expanded detail panel */}
-      <Collapse in={expanded}>
-        <PlanDetailPanel plan={plan} history={history} t={t} />
-      </Collapse>
+      {/* Name */}
+      <Typography sx={{ fontWeight: 700, fontSize: '13px', color: C.text, flex: 1, minWidth: 0,
+        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        {client.name}
+      </Typography>
+
+      {/* Plan info: credits remaining */}
+      {plan ? (
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, flexShrink: 0 }}>
+          {plan.plan_type !== 'unlimited' ? (
+            <Typography sx={{ fontSize: '12px', fontWeight: 800,
+              color: isLow ? '#FB923C' : C.purple }}>
+              {credits}
+            </Typography>
+          ) : (
+            <Typography sx={{ fontSize: '10px', fontWeight: 700, color: C.text }}>
+              ∞
+            </Typography>
+          )}
+          <Tooltip title={isPaid ? t('markedPaid') : t('markedUnpaid')} arrow>
+            <Box sx={{
+              width: 8, height: 8, borderRadius: '50%', flexShrink: 0,
+              background: isPaid ? C.primary : '#F87171',
+            }} />
+          </Tooltip>
+        </Box>
+      ) : (
+        <Typography sx={{ fontSize: '10px', color: '#F87171', fontWeight: 700, flexShrink: 0 }}>—</Typography>
+      )}
+
+      {/* Actions */}
+      <Box sx={{ display: 'flex', gap: 0.25, flexShrink: 0 }}>
+        <IconButton size="small" onClick={e => { e.stopPropagation(); onManage(client, plan) }}
+          sx={{ color: C.muted, '&:hover': { color: C.purple } }}>
+          <EditIcon sx={{ fontSize: 14 }} />
+        </IconButton>
+        {onDelete && (
+          <IconButton size="small" onClick={e => { e.stopPropagation(); onDelete(client) }}
+            sx={{ color: C.muted, '&:hover': { color: '#F87171' } }}>
+            <DeleteOutlineIcon sx={{ fontSize: 14 }} />
+          </IconButton>
+        )}
+      </Box>
     </Box>
   )
 }
@@ -798,7 +865,7 @@ function PlansTab({ t }) {
   const [search,      setSearch]      = useState('')
   const [planDlg,     setPlanDlg]     = useState(null) // { client, plan }
   const [loaded,      setLoaded]      = useState(false)
-  const [expandedId,  setExpandedId]  = useState(null)
+  const [infoDlg,     setInfoDlg]     = useState(null)
 
   useEffect(() => {
     loadAllPlans().then(() => setLoaded(true))
@@ -855,15 +922,19 @@ function PlansTab({ t }) {
               const plan = getClientPlan(client.id)
               return (
                 <ClientPlanRow key={client.id} client={client} plan={plan} t={t}
-                  allClientPlans={allPlans.filter(p => p.client_id === client.id)}
-                  expanded={expandedId === client.id}
-                  onToggle={() => setExpandedId(expandedId === client.id ? null : client.id)}
+                  onOpen={() => setInfoDlg({ client, plan, allClientPlans: allPlans.filter(p => p.client_id === client.id), workouts: client.workouts || [] })}
                   onManage={(c, p) => setPlanDlg({ client: c, plan: p })}
                   />
               )
             })
           )}
         </Paper>
+      )}
+
+      {infoDlg && (
+        <ClientInfoDialog open={!!infoDlg} onClose={() => setInfoDlg(null)}
+          client={infoDlg.client} plan={infoDlg.plan}
+          allClientPlans={infoDlg.allClientPlans} workouts={infoDlg.workouts} t={t} />
       )}
 
       {planDlg && (
@@ -971,7 +1042,7 @@ function ClientsTab({ t }) {
   const [planDlg, setPlanDlg]   = useState(null)
   const [loaded, setLoaded]     = useState(false)
   const [clientSearch, setClientSearch] = useState('')
-  const [expandedId, setExpandedId] = useState(null)
+  const [infoDlg, setInfoDlg] = useState(null) // { client, plan, allClientPlans, workouts }
 
   useEffect(() => { loadAllPlans().then(() => setLoaded(true)) }, [])
 
@@ -1040,12 +1111,9 @@ function ClientsTab({ t }) {
         <Paper sx={{ borderRadius: '16px', border: `1px solid rgba(248,113,113,0.3)`, overflow: 'hidden', mb: 3 }}>
           {pending.map(client => {
             const expiredPlan = getClientPlan(client.id)
-            const clientPlans = allPlans.filter(p => p.client_id === client.id)
             return (
               <ClientPlanRow key={client.id} client={client} plan={expiredPlan}
-                allClientPlans={clientPlans}
-                expanded={expandedId === client.id}
-                onToggle={() => setExpandedId(expandedId === client.id ? null : client.id)}
+                onOpen={() => setInfoDlg({ client, plan: expiredPlan, allClientPlans: allPlans.filter(p => p.client_id === client.id), workouts: client.workouts || [] })}
                 t={t} lang={lang}
                 onManage={(c, p) => setPlanDlg({ client: c, plan: p })}
                 onDelete={handleDelete} />
@@ -1061,20 +1129,22 @@ function ClientsTab({ t }) {
       <Paper sx={{ borderRadius: '16px', border: `1px solid ${C.border}`, overflow: 'hidden' }}>
         {active.map(client => {
           const plan = getClientPlan(client.id)
-          const clientPlans = allPlans.filter(p => p.client_id === client.id)
           return (
             <ClientPlanRow key={client.id} client={client} plan={plan}
-              allClientPlans={clientPlans}
-              expanded={expandedId === client.id}
-              onToggle={() => setExpandedId(expandedId === client.id ? null : client.id)}
+              onOpen={() => setInfoDlg({ client, plan, allClientPlans: allPlans.filter(p => p.client_id === client.id), workouts: client.workouts || [] })}
               t={t} lang={lang}
               onManage={(c, p) => setPlanDlg({ client: c, plan: p })}
-              onDeactivate={handleDeactivate}
-              onDelete={handleDelete}
-              onTogglePaid={handleTogglePaid} />
+              onDelete={handleDelete} />
           )
         })}
       </Paper>
+
+      {/* Client info popup */}
+      {infoDlg && (
+        <ClientInfoDialog open={!!infoDlg} onClose={() => setInfoDlg(null)}
+          client={infoDlg.client} plan={infoDlg.plan}
+          allClientPlans={infoDlg.allClientPlans} workouts={infoDlg.workouts} t={t} />
+      )}
 
       {planDlg && (
         <PlanDialog open={!!planDlg} onClose={() => setPlanDlg(null)}
