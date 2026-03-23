@@ -433,73 +433,144 @@ function PlanDialog({ open, onClose, onActivate, onExtend, onAdjust, onTogglePai
   )
 }
 
+// ── Plan Detail Panel (expanded view) ─────────────────────────
+function PlanDetailPanel({ plan, history, t }) {
+  const infoRow = (label, value, color) => (
+    <Box sx={{ display: 'flex', justifyContent: 'space-between', py: 0.4 }}>
+      <Typography sx={{ fontSize: '11px', color: C.muted, fontWeight: 600 }}>{label}</Typography>
+      <Typography sx={{ fontSize: '11px', color: color || C.text, fontWeight: 700 }}>{value}</Typography>
+    </Box>
+  )
+
+  return (
+    <Box sx={{ px: 1.5, pb: 1.5 }}>
+      {/* Current plan */}
+      {plan ? (
+        <Box sx={{ p: 1.25, borderRadius: '10px', background: 'rgba(255,255,255,0.03)', border: `1px solid ${C.border}`, mb: history.length ? 1.25 : 0 }}>
+          <Typography sx={{ fontSize: '10px', fontWeight: 800, color: C.purple, textTransform: 'uppercase', letterSpacing: '0.7px', mb: 0.75 }}>
+            {t('planDetailsLbl')}
+          </Typography>
+          {infoRow(t('planTypeLbl'), planLabel(plan.plan_type, t))}
+          {plan.plan_type !== 'unlimited' && infoRow(t('creditsRemaining'), `${creditsRemaining(plan)} / ${plan.credits_total}`)}
+          {infoRow(t('validFromLbl'), plan.valid_from || '—')}
+          {infoRow(t('validUntilLbl'), (plan.extended_to || plan.valid_to) || '—')}
+          {infoRow(t('priceLbl'), plan.price ? `${plan.price} EUR` : t('freeLbl'))}
+          {infoRow(plan.is_paid ? t('paidLbl') : t('unpaidLbl'), '', plan.is_paid ? C.primary : '#F87171')}
+          {plan.activated_by && infoRow(t('activatedByLbl'), plan.activated_by)}
+          {plan.created_at && infoRow(t('createdAtLbl'), plan.created_at.slice(0, 10))}
+        </Box>
+      ) : (
+        <Box sx={{ p: 1.25, borderRadius: '10px', background: 'rgba(248,113,113,0.06)', border: '1px solid rgba(248,113,113,0.2)', mb: history.length ? 1.25 : 0 }}>
+          <Typography sx={{ fontSize: '11px', color: '#F87171', fontWeight: 700 }}>{t('hasNoPlan')}</Typography>
+        </Box>
+      )}
+
+      {/* Plan history */}
+      {history.length > 0 && (
+        <Box>
+          <Typography sx={{ fontSize: '10px', fontWeight: 800, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.7px', mb: 0.75 }}>
+            {t('planHistoryLbl')}
+          </Typography>
+          {history.map((h, i) => (
+            <Box key={h.id || i} sx={{
+              display: 'flex', alignItems: 'center', gap: 1, py: 0.5,
+              borderBottom: i < history.length - 1 ? `1px solid rgba(255,255,255,0.04)` : 'none',
+            }}>
+              <Chip label={planLabel(h.plan_type, t)} size="small"
+                sx={{ fontSize: '10px', fontWeight: 700, height: 20, background: 'rgba(255,255,255,0.06)', color: C.muted }} />
+              <Typography sx={{ fontSize: '10px', color: C.muted }}>
+                {h.valid_from || '?'} — {h.extended_to || h.valid_to || '?'}
+              </Typography>
+              <Typography sx={{ fontSize: '10px', color: C.muted, ml: 'auto' }}>
+                {h.price ? `${h.price} EUR` : '—'}
+              </Typography>
+              <Box sx={{ width: 6, height: 6, borderRadius: '50%', background: h.is_paid ? 'rgba(74,222,128,0.5)' : 'rgba(248,113,113,0.5)' }} />
+            </Box>
+          ))}
+        </Box>
+      )}
+      {!plan && history.length === 0 && (
+        <Typography sx={{ fontSize: '11px', color: C.muted, mt: 0.5 }}>{t('noPlanHistory')}</Typography>
+      )}
+    </Box>
+  )
+}
+
 // ── Client Plan Row (compact) ─────────────────────────────────
-function ClientPlanRow({ client, plan, onManage, onDeactivate, onDelete, t, lang }) {
+function ClientPlanRow({ client, plan, allClientPlans, expanded, onToggle, onManage, onDeactivate, onDelete, t, lang }) {
   const active   = isPlanActive(plan)
   const credits  = plan ? creditsRemaining(plan) : null
   const isLow    = plan && plan.plan_type !== 'unlimited' && credits !== null && credits <= 2
   const isPaid   = plan?.is_paid
+  const history  = (allClientPlans || []).filter(p => p.id !== plan?.id)
 
   return (
-    <Box sx={{
-      display: 'flex', alignItems: 'center', gap: 1.25, py: 1, px: 1.5,
-      borderBottom: `1px solid ${C.border}`,
-      '&:last-child': { borderBottom: 'none' },
-    }}>
-      {/* Avatar */}
-      <Box sx={{
-        width: 32, height: 32, borderRadius: '50%', flexShrink: 0,
-        background: active ? C.primaryContainer : 'rgba(255,255,255,0.06)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: '13px', fontWeight: 800, color: active ? C.purple : C.muted,
+    <Box sx={{ borderBottom: `1px solid ${C.border}`, '&:last-child': { borderBottom: 'none' } }}>
+      <Box onClick={onToggle} sx={{
+        display: 'flex', alignItems: 'center', gap: 1.25, py: 1, px: 1.5,
+        cursor: 'pointer', '&:hover': { background: 'rgba(255,255,255,0.02)' },
+        transition: 'background 0.15s',
       }}>
-        {client.name.charAt(0).toUpperCase()}
-      </Box>
-
-      {/* Name */}
-      <Typography sx={{ fontWeight: 700, fontSize: '13px', color: C.text, flex: 1, minWidth: 0,
-        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-        {client.name}
-      </Typography>
-
-      {/* Plan info: credits remaining */}
-      {plan ? (
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, flexShrink: 0 }}>
-          {plan.plan_type !== 'unlimited' ? (
-            <Typography sx={{ fontSize: '12px', fontWeight: 800,
-              color: isLow ? '#FB923C' : C.purple }}>
-              {credits}
-            </Typography>
-          ) : (
-            <Typography sx={{ fontSize: '10px', fontWeight: 700, color: C.text }}>
-              ∞
-            </Typography>
-          )}
-          {/* Paid indicator: green = paid, red = unpaid */}
-          <Tooltip title={isPaid ? t('markedPaid') : t('markedUnpaid')} arrow>
-            <Box sx={{
-              width: 8, height: 8, borderRadius: '50%', flexShrink: 0,
-              background: isPaid ? C.primary : '#F87171',
-            }} />
-          </Tooltip>
+        {/* Avatar */}
+        <Box sx={{
+          width: 32, height: 32, borderRadius: '50%', flexShrink: 0,
+          background: active ? C.primaryContainer : 'rgba(255,255,255,0.06)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: '13px', fontWeight: 800, color: active ? C.purple : C.muted,
+        }}>
+          {client.name.charAt(0).toUpperCase()}
         </Box>
-      ) : (
-        <Typography sx={{ fontSize: '10px', color: '#F87171', fontWeight: 700, flexShrink: 0 }}>—</Typography>
-      )}
 
-      {/* Actions */}
-      <Box sx={{ display: 'flex', gap: 0.25, flexShrink: 0 }}>
-        <IconButton size="small" onClick={() => onManage(client, plan)}
-          sx={{ color: C.muted, '&:hover': { color: C.purple } }}>
-          <EditIcon sx={{ fontSize: 14 }} />
-        </IconButton>
-        {onDelete && (
-          <IconButton size="small" onClick={() => onDelete(client)}
-            sx={{ color: C.muted, '&:hover': { color: '#F87171' } }}>
-            <DeleteOutlineIcon sx={{ fontSize: 14 }} />
-          </IconButton>
+        {/* Name */}
+        <Typography sx={{ fontWeight: 700, fontSize: '13px', color: C.text, flex: 1, minWidth: 0,
+          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {client.name}
+        </Typography>
+
+        {/* Plan info: credits remaining */}
+        {plan ? (
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, flexShrink: 0 }}>
+            {plan.plan_type !== 'unlimited' ? (
+              <Typography sx={{ fontSize: '12px', fontWeight: 800,
+                color: isLow ? '#FB923C' : C.purple }}>
+                {credits}
+              </Typography>
+            ) : (
+              <Typography sx={{ fontSize: '10px', fontWeight: 700, color: C.text }}>
+                ∞
+              </Typography>
+            )}
+            {/* Paid indicator: green = paid, red = unpaid */}
+            <Tooltip title={isPaid ? t('markedPaid') : t('markedUnpaid')} arrow>
+              <Box sx={{
+                width: 8, height: 8, borderRadius: '50%', flexShrink: 0,
+                background: isPaid ? C.primary : '#F87171',
+              }} />
+            </Tooltip>
+          </Box>
+        ) : (
+          <Typography sx={{ fontSize: '10px', color: '#F87171', fontWeight: 700, flexShrink: 0 }}>—</Typography>
         )}
+
+        {/* Actions */}
+        <Box sx={{ display: 'flex', gap: 0.25, flexShrink: 0 }}>
+          <IconButton size="small" onClick={e => { e.stopPropagation(); onManage(client, plan) }}
+            sx={{ color: C.muted, '&:hover': { color: C.purple } }}>
+            <EditIcon sx={{ fontSize: 14 }} />
+          </IconButton>
+          {onDelete && (
+            <IconButton size="small" onClick={e => { e.stopPropagation(); onDelete(client) }}
+              sx={{ color: C.muted, '&:hover': { color: '#F87171' } }}>
+              <DeleteOutlineIcon sx={{ fontSize: 14 }} />
+            </IconButton>
+          )}
+        </Box>
       </Box>
+
+      {/* Expanded detail panel */}
+      <Collapse in={expanded}>
+        <PlanDetailPanel plan={plan} history={history} t={t} />
+      </Collapse>
     </Box>
   )
 }
@@ -724,9 +795,10 @@ function AddClientDialog({ open, onClose, onAdd, slot, realClients, t }) {
 function PlansTab({ t }) {
   const { realClients, showSnackbar } = useApp()
   const { allPlans, loadAllPlans, activatePlan, extendPlan, adjustCredits } = useBooking()
-  const [search,    setSearch]    = useState('')
-  const [planDlg,   setPlanDlg]   = useState(null) // { client, plan }
-  const [loaded,    setLoaded]    = useState(false)
+  const [search,      setSearch]      = useState('')
+  const [planDlg,     setPlanDlg]     = useState(null) // { client, plan }
+  const [loaded,      setLoaded]      = useState(false)
+  const [expandedId,  setExpandedId]  = useState(null)
 
   useEffect(() => {
     loadAllPlans().then(() => setLoaded(true))
@@ -783,6 +855,9 @@ function PlansTab({ t }) {
               const plan = getClientPlan(client.id)
               return (
                 <ClientPlanRow key={client.id} client={client} plan={plan} t={t}
+                  allClientPlans={allPlans.filter(p => p.client_id === client.id)}
+                  expanded={expandedId === client.id}
+                  onToggle={() => setExpandedId(expandedId === client.id ? null : client.id)}
                   onManage={(c, p) => setPlanDlg({ client: c, plan: p })}
                   />
               )
@@ -893,9 +968,10 @@ function ClientModuleEditor({ clientId, currentModules, t, lang }) {
 function ClientsTab({ t }) {
   const { realClients, showSnackbar, lang, setConfirmDelete } = useApp()
   const { allPlans, loadAllPlans, activatePlan, extendPlan, adjustCredits, deactivatePlan } = useBooking()
-  const [planDlg, setPlanDlg] = useState(null)
-  const [loaded, setLoaded]   = useState(false)
+  const [planDlg, setPlanDlg]   = useState(null)
+  const [loaded, setLoaded]     = useState(false)
   const [clientSearch, setClientSearch] = useState('')
+  const [expandedId, setExpandedId] = useState(null)
 
   useEffect(() => { loadAllPlans().then(() => setLoaded(true)) }, [])
 
@@ -962,33 +1038,19 @@ function ClientsTab({ t }) {
         <Typography sx={{ color: C.muted, fontSize: '13px', mb: 3 }}>{t('noPendingClients')}</Typography>
       ) : (
         <Paper sx={{ borderRadius: '16px', border: `1px solid rgba(248,113,113,0.3)`, overflow: 'hidden', mb: 3 }}>
-          {pending.map(client => (
-            <Box key={client.id} sx={{
-              display: 'flex', alignItems: 'center', gap: 1.25, py: 1, px: 1.5,
-              borderBottom: `1px solid ${C.border}`, '&:last-child': { borderBottom: 'none' },
-            }}>
-              <Box sx={{ width: 32, height: 32, borderRadius: '50%', background: 'rgba(248,113,113,0.15)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: '13px', fontWeight: 800, color: '#F87171', flexShrink: 0 }}>
-                {client.name.charAt(0).toUpperCase()}
-              </Box>
-              <Typography sx={{ fontWeight: 700, fontSize: '13px', color: C.text, flex: 1, minWidth: 0,
-                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {client.name}
-              </Typography>
-              <Typography sx={{ fontSize: '10px', color: '#F87171', fontWeight: 700, flexShrink: 0 }}>—</Typography>
-              <Box sx={{ display: 'flex', gap: 0.25, flexShrink: 0 }}>
-                <IconButton size="small" onClick={() => setPlanDlg({ client, plan: null })}
-                  sx={{ color: C.purple }}>
-                  <EditIcon sx={{ fontSize: 14 }} />
-                </IconButton>
-                <IconButton size="small" onClick={() => handleDelete(client)}
-                  sx={{ color: C.muted, '&:hover': { color: '#F87171' } }}>
-                  <DeleteOutlineIcon sx={{ fontSize: 14 }} />
-                </IconButton>
-              </Box>
-            </Box>
-          ))}
+          {pending.map(client => {
+            const expiredPlan = getClientPlan(client.id)
+            const clientPlans = allPlans.filter(p => p.client_id === client.id)
+            return (
+              <ClientPlanRow key={client.id} client={client} plan={expiredPlan}
+                allClientPlans={clientPlans}
+                expanded={expandedId === client.id}
+                onToggle={() => setExpandedId(expandedId === client.id ? null : client.id)}
+                t={t} lang={lang}
+                onManage={(c, p) => setPlanDlg({ client: c, plan: p })}
+                onDelete={handleDelete} />
+            )
+          })}
         </Paper>
       )}
 
@@ -999,8 +1061,13 @@ function ClientsTab({ t }) {
       <Paper sx={{ borderRadius: '16px', border: `1px solid ${C.border}`, overflow: 'hidden' }}>
         {active.map(client => {
           const plan = getClientPlan(client.id)
+          const clientPlans = allPlans.filter(p => p.client_id === client.id)
           return (
-            <ClientPlanRow key={client.id} client={client} plan={plan} t={t} lang={lang}
+            <ClientPlanRow key={client.id} client={client} plan={plan}
+              allClientPlans={clientPlans}
+              expanded={expandedId === client.id}
+              onToggle={() => setExpandedId(expandedId === client.id ? null : client.id)}
+              t={t} lang={lang}
               onManage={(c, p) => setPlanDlg({ client: c, plan: p })}
               onDeactivate={handleDeactivate}
               onDelete={handleDelete}
