@@ -86,13 +86,17 @@ export function BookingProvider({ children }) {
       })
       if (result?.error) return { error: result.error }
       await Promise.all([loadSlots(), loadMyBookings(auth.id), loadMyPlan(auth.id)])
+      // Notify coaches/admins about the booking
+      const slot = slots.find(s => s.id === slotId)
+      const timeInfo = slot ? `${slot.slot_date} ${slot.start_time?.slice(0, 5)}` : ''
+      DB.insertNotification(auth.name, auth.name, 'booking', `${auth.name} си записа час: ${timeInfo}`)
       return { ok: true }
     } catch (e) {
       return { error: e.message || 'Грешка при записване' }
     } finally {
       setBookingBusy(false)
     }
-  }, [auth, loadSlots, loadMyBookings, loadMyPlan])
+  }, [auth, slots, loadSlots, loadMyBookings, loadMyPlan])
 
   // ── Client: cancel booking ────────────────────────────────
   const cancelBookingForSlot = useCallback(async (slotId) => {

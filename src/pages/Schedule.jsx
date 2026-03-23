@@ -375,35 +375,34 @@ function SlotCell({ slot, adminMode, onEdit, onDelete, onAddClient, bookings = [
     <Box
       onClick={adminMode ? (e) => { e.stopPropagation(); setShowActions(s => !s); setConfirmDel(false) } : undefined}
       onMouseLeave={() => { setShowActions(false); setConfirmDel(false) }}
-      sx={{ position: 'relative', mb: '3px', userSelect: 'none', cursor: adminMode ? 'pointer' : 'default' }}
+      sx={{ position: 'relative', mb: '1px', userSelect: 'none', cursor: adminMode ? 'pointer' : 'default' }}
     >
       {/* Pills stacked vertically — booked=full card, empty=thin line */}
-      <Box sx={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
         {cells.map((booking, i) => (
           booking ? (
             <Box key={i} onClick={!adminMode ? () => openClient(booking) : undefined} sx={{
-              borderRadius: '6px',
-              px: '4px', py: '3px',
+              borderRadius: '4px',
+              px: '3px', py: '1px',
               background: hexRgba(base, 0.30),
               border: `1px solid ${hexRgba(base, 0.58)}`,
               overflow: 'hidden',
             }}>
               <Typography sx={{
-                fontSize: '10px', fontWeight: 700,
+                fontSize: '8px', fontWeight: 700,
                 color: base,
-                lineHeight: 1.2,
-                display: '-webkit-box',
-                WebkitLineClamp: 2,
-                WebkitBoxOrient: 'vertical',
+                lineHeight: 1.15,
+                whiteSpace: 'nowrap',
                 overflow: 'hidden',
+                textOverflow: 'ellipsis',
               }}>
                 {booking.client_name}
               </Typography>
             </Box>
           ) : (
             <Box key={i} sx={{
-              borderRadius: '4px',
-              height: '8px',
+              borderRadius: '3px',
+              height: '5px',
               background: hexRgba(base, 0.07),
               border: `1px solid ${hexRgba(base, 0.15)}`,
             }} />
@@ -563,19 +562,19 @@ export default function Schedule() {
     const d = new Date(Date.UTC(y, m - 1, day))
     const wd = lang === 'bg' ? WEEKDAYS_BG[d.getUTCDay()] : WEEKDAYS_EN[d.getUTCDay()]
     return (
-      <Box sx={{ borderLeft: `1px solid ${C.border}`, py: 1.25, textAlign: 'center' }}>
+      <Box sx={{ borderLeft: `1px solid ${C.border}`, py: 0.5, textAlign: 'center' }}>
         <Typography sx={{
-          fontSize: '10px', fontWeight: 700, textTransform: 'uppercase',
+          fontSize: '9px', fontWeight: 700, textTransform: 'uppercase',
           letterSpacing: '0.5px', color: isToday_ ? C.purple : C.muted, lineHeight: 1,
         }}>
           {wd}
         </Typography>
         <Box sx={{
           display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-          width: 32, height: 32, borderRadius: '50%', mt: 0.5,
+          width: 24, height: 24, borderRadius: '50%', mt: 0.25,
           background: isToday_ ? C.primary : 'transparent',
         }}>
-          <Typography sx={{ fontSize: '16px', fontWeight: 800, color: isToday_ ? '#0f1c11' : C.text, lineHeight: 1 }}>
+          <Typography sx={{ fontSize: '13px', fontWeight: 800, color: isToday_ ? '#0f1c11' : C.text, lineHeight: 1 }}>
             {d.getUTCDate()}
           </Typography>
         </Box>
@@ -586,57 +585,52 @@ export default function Schedule() {
   return (
     <Box sx={{ maxWidth: 900, mx: 'auto' }}>
       {/* ── Page header ──────────────────────────────── */}
-      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2, flexWrap: 'wrap', gap: 1 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <Typography variant="h5" sx={{ fontWeight: 800, color: C.text }}>
-            {t('scheduleTitle')}
-          </Typography>
-          {admin && (
-            <Button
-              startIcon={<BoltIcon sx={{ fontSize: '15px !important' }} />}
-              onClick={() => setShowShiftDlg(true)}
-              size="small"
-              sx={{
-                background: 'rgba(255,184,122,0.12)', color: C.orange,
-                fontWeight: 700, fontSize: '12px', borderRadius: '10px',
-                border: '1px solid rgba(255,184,122,0.25)',
-                px: 1.5, py: 0.5, textTransform: 'none',
-                '&:hover': { background: 'rgba(255,184,122,0.2)' },
-              }}
-            >
-              Нова смяна
-            </Button>
-          )}
-        </Box>
-
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1, gap: 1 }}>
         {/* Navigation */}
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
           {viewStart !== today && (
             <Button size="small" onClick={() => setViewStart(today)}
-              sx={{ color: C.muted, fontSize: '11px', textTransform: 'none', px: 1, py: 0.5,
-                border: `1px solid ${C.border}`, borderRadius: '8px' }}>
+              sx={{ color: C.muted, fontSize: '11px', textTransform: 'none', px: 1, py: 0.25,
+                border: `1px solid ${C.border}`, borderRadius: '8px', minWidth: 0 }}>
               Днес
             </Button>
           )}
           <IconButton onClick={() => setViewStart(addDays(viewStart, -3))} size="small"
-            sx={{ color: C.muted, border: `1px solid ${C.border}`, borderRadius: '8px' }}>
-            <ChevronLeftIcon />
+            sx={{ color: C.muted, border: `1px solid ${C.border}`, borderRadius: '8px', p: 0.5 }}>
+            <ChevronLeftIcon sx={{ fontSize: 18 }} />
           </IconButton>
-          <Typography sx={{ fontSize: '12px', color: C.muted, minWidth: 110, textAlign: 'center' }}>
+          <Typography sx={{ fontSize: '11px', color: C.muted, minWidth: 95, textAlign: 'center' }}>
             {viewStart} – {addDays(viewStart, 2)}
           </Typography>
           <IconButton onClick={() => setViewStart(addDays(viewStart, 3))} size="small"
-            sx={{ color: C.muted, border: `1px solid ${C.border}`, borderRadius: '8px' }}>
-            <ChevronRightIcon />
+            sx={{ color: C.muted, border: `1px solid ${C.border}`, borderRadius: '8px', p: 0.5 }}>
+            <ChevronRightIcon sx={{ fontSize: 18 }} />
           </IconButton>
         </Box>
+
+        {admin && (
+          <Button
+            startIcon={<BoltIcon sx={{ fontSize: '13px !important' }} />}
+            onClick={() => setShowShiftDlg(true)}
+            size="small"
+            sx={{
+              background: 'rgba(255,184,122,0.12)', color: C.orange,
+              fontWeight: 700, fontSize: '11px', borderRadius: '8px',
+              border: '1px solid rgba(255,184,122,0.25)',
+              px: 1, py: 0.25, textTransform: 'none', minWidth: 0,
+              '&:hover': { background: 'rgba(255,184,122,0.2)' },
+            }}
+          >
+            Нова смяна
+          </Button>
+        )}
       </Box>
 
       {/* ── Calendar Grid ─────────────────────────────── */}
       <Paper sx={{ borderRadius: '16px', border: `1px solid ${C.border}`, overflow: 'hidden' }}>
         {/* Day header row */}
         <Box sx={{
-          display: 'grid', gridTemplateColumns: '48px repeat(3, 1fr)',
+          display: 'grid', gridTemplateColumns: '36px repeat(3, 1fr)',
           borderBottom: `2px solid ${C.border}`,
           background: C.card, position: 'sticky', top: 0, zIndex: 2,
         }}>
@@ -653,18 +647,18 @@ export default function Schedule() {
           HOURS.map(hour => (
             <Box key={hour} sx={{
               display: 'grid',
-              gridTemplateColumns: '48px repeat(3, 1fr)',
+              gridTemplateColumns: '36px repeat(3, 1fr)',
               borderBottom: `1px solid ${C.border}`,
               '&:last-child': { borderBottom: 'none' },
-              minHeight: 40,
+              minHeight: 28,
             }}>
               {/* Time label */}
               <Box sx={{
                 display: 'flex', alignItems: 'flex-start',
-                justifyContent: 'flex-end', pr: '6px', pt: '7px',
+                justifyContent: 'flex-end', pr: '3px', pt: '3px',
                 borderRight: `1px solid ${C.border}`,
               }}>
-                <Typography sx={{ fontSize: '10px', color: C.muted, fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
+                <Typography sx={{ fontSize: '9px', color: C.muted, fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
                   {p2(hour)}:00
                 </Typography>
               </Box>
@@ -681,8 +675,8 @@ export default function Schedule() {
                     onClick={admin && isEmpty ? () => { setCellTarget({ date, hour }); setShowCellDlg(true) } : undefined}
                     sx={{
                       borderLeft: `1px solid ${C.border}`,
-                      p: '3px 4px',
-                      minHeight: 30,
+                      p: '2px 3px',
+                      minHeight: 22,
                       cursor: admin && isEmpty ? 'pointer' : 'default',
                       '&:hover': admin && isEmpty ? { background: C.primaryA5 } : {},
                       display: 'flex', flexDirection: 'column', position: 'relative',

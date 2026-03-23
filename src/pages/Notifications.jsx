@@ -5,14 +5,18 @@ import PersonAddAlt1Icon from '@mui/icons-material/PersonAddAlt1'
 import AssignmentIcon from '@mui/icons-material/Assignment'
 import ChatBubbleOutlineIcon from '@mui/icons-material/ChatBubbleOutline'
 import ThumbUpAltIcon from '@mui/icons-material/ThumbUpAlt'
+import EventAvailableIcon from '@mui/icons-material/EventAvailable'
+import SchoolIcon from '@mui/icons-material/School'
 import { useApp } from '../context/AppContext'
 import { C, EASE } from '../theme'
 
 const ACTION_ICONS = {
-  task:         AssignmentIcon,
-  task_comment: ChatBubbleOutlineIcon,
-  reaction:     ThumbUpAltIcon,
-  registration: PersonAddAlt1Icon,
+  task:            AssignmentIcon,
+  task_comment:    ChatBubbleOutlineIcon,
+  reaction:        ThumbUpAltIcon,
+  registration:    PersonAddAlt1Icon,
+  booking:         EventAvailableIcon,
+  lesson_complete: SchoolIcon,
 }
 
 function timeAgo(dateStr, t) {

@@ -828,8 +828,14 @@ export default function Programs() {
     } else {
       await DB.markLessonComplete(auth.id, lessonId)
       setProgress(prev => [...prev, { client_id: auth.id, lesson_id: lessonId, completed_at: new Date().toISOString() }])
+      // Notify coaches — only when marking complete, not when unmarking
+      if (auth.role === 'client') {
+        const lesson = lessons.find(l => l.id === lessonId)
+        const lessonName = lesson ? (lesson.name_bg || lesson.name_en) : ''
+        DB.insertNotification(auth.name, auth.name, 'lesson_complete', `${auth.name} завърши урок: ${lessonName}`)
+      }
     }
-  }, [auth.id, progress])
+  }, [auth, progress, lessons])
 
   // Toggle resource step completion
   const toggleStep = useCallback(async (stepId) => {
