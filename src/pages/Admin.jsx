@@ -533,25 +533,27 @@ function ClientInfoDialog({ open, onClose, client, plan, allClientPlans, workout
           )
         })()}
 
-        {/* ── Plan history (compact) ── */}
-        {history.length > 0 && (
-          <Box sx={{ p: 1.5, borderRadius: '14px', background: 'rgba(255,255,255,0.03)', border: `1px solid ${C.border}` }}>
-            <Typography sx={{ fontSize: '10px', fontWeight: 800, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.7px', mb: 0.75 }}>
-              {t('planHistoryLbl')}
-            </Typography>
+        {/* ── Plan history (compact) — always shown ── */}
+        <Box sx={{ p: 1.5, borderRadius: '14px', background: 'rgba(255,255,255,0.03)', border: `1px solid ${C.border}` }}>
+          <Typography sx={{ fontSize: '10px', fontWeight: 800, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.7px', mb: 0.75 }}>
+            {t('planHistoryLbl')}
+          </Typography>
+          {history.length > 0 ? (
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
               {history.map((h, i) => (
                 <Box key={h.id || i} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                   <Box sx={{ width: 6, height: 6, borderRadius: '50%', flexShrink: 0, background: h.is_paid ? 'rgba(74,222,128,0.6)' : 'rgba(248,113,113,0.6)' }} />
                   <Typography sx={{ fontSize: '12px', color: C.text, fontWeight: 600 }}>
-                    {planLabel(h.plan_type, t)} {h.valid_from?.slice(5) || '?'}-{(h.extended_to || h.valid_to)?.slice(5) || '?'}
+                    {planLabel(h.plan_type, t)} {h.valid_from || '?'} — {h.extended_to || h.valid_to || '?'}
                   </Typography>
-                  {h.price > 0 && <Typography sx={{ fontSize: '11px', color: C.muted, ml: 'auto' }}>{h.price}EUR</Typography>}
+                  {h.price > 0 && <Typography sx={{ fontSize: '11px', color: C.muted, ml: 'auto' }}>{h.price} EUR</Typography>}
                 </Box>
               ))}
             </Box>
-          </Box>
-        )}
+          ) : (
+            <Typography sx={{ fontSize: '11px', color: C.muted }}>{t('noPlanHistory')}</Typography>
+          )}
+        </Box>
 
       </DialogContent>
       <DialogActions sx={{ px: 3, pb: 2 }}>
