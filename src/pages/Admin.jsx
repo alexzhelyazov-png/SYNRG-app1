@@ -436,6 +436,18 @@ function PlanDialog({ open, onClose, onActivate, onExtend, onAdjust, onTogglePai
 // ── Client Info Dialog (popup) ─────────────────────────────────
 function ClientInfoDialog({ open, onClose, client, plan, allClientPlans, workouts, t }) {
   const history = (allClientPlans || []).filter(p => p.id !== plan?.id)
+  const [upcomingBookings, setUpcomingBookings] = useState([])
+
+  useEffect(() => {
+    if (open && client?.id) {
+      DB.getClientUpcomingBookings(client.id).then(data => {
+        // Filter out bookings where slot join returned null (past dates filtered server-side)
+        setUpcomingBookings((data || []).filter(b => b.slots))
+      })
+    } else {
+      setUpcomingBookings([])
+    }
+  }, [open, client?.id])
 
   const infoRow = (label, value, color) => (
     <Box sx={{ display: 'flex', justifyContent: 'space-between', py: 0.5 }}>
@@ -489,6 +501,23 @@ function ClientInfoDialog({ open, onClose, client, plan, allClientPlans, workout
             <Typography sx={{ fontSize: '12px', color: '#F87171', fontWeight: 700 }}>{t('hasNoPlan')}</Typography>
           )}
         </Box>
+
+        {/* ── Upcoming booked sessions ── */}
+        {upcomingBookings.length > 0 && (
+          <Box sx={{ p: 1.5, borderRadius: '14px', background: 'rgba(255,255,255,0.03)', border: `1px solid ${C.border}` }}>
+            <Typography sx={{ fontSize: '10px', fontWeight: 800, color: C.primary, textTransform: 'uppercase', letterSpacing: '0.7px', mb: 0.75 }}>
+              {t('bookedSessionsLbl') || 'Запазени часове'}
+            </Typography>
+            <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
+              {upcomingBookings.map((b, i) => (
+                <Chip key={b.id || i}
+                  label={`${b.slots.date} ${b.slots.start_time?.slice(0,5) || ''}${b.slots.coach_name ? ' · ' + b.slots.coach_name : ''}`}
+                  size="small"
+                  sx={{ fontSize: '11px', fontWeight: 600, height: 24, background: 'rgba(74,222,128,0.1)', color: C.primary, border: `1px solid rgba(74,222,128,0.2)` }} />
+              ))}
+            </Box>
+          </Box>
+        )}
 
         {/* ── Workout dates (compact) ── */}
         {workouts.length > 0 && (() => {

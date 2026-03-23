@@ -215,6 +215,18 @@ export const DB = {
     return all.filter(b => b.client_id === clientId && b.status === 'active')
   },
 
+  // ── Booking: client's upcoming bookings with slot info ───────
+  async getClientUpcomingBookings(clientId) {
+    if (isUsingSupabase) {
+      const today = new Date().toISOString().slice(0, 10)
+      return (await sbFetchSafe(
+        sbUrl('slot_bookings', `?select=*,slots(date,start_time,coach_name)&client_id=eq.${clientId}&status=eq.active&slots.date=gte.${today}&order=slots.date.asc`),
+        { headers: sbHeaders() }
+      )) || []
+    }
+    return []
+  },
+
   // ── Plans: get client's current active plan ──────────────────
   async getClientActivePlan(clientId) {
     if (isUsingSupabase) {
