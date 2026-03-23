@@ -490,76 +490,64 @@ function ClientInfoDialog({ open, onClose, client, plan, allClientPlans, workout
           )}
         </Box>
 
-        {/* ── Upcoming workouts (future dates) ── */}
-        {workouts.filter(w => w.date >= new Date().toISOString().slice(0, 10)).length > 0 && (
-          <Box sx={{ p: 1.5, borderRadius: '14px', background: 'rgba(255,255,255,0.03)', border: `1px solid ${C.border}` }}>
-            <Typography sx={{ fontSize: '10px', fontWeight: 800, color: C.primary, textTransform: 'uppercase', letterSpacing: '0.7px', mb: 1 }}>
-              {t('upcomingWorkoutsLbl') || 'Предстоящи тренировки'}
-            </Typography>
-            {workouts.filter(w => w.date >= new Date().toISOString().slice(0, 10)).map((w, i) => (
-              <Box key={w.id || i} sx={{ py: 0.5, borderBottom: i < workouts.length - 1 ? `1px solid rgba(255,255,255,0.04)` : 'none' }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.25 }}>
-                  <Typography sx={{ fontSize: '12px', fontWeight: 700, color: C.text }}>{w.date}</Typography>
-                  {w.category && <Chip label={t(w.category)} size="small" sx={{ fontSize: '10px', fontWeight: 700, height: 20, background: C.purpleSoft, color: C.purple }} />}
-                  <Typography sx={{ fontSize: '10px', color: C.muted, ml: 'auto' }}>{w.items?.length || 0} {t('exercisesLbl')}</Typography>
-                </Box>
-              </Box>
-            ))}
-          </Box>
-        )}
-
-        {/* ── Workout history ── */}
-        {workouts.length > 0 && (
-          <Box sx={{ p: 1.5, borderRadius: '14px', background: 'rgba(255,255,255,0.03)', border: `1px solid ${C.border}` }}>
-            <Typography sx={{ fontSize: '10px', fontWeight: 800, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.7px', mb: 1 }}>
-              {t('workoutHistory')}
-            </Typography>
-            {workouts.slice(0, 20).map((w, i) => (
-              <Box key={w.id || i} sx={{ py: 0.5, borderBottom: i < Math.min(workouts.length, 20) - 1 ? `1px solid rgba(255,255,255,0.04)` : 'none' }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <Typography sx={{ fontSize: '12px', fontWeight: 700, color: C.text }}>{w.date}</Typography>
-                  {w.category && <Chip label={t(w.category)} size="small" sx={{ fontSize: '10px', fontWeight: 700, height: 20, background: C.purpleSoft, color: C.purple }} />}
-                  {w.coach && <Typography sx={{ fontSize: '10px', color: C.muted, ml: 'auto' }}>{w.coach}</Typography>}
-                </Box>
-                {(w.items || []).map((ex, j) => (
-                  <Box key={j} sx={{ display: 'flex', gap: 1.5, pl: 1.5, py: 0.15 }}>
-                    <Typography sx={{ fontSize: '11px', color: C.text, fontWeight: 600, flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ex.exercise}</Typography>
-                    <Typography sx={{ fontSize: '11px', color: C.muted, flexShrink: 0 }}>{ex.scheme}</Typography>
-                    <Typography sx={{ fontSize: '11px', color: C.muted, flexShrink: 0 }}>{ex.weight}{ex.weight ? ' kg' : ''}</Typography>
+        {/* ── Workout dates (compact) ── */}
+        {workouts.length > 0 && (() => {
+          const today = new Date().toISOString().slice(0, 10)
+          const upcoming = workouts.filter(w => w.date >= today)
+          const past = workouts.filter(w => w.date < today)
+          return (
+            <Box sx={{ p: 1.5, borderRadius: '14px', background: 'rgba(255,255,255,0.03)', border: `1px solid ${C.border}` }}>
+              {upcoming.length > 0 && (
+                <>
+                  <Typography sx={{ fontSize: '10px', fontWeight: 800, color: C.primary, textTransform: 'uppercase', letterSpacing: '0.7px', mb: 0.75 }}>
+                    {t('upcomingWorkoutsLbl') || 'Предстоящи'}
+                  </Typography>
+                  <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', mb: past.length ? 1.5 : 0 }}>
+                    {upcoming.map((w, i) => (
+                      <Chip key={w.id || i} label={`${w.date}${w.category ? ' · ' + t(w.category) : ''}`} size="small"
+                        sx={{ fontSize: '11px', fontWeight: 600, height: 24, background: 'rgba(74,222,128,0.1)', color: C.primary, border: `1px solid rgba(74,222,128,0.2)` }} />
+                    ))}
                   </Box>
-                ))}
-              </Box>
-            ))}
-            {workouts.length > 20 && (
-              <Typography sx={{ fontSize: '11px', color: C.muted, mt: 0.5, textAlign: 'center' }}>
-                +{workouts.length - 20} {t('moreWorkoutsLbl') || 'още'}
-              </Typography>
-            )}
-          </Box>
-        )}
+                </>
+              )}
+              {past.length > 0 && (
+                <>
+                  <Typography sx={{ fontSize: '10px', fontWeight: 800, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.7px', mb: 0.75 }}>
+                    {t('workoutHistory')} ({past.length})
+                  </Typography>
+                  <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
+                    {past.slice(0, 30).map((w, i) => (
+                      <Chip key={w.id || i} label={w.date} size="small"
+                        sx={{ fontSize: '10px', fontWeight: 600, height: 22, background: 'rgba(255,255,255,0.06)', color: C.muted }} />
+                    ))}
+                    {past.length > 30 && (
+                      <Chip label={`+${past.length - 30}`} size="small"
+                        sx={{ fontSize: '10px', fontWeight: 600, height: 22, background: 'rgba(255,255,255,0.04)', color: C.muted }} />
+                    )}
+                  </Box>
+                </>
+              )}
+            </Box>
+          )
+        })()}
 
-        {/* ── Plan history ── */}
+        {/* ── Plan history (compact) ── */}
         {history.length > 0 && (
           <Box sx={{ p: 1.5, borderRadius: '14px', background: 'rgba(255,255,255,0.03)', border: `1px solid ${C.border}` }}>
-            <Typography sx={{ fontSize: '10px', fontWeight: 800, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.7px', mb: 1 }}>
+            <Typography sx={{ fontSize: '10px', fontWeight: 800, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.7px', mb: 0.75 }}>
               {t('planHistoryLbl')}
             </Typography>
-            {history.map((h, i) => (
-              <Box key={h.id || i} sx={{
-                display: 'flex', alignItems: 'center', gap: 1, py: 0.6,
-                borderBottom: i < history.length - 1 ? `1px solid rgba(255,255,255,0.04)` : 'none',
-              }}>
-                <Chip label={planLabel(h.plan_type, t)} size="small"
-                  sx={{ fontSize: '10px', fontWeight: 700, height: 22, background: 'rgba(255,255,255,0.06)', color: C.muted }} />
-                <Typography sx={{ fontSize: '11px', color: C.muted }}>
-                  {h.valid_from || '?'} — {h.extended_to || h.valid_to || '?'}
-                </Typography>
-                <Typography sx={{ fontSize: '11px', color: C.muted, ml: 'auto' }}>
-                  {h.price ? `${h.price} EUR` : '—'}
-                </Typography>
-                <Box sx={{ width: 7, height: 7, borderRadius: '50%', background: h.is_paid ? 'rgba(74,222,128,0.6)' : 'rgba(248,113,113,0.6)' }} />
-              </Box>
-            ))}
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+              {history.map((h, i) => (
+                <Box key={h.id || i} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Box sx={{ width: 6, height: 6, borderRadius: '50%', flexShrink: 0, background: h.is_paid ? 'rgba(74,222,128,0.6)' : 'rgba(248,113,113,0.6)' }} />
+                  <Typography sx={{ fontSize: '12px', color: C.text, fontWeight: 600 }}>
+                    {planLabel(h.plan_type, t)} {h.valid_from?.slice(5) || '?'}-{(h.extended_to || h.valid_to)?.slice(5) || '?'}
+                  </Typography>
+                  {h.price > 0 && <Typography sx={{ fontSize: '11px', color: C.muted, ml: 'auto' }}>{h.price}EUR</Typography>}
+                </Box>
+              ))}
+            </Box>
           </Box>
         )}
 
