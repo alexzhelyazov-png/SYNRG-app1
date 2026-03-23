@@ -483,19 +483,22 @@ function ClientInfoDialog({ open, onClose, client, plan, allClientPlans, workout
           </Typography>
           {plan ? (
             <>
-              {infoRow(t('planTypeLbl'), planLabel(plan.plan_type, t))}
-              {plan.plan_type !== 'unlimited' && infoRow(t('creditsRemaining'), `${creditsRemaining(plan)} / ${plan.credits_total}`)}
-              {infoRow(t('validFromLbl'), plan.valid_from || '—')}
-              {infoRow(t('validUntilLbl'), (plan.extended_to || plan.valid_to) || '—')}
-              {infoRow(t('priceLbl'), plan.price ? `${plan.price} EUR` : t('freeLbl'))}
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mt: 0.5 }}>
-                <Box sx={{ width: 8, height: 8, borderRadius: '50%', background: plan.is_paid ? C.primary : '#F87171' }} />
-                <Typography sx={{ fontSize: '12px', fontWeight: 700, color: plan.is_paid ? C.primary : '#F87171' }}>
-                  {plan.is_paid ? t('paidLbl') : t('unpaidLbl')}
-                </Typography>
+              {infoRow(t('planTypeLbl'), `${planLabel(plan.plan_type, t)}${plan.plan_type !== 'unlimited' ? ` · ${creditsRemaining(plan)}/${plan.credits_total}` : ''}`)}
+              {infoRow(t('validFromLbl'), `${plan.valid_from || '—'} — ${plan.extended_to || plan.valid_to || '—'}`)}
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 0.5 }}>
+                <Typography sx={{ fontSize: '12px', color: C.muted, fontWeight: 600 }}>{t('priceLbl')}</Typography>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Typography sx={{ fontSize: '12px', color: C.text, fontWeight: 700 }}>{plan.price ? `${plan.price} EUR` : t('freeLbl')}</Typography>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, px: 1, py: 0.25, borderRadius: '100px',
+                    background: plan.is_paid ? 'rgba(74,222,128,0.1)' : 'rgba(248,113,113,0.1)',
+                    border: `1px solid ${plan.is_paid ? 'rgba(74,222,128,0.25)' : 'rgba(248,113,113,0.25)'}` }}>
+                    <Box sx={{ width: 6, height: 6, borderRadius: '50%', background: plan.is_paid ? C.primary : '#F87171' }} />
+                    <Typography sx={{ fontSize: '10px', fontWeight: 700, color: plan.is_paid ? C.primary : '#F87171' }}>
+                      {plan.is_paid ? t('paidLbl') : t('unpaidLbl')}
+                    </Typography>
+                  </Box>
+                </Box>
               </Box>
-              {plan.activated_by && infoRow(t('activatedByLbl'), plan.activated_by)}
-              {plan.created_at && infoRow(t('createdAtLbl'), plan.created_at.slice(0, 10))}
             </>
           ) : (
             <Typography sx={{ fontSize: '12px', color: '#F87171', fontWeight: 700 }}>{t('hasNoPlan')}</Typography>
