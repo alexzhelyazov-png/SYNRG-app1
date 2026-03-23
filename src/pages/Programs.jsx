@@ -846,8 +846,13 @@ export default function Programs() {
     } else {
       await DB.markStepComplete(auth.id, stepId)
       setResourceProgress(prev => [...prev, { client_id: auth.id, step_id: stepId, completed_at: new Date().toISOString() }])
+      if (auth.role === 'client') {
+        const step = resourceSteps.find(s => s.id === stepId)
+        const stepName = step ? (step.name_bg || step.name_en) : ''
+        DB.insertNotification(auth.name, auth.name, 'lesson_complete', `${auth.name} изгледа: ${stepName}`)
+      }
     }
-  }, [auth.id, resourceProgress])
+  }, [auth, resourceProgress, resourceSteps])
 
   const handleBuy = useCallback(async (prog) => {
     if (!prog.stripe_price_id) { showSnackbar(t('purchaseError')); return }
