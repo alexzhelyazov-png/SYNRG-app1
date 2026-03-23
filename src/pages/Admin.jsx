@@ -492,15 +492,17 @@ function ClientInfoDialog({ open, onClose, client, plan, allClientPlans, workout
 
         {/* ── Workout dates (compact) ── */}
         {workouts.length > 0 && (() => {
-          const today = new Date().toISOString().slice(0, 10)
-          const upcoming = workouts.filter(w => w.date >= today)
-          const past = workouts.filter(w => w.date < today)
+          // dates can be DD.MM.YYYY or YYYY-MM-DD — normalize to YYYY-MM-DD for comparison
+          const toIso = d => { if (!d) return ''; if (d[4] === '-') return d; const p = d.split('.'); return p.length === 3 ? `${p[2]}-${p[1]}-${p[0]}` : d }
+          const todayIso = new Date().toISOString().slice(0, 10)
+          const upcoming = workouts.filter(w => toIso(w.date) > todayIso)
+          const past = workouts.filter(w => toIso(w.date) <= todayIso)
           return (
             <Box sx={{ p: 1.5, borderRadius: '14px', background: 'rgba(255,255,255,0.03)', border: `1px solid ${C.border}` }}>
               {upcoming.length > 0 && (
                 <>
                   <Typography sx={{ fontSize: '10px', fontWeight: 800, color: C.primary, textTransform: 'uppercase', letterSpacing: '0.7px', mb: 0.75 }}>
-                    {t('upcomingWorkoutsLbl') || 'Предстоящи'}
+                    {t('upcomingWorkoutsLbl')}
                   </Typography>
                   <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', mb: past.length ? 1.5 : 0 }}>
                     {upcoming.map((w, i) => (
