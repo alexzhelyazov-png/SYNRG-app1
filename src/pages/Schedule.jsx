@@ -677,6 +677,7 @@ export default function Schedule() {
                       borderLeft: `1px solid ${C.border}`,
                       p: '2px 3px',
                       minHeight: 22,
+                      minWidth: 0, overflow: 'hidden',
                       cursor: admin && isEmpty ? 'pointer' : 'default',
                       '&:hover': admin && isEmpty ? { background: C.primaryA5 } : {},
                       display: 'flex', flexDirection: 'column', position: 'relative',
