@@ -774,12 +774,13 @@ export function AppProvider({ children }) {
     try { await DB.deleteById('workouts', workoutId) } catch (e) { console.error('deleteWorkout:', e) }
   }
 
-  async function updateWorkout(workoutId, updatedItems) {
+  async function updateWorkout(workoutId, updatedItems, extra = {}) {
     if (!workoutId) return
+    const patch = { items: updatedItems, ...extra }
     setClients(prev => prev.map(c => ({
-      ...c, workouts: c.workouts.map(w => w.id === workoutId ? { ...w, items: updatedItems } : w)
+      ...c, workouts: c.workouts.map(w => w.id === workoutId ? { ...w, ...patch } : w)
     })))
-    try { await DB.update('workouts', workoutId, { items: updatedItems }) } catch (e) { console.error('updateWorkout:', e) }
+    try { await DB.update('workouts', workoutId, patch) } catch (e) { console.error('updateWorkout:', e) }
   }
 
   // ── Module management (admin) ─────────────────────────────────

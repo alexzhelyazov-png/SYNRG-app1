@@ -260,7 +260,7 @@ function PlanDialog({ open, onClose, onActivate, onExtend, onAdjust, onTogglePai
   async function handleSave() {
     setSaving(true)
     let res
-    if (mode === 'activate') {
+    if (mode === 'activate' && planType) {
       const sc = startCredits !== '' ? Number(startCredits) : null
       res = await onActivate(client.id, planType, validFrom, price, sc, isPaid, validTo)
     } else if (mode === 'extend') {
@@ -268,13 +268,16 @@ function PlanDialog({ open, onClose, onActivate, onExtend, onAdjust, onTogglePai
     } else if (mode === 'adjust') {
       res = await onAdjust(plan.id, Number(credUsed))
     }
-    // Update is_paid separately if plan exists and changed
+    // Update is_paid separately if plan exists and changed (or if no new plan was created)
     if (plan && plan.is_paid !== isPaid && onTogglePaid) {
       await onTogglePaid(plan.id, isPaid)
     }
     setSaving(false)
     if (!res?.error) onClose()
   }
+
+  // Allow save when plan exists and only is_paid changed (no need to select new planType)
+  const paidChanged = plan && plan.is_paid !== isPaid
 
   const inputSx = {
     '& .MuiInputBase-input':           { color: C.text },
@@ -421,7 +424,7 @@ function PlanDialog({ open, onClose, onActivate, onExtend, onAdjust, onTogglePai
       </DialogContent>
       <DialogActions sx={{ px: 3, pb: 2 }}>
         <Button onClick={onClose} sx={{ color: C.muted }}>{t('cancelBtn')}</Button>
-        <Button variant="contained" onClick={handleSave} disabled={saving || (mode === 'activate' && !planType)}
+        <Button variant="contained" onClick={handleSave} disabled={saving || (mode === 'activate' && !planType && !paidChanged)}
           sx={{ background: C.primary, color: '#0f1c11', fontWeight: 700 }}>
           {saving ? <CircularProgress size={16} /> : t('saveBtn')}
         </Button>

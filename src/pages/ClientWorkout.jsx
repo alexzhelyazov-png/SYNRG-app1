@@ -1,6 +1,7 @@
 import { useState } from 'react'
-import { Box, Typography, TextField, Button, Chip, Paper } from '@mui/material'
+import { Box, Typography, TextField, Button, Chip, Paper, IconButton } from '@mui/material'
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline'
+import EditIcon from '@mui/icons-material/Edit'
 import { useApp } from '../context/AppContext'
 import { WORKOUT_CATEGORIES } from '../lib/constants'
 import { C, EASE } from '../theme'
@@ -12,8 +13,11 @@ export default function ClientWorkout() {
     exName, setExName, exScheme, setExScheme, exWeight, setExWeight,
     workoutCategory, setWorkoutCategory,
     currentWorkout, setCurrentWorkout,
-    addExercise, saveWorkout,
+    addExercise, saveWorkout, updateWorkout, deleteWorkout,
   } = useApp()
+
+  const [editingWorkout, setEditingWorkout] = useState(null)
+  const isCoach = auth.role === 'coach' || auth.role === 'admin'
 
   const isMobile = window.innerWidth < 640
 
@@ -188,14 +192,71 @@ export default function ClientWorkout() {
                     <Chip label={t(w.category)} size="small" sx={{ background: C.purpleSoft, color: C.purple, border: '1px solid rgba(200,197,255,0.2)', fontSize: '11px', fontWeight: 600 }} />
                   )}
                 </Box>
+                {isCoach && (
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                    <Typography sx={{ color: C.muted, fontSize: '12px' }}>{w.coach || ''}</Typography>
+                    <IconButton size="small" onClick={() => setEditingWorkout(editingWorkout?.id === w.id ? null : { id: w.id, date: w.date, category: w.category || '', items: w.items.map(ex => ({ ...ex })) })}
+                      sx={{ color: editingWorkout?.id === w.id ? C.primary : C.muted }}><EditIcon sx={{ fontSize: 14 }} /></IconButton>
+                    <IconButton size="small" onClick={() => deleteWorkout(w.id)}
+                      sx={{ color: C.muted, '&:hover': { color: '#F87171' } }}><DeleteOutlineIcon sx={{ fontSize: 14 }} /></IconButton>
+                  </Box>
+                )}
               </Box>
-              {(w.items || []).map((ex, j) => (
-                <Box key={j} sx={{ display: 'grid', gridTemplateColumns: '1fr 90px 60px', gap: 1, py: 0.6, borderBottom: j < w.items.length - 1 ? `1px solid ${C.border}` : 'none' }}>
-                  <Typography sx={{ color: C.text, fontWeight: 600, fontSize: '13px' }}>{ex.exercise}</Typography>
-                  <Typography sx={{ color: C.muted, fontSize: '12.5px' }}>{ex.scheme}</Typography>
-                  <Typography sx={{ color: C.muted, fontSize: '12.5px', textAlign: 'right' }}>{ex.weight} {t('kgUnit')}</Typography>
-                </Box>
-              ))}
+              {editingWorkout?.id === w.id ? (
+                <>
+                  {/* Date & category edit */}
+                  <Box sx={{ display: 'flex', gap: 1, mb: 1.25, alignItems: 'center', flexWrap: 'wrap' }}>
+                    <TextField size="small" type="date" value={editingWorkout.date || ''}
+                      onChange={e => setEditingWorkout({ ...editingWorkout, date: e.target.value })}
+                      inputProps={{ style: { fontSize: '12px', padding: '6px 8px' } }}
+                      sx={{ width: 140, '& .MuiInputBase-input::-webkit-calendar-picker-indicator': { filter: 'invert(0.7)' } }} />
+                    <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
+                      {WORKOUT_CATEGORIES.map(({ key }) => {
+                        const active = editingWorkout.category === key
+                        return (
+                          <Chip key={key} label={t(key)} size="small"
+                            onClick={() => setEditingWorkout({ ...editingWorkout, category: key })}
+                            sx={{
+                              background: active ? C.purpleSoft : 'rgba(255,255,255,0.04)',
+                              color: active ? C.purple : C.muted,
+                              border: `1px solid ${active ? 'rgba(200,197,255,0.3)' : C.border}`,
+                              fontWeight: active ? 700 : 500, fontSize: '11px', cursor: 'pointer',
+                              '&:hover': { background: active ? C.purpleSoft : 'rgba(255,255,255,0.08)' },
+                            }} />
+                        )
+                      })}
+                    </Box>
+                  </Box>
+                  {editingWorkout.items.map((ex, j) => (
+                    <Box key={j} sx={{ display: 'grid', gridTemplateColumns: '1fr 80px 60px auto', gap: 0.75, py: 0.5, alignItems: 'center' }}>
+                      <TextField size="small" value={ex.exercise} onChange={e => { const items = [...editingWorkout.items]; items[j] = { ...items[j], exercise: e.target.value }; setEditingWorkout({ ...editingWorkout, items }) }}
+                        inputProps={{ style: { fontSize: '12px', padding: '6px 8px' } }} />
+                      <TextField size="small" value={ex.scheme} onChange={e => { const items = [...editingWorkout.items]; items[j] = { ...items[j], scheme: e.target.value }; setEditingWorkout({ ...editingWorkout, items }) }}
+                        inputProps={{ style: { fontSize: '12px', padding: '6px 8px' } }} />
+                      <TextField size="small" value={ex.weight} onChange={e => { const items = [...editingWorkout.items]; items[j] = { ...items[j], weight: e.target.value }; setEditingWorkout({ ...editingWorkout, items }) }}
+                        inputProps={{ style: { fontSize: '12px', padding: '6px 8px' } }} />
+                      <IconButton size="small" onClick={() => { const items = editingWorkout.items.filter((_, k) => k !== j); setEditingWorkout({ ...editingWorkout, items }) }}
+                        sx={{ color: C.muted, '&:hover': { color: '#F87171' } }}><DeleteOutlineIcon sx={{ fontSize: 14 }} /></IconButton>
+                    </Box>
+                  ))}
+                  <Button size="small" onClick={() => setEditingWorkout({ ...editingWorkout, items: [...editingWorkout.items, { exercise: '', scheme: '', weight: '' }] })}
+                    sx={{ fontSize: '12px', color: C.primary, mt: 0.5 }}>+ {t('addExerciseBtn') || 'Упражнение'}</Button>
+                  <Box sx={{ display: 'flex', gap: 1, mt: 1 }}>
+                    <Button size="small" variant="contained" onClick={() => { updateWorkout(editingWorkout.id, editingWorkout.items.filter(ex => ex.exercise.trim()), { date: editingWorkout.date, category: editingWorkout.category }); setEditingWorkout(null) }}
+                      sx={{ fontSize: '12px', fontWeight: 700, background: C.primary, color: C.primaryOn }}>{t('saveBtn') || 'Запази'}</Button>
+                    <Button size="small" onClick={() => setEditingWorkout(null)}
+                      sx={{ fontSize: '12px', color: C.muted }}>{t('cancelBtn') || 'Откажи'}</Button>
+                  </Box>
+                </>
+              ) : (
+                (w.items || []).map((ex, j) => (
+                  <Box key={j} sx={{ display: 'grid', gridTemplateColumns: '1fr 90px 60px', gap: 1, py: 0.6, borderBottom: j < w.items.length - 1 ? `1px solid ${C.border}` : 'none' }}>
+                    <Typography sx={{ color: C.text, fontWeight: 600, fontSize: '13px' }}>{ex.exercise}</Typography>
+                    <Typography sx={{ color: C.muted, fontSize: '12.5px' }}>{ex.scheme}</Typography>
+                    <Typography sx={{ color: C.muted, fontSize: '12.5px', textAlign: 'right' }}>{ex.weight} {t('kgUnit')}</Typography>
+                  </Box>
+                ))
+              )}
             </Paper>
           ))}
         </Box>

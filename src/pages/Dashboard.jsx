@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import ClientWorkout from './ClientWorkout'
 import { Box, Typography, TextField, Button, Chip, Paper, Switch, Collapse, Tabs, Tab, IconButton, Tooltip } from '@mui/material'
 import ArrowBackIcon from '@mui/icons-material/ArrowBack'
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline'
@@ -692,7 +693,7 @@ export function ClientDetail() {
                       <Typography sx={{ color: C.muted, fontSize: '12px' }}>{w.coach || '—'}</Typography>
                       {isCoach && (
                         <>
-                          <IconButton size="small" onClick={() => setEditingWorkout(editingWorkout?.id === w.id ? null : { id: w.id, items: w.items.map(ex => ({ ...ex })) })}
+                          <IconButton size="small" onClick={() => setEditingWorkout(editingWorkout?.id === w.id ? null : { id: w.id, date: w.date, category: w.category || '', items: w.items.map(ex => ({ ...ex })) })}
                             sx={{ color: editingWorkout?.id === w.id ? C.primary : C.muted }}><EditIcon sx={{ fontSize: 14 }} /></IconButton>
                           <IconButton size="small" onClick={() => deleteWorkout(w.id)}
                             sx={{ color: C.muted, '&:hover': { color: '#F87171' } }}><DeleteOutlineIcon sx={{ fontSize: 14 }} /></IconButton>
@@ -702,6 +703,29 @@ export function ClientDetail() {
                   </Box>
                   {editingWorkout?.id === w.id ? (
                     <>
+                      {/* Date & category edit */}
+                      <Box sx={{ display: 'flex', gap: 1, mb: 1.25, alignItems: 'center', flexWrap: 'wrap' }}>
+                        <TextField size="small" type="date" value={editingWorkout.date || ''}
+                          onChange={e => setEditingWorkout({ ...editingWorkout, date: e.target.value })}
+                          inputProps={{ style: { fontSize: '12px', padding: '6px 8px' } }}
+                          sx={{ width: 140 }} />
+                        <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
+                          {WORKOUT_CATEGORIES.map(({ key }) => {
+                            const active = editingWorkout.category === key
+                            return (
+                              <Chip key={key} label={t(key)} size="small"
+                                onClick={() => setEditingWorkout({ ...editingWorkout, category: key })}
+                                sx={{
+                                  background: active ? C.purpleSoft : 'rgba(255,255,255,0.04)',
+                                  color: active ? C.purple : C.muted,
+                                  border: `1px solid ${active ? 'rgba(200,197,255,0.3)' : C.border}`,
+                                  fontWeight: active ? 700 : 500, fontSize: '11px', cursor: 'pointer',
+                                  '&:hover': { background: active ? C.purpleSoft : 'rgba(255,255,255,0.08)' },
+                                }} />
+                            )
+                          })}
+                        </Box>
+                      </Box>
                       {editingWorkout.items.map((ex, j) => (
                         <Box key={j} sx={{ display: 'grid', gridTemplateColumns: '1fr 80px 60px auto', gap: 0.75, py: 0.5, alignItems: 'center' }}>
                           <TextField size="small" value={ex.exercise} onChange={e => { const items = [...editingWorkout.items]; items[j] = { ...items[j], exercise: e.target.value }; setEditingWorkout({ ...editingWorkout, items }) }}
@@ -717,7 +741,7 @@ export function ClientDetail() {
                       <Button size="small" onClick={() => setEditingWorkout({ ...editingWorkout, items: [...editingWorkout.items, { exercise: '', scheme: '', weight: '' }] })}
                         sx={{ fontSize: '12px', color: C.primary, mt: 0.5 }}>+ {t('addExerciseBtn') || 'Упражнение'}</Button>
                       <Box sx={{ display: 'flex', gap: 1, mt: 1 }}>
-                        <Button size="small" variant="contained" onClick={() => { updateWorkout(editingWorkout.id, editingWorkout.items.filter(ex => ex.exercise.trim())); setEditingWorkout(null) }}
+                        <Button size="small" variant="contained" onClick={() => { updateWorkout(editingWorkout.id, editingWorkout.items.filter(ex => ex.exercise.trim()), { date: editingWorkout.date, category: editingWorkout.category }); setEditingWorkout(null) }}
                           sx={{ fontSize: '12px', fontWeight: 700, background: C.primary, color: C.primaryOn }}>{t('saveBtn') || 'Запази'}</Button>
                         <Button size="small" onClick={() => setEditingWorkout(null)}
                           sx={{ fontSize: '12px', color: C.muted }}>{t('cancelBtn') || 'Откажи'}</Button>
@@ -1044,21 +1068,25 @@ function DashboardClient({ isCoachView = false }) {
         </Tabs>
 
         {tab === 0 && (
-          <Paper sx={{ p: 2.25, mb: 2.5, border: `1px solid ${C.border}`, borderRadius: '16px' }}>
-            <Typography variant="h3" sx={{ mb: 1.5 }}>{t('workoutsThisWeekLbl')}</Typography>
-            {weekWorkouts.length === 0 ? (
-              <Typography sx={{ color: C.muted, fontSize: '13px' }}>{t('noWorkoutsWeekLbl')}</Typography>
-            ) : weekWorkouts.map((w, i) => (
-              <Box key={i} sx={{ display: 'flex', alignItems: 'center', gap: 1.5, py: '8px',
-                borderBottom: i < weekWorkouts.length - 1 ? `1px solid ${C.border}` : 'none' }}>
-                <Typography sx={{ color: C.muted, fontSize: '13px', minWidth: '92px' }}>{w.date}</Typography>
-                {w.category && (
-                  <Chip label={t(w.category)} size="small" sx={{ background: C.purpleSoft, color: C.purple, fontSize: '11.5px', fontWeight: 600 }} />
-                )}
-                <Typography sx={{ color: C.muted, fontSize: '12px', ml: 'auto' }}>{w.items?.length || 0} {t('exercisesLbl')}</Typography>
-              </Box>
-            ))}
-          </Paper>
+          isCoachView ? (
+            <ClientWorkout />
+          ) : (
+            <Paper sx={{ p: 2.25, mb: 2.5, border: `1px solid ${C.border}`, borderRadius: '16px' }}>
+              <Typography variant="h3" sx={{ mb: 1.5 }}>{t('workoutsThisWeekLbl')}</Typography>
+              {weekWorkouts.length === 0 ? (
+                <Typography sx={{ color: C.muted, fontSize: '13px' }}>{t('noWorkoutsWeekLbl')}</Typography>
+              ) : weekWorkouts.map((w, i) => (
+                <Box key={i} sx={{ display: 'flex', alignItems: 'center', gap: 1.5, py: '8px',
+                  borderBottom: i < weekWorkouts.length - 1 ? `1px solid ${C.border}` : 'none' }}>
+                  <Typography sx={{ color: C.muted, fontSize: '13px', minWidth: '92px' }}>{w.date}</Typography>
+                  {w.category && (
+                    <Chip label={t(w.category)} size="small" sx={{ background: C.purpleSoft, color: C.purple, fontSize: '11.5px', fontWeight: 600 }} />
+                  )}
+                  <Typography sx={{ color: C.muted, fontSize: '12px', ml: 'auto' }}>{w.items?.length || 0} {t('exercisesLbl')}</Typography>
+                </Box>
+              ))}
+            </Paper>
+          )
         )}
 
         {tab === 1 && (
