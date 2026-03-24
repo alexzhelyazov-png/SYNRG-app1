@@ -170,8 +170,8 @@ export default function FoodTracker() {
                 sx={{
                   display:             'grid',
                   gridTemplateColumns: isMobile
-                    ? (auth.role === 'coach' ? '1fr 56px auto' : '1fr 56px')
-                    : (auth.role === 'coach' ? '1fr 72px 100px 104px auto' : '1fr 72px 100px 104px'),
+                    ? `1fr 56px${!isTrackerReadOnly ? ' auto' : ''}`
+                    : `1fr 72px 100px 104px${!isTrackerReadOnly ? ' auto' : ''}`,
                   gap:          1.5,
                   py:           1.25,
                   borderBottom: `1px solid ${C.border}`,
@@ -201,8 +201,8 @@ export default function FoodTracker() {
                   <Typography
                     onClick={() => deleteMealFromClient(client.id, item.id)}
                     sx={{
-                      fontSize: '11px', color: 'rgba(255,107,157,0.5)', cursor: 'pointer',
-                      lineHeight: 1, userSelect: 'none',
+                      fontSize: '14px', color: 'rgba(255,107,157,0.4)', cursor: 'pointer',
+                      lineHeight: 1, userSelect: 'none', textAlign: 'center',
                       '&:hover': { color: C.danger },
                     }}
                   >x</Typography>
