@@ -661,9 +661,10 @@ export function AppProvider({ children }) {
       grams,
       kcal:    Math.round((food.kcal    / 100) * grams),
       protein: Math.round(((food.protein / 100) * grams) * 10) / 10,
-      date:    selFoodDate,
+      date:    todayDate(),
     }
     addMealToClient(client.id, meal)
+    setFoodDate(dateToInput(todayDate())) // jump back to today
     setFoodSearch(''); setGramsInput(''); setFoodModalOpen(false)
     showSnackbar(`${food.label} ${t('foodAddedSuffix')}`)
   }
@@ -675,9 +676,10 @@ export function AppProvider({ children }) {
       grams,
       kcal:    Math.round((food.kcal    / 100) * grams),
       protein: Math.round(((food.protein / 100) * grams) * 10) / 10,
-      date:    selFoodDate,
+      date:    todayDate(),
     }
     addMealToClient(client.id, meal)
+    setFoodDate(dateToInput(todayDate())) // jump back to today
     showSnackbar(`${food.label} ${t('foodAddedSuffix')}`)
   }
 
@@ -688,9 +690,10 @@ export function AppProvider({ children }) {
       grams,
       kcal:    Math.round((kcalPer100 / 100) * grams),
       protein: Math.round(((protPer100 / 100) * grams) * 10) / 10,
-      date:    selFoodDate,
+      date:    todayDate(),
     }
     addMealToClient(client.id, meal)
+    setFoodDate(dateToInput(todayDate())) // jump back to today
     setFoodModalOpen(false)
     showSnackbar(`${name} ${t('foodAddedSuffix')}`)
   }
