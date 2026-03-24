@@ -1408,36 +1408,41 @@ function ExpensesTab({ t }) {
 
 // ── Coaches Tab ───────────────────────────────────────────────
 function CoachesTab({ t }) {
-  const { realClients, lang } = useApp()
+  const { lang } = useApp()
   const now = new Date()
-  const [monthOffset, setMonthOffset] = useState(0) // 0 = current, -1 = previous, etc.
+  const [monthOffset, setMonthOffset] = useState(0)
+  const [allBookings, setAllBookings] = useState([])
+  const [loaded, setLoaded] = useState(false)
+
+  useEffect(() => {
+    DB.getAllCompletedBookings().then(data => { setAllBookings(data || []); setLoaded(true) })
+  }, [])
 
   const targetDate = new Date(now.getFullYear(), now.getMonth() + monthOffset, 1)
   const targetYear = targetDate.getFullYear()
-  const targetMonth = targetDate.getMonth() // 0-based
+  const targetMonth = targetDate.getMonth()
+  const todayIso = now.toISOString().slice(0, 10)
 
   const monthNames = lang === 'en'
     ? ['January','February','March','April','May','June','July','August','September','October','November','December']
     : ['Януари','Февруари','Март','Април','Май','Юни','Юли','Август','Септември','Октомври','Ноември','Декември']
 
   const coachStats = useMemo(() => {
-    const toIso = d => { if (!d) return ''; if (d[4] === '-') return d; const p = d.split('.'); return p.length === 3 ? `${p[2]}-${p[1]}-${p[0]}` : d }
     const counts = {}
-    realClients.forEach(c => {
-      ;(c.workouts || []).forEach(w => {
-        const iso = toIso(w.date)
-        if (!iso) return
-        const d = new Date(iso + 'T00:00:00')
-        if (d.getFullYear() === targetYear && d.getMonth() === targetMonth) {
-          const name = w.coach || '—'
-          counts[name] = (counts[name] || 0) + 1
-        }
-      })
+    allBookings.forEach(b => {
+      if (!b.booking_slots) return
+      const d = new Date(b.booking_slots.slot_date + 'T00:00:00')
+      // Only count past sessions (completed, not future)
+      if (b.booking_slots.slot_date > todayIso) return
+      if (d.getFullYear() === targetYear && d.getMonth() === targetMonth) {
+        const name = b.booking_slots.coach_name || '—'
+        counts[name] = (counts[name] || 0) + 1
+      }
     })
     return Object.entries(counts)
       .map(([name, count]) => ({ name, count }))
       .sort((a, b) => b.count - a.count)
-  }, [realClients, targetYear, targetMonth])
+  }, [allBookings, targetYear, targetMonth, todayIso])
 
   return (
     <Box>
@@ -1454,7 +1459,8 @@ function CoachesTab({ t }) {
         </IconButton>
       </Box>
 
-      <Paper sx={{ borderRadius: '16px', border: `1px solid ${C.border}`, overflow: 'hidden' }}>
+      {!loaded && <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}><CircularProgress size={24} sx={{ color: C.primary }} /></Box>}
+      {loaded && <Paper sx={{ borderRadius: '16px', border: `1px solid ${C.border}`, overflow: 'hidden' }}>
         {coachStats.length === 0 ? (
           <Typography sx={{ color: C.muted, p: 3, textAlign: 'center' }}>{t('noDataLbl')}</Typography>
         ) : coachStats.map(({ name, count }, i) => (
@@ -1479,12 +1485,12 @@ function CoachesTab({ t }) {
                 {count}
               </Typography>
               <Typography sx={{ fontSize: '10px', color: C.muted, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                {t('tabWorkouts')}
+                {t('sessionsLbl') || 'часове'}
               </Typography>
             </Box>
           </Box>
         ))}
-      </Paper>
+      </Paper>}
     </Box>
   )
 }

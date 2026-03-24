@@ -231,6 +231,17 @@ export const DB = {
     return []
   },
 
+  // ── Booking: all completed bookings with coach info ────────
+  async getAllCompletedBookings() {
+    if (isUsingSupabase) {
+      return (await sbFetchSafe(
+        sbUrl('slot_bookings', `?select=id,booking_slots(slot_date,coach_name)&status=eq.active`),
+        { headers: sbHeaders() }
+      )) || []
+    }
+    return []
+  },
+
   // ── Plans: get client's current active plan ──────────────────
   async getClientActivePlan(clientId) {
     if (isUsingSupabase) {
