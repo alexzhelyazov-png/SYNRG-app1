@@ -198,25 +198,14 @@ export default function FoodTracker() {
                   </Typography>
                 )}
                 {!isTrackerReadOnly && (
-                  <Button
-                    size="small"
+                  <Typography
                     onClick={() => deleteMealFromClient(client.id, item.id)}
                     sx={{
-                      minWidth:    'auto',
-                      background:  C.dangerSoft,
-                      color:       C.danger,
-                      border:      '1px solid rgba(255,107,157,0.2)',
-                      borderRadius:'10px',
-                      px:          1.25,
-                      py:          '4px',
-                      fontSize:    '13px',
-                      '&:hover':   {
-                        background: 'rgba(255,107,157,0.18)',
-                        boxShadow:  '0 3px 10px rgba(255,107,157,0.2)',
-                        transform:  'translateY(-1px)',
-                      },
+                      fontSize: '11px', color: 'rgba(255,107,157,0.5)', cursor: 'pointer',
+                      lineHeight: 1, userSelect: 'none',
+                      '&:hover': { color: C.danger },
                     }}
-                  >×</Button>
+                  >x</Typography>
                 )}
               </Box>
             ))}
