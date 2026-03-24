@@ -234,7 +234,7 @@ function CellAddDialog({ open, onClose, onSave, coaches, date, hour, t }) {
 }
 
 // ── Edit Slot Dialog ───────────────────────────────────────────
-function EditSlotDialog({ open, onClose, onSave, slot, coaches, t }) {
+function EditSlotDialog({ open, onClose, onSave, slot, coaches, bookings = [], onRemoveClient, t }) {
   const [capacity,  setCapacity]  = useState(slot?.capacity || 3)
   const [coachName, setCoachName] = useState(slot?.coach_name || '')
   const [notes,     setNotes]     = useState(slot?.notes || '')
@@ -279,6 +279,26 @@ function EditSlotDialog({ open, onClose, onSave, slot, coaches, t }) {
           inputProps={{ min: 1, max: 30 }} sx={inputSx} />
         <TextField label={t('slotNotesLbl')} size="small" multiline rows={2}
           value={notes} onChange={e => setNotes(e.target.value)} sx={inputSx} />
+
+        {/* Booked clients list */}
+        {bookings.length > 0 && (
+          <Box sx={{ p: 1.5, borderRadius: '12px', background: 'rgba(255,255,255,0.03)', border: `1px solid ${C.border}` }}>
+            <Typography sx={{ fontSize: '11px', fontWeight: 700, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.7px', mb: 1 }}>
+              {t('bookedClientsLbl') || 'Записани клиенти'} ({bookings.length})
+            </Typography>
+            {bookings.map(b => (
+              <Box key={b.id} sx={{ display: 'flex', alignItems: 'center', gap: 1, py: 0.5,
+                borderBottom: `1px solid rgba(255,255,255,0.04)`, '&:last-child': { borderBottom: 'none' } }}>
+                <Typography sx={{ fontSize: '13px', fontWeight: 600, color: C.text, flex: 1 }}>{b.client_name}</Typography>
+                <Button size="small" onClick={() => onRemoveClient(slot.id, b.client_id, b.client_name)}
+                  sx={{ minWidth: 'auto', fontSize: '11px', color: '#F87171', fontWeight: 700, px: 1,
+                    '&:hover': { background: 'rgba(248,113,113,0.1)' } }}>
+                  {t('removeBtn') || 'Премахни'}
+                </Button>
+              </Box>
+            ))}
+          </Box>
+        )}
       </DialogContent>
       <DialogActions sx={{ px: 3, pb: 2 }}>
         <Button onClick={onClose} sx={{ color: C.muted }}>{t('cancelBtn')}</Button>
@@ -356,7 +376,6 @@ function hexRgba(hex, a) {
 function SlotCell({ slot, adminMode, onEdit, onDelete, onAddClient, onRemoveClient, bookings = [] }) {
   const [hover,        setHover]        = useState(false)
   const [confirmDel,   setConfirmDel]   = useState(false)
-  const [showClients,  setShowClients]  = useState(false)
   const { auth, realClients, setSelIdx, setCoachClientMode } = useApp()
   const color    = coachColor(slot.coach_name)
   const base     = color.txt
@@ -374,8 +393,8 @@ function SlotCell({ slot, adminMode, onEdit, onDelete, onAddClient, onRemoveClie
 
   return (
     <Box
-      onClick={adminMode ? (e) => { e.stopPropagation(); setShowActions(s => !s); setConfirmDel(false); setShowClients(false) } : undefined}
-      onMouseLeave={() => { setShowActions(false); setConfirmDel(false); setShowClients(false) }}
+      onClick={adminMode ? (e) => { e.stopPropagation(); setShowActions(s => !s); setConfirmDel(false) } : undefined}
+      onMouseLeave={() => { setShowActions(false); setConfirmDel(false) }}
       sx={{ position: 'relative', mb: '1px', userSelect: 'none', cursor: adminMode ? 'pointer' : 'default' }}
     >
       {/* Pills stacked vertically — booked=full card, empty=thin line */}
@@ -424,13 +443,6 @@ function SlotCell({ slot, adminMode, onEdit, onDelete, onAddClient, onRemoveClie
             sx={{ p: '6px', color: C.purple, background: 'rgba(200,197,255,0.12)', borderRadius: '8px' }}>
             <PersonAddIcon sx={{ fontSize: 20 }} />
           </IconButton>
-          {bookings.length > 0 && (
-            <IconButton size="small"
-              onClick={e => { e.stopPropagation(); setShowClients(true); setShowActions(false) }}
-              sx={{ p: '6px', color: '#FB923C', background: 'rgba(251,146,60,0.12)', borderRadius: '8px' }}>
-              <PersonRemoveIcon sx={{ fontSize: 20 }} />
-            </IconButton>
-          )}
           <IconButton size="small"
             onClick={e => { e.stopPropagation(); onEdit(slot); setShowActions(false) }}
             sx={{ p: '6px', color: C.purple, background: 'rgba(200,197,255,0.12)', borderRadius: '8px' }}>
@@ -441,36 +453,6 @@ function SlotCell({ slot, adminMode, onEdit, onDelete, onAddClient, onRemoveClie
             sx={{ p: '6px', color: '#F87171', background: 'rgba(248,113,113,0.12)', borderRadius: '8px' }}>
             <DeleteOutlineIcon sx={{ fontSize: 20 }} />
           </IconButton>
-        </Box>
-      )}
-
-      {/* Client list overlay — remove individual bookings */}
-      {showClients && (
-        <Box onClick={e => e.stopPropagation()} sx={{
-          position: 'absolute', inset: 0, borderRadius: '5px',
-          background: 'rgba(12,10,9,0.92)',
-          display: 'flex', flexDirection: 'column', alignItems: 'stretch', justifyContent: 'center',
-          gap: '2px', px: '3px', py: '2px',
-          zIndex: 10, overflow: 'auto',
-        }}>
-          {bookings.map(b => (
-            <Box key={b.id} sx={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
-              <Typography sx={{ fontSize: '8px', fontWeight: 700, color: '#fff', flex: 1, minWidth: 0,
-                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {b.client_name}
-              </Typography>
-              <Typography
-                onClick={() => onRemoveClient(slot.id, b.client_id, b.client_name)}
-                sx={{ fontSize: '10px', color: '#F87171', cursor: 'pointer', fontWeight: 700, flexShrink: 0, px: '3px',
-                  '&:hover': { color: '#fff' } }}>
-                x
-              </Typography>
-            </Box>
-          ))}
-          <Typography onClick={() => setShowClients(false)}
-            sx={{ fontSize: '7px', color: C.muted, textAlign: 'center', cursor: 'pointer', mt: '1px' }}>
-            Назад
-          </Typography>
         </Box>
       )}
 
@@ -788,6 +770,8 @@ export default function Schedule() {
           onSave={handleUpdateSlot}
           slot={editTarget}
           coaches={coaches}
+          bookings={editTarget ? (slotBookings[editTarget.id] || []) : []}
+          onRemoveClient={handleRemoveClient}
           t={t}
         />
       )}
