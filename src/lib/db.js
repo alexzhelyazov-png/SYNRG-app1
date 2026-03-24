@@ -219,15 +219,14 @@ export const DB = {
   async getClientUpcomingBookings(clientId) {
     if (isUsingSupabase) {
       const data = (await sbFetchSafe(
-        sbUrl('slot_bookings', `?select=*,booking_slots(date,start_time,coach_name)&client_id=eq.${clientId}&status=eq.active`),
+        sbUrl('slot_bookings', `?select=*,booking_slots(slot_date,start_time,coach_name)&client_id=eq.${clientId}&status=eq.active`),
         { headers: sbHeaders() }
       )) || []
-      // Filter to future dates client-side
       const today = new Date().toISOString().slice(0, 10)
       return data
-        .filter(b => b.booking_slots && b.booking_slots.date >= today)
-        .sort((a, b) => a.booking_slots.date.localeCompare(b.booking_slots.date))
-        .map(b => ({ ...b, slots: b.booking_slots })) // normalize to `slots` key
+        .filter(b => b.booking_slots && b.booking_slots.slot_date >= today)
+        .sort((a, b) => a.booking_slots.slot_date.localeCompare(b.booking_slots.slot_date))
+        .map(b => ({ ...b, slots: { date: b.booking_slots.slot_date, start_time: b.booking_slots.start_time, coach_name: b.booking_slots.coach_name } }))
     }
     return []
   },
