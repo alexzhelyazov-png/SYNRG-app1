@@ -1,10 +1,12 @@
-import { Box, Typography, TextField, Button, Chip, Paper } from '@mui/material'
+import { Box, Typography, TextField, Button, Chip, Paper, IconButton } from '@mui/material'
+import ChevronLeftIcon  from '@mui/icons-material/ChevronLeft'
+import ChevronRightIcon from '@mui/icons-material/ChevronRight'
 import { useApp } from '../context/AppContext'
 import { quickFoods, foodDB, foodLabel } from '../lib/constants'
 import { C, EASE } from '../theme'
 import ProgressRing from '../components/ProgressRing'
 import FoodModal    from '../components/FoodModal'
-import { fmt1 } from '../lib/utils'
+import { fmt1, todayDate, dateToInput } from '../lib/utils'
 
 export default function FoodTracker() {
   const {
@@ -140,9 +142,23 @@ export default function FoodTracker() {
 
       {/* ── Храна за деня ──────────────────────────── */}
       <Paper sx={{ p: 2 }}>
-        <Typography variant="h3" sx={{ mb: 1.5 }}>
-          {t('foodForLbl')} {selFoodDate}
-        </Typography>
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1.5, mb: 1.5 }}>
+          <IconButton size="small" onClick={() => {
+            const d = new Date(foodDate + 'T00:00:00'); d.setDate(d.getDate() - 1)
+            setFoodDate(d.toISOString().slice(0, 10))
+          }} sx={{ color: C.muted }}>
+            <ChevronLeftIcon />
+          </IconButton>
+          <Typography variant="h3" sx={{ minWidth: 160, textAlign: 'center' }}>
+            {t('foodForLbl')} {selFoodDate}
+          </Typography>
+          <IconButton size="small" onClick={() => {
+            const d = new Date(foodDate + 'T00:00:00'); d.setDate(d.getDate() + 1)
+            setFoodDate(d.toISOString().slice(0, 10))
+          }} disabled={foodDate >= new Date().toISOString().slice(0, 10)} sx={{ color: C.muted }}>
+            <ChevronRightIcon />
+          </IconButton>
+        </Box>
 
         {mealsForDate.length === 0 ? (
           <Typography variant="body2" sx={{ color: C.muted, py: 1 }}>{t('noFoodToday')}</Typography>
