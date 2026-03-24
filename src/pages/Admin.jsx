@@ -505,61 +505,54 @@ function ClientInfoDialog({ open, onClose, client, plan, allClientPlans, workout
           )}
         </Box>
 
-        {/* ── Upcoming booked sessions ── */}
-        {upcomingBookings.length > 0 && (
-          <Box sx={{ p: 1.5, borderRadius: '14px', background: 'rgba(255,255,255,0.03)', border: `1px solid ${C.border}` }}>
-            <Typography sx={{ fontSize: '10px', fontWeight: 800, color: C.primary, textTransform: 'uppercase', letterSpacing: '0.7px', mb: 0.75 }}>
-              {t('bookedSessionsLbl') || 'Запазени часове'}
-            </Typography>
-            <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
-              {upcomingBookings.map((b, i) => (
-                <Chip key={b.id || i}
-                  label={`${b.slots.date} ${b.slots.start_time?.slice(0,5) || ''}${b.slots.coach_name ? ' · ' + b.slots.coach_name : ''}`}
-                  size="small"
-                  sx={{ fontSize: '11px', fontWeight: 600, height: 24, background: 'rgba(74,222,128,0.1)', color: C.primary, border: `1px solid rgba(74,222,128,0.2)` }} />
-              ))}
-            </Box>
-          </Box>
-        )}
-
-        {/* ── Workout dates (compact) ── */}
-        {workouts.length > 0 && (() => {
-          // dates can be DD.MM.YYYY or YYYY-MM-DD — normalize to YYYY-MM-DD for comparison
+        {/* ── Workouts & booked sessions — always shown ── */}
+        {(() => {
           const toIso = d => { if (!d) return ''; if (d[4] === '-') return d; const p = d.split('.'); return p.length === 3 ? `${p[2]}-${p[1]}-${p[0]}` : d }
           const todayIso = new Date().toISOString().slice(0, 10)
           const upcoming = workouts.filter(w => toIso(w.date) > todayIso)
           const past = workouts.filter(w => toIso(w.date) <= todayIso)
           return (
             <Box sx={{ p: 1.5, borderRadius: '14px', background: 'rgba(255,255,255,0.03)', border: `1px solid ${C.border}` }}>
-              {upcoming.length > 0 && (
-                <>
-                  <Typography sx={{ fontSize: '10px', fontWeight: 800, color: C.primary, textTransform: 'uppercase', letterSpacing: '0.7px', mb: 0.75 }}>
-                    {t('upcomingWorkoutsLbl')}
-                  </Typography>
-                  <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', mb: past.length ? 1.5 : 0 }}>
-                    {upcoming.map((w, i) => (
-                      <Chip key={w.id || i} label={`${w.date}${w.category ? ' · ' + t(w.category) : ''}`} size="small"
-                        sx={{ fontSize: '11px', fontWeight: 600, height: 24, background: 'rgba(74,222,128,0.1)', color: C.primary, border: `1px solid rgba(74,222,128,0.2)` }} />
-                    ))}
-                  </Box>
-                </>
+              <Typography sx={{ fontSize: '10px', fontWeight: 800, color: C.primary, textTransform: 'uppercase', letterSpacing: '0.7px', mb: 0.75 }}>
+                {t('bookedSessionsLbl')} / {t('upcomingWorkoutsLbl')}
+              </Typography>
+              {upcomingBookings.length > 0 ? (
+                <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', mb: (upcoming.length || past.length) ? 1 : 0 }}>
+                  {upcomingBookings.map((b, i) => (
+                    <Chip key={b.id || i}
+                      label={`${b.slots.date} ${b.slots.start_time?.slice(0,5) || ''}${b.slots.coach_name ? ' · ' + b.slots.coach_name : ''}`}
+                      size="small"
+                      sx={{ fontSize: '11px', fontWeight: 600, height: 24, background: 'rgba(74,222,128,0.1)', color: C.primary, border: `1px solid rgba(74,222,128,0.2)` }} />
+                  ))}
+                </Box>
+              ) : (
+                !upcoming.length && <Typography sx={{ fontSize: '11px', color: C.muted, mb: past.length ? 1 : 0 }}>{t('noUpcomingSessions') || 'Няма предстоящи'}</Typography>
               )}
-              {past.length > 0 && (
-                <>
-                  <Typography sx={{ fontSize: '10px', fontWeight: 800, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.7px', mb: 0.75 }}>
-                    {t('workoutHistory')} ({past.length})
-                  </Typography>
-                  <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
-                    {past.slice(0, 30).map((w, i) => (
-                      <Chip key={w.id || i} label={w.date} size="small"
-                        sx={{ fontSize: '10px', fontWeight: 600, height: 22, background: 'rgba(255,255,255,0.06)', color: C.muted }} />
-                    ))}
-                    {past.length > 30 && (
-                      <Chip label={`+${past.length - 30}`} size="small"
-                        sx={{ fontSize: '10px', fontWeight: 600, height: 22, background: 'rgba(255,255,255,0.04)', color: C.muted }} />
-                    )}
-                  </Box>
-                </>
+              {upcoming.length > 0 && (
+                <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', mb: past.length ? 1 : 0 }}>
+                  {upcoming.map((w, i) => (
+                    <Chip key={w.id || i} label={`${w.date}${w.category ? ' · ' + t(w.category) : ''}`} size="small"
+                      sx={{ fontSize: '11px', fontWeight: 600, height: 24, background: 'rgba(170,169,205,0.1)', color: C.purple, border: `1px solid rgba(170,169,205,0.2)` }} />
+                  ))}
+                </Box>
+              )}
+
+              <Typography sx={{ fontSize: '10px', fontWeight: 800, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.7px', mb: 0.75, mt: 1 }}>
+                {t('workoutHistory')} ({past.length})
+              </Typography>
+              {past.length > 0 ? (
+                <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
+                  {past.slice(0, 30).map((w, i) => (
+                    <Chip key={w.id || i} label={w.date} size="small"
+                      sx={{ fontSize: '10px', fontWeight: 600, height: 22, background: 'rgba(255,255,255,0.06)', color: C.muted }} />
+                  ))}
+                  {past.length > 30 && (
+                    <Chip label={`+${past.length - 30}`} size="small"
+                      sx={{ fontSize: '10px', fontWeight: 600, height: 22, background: 'rgba(255,255,255,0.04)', color: C.muted }} />
+                  )}
+                </Box>
+              ) : (
+                <Typography sx={{ fontSize: '11px', color: C.muted }}>{t('noWorkoutsYet') || 'Няма записани тренировки'}</Typography>
               )}
             </Box>
           )
