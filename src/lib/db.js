@@ -218,11 +218,16 @@ export const DB = {
   // ── Booking: client's upcoming bookings with slot info ───────
   async getClientUpcomingBookings(clientId) {
     if (isUsingSupabase) {
-      const today = new Date().toISOString().slice(0, 10)
-      return (await sbFetchSafe(
-        sbUrl('slot_bookings', `?select=*,slots(date,start_time,coach_name)&client_id=eq.${clientId}&status=eq.active&slots.date=gte.${today}&order=slots.date.asc`),
+      const data = (await sbFetchSafe(
+        sbUrl('slot_bookings', `?select=*,booking_slots(date,start_time,coach_name)&client_id=eq.${clientId}&status=eq.active`),
         { headers: sbHeaders() }
       )) || []
+      // Filter to future dates client-side
+      const today = new Date().toISOString().slice(0, 10)
+      return data
+        .filter(b => b.booking_slots && b.booking_slots.date >= today)
+        .sort((a, b) => a.booking_slots.date.localeCompare(b.booking_slots.date))
+        .map(b => ({ ...b, slots: b.booking_slots })) // normalize to `slots` key
     }
     return []
   },
