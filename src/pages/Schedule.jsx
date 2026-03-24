@@ -353,7 +353,7 @@ function hexRgba(hex, a) {
 }
 
 // ── Slot Card inside a calendar cell — horizontal pill row ────
-function SlotCell({ slot, adminMode, onEdit, onDelete, onAddClient, bookings = [] }) {
+function SlotCell({ slot, adminMode, onEdit, onDelete, onAddClient, onRemoveClient, bookings = [] }) {
   const [hover,      setHover]      = useState(false)
   const [confirmDel, setConfirmDel] = useState(false)
   const { auth, realClients, setSelIdx, setCoachClientMode } = useApp()
@@ -387,6 +387,7 @@ function SlotCell({ slot, adminMode, onEdit, onDelete, onAddClient, bookings = [
               background: hexRgba(base, 0.30),
               border: `1px solid ${hexRgba(base, 0.58)}`,
               overflow: 'hidden',
+              display: 'flex', alignItems: 'center', gap: '2px',
             }}>
               <Typography sx={{
                 fontSize: '8px', fontWeight: 700,
@@ -395,9 +396,16 @@ function SlotCell({ slot, adminMode, onEdit, onDelete, onAddClient, bookings = [
                 whiteSpace: 'nowrap',
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',
+                flex: 1, minWidth: 0,
               }}>
                 {booking.client_name}
               </Typography>
+              {adminMode && onRemoveClient && (
+                <Typography
+                  onClick={e => { e.stopPropagation(); onRemoveClient(slot.id, booking.client_id, booking.client_name) }}
+                  sx={{ fontSize: '8px', color: hexRgba(base, 0.5), cursor: 'pointer', lineHeight: 1, flexShrink: 0, '&:hover': { color: '#F87171' } }}
+                >x</Typography>
+              )}
             </Box>
           ) : (
             <Box key={i} sx={{
@@ -549,6 +557,14 @@ export default function Schedule() {
     await refreshView()
   }
 
+  async function handleRemoveClient(slotId, clientId, clientName) {
+    if (!confirm(`${t('removeClientConfirm') || 'Премахни'} ${clientName}?`)) return
+    const res = await adminRemoveFromSlot(slotId, clientId, true)
+    if (res?.error) { showSnackbar('Грешка: ' + res.error); return }
+    showSnackbar(`${clientName} ${t('removedFromSlot') || 'премахнат'}`)
+    await refreshView()
+  }
+
   async function handleAddClient(slotId, clientId, clientName, useCredit) {
     const res = await adminAddToSlot(slotId, clientId, clientName, useCredit)
     if (!res?.error) showSnackbar(`${clientName} добавен в часа`)
@@ -692,6 +708,7 @@ export default function Schedule() {
                         onEdit={s => { setEditTarget(s); setShowEditDlg(true) }}
                         onDelete={handleDeleteSlot}
                         onAddClient={s => { setAddTarget(s); setShowAddDlg(true) }}
+                        onRemoveClient={handleRemoveClient}
                       />
                     ))}
                     {/* "+" hint for empty admin cells — always visible */}
