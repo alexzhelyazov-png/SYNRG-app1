@@ -144,8 +144,9 @@ export default function FoodTracker() {
       <Paper sx={{ p: 2 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1.5, mb: 1.5 }}>
           <IconButton size="small" onClick={() => {
-            const d = new Date(foodDate + 'T00:00:00'); d.setDate(d.getDate() - 1)
-            setFoodDate(d.toISOString().slice(0, 10))
+            const [y, m, d] = foodDate.split('-').map(Number)
+            const prev = new Date(y, m - 1, d - 1)
+            setFoodDate(`${prev.getFullYear()}-${String(prev.getMonth()+1).padStart(2,'0')}-${String(prev.getDate()).padStart(2,'0')}`)
           }} sx={{ color: C.muted }}>
             <ChevronLeftIcon />
           </IconButton>
@@ -153,9 +154,10 @@ export default function FoodTracker() {
             {t('foodForLbl')} {selFoodDate}
           </Typography>
           <IconButton size="small" onClick={() => {
-            const d = new Date(foodDate + 'T00:00:00'); d.setDate(d.getDate() + 1)
-            setFoodDate(d.toISOString().slice(0, 10))
-          }} disabled={foodDate >= new Date().toISOString().slice(0, 10)} sx={{ color: C.muted }}>
+            const [y, m, d] = foodDate.split('-').map(Number)
+            const next = new Date(y, m - 1, d + 1)
+            setFoodDate(`${next.getFullYear()}-${String(next.getMonth()+1).padStart(2,'0')}-${String(next.getDate()).padStart(2,'0')}`)
+          }} disabled={foodDate >= `${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,'0')}-${String(new Date().getDate()).padStart(2,'0')}`} sx={{ color: C.muted }}>
             <ChevronRightIcon />
           </IconButton>
         </Box>
