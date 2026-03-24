@@ -21,6 +21,8 @@ import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline'
 import FitnessCenterIcon     from '@mui/icons-material/FitnessCenter'
 import ExpandMoreIcon        from '@mui/icons-material/ExpandMore'
 import ExpandLessIcon        from '@mui/icons-material/ExpandLess'
+import ChevronLeftIcon       from '@mui/icons-material/ChevronLeft'
+import ChevronRightIcon      from '@mui/icons-material/ChevronRight'
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings'
 import Switch                from '@mui/material/Switch'
 import { useApp }            from '../context/AppContext'
@@ -1406,23 +1408,52 @@ function ExpensesTab({ t }) {
 
 // ── Coaches Tab ───────────────────────────────────────────────
 function CoachesTab({ t }) {
-  const { realClients } = useApp()
+  const { realClients, lang } = useApp()
+  const now = new Date()
+  const [monthOffset, setMonthOffset] = useState(0) // 0 = current, -1 = previous, etc.
+
+  const targetDate = new Date(now.getFullYear(), now.getMonth() + monthOffset, 1)
+  const targetYear = targetDate.getFullYear()
+  const targetMonth = targetDate.getMonth() // 0-based
+
+  const monthNames = lang === 'en'
+    ? ['January','February','March','April','May','June','July','August','September','October','November','December']
+    : ['Януари','Февруари','Март','Април','Май','Юни','Юли','Август','Септември','Октомври','Ноември','Декември']
 
   const coachStats = useMemo(() => {
+    const toIso = d => { if (!d) return ''; if (d[4] === '-') return d; const p = d.split('.'); return p.length === 3 ? `${p[2]}-${p[1]}-${p[0]}` : d }
     const counts = {}
     realClients.forEach(c => {
       ;(c.workouts || []).forEach(w => {
-        const name = w.coach || '—'
-        counts[name] = (counts[name] || 0) + 1
+        const iso = toIso(w.date)
+        if (!iso) return
+        const d = new Date(iso + 'T00:00:00')
+        if (d.getFullYear() === targetYear && d.getMonth() === targetMonth) {
+          const name = w.coach || '—'
+          counts[name] = (counts[name] || 0) + 1
+        }
       })
     })
     return Object.entries(counts)
       .map(([name, count]) => ({ name, count }))
       .sort((a, b) => b.count - a.count)
-  }, [realClients])
+  }, [realClients, targetYear, targetMonth])
 
   return (
     <Box>
+      {/* Month selector */}
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2, mb: 2 }}>
+        <IconButton size="small" onClick={() => setMonthOffset(m => m - 1)} sx={{ color: C.muted }}>
+          <ChevronLeftIcon />
+        </IconButton>
+        <Typography sx={{ fontWeight: 800, fontSize: '15px', color: C.text, minWidth: 140, textAlign: 'center' }}>
+          {monthNames[targetMonth]} {targetYear}
+        </Typography>
+        <IconButton size="small" onClick={() => setMonthOffset(m => Math.min(m + 1, 0))} disabled={monthOffset >= 0} sx={{ color: C.muted }}>
+          <ChevronRightIcon />
+        </IconButton>
+      </Box>
+
       <Paper sx={{ borderRadius: '16px', border: `1px solid ${C.border}`, overflow: 'hidden' }}>
         {coachStats.length === 0 ? (
           <Typography sx={{ color: C.muted, p: 3, textAlign: 'center' }}>{t('noDataLbl')}</Typography>
