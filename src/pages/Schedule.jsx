@@ -401,7 +401,7 @@ function SlotCell({ slot, adminMode, onEdit, onDelete, onAddClient, onRemoveClie
       <Box sx={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
         {cells.map((booking, i) => (
           booking ? (
-            <Box key={i} onClick={!adminMode ? () => openClient(booking) : undefined} sx={{
+            <Box key={i} onClick={adminMode ? undefined : () => openClient(booking)} sx={{
               borderRadius: '4px',
               px: '3px', py: '1px',
               background: hexRgba(base, 0.30),
@@ -431,7 +431,7 @@ function SlotCell({ slot, adminMode, onEdit, onDelete, onAddClient, onRemoveClie
       </Box>
 
       {/* Admin action buttons — shown on tap (mobile) or hover (desktop) */}
-      {adminMode && showActions && !confirmDel && !showClients && (
+      {adminMode && showActions && !confirmDel && (
         <Box sx={{
           position: 'absolute', inset: 0, borderRadius: '5px',
           background: 'rgba(12,10,9,0.88)',
