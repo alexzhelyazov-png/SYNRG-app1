@@ -101,9 +101,9 @@ export const MONTHLY_BADGES = [
   { id: 'm_streak_gold',   monthly: true, xp: 35, tier: 'gold',   series: 'm_streak', muiIcon: 'LocalFireDepartment', condType: 'monthly_streak', condValue: 30 },
 
   // ── m_steps series ──
-  { id: 'm_steps_bronze', monthly: true, xp: 10, tier: 'bronze', series: 'm_steps', muiIcon: 'DirectionsWalk', condType: 'monthly_steps', condValue: 200000 },
-  { id: 'm_steps_silver', monthly: true, xp: 20, tier: 'silver', series: 'm_steps', muiIcon: 'DirectionsWalk', condType: 'monthly_steps', condValue: 300000 },
-  { id: 'm_steps_gold',   monthly: true, xp: 35, tier: 'gold',   series: 'm_steps', muiIcon: 'DirectionsWalk', condType: 'monthly_steps', condValue: 450000 },
+  { id: 'm_steps_bronze', monthly: true, xp: 15, tier: 'bronze', series: 'm_steps', muiIcon: 'DirectionsWalk', condType: 'monthly_steps', condValue: 200000 },
+  { id: 'm_steps_silver', monthly: true, xp: 35, tier: 'silver', series: 'm_steps', muiIcon: 'DirectionsWalk', condType: 'monthly_steps', condValue: 300000 },
+  { id: 'm_steps_gold',   monthly: true, xp: 60, tier: 'gold',   series: 'm_steps', muiIcon: 'DirectionsWalk', condType: 'monthly_steps', condValue: 450000 },
 
   // ── m_steps_days series ──
   { id: 'm_steps_days_bronze', monthly: true, xp: 10, tier: 'bronze', series: 'm_steps_days', muiIcon: 'DirectionsRun', condType: 'monthly_count', condField: 'stepsDays', condValue: 7  },
