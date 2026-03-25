@@ -102,19 +102,22 @@ export function BookingProvider({ children }) {
   const cancelBookingForSlot = useCallback(async (slotId) => {
     setBookingBusy(true)
     try {
+      const slot = slots.find(s => s.id === slotId)
       const result = await DB.callRpc('cancel_booking', {
         p_slot_id:   slotId,
         p_client_id: auth.id,
       })
       if (result?.error) return { error: result.error }
       await Promise.all([loadSlots(), loadMyBookings(auth.id), loadMyPlan(auth.id)])
+      const timeInfo = slot ? `${slot.slot_date} ${slot.start_time?.slice(0, 5)}` : ''
+      DB.insertNotification(auth.name, auth.name, 'cancel', `${auth.name} отмени час: ${timeInfo}`)
       return { ok: true }
     } catch (e) {
       return { error: e.message || 'Грешка при отказ' }
     } finally {
       setBookingBusy(false)
     }
-  }, [auth, loadSlots, loadMyBookings, loadMyPlan])
+  }, [auth, slots, loadSlots, loadMyBookings, loadMyPlan])
 
   // Coach/admin cancels a booking on behalf of a specific client
   const cancelBookingForClient = useCallback(async (slotId, clientId) => {
