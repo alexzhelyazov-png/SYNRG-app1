@@ -50,18 +50,18 @@ export const BADGE_CATEGORIES = [
 
 export const ALLTIME_BADGES = [
   // ── Workouts milestones (bronze → silver → gold) ──
-  { id: 'workouts_30',      category: 'consistency',  xp: 20, tier: 'bronze', series: null, muiIcon: 'FitnessCenter', condType: 'count', condField: 'workoutCount', condValue: 30  },
-  { id: 'workouts_50',      category: 'consistency',  xp: 35, tier: 'silver', series: null, muiIcon: 'FitnessCenter', condType: 'count', condField: 'workoutCount', condValue: 50  },
-  { id: 'workouts_gold',    category: 'consistency',  xp: 50, tier: 'gold',   series: null, muiIcon: 'FitnessCenter', condType: 'count', condField: 'workoutCount', condValue: 100 },
+  { id: 'workouts_30',      category: 'consistency',  xp: 60,  tier: 'bronze', series: null, muiIcon: 'FitnessCenter', condType: 'count', condField: 'workoutCount', condValue: 30  },
+  { id: 'workouts_50',      category: 'consistency',  xp: 100, tier: 'silver', series: null, muiIcon: 'FitnessCenter', condType: 'count', condField: 'workoutCount', condValue: 50  },
+  { id: 'workouts_gold',    category: 'consistency',  xp: 150, tier: 'gold',   series: null, muiIcon: 'FitnessCenter', condType: 'count', condField: 'workoutCount', condValue: 100 },
   // ── Weight loss milestones (bronze → silver → gold) ──
-  { id: 'weight_loss_5',    category: 'weight_loss',  xp: 20, tier: 'bronze', series: null, muiIcon: 'TrendingDown', condType: 'weight_loss', condValue: 5  },
-  { id: 'weight_loss_10',   category: 'weight_loss',  xp: 40, tier: 'silver', series: null, muiIcon: 'TrendingDown', condType: 'weight_loss', condValue: 10 },
-  { id: 'weight_loss_gold', category: 'weight_loss',  xp: 60, tier: 'gold',   series: null, muiIcon: 'TrendingDown', condType: 'weight_loss', condValue: 20 },
+  { id: 'weight_loss_5',    category: 'weight_loss',  xp: 50,  tier: 'bronze', series: null, muiIcon: 'TrendingDown', condType: 'weight_loss', condValue: 5  },
+  { id: 'weight_loss_10',   category: 'weight_loss',  xp: 80,  tier: 'silver', series: null, muiIcon: 'TrendingDown', condType: 'weight_loss', condValue: 10 },
+  { id: 'weight_loss_gold', category: 'weight_loss',  xp: 200, tier: 'gold',   series: null, muiIcon: 'TrendingDown', condType: 'weight_loss', condValue: 20 },
   // ── Other big goals ──
-  { id: 'cal_days_gold',    category: 'special',      xp: 50, tier: 'gold', series: null, muiIcon: 'LocalDining',         condType: 'target_days',   condField: 'calTargetDays', condValue: 50  },
-  { id: 'training_3m',      category: 'consistency',  xp: 50, tier: 'gold', series: null, muiIcon: 'FitnessCenter',       condType: 'consecutive_workout_months',                 condValue: 3   },
-  { id: 'streak_gold',      category: 'special',      xp: 50, tier: 'gold', series: null, muiIcon: 'LocalFireDepartment', condType: 'streak',                                    condValue: 90  },
-  { id: 'active_days_gold', category: 'consistency',  xp: 50, tier: 'gold', series: null, muiIcon: 'EventAvailable',      condType: 'count',         condField: 'activeDays',    condValue: 120 },
+  { id: 'cal_days_gold',    category: 'special',      xp: 100, tier: 'gold', series: null, muiIcon: 'LocalDining',         condType: 'target_days',   condField: 'calTargetDays', condValue: 50  },
+  { id: 'training_3m',      category: 'consistency',  xp: 50,  tier: 'gold', series: null, muiIcon: 'FitnessCenter',       condType: 'consecutive_workout_months',                 condValue: 3   },
+  { id: 'streak_gold',      category: 'special',      xp: 120, tier: 'gold', series: null, muiIcon: 'LocalFireDepartment', condType: 'streak',                                    condValue: 90  },
+  { id: 'active_days_gold', category: 'consistency',  xp: 200, tier: 'gold', series: null, muiIcon: 'EventAvailable',      condType: 'count',         condField: 'activeDays',    condValue: 120 },
 
   // ── First entry (instant gratification) ──
   { id: 'first_meal',   category: 'consistency', xp: 5,  tier: null, series: null, muiIcon: 'Restaurant',     condType: 'count', condField: 'mealCount',   condValue: 1 },
@@ -119,6 +119,11 @@ export const MONTHLY_BADGES = [
   { id: 'm_prot_target_bronze', monthly: true, xp: 15, tier: 'bronze', series: 'm_prot_target', muiIcon: 'Egg', condType: 'monthly_target', condField: 'protTargetDays', condValue: 7  },
   { id: 'm_prot_target_silver', monthly: true, xp: 30, tier: 'silver', series: 'm_prot_target', muiIcon: 'Egg', condType: 'monthly_target', condField: 'protTargetDays', condValue: 15 },
   { id: 'm_prot_target_gold',   monthly: true, xp: 50, tier: 'gold',   series: 'm_prot_target', muiIcon: 'Egg', condType: 'monthly_target', condField: 'protTargetDays', condValue: 30 },
+
+  // ── m_weight_loss series (monthly) ──
+  { id: 'm_weight_loss_bronze', monthly: true, xp: 50,  tier: 'bronze', series: 'm_weight_loss', muiIcon: 'TrendingDown', condType: 'monthly_weight_loss', condValue: 1 },
+  { id: 'm_weight_loss_silver', monthly: true, xp: 90,  tier: 'silver', series: 'm_weight_loss', muiIcon: 'TrendingDown', condType: 'monthly_weight_loss', condValue: 2 },
+  { id: 'm_weight_loss_gold',   monthly: true, xp: 120, tier: 'gold',   series: 'm_weight_loss', muiIcon: 'TrendingDown', condType: 'monthly_weight_loss', condValue: 4 },
 ]
 
 // Combined for backward compatibility
@@ -214,6 +219,10 @@ function collectMonthlyStats(client, monthKey) {
   const calTargetDays  = targetDaysCount(meals, client.calorieTarget || 99999, 'kcal')
   const protTargetDays = targetDaysCount(meals, client.proteinTarget || 99999, 'protein')
 
+  // Monthly weight loss: difference between first and last weight in the month
+  const sortedW = [...weights].sort((a, b) => a.date.localeCompare(b.date))
+  const monthWeightLoss = sortedW.length >= 2 ? sortedW[0].weight - sortedW[sortedW.length - 1].weight : 0
+
   return {
     workoutCount: workouts.length,
     mealCount:    meals.length,
@@ -223,6 +232,7 @@ function collectMonthlyStats(client, monthKey) {
     streak,
     calTargetDays,
     protTargetDays,
+    monthWeightLoss: Math.max(0, monthWeightLoss),
   }
 }
 
@@ -478,6 +488,8 @@ function checkMonthlyBadge(badge, monthStats) {
       return monthStats.totalSteps >= badge.condValue
     case 'monthly_target':
       return (monthStats[badge.condField] || 0) >= badge.condValue
+    case 'monthly_weight_loss':
+      return (monthStats.monthWeightLoss || 0) >= badge.condValue
     default:
       return false
   }
@@ -594,6 +606,8 @@ export function getBadgeProgress(badge, client) {
         return { current: Math.min(stats.totalSteps, badge.condValue), target: badge.condValue }
       case 'monthly_target':
         return { current: Math.min(stats[badge.condField] || 0, badge.condValue), target: badge.condValue }
+      case 'monthly_weight_loss':
+        return { current: Math.min(Number((stats.monthWeightLoss || 0).toFixed(1)), badge.condValue), target: badge.condValue }
       default:
         return { current: 0, target: 1 }
     }

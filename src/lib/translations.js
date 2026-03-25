@@ -244,6 +244,8 @@ export const T = {
     badgeDesc_m_steps_days_bronze: 'Запиши стъпки в 7 различни дни в един месец', badgeDesc_m_steps_days_silver: 'Запиши стъпки в 15 различни дни в един месец', badgeDesc_m_steps_days_gold: 'Запиши стъпки в 30 различни дни в един месец',
     badgeDesc_m_cal_target_bronze: 'Влез в калорийната си цел 7 дни в един месец', badgeDesc_m_cal_target_silver: 'Влез в калорийната си цел 15 дни в един месец', badgeDesc_m_cal_target_gold: 'Влез в калорийната си цел 30 дни в един месец',
     badgeDesc_m_prot_target_bronze: 'Постигни протеиновата си цел 7 дни в един месец', badgeDesc_m_prot_target_silver: 'Постигни протеиновата си цел 15 дни в един месец', badgeDesc_m_prot_target_gold: 'Постигни протеиновата си цел 30 дни в един месец',
+    badge_m_weight_loss_bronze: '-1 кг', badge_m_weight_loss_silver: '-2 кг', badge_m_weight_loss_gold: '-4 кг',
+    badgeDesc_m_weight_loss_bronze: 'Свали 1 кг за един месец', badgeDesc_m_weight_loss_silver: 'Свали 2 кг за един месец', badgeDesc_m_weight_loss_gold: 'Свали 4 кг за един месец',
 
     // ── Delete Modal ──────────────────────────────────
     deleteTitle:        'Изтрий клиент?',
@@ -1034,6 +1036,8 @@ export const T = {
     badgeDesc_m_steps_days_bronze: 'Log steps on 7 different days in a single month', badgeDesc_m_steps_days_silver: 'Log steps on 15 different days in a single month', badgeDesc_m_steps_days_gold: 'Log steps on 30 different days in a single month',
     badgeDesc_m_cal_target_bronze: 'Hit your calorie target 7 days in a single month', badgeDesc_m_cal_target_silver: 'Hit your calorie target 15 days in a single month', badgeDesc_m_cal_target_gold: 'Hit your calorie target 30 days in a single month',
     badgeDesc_m_prot_target_bronze: 'Hit your protein target 7 days in a single month', badgeDesc_m_prot_target_silver: 'Hit your protein target 15 days in a single month', badgeDesc_m_prot_target_gold: 'Hit your protein target 30 days in a single month',
+    badge_m_weight_loss_bronze: '-1 kg', badge_m_weight_loss_silver: '-2 kg', badge_m_weight_loss_gold: '-4 kg',
+    badgeDesc_m_weight_loss_bronze: 'Lose 1 kg in a single month', badgeDesc_m_weight_loss_silver: 'Lose 2 kg in a single month', badgeDesc_m_weight_loss_gold: 'Lose 4 kg in a single month',
 
     // ── Delete Modal ──────────────────────────────────
     deleteTitle:        'Delete client?',
