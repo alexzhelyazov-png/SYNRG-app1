@@ -438,6 +438,7 @@ export function ClientDetail() {
   const { allPlans, loadAllPlans, slots, slotBookings, extendPlan, adjustCredits } = useBooking()
 
   const [tab, setTab] = useState(0)
+  const [subView, setSubView] = useState(null) // 'weight' | null
   const [editingTargets, setEditingTargets] = useState(null) // { cal, prot }
   const [editCredits, setEditCredits] = useState(null)   // credits_used value or null
   const [editValidTo, setEditValidTo] = useState(null)   // date string or null
@@ -471,6 +472,19 @@ export function ClientDetail() {
       mealsByDate[m.date].protein += (m.protein || 0)
     }
   })
+
+  // Sub-view (weight tracker inside client detail)
+  if (subView === 'weight') {
+    return (
+      <>
+        <Button size="small" startIcon={<ArrowBackIcon />} onClick={() => setSubView(null)}
+          sx={{ color: C.muted, '&:hover': { color: C.purple }, pl: 0, mb: 1 }}>
+          {t('backBtn')}
+        </Button>
+        <WeightTracker />
+      </>
+    )
+  }
 
   return (
     <>
@@ -865,7 +879,7 @@ export function ClientDetail() {
             </Paper>
 
             {/* ── 2. Тегло ── */}
-            <Paper onClick={() => setView('weight')} sx={{ p: 2.5, border: `1px solid ${C.border}`, borderRadius: '16px', cursor: 'pointer', '&:hover': { borderColor: C.purple } }}>
+            <Paper onClick={() => setSubView('weight')} sx={{ p: 2.5, border: `1px solid ${C.border}`, borderRadius: '16px', cursor: 'pointer', '&:hover': { borderColor: C.purple } }}>
               <Typography sx={{ fontSize: '12px', fontWeight: 700, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.6px', mb: 1.5 }}>
                 {t('weightHistoryLbl')}
               </Typography>
