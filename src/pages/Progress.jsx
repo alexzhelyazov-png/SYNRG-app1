@@ -5,7 +5,7 @@ import { useApp } from '../context/AppContext'
 import { C, EASE } from '../theme'
 import {
   ALLTIME_BADGES, MONTHLY_BADGES, BADGES, PR_EXERCISES, getCurrentPRs,
-  TIER_COLORS, TIER_ORDER,
+  TIER_COLORS, TIER_ORDER, LEVEL_THRESHOLDS, LEVEL_NAMES,
   evaluateBadges, evaluateMonthlyBadgesForMonth,
   computeTotalXP, computeMonthlyXP, computeLevel, getLevelName,
   getNextBadges, getBadgeProgress, getMonthlyBadgeHistory,
@@ -389,61 +389,113 @@ export default function Progress() {
    LevelCard — hero section
    ═══════════════════════════════════════════════════════════════ */
 function LevelCard({ levelData, levelName, t, lang, earnedCount }) {
+  const [showLevels, setShowLevels] = useState(false)
+  const names = LEVEL_NAMES[lang] || LEVEL_NAMES.bg
+
   return (
-    <Box sx={{
-      background: 'linear-gradient(145deg, var(--c-card) 0%, var(--c-cardDeep) 100%)',
-      border: `1px solid ${C.border}`,
-      borderRadius: '20px',
-      p: '24px',
-      mb: 3,
-      animation: `fadeInUp 0.3s ${EASE.decelerate} both`,
-    }}>
-      <Typography sx={{
-        fontSize: '11px', fontWeight: 700, textTransform: 'uppercase',
-        letterSpacing: '0.9px', color: C.muted, mb: 0.75,
+    <>
+      <Box onClick={() => setShowLevels(true)} sx={{
+        background: 'linear-gradient(145deg, var(--c-card) 0%, var(--c-cardDeep) 100%)',
+        border: `1px solid ${C.border}`,
+        borderRadius: '20px',
+        p: '24px',
+        mb: 3,
+        cursor: 'pointer',
+        animation: `fadeInUp 0.3s ${EASE.decelerate} both`,
+        '&:hover': { borderColor: C.primary },
       }}>
-        {t('levelLbl')} {levelData.level}/20
-      </Typography>
-
-      <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1.5, mb: 2 }}>
         <Typography sx={{
-          fontSize: '48px', fontWeight: 900, fontStyle: 'italic',
-          fontFamily: "'MontBlanc', sans-serif",
-          color: C.text, lineHeight: 1,
-          letterSpacing: '-1px',
+          fontSize: '11px', fontWeight: 700, textTransform: 'uppercase',
+          letterSpacing: '0.9px', color: C.muted, mb: 0.75,
         }}>
-          {levelData.level}
+          {t('levelLbl')} {levelData.level}/20
         </Typography>
-        <Typography sx={{
-          fontSize: '18px', fontWeight: 700, color: C.text,
-          fontStyle: 'italic',
-        }}>
-          {levelName}
-        </Typography>
-      </Box>
 
-      {/* XP progress bar */}
-      <Box sx={{
-        height: '8px', borderRadius: '4px',
-        background: C.border, overflow: 'hidden', mb: 1,
-      }}>
+        <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1.5, mb: 2 }}>
+          <Typography sx={{
+            fontSize: '48px', fontWeight: 900, fontStyle: 'italic',
+            fontFamily: "'MontBlanc', sans-serif",
+            color: C.text, lineHeight: 1,
+            letterSpacing: '-1px',
+          }}>
+            {levelData.level}
+          </Typography>
+          <Typography sx={{
+            fontSize: '18px', fontWeight: 700, color: C.text,
+            fontStyle: 'italic',
+          }}>
+            {levelName}
+          </Typography>
+        </Box>
+
+        {/* XP progress bar */}
         <Box sx={{
-          height: '100%', borderRadius: '4px',
-          background: `linear-gradient(90deg, ${C.primary}, ${C.primaryDeep})`,
-          width: `${levelData.progress * 100}%`,
-          transition: `width 0.6s ${EASE.spring}`,
-        }} />
+          height: '8px', borderRadius: '4px',
+          background: C.border, overflow: 'hidden', mb: 1,
+        }}>
+          <Box sx={{
+            height: '100%', borderRadius: '4px',
+            background: `linear-gradient(90deg, ${C.primary}, ${C.primaryDeep})`,
+            width: `${levelData.progress * 100}%`,
+            transition: `width 0.6s ${EASE.spring}`,
+          }} />
+        </Box>
+
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Typography sx={{ fontSize: '12px', color: C.muted, fontWeight: 600 }}>
+            {levelData.xpForLevel - levelData.xpIntoLevel} {t('xpLbl')} {lang === 'bg' ? 'до следващо ниво' : 'to next level'}
+          </Typography>
+          <Typography sx={{ fontSize: '12px', color: C.text, fontWeight: 700 }}>
+            {levelData.totalXP} {t('xpLbl')}
+          </Typography>
+        </Box>
       </Box>
 
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Typography sx={{ fontSize: '12px', color: C.muted, fontWeight: 600 }}>
-          {levelData.xpForLevel - levelData.xpIntoLevel} {t('xpLbl')} {lang === 'bg' ? 'до следващо ниво' : 'to next level'}
-        </Typography>
-        <Typography sx={{ fontSize: '12px', color: C.text, fontWeight: 700 }}>
-          {levelData.totalXP} {t('xpLbl')}
-        </Typography>
-      </Box>
-    </Box>
+      {/* All levels dialog */}
+      <Dialog open={showLevels} onClose={() => setShowLevels(false)} maxWidth="xs" fullWidth
+        PaperProps={{ sx: { borderRadius: '20px', background: C.card, border: `1px solid ${C.border}` } }}>
+        <Box sx={{ p: 3 }}>
+          <Typography sx={{ fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.9px', color: C.muted, mb: 2 }}>
+            {lang === 'bg' ? 'Всички нива' : 'All levels'}
+          </Typography>
+          {LEVEL_THRESHOLDS.map((xp, i) => {
+            const lvl = i + 1
+            const isCurrent = levelData.level === lvl
+            const isReached = levelData.level >= lvl
+            return (
+              <Box key={lvl} sx={{
+                display: 'flex', alignItems: 'center', gap: 1.5, py: 1,
+                borderBottom: `1px solid ${i < 19 ? 'rgba(255,255,255,0.04)' : 'transparent'}`,
+                opacity: isReached ? 1 : 0.45,
+              }}>
+                <Typography sx={{
+                  fontSize: '20px', fontWeight: 900, fontStyle: 'italic',
+                  fontFamily: "'MontBlanc', sans-serif",
+                  color: isCurrent ? C.primary : isReached ? C.purple : C.muted,
+                  minWidth: 32, textAlign: 'center', lineHeight: 1,
+                }}>
+                  {lvl}
+                </Typography>
+                <Box sx={{ flex: 1 }}>
+                  <Typography sx={{ fontSize: '13px', fontWeight: 700, color: isCurrent ? C.primary : C.text }}>
+                    {names[i]}
+                  </Typography>
+                  <Typography sx={{ fontSize: '10px', color: C.muted }}>
+                    {xp} {t('xpLbl')}{i < 19 ? ` — ${LEVEL_THRESHOLDS[i + 1] - 1} ${t('xpLbl')}` : '+'}
+                  </Typography>
+                </Box>
+                {isCurrent && (
+                  <Box sx={{ width: 8, height: 8, borderRadius: '50%', background: C.primary, flexShrink: 0 }} />
+                )}
+                {isReached && !isCurrent && (
+                  <Typography sx={{ fontSize: '10px', color: C.purple }}>&#10003;</Typography>
+                )}
+              </Box>
+            )
+          })}
+        </Box>
+      </Dialog>
+    </>
   )
 }
 
