@@ -56,15 +56,17 @@ export default function WeightTracker() {
               <Typography variant="h3" sx={{ mb: 1.5 }}>{t('logWeightLbl')}</Typography>
               {auth.role !== 'client' && (
                 <TextField type="date" value={weightDate} onChange={e => setWeightDate(e.target.value)}
-                  size="small" fullWidth sx={{ mb: 1 }} />
+                  size="small" sx={{ width: '150px', mb: 1, display: 'block' }} />
               )}
-              <TextField placeholder={t('weightInKg')} value={weightInput}
-                onChange={e => setWeightInput(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && saveWeight()}
-                size="small" fullWidth sx={{ mb: 1 }} />
-              <Button variant="contained" color="primary" size="small" fullWidth onClick={saveWeight}>
-                {t('saveLbl')}
-              </Button>
+              <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                <TextField placeholder={t('weightInKg')} value={weightInput}
+                  onChange={e => setWeightInput(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && saveWeight()}
+                  size="small" sx={{ width: '120px' }} />
+                <Button variant="contained" color="primary" size="small" onClick={saveWeight}>
+                  {t('saveLbl')}
+                </Button>
+              </Box>
             </Box>
           )}
           {/* Right: chart */}
