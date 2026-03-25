@@ -337,11 +337,8 @@ export default function Progress() {
           }}>
             <BadgeIcon muiIcon="EmojiEvents" size={24} color="#D4AF37" />
           </Box>
-          <Typography sx={{ fontSize: '11px', fontWeight: 800, color: '#D4AF37', mb: 0.25, lineHeight: 1.3 }}>
+          <Typography sx={{ fontSize: '11px', fontWeight: 800, color: '#D4AF37', mb: 0.5, lineHeight: 1.3 }}>
             {lang === 'bg' ? 'Лични рекорди' : 'Personal Records'}
-          </Typography>
-          <Typography sx={{ fontSize: '9px', fontWeight: 600, color: C.muted, mb: 0.5 }}>
-            {prTotalUnlocked}/{prTotalAll}
           </Typography>
           <Typography sx={{ fontSize: '10px', fontWeight: 600, color: '#D4AF37' }}>
             +{prTotalXP} XP
