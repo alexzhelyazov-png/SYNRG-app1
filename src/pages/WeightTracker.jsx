@@ -6,7 +6,7 @@ import { fmt1 } from '../lib/utils'
 
 export default function WeightTracker() {
   const {
-    auth, client, t,
+    auth, client, t, lang,
     viewingCoach,
     weightInput, setWeightInput,
     weightDate,  setWeightDate,
@@ -47,32 +47,34 @@ export default function WeightTracker() {
         </Box>
       )}
 
-      {/* ── 1. Input section (compact) ─────────────── */}
-      {!isTrackerReadOnly && (
-        <Paper sx={{ p: 2.5, mb: 2 }}>
-          <Typography variant="h3" sx={{ mb: 1.5 }}>{t('logWeightLbl')}</Typography>
-          <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center', flexWrap: 'wrap' }}>
-            {auth.role !== 'client' && (
-              <TextField type="date" value={weightDate} onChange={e => setWeightDate(e.target.value)}
-                size="small" sx={{ width: '150px' }} />
-            )}
-            <TextField placeholder={t('weightInKg')} value={weightInput}
-              onChange={e => setWeightInput(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && saveWeight()}
-              size="small" sx={{ width: '120px' }} />
-            <Button variant="contained" color="primary" size="small" onClick={saveWeight}>
-              {t('saveLbl')}
-            </Button>
-          </Box>
-        </Paper>
-      )}
-
-      {/* ── 2. Chart (compact) ─────────────────────── */}
-      {weightChartData.length >= 2 && (
-        <Paper sx={{ p: 2, mb: 2, overflow: 'hidden' }}>
-          <WeightChart data={weightChartData} />
-        </Paper>
-      )}
+      {/* ── 1. Input + Chart side by side ─────────── */}
+      <Paper sx={{ p: 2.5, mb: 2 }}>
+        <Box sx={{ display: 'flex', gap: 2, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+          {/* Left: input */}
+          {!isTrackerReadOnly && (
+            <Box sx={{ flex: '1 1 200px', minWidth: 180 }}>
+              <Typography variant="h3" sx={{ mb: 1.5 }}>{t('logWeightLbl')}</Typography>
+              {auth.role !== 'client' && (
+                <TextField type="date" value={weightDate} onChange={e => setWeightDate(e.target.value)}
+                  size="small" fullWidth sx={{ mb: 1 }} />
+              )}
+              <TextField placeholder={t('weightInKg')} value={weightInput}
+                onChange={e => setWeightInput(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && saveWeight()}
+                size="small" fullWidth sx={{ mb: 1 }} />
+              <Button variant="contained" color="primary" size="small" fullWidth onClick={saveWeight}>
+                {t('saveLbl')}
+              </Button>
+            </Box>
+          )}
+          {/* Right: chart */}
+          {weightChartData.length >= 2 && (
+            <Box sx={{ flex: '2 1 250px', minWidth: 200, overflow: 'hidden' }}>
+              <WeightChart data={weightChartData} />
+            </Box>
+          )}
+        </Box>
+      </Paper>
 
       {/* ── 3. History table ───────────────────────── */}
       <Paper sx={{ p: 2 }}>
@@ -87,10 +89,10 @@ export default function WeightTracker() {
               display: 'grid', gridTemplateColumns: '1fr 60px 60px 70px auto',
               gap: 1, pb: 1, borderBottom: `2px solid ${C.border}`,
             }}>
-              <Typography sx={{ fontSize: '10px', fontWeight: 700, color: C.muted, textTransform: 'uppercase' }}>{t('dateLbl') || 'Дата'}</Typography>
+              <Typography sx={{ fontSize: '10px', fontWeight: 700, color: C.muted, textTransform: 'uppercase' }}>{lang === 'bg' ? 'Дата' : 'Date'}</Typography>
               <Typography sx={{ fontSize: '10px', fontWeight: 700, color: C.muted, textTransform: 'uppercase', textAlign: 'right' }}>{t('kgUnit')}</Typography>
               <Typography sx={{ fontSize: '10px', fontWeight: 700, color: C.muted, textTransform: 'uppercase', textAlign: 'right' }}>MA</Typography>
-              <Typography sx={{ fontSize: '10px', fontWeight: 700, color: C.muted, textTransform: 'uppercase', textAlign: 'right' }}>{t('weeklyRateShort') || '/sed'}</Typography>
+              <Typography sx={{ fontSize: '10px', fontWeight: 700, color: C.muted, textTransform: 'uppercase', textAlign: 'right' }}>{lang === 'bg' ? '/сед' : '/wk'}</Typography>
               <Box />
             </Box>
 
