@@ -1,8 +1,13 @@
 // ── Admin names (can also add is_admin to coaches table) ─────
-export const ADMIN_NAMES = ['АдминАлекс', 'АдминКари']
+export const ADMIN_NAMES = ['АдминАлекс', 'АдминКари', 'Елина']
+export const FULL_ADMIN_NAMES = ['АдминАлекс', 'АдминКари']
 
 export function isAdmin(auth) {
   return auth.role === 'coach' && ADMIN_NAMES.includes(auth.name)
+}
+
+export function isFullAdmin(auth) {
+  return auth.role === 'coach' && FULL_ADMIN_NAMES.includes(auth.name)
 }
 
 // ── Plan configs ─────────────────────────────────────────────

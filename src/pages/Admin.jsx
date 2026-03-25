@@ -36,7 +36,7 @@ import { MODULE_DEFS, MODULE_PRESETS, ADMIN_MANAGEABLE_MODULES } from '../lib/mo
 import {
   isoToday, isoDatePlusDays, groupByDate, dayLabel, fmtTime,
   occupancyStr, planLabel, fmtValidTo, isPlanActive, creditsRemaining,
-  daysUntilExpiry, effectiveValidTo,
+  daysUntilExpiry, effectiveValidTo, isFullAdmin,
 } from '../lib/bookingUtils'
 
 const PLAN_TYPES = ['8', '12', 'unlimited']
@@ -1655,18 +1655,19 @@ function DashboardTab({ t, lang, setTab }) {
 
 // ── Main Admin Page ──────────────────────────────────────────
 export default function Admin() {
-  const { t, lang } = useApp()
+  const { t, lang, auth } = useApp()
   const [tab, setTab] = useState(0)
+  const fullAdmin = isFullAdmin(auth)
 
   const TABS = [
     { label: t('adminDashboard'),  key: 0 },
     { label: t('clientsMgmt'),     key: 1 },
-    { label: t('analyticsTab'),    key: 2 },
+    ...(fullAdmin ? [{ label: t('analyticsTab'), key: 2 }] : []),
     { label: t('coachesTab'),      key: 3 },
-    { label: t('expensesTab'),     key: 4 },
+    ...(fullAdmin ? [{ label: t('expensesTab'), key: 4 }] : []),
     { label: t('siteTab'),         key: 5 },
     { label: t('adminPrograms'),   key: 6 },
-    { label: t('subscriptionsTab'), key: 7 },
+    ...(fullAdmin ? [{ label: t('subscriptionsTab'), key: 7 }] : []),
   ]
 
   return (
