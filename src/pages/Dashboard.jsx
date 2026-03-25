@@ -427,7 +427,7 @@ function MiniBarChart({ data, width = 200, height = 48, color = C.purple }) {
 
 export function ClientDetail() {
   const {
-    client, auth, t, lang, weeklyRate,
+    client, auth, t, lang, weeklyRate, setView,
     setCoachClientMode, updateClientTargets, saveWorkoutDraft,
     exName, setExName, exScheme, setExScheme, exWeight, setExWeight,
     workoutCategory, setWorkoutCategory,
@@ -865,7 +865,7 @@ export function ClientDetail() {
             </Paper>
 
             {/* ── 2. Тегло ── */}
-            <Paper sx={{ p: 2.5, border: `1px solid ${C.border}`, borderRadius: '16px' }}>
+            <Paper onClick={() => setView('weight')} sx={{ p: 2.5, border: `1px solid ${C.border}`, borderRadius: '16px', cursor: 'pointer', '&:hover': { borderColor: C.purple } }}>
               <Typography sx={{ fontSize: '12px', fontWeight: 700, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.6px', mb: 1.5 }}>
                 {t('weightHistoryLbl')}
               </Typography>
