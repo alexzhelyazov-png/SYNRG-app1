@@ -58,15 +58,13 @@ export default function WeightTracker() {
                 <TextField type="date" value={weightDate} onChange={e => setWeightDate(e.target.value)}
                   size="small" sx={{ width: '150px', mb: 1, display: 'block' }} />
               )}
-              <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
-                <TextField placeholder={t('weightInKg')} value={weightInput}
-                  onChange={e => setWeightInput(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && saveWeight()}
-                  size="small" sx={{ width: '120px' }} />
-                <Button variant="contained" color="primary" size="small" onClick={saveWeight}>
-                  {t('saveLbl')}
-                </Button>
-              </Box>
+              <TextField placeholder={t('weightInKg')} value={weightInput}
+                onChange={e => setWeightInput(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && saveWeight()}
+                size="small" sx={{ width: '150px', mb: 1, display: 'block' }} />
+              <Button variant="contained" color="primary" size="small" onClick={saveWeight}>
+                {t('saveLbl')}
+              </Button>
             </Box>
           )}
           {/* Right: chart */}
