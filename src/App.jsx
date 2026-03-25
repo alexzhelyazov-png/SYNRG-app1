@@ -152,17 +152,17 @@ function BadgeUnlockWatcher() {
 
   useEffect(() => {
     if (!client.workouts || client.workouts.length === 0) return
-    if (unlockedBadge || prCelebration) return // don't overlap with badge celebration
+    if (unlockedBadge || prCelebration) return
     const dismissed = client.dismissedBadges || []
     for (const ex of PR_EXERCISES) {
       const pr = currentPRs[ex.id]
       if (!pr || pr.unlockedIdx.length === 0) continue
-      // Show only the HIGHEST unlocked milestone (not the lowest)
+      // Only show the HIGHEST unlocked milestone, skip if already dismissed
       const highestIdx = pr.unlockedIdx[pr.unlockedIdx.length - 1]
       const m = ex.milestones[highestIdx]
       const key = `${ex.id}:${m.v}`
       if (!dismissed.includes(key)) {
-        setPrCelebration({ exercise: ex, value: m.v })
+        setPrCelebration({ exercise: ex, value: m.v, allMilestones: pr.unlockedIdx.map(i => ex.milestones[i]) })
         return
       }
     }
@@ -171,7 +171,10 @@ function BadgeUnlockWatcher() {
   useEffect(() => {
     if (!prCelebration) return
     const timer = setTimeout(async () => {
-      await dismissBadge(prCelebration.exercise.id, String(prCelebration.value))
+      // Dismiss ALL milestones up to and including the shown one (prevent cascade)
+      for (const m of (prCelebration.allMilestones || [{ v: prCelebration.value }])) {
+        await dismissBadge(prCelebration.exercise.id, String(m.v))
+      }
       setPrCelebration(null)
     }, 4000)
     return () => clearTimeout(timer)
