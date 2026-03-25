@@ -1667,7 +1667,7 @@ export default function Admin() {
     ...(fullAdmin ? [{ label: t('expensesTab'), key: 4 }] : []),
     { label: t('siteTab'),         key: 5 },
     { label: t('adminPrograms'),   key: 6 },
-    ...(fullAdmin ? [{ label: t('subscriptionsTab'), key: 7 }] : []),
+    { label: t('subscriptionsTab'), key: 7 },
   ]
 
   return (
