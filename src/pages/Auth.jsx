@@ -338,7 +338,12 @@ export default function Auth() {
 
         {/* ── Normal login / register form ── */}
         {!isForgot && (
-          <Box sx={{ display: 'grid', gap: 1.25 }}>
+          <Box
+            component="form"
+            autoComplete="on"
+            onSubmit={e => { e.preventDefault(); handleSubmit() }}
+            sx={{ display: 'grid', gap: 1.25 }}
+          >
             <TextField
               fullWidth
               placeholder={t('namePlaceholder')}
@@ -391,11 +396,11 @@ export default function Auth() {
             )}
 
             <Button
+              type="submit"
               variant="contained"
               color="primary"
               fullWidth
               disabled={loading}
-              onClick={handleSubmit}
               sx={{ py: 1.625, mt: 0.5, fontWeight: 800, fontSize: '15px', letterSpacing: '0.2px' }}
             >
               {loading ? t('saving') : (isRegister ? t('createProfile') : t('loginBtn'))}

@@ -250,6 +250,8 @@ export function AppProvider({ children }) {
   useEffect(() => {
     if (loading) return
     if (!auth.isLoggedIn) return
+    // If data failed to load (network error etc.) keep the user logged in — don't log out on a transient error
+    if (loadError) return
     if (auth.role === 'coach') {
       const valid = coaches.find(c => c.id === auth.id)
       if (!valid) { logout(); return }
