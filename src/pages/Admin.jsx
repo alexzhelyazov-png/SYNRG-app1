@@ -1199,7 +1199,7 @@ function AnalyticsTab({ t }) {
 
   const monthPlans = allPlans.filter(p => {
     if (!p.is_paid) return false
-    const d = (p.created_at || '').slice(0, 10)
+    const d = (p.valid_from || p.created_at || '').slice(0, 10)
     return d >= monthStart && d < nextMonth
   })
   const monthExpenses = expenses.filter(e => {
@@ -1408,7 +1408,7 @@ function ExpensesTab({ t }) {
 
 // ── Coaches Tab ───────────────────────────────────────────────
 function CoachesTab({ t }) {
-  const { lang } = useApp()
+  const { lang, coachProfiles, setViewingCoach, setView } = useApp()
   const now = new Date()
   const [monthOffset, setMonthOffset] = useState(0)
   const [allBookings, setAllBookings] = useState([])
@@ -1464,9 +1464,13 @@ function CoachesTab({ t }) {
         {coachStats.length === 0 ? (
           <Typography sx={{ color: C.muted, p: 3, textAlign: 'center' }}>{t('noDataLbl')}</Typography>
         ) : coachStats.map(({ name, count }, i) => (
-          <Box key={name} sx={{ display: 'flex', alignItems: 'center', gap: 1.5,
-            px: 2, py: 1.5,
-            borderBottom: `1px solid ${C.border}`, '&:last-child': { borderBottom: 'none' } }}>
+          <Box key={name} onClick={() => {
+            const cp = coachProfiles.find(c => c.name === name)
+            if (cp) { setViewingCoach(name); setView('dashboard') }
+          }} sx={{ display: 'flex', alignItems: 'center', gap: 1.5,
+            px: 2, py: 1.5, cursor: 'pointer',
+            borderBottom: `1px solid ${C.border}`, '&:last-child': { borderBottom: 'none' },
+            '&:hover': { background: 'rgba(170,169,205,0.08)' } }}>
             <Typography sx={{ fontSize: '18px', fontWeight: 800, color: i === 0 ? C.purple : C.muted,
               minWidth: 28, fontFamily: "'MontBlanc', sans-serif" }}>
               #{i + 1}
