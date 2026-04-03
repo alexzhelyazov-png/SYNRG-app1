@@ -30,19 +30,49 @@ function getNavItems(auth, admin) {
     if (admin) items.push({ view: 'admin', Icon: AdminPanelSettingsIcon, labelKey: 'navAdmin' })
     return items
   }
-  // Client nav — module-aware
+  // Client nav — module-aware, locked items always visible
   const modules = auth.modules || []
+  const hasProgramAccess = hasModule(modules, 'program_access')
+  const hasBookingAccess = hasModule(modules, 'booking_access')
+
   const items = [{ view: 'dashboard', Icon: DashboardIcon, labelKey: 'navDashboard' }]
   if (hasModule(modules, 'nutrition_tracking') || hasModule(modules, 'weight_tracking'))
     items.push({ view: 'progress', Icon: TrendingUpIcon, labelKey: 'navProgress' })
-  items.push({ view: 'programs', Icon: PlayCircleOutlineIcon, labelKey: 'navPrograms' })
-  if (hasModule(modules, 'booking_access'))       items.push({ view: 'schedule', Icon: CalendarMonthIcon, labelKey: 'navBookSlot' })
-  if (modules.includes('synrg_method'))           items.push({ view: 'synrg_method', Icon: SpaIcon, labelKey: 'navSynrgMethod' })
+
+  // Programs: always visible — locked with indicator if no program_access
+  items.push({ view: 'programs', Icon: PlayCircleOutlineIcon, labelKey: 'navPrograms', isLocked: !hasProgramAccess })
+
+  // Schedule: always visible — locked with indicator if no booking_access
+  items.push({ view: 'schedule', Icon: CalendarMonthIcon, labelKey: 'navBookSlot', isLocked: !hasBookingAccess })
+
+  if (modules.includes('synrg_method'))
+    items.push({ view: 'synrg_method', Icon: SpaIcon, labelKey: 'navSynrgMethod' })
   return items
 }
 
+// ── Lock icon SVG ─────────────────────────────────────
+function LockBadge() {
+  return (
+    <Box sx={{
+      position: 'absolute', bottom: -3, right: -5,
+      width: 12, height: 12, borderRadius: '4px',
+      background: 'rgba(20,24,22,0.95)',
+      border: '1px solid rgba(255,255,255,0.08)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+    }}>
+      <svg width="6" height="7" viewBox="0 0 6 8" fill="none">
+        <rect x="0.5" y="3.5" width="5" height="4" rx="1" fill="rgba(196,209,205,0.45)" />
+        <path d="M1.5 3.5V2.5a1.5 1.5 0 0 1 3 0v1" stroke="rgba(196,209,205,0.45)" strokeWidth="1.1" strokeLinecap="round" />
+      </svg>
+    </Box>
+  )
+}
+
 // ── Shared pill-style nav button ─────────────────────────────
-function NavAction({ value, Icon, label, isSelected, onClick, badge, ...rest }) {
+function NavAction({ value, Icon, label, isSelected, onClick, badge, isLocked, ...rest }) {
+  const iconColor = isSelected ? C.purple : isLocked ? 'rgba(196,209,205,0.3)' : C.muted
+  const labelColor = isSelected ? C.purple : isLocked ? 'rgba(196,209,205,0.3)' : C.muted
+
   return (
     <BottomNavigationAction
       value={value}
@@ -61,8 +91,9 @@ function NavAction({ value, Icon, label, isSelected, onClick, badge, ...rest }) 
             transform: isSelected ? 'scale(1.08)' : 'scale(1)',
             transition: `transform 0.2s ${EASE.spring}`,
           }}>
-            <Icon sx={{ fontSize: '20px', color: isSelected ? C.purple : C.muted }} />
-            {badge > 0 && (
+            <Icon sx={{ fontSize: '20px', color: iconColor }} />
+            {isLocked && <LockBadge />}
+            {badge > 0 && !isLocked && (
               <Box sx={{
                 position: 'absolute', top: -4, right: -6,
                 minWidth: 16, height: 16, borderRadius: '8px',
@@ -81,7 +112,7 @@ function NavAction({ value, Icon, label, isSelected, onClick, badge, ...rest }) 
         '& .MuiBottomNavigationAction-label': {
           fontSize: '10px !important',
           fontWeight: isSelected ? '700 !important' : '500 !important',
-          color: isSelected ? `${C.purple} !important` : `${C.muted} !important`,
+          color: `${labelColor} !important`,
           opacity: '1 !important',
           transition: `color 0.2s ${EASE.standard}`,
         },
@@ -117,6 +148,15 @@ export default function MobileNav() {
           showLabels
           onChange={(_, newView) => {
             if (newView === '__clients__' || newView === '__tracker__') return
+            // Locked item → redirect to Programs (upgrade/buy page)
+            const item = navItems.find(n => n.view === newView)
+            if (item?.isLocked) {
+              setView('programs')
+              setShowClientMenu(false)
+              setViewingCoach(null)
+              setCoachClientMode(false)
+              return
+            }
             if (coachClientMode && client?.id) saveWorkoutDraft(client.id)
             setView(newView)
             setShowClientMenu(false)
@@ -126,7 +166,7 @@ export default function MobileNav() {
           sx={{ height: '64px', background: 'transparent', borderTop: 'none' }}
         >
           {/* Role-specific nav items */}
-          {navItems.map(({ view: v, Icon, labelKey }) => {
+          {navItems.map(({ view: v, Icon, labelKey, isLocked }) => {
             const showBadge = unreadFeedCount > 0 && (v === 'progress' || v === 'ranking')
             return (
               <NavAction
@@ -136,6 +176,7 @@ export default function MobileNav() {
                 label={t(labelKey)}
                 isSelected={view === v && !viewingCoach}
                 badge={showBadge ? unreadFeedCount : 0}
+                isLocked={!!isLocked}
               />
             )
           })}

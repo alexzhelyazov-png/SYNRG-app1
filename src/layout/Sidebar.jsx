@@ -42,13 +42,21 @@ function getNavItems(auth, admin) {
     if (admin) coachItems.push({ view: 'admin', labelKey: 'navAdmin', Icon: AdminPanelSettingsIcon })
     return coachItems
   }
-  // Client nav — module-aware
+  // Client nav — module-aware, locked items always visible
   const modules = auth.modules || []
+  const hasProgramAccess = hasModule(modules, 'program_access')
+  const hasBookingAccess = hasModule(modules, 'booking_access')
+
   const items = [{ view: 'dashboard', labelKey: 'navDashboard', Icon: DashboardIcon }]
   if (hasModule(modules, 'nutrition_tracking') || hasModule(modules, 'weight_tracking'))
     items.push({ view: 'progress', labelKey: 'navProgress', Icon: TrendingUpIcon })
-  items.push({ view: 'programs', labelKey: 'navPrograms', Icon: PlayCircleOutlineIcon })
-  if (hasModule(modules, 'booking_access'))      items.push({ view: 'schedule', labelKey: 'navBookSlot', Icon: EventIcon })
+
+  // Programs: always visible — locked with indicator if no program_access
+  items.push({ view: 'programs', labelKey: 'navPrograms', Icon: PlayCircleOutlineIcon, isLocked: !hasProgramAccess })
+
+  // Schedule: always visible — locked with indicator if no booking_access
+  items.push({ view: 'schedule', labelKey: 'navBookSlot', Icon: EventIcon, isLocked: !hasBookingAccess })
+
   if (modules.includes('synrg_method'))          items.push({ view: 'synrg_method', labelKey: 'navSynrgMethod', Icon: SpaIcon })
   return items
 }
@@ -139,22 +147,44 @@ export default function Sidebar() {
 
       {/* ── Nav items ───────────────────────────────────── */}
       <List sx={{ px: 0, py: 0.5, flexShrink: 0 }}>
-        {navItems.map(({ view: v, labelKey, Icon }) => {
+        {navItems.map(({ view: v, labelKey, Icon, isLocked }) => {
           const isActive = view === v && !viewingCoach
           // Show feed badge on 'ranking' (coach) and 'progress' (client)
           const showFeedBadge = unreadFeedCount > 0 && (v === 'ranking' || v === 'progress')
+          const iconColor = isActive ? C.purple : isLocked ? 'rgba(196,209,205,0.28)' : C.muted
           return (
             <Tooltip key={v} title={!open ? t(labelKey) : ''} placement="right" arrow>
               <ListItemButton
                 selected={isActive}
-                onClick={() => { if (coachClientMode && client?.id) saveWorkoutDraft(client.id); setView(v); setViewingCoach(null); setCoachClientMode(false) }}
+                onClick={() => {
+                  // Locked item → redirect to Programs (upgrade/buy page)
+                  if (isLocked) { setView('programs'); setViewingCoach(null); setCoachClientMode(false); return }
+                  if (coachClientMode && client?.id) saveWorkoutDraft(client.id)
+                  setView(v); setViewingCoach(null); setCoachClientMode(false)
+                }}
                 sx={{
                   justifyContent: open ? 'flex-start' : 'center',
                   px: open ? 2 : 0, mx: open ? 1.5 : 1, my: '2px', minHeight: 44,
+                  opacity: isLocked ? 0.65 : 1,
                 }}
               >
-                <ListItemIcon sx={{ minWidth: open ? 38 : 'unset', justifyContent: 'center', color: isActive ? C.purple : C.muted, position: 'relative' }}>
+                <ListItemIcon sx={{ minWidth: open ? 38 : 'unset', justifyContent: 'center', color: iconColor, position: 'relative' }}>
                   <Icon sx={{ fontSize: '20px' }} />
+                  {/* Lock indicator */}
+                  {isLocked && (
+                    <Box sx={{
+                      position: 'absolute', bottom: -2, right: open ? -2 : -4,
+                      width: 12, height: 12, borderRadius: '4px',
+                      background: 'rgba(20,24,22,0.95)',
+                      border: '1px solid rgba(255,255,255,0.08)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    }}>
+                      <svg width="6" height="7" viewBox="0 0 6 8" fill="none">
+                        <rect x="0.5" y="3.5" width="5" height="4" rx="1" fill="rgba(196,209,205,0.45)" />
+                        <path d="M1.5 3.5V2.5a1.5 1.5 0 0 1 3 0v1" stroke="rgba(196,209,205,0.45)" strokeWidth="1.1" strokeLinecap="round" />
+                      </svg>
+                    </Box>
+                  )}
                   {/* Small dot on icon when sidebar is collapsed */}
                   {showFeedBadge && !open && (
                     <Box sx={{
@@ -170,7 +200,7 @@ export default function Sidebar() {
                     <ListItemText primary={t(labelKey)} sx={{
                       flex: 'none',
                       '& .MuiListItemText-primary': {
-                        color:      isActive ? C.purple : C.text,
+                        color:      isActive ? C.purple : isLocked ? 'rgba(196,209,205,0.4)' : C.text,
                         fontWeight: isActive ? 700 : 500,
                         fontSize:   '14px',
                       }
