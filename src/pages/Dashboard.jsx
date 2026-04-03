@@ -1190,6 +1190,12 @@ function DashboardClient({ isCoachView = false }) {
   const today = isoToday()
   const showBooking = hasModule(auth.modules, 'booking_access')
 
+  // Free user = self-registered, no paid modules unlocked yet
+  const isFreeUser = !isCoachView
+    && !hasModule(auth.modules, 'program_access')
+    && !hasModule(auth.modules, 'studio_access')
+    && !hasModule(auth.modules, 'booking_access')
+
   const nextSession = showBooking ? (myBookings || [])
     .filter(b => b.status === 'active')
     .map(b => ({ booking: b, slot: (slots || []).find(s => s.id === b.slot_id) }))
@@ -1253,6 +1259,43 @@ function DashboardClient({ isCoachView = false }) {
           </Typography>
         </Box>
       </Box>
+
+      {/* ── SYNRG ONLINE upgrade banner (free users only) ── */}
+      {isFreeUser && (
+        <Box sx={{
+          mb: 2,
+          px: 2, py: 1.5,
+          borderRadius: '14px',
+          background: 'linear-gradient(135deg, rgba(196,233,191,0.07) 0%, rgba(170,169,205,0.04) 100%)',
+          border: '1px solid rgba(196,233,191,0.18)',
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 1.5,
+          animation: `fadeInUp 0.25s ${EASE.decelerate} 0.05s both`,
+        }}>
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <Typography sx={{ fontSize: '13px', fontWeight: 800, color: C.primary, letterSpacing: '0.4px', mb: 0.25 }}>
+              {t('upgradeOnlineBanner')}
+            </Typography>
+            <Typography sx={{ fontSize: '11px', color: C.muted, lineHeight: 1.4 }}>
+              {t('upgradeOnlineDesc')}
+            </Typography>
+          </Box>
+          <Button
+            onClick={() => setView('programs')}
+            size="small"
+            variant="outlined"
+            sx={{
+              flexShrink: 0,
+              fontSize: '12px', fontWeight: 800,
+              color: C.primary, borderColor: 'rgba(196,233,191,0.35)',
+              borderRadius: '8px', px: 1.5, py: 0.75, textTransform: 'none',
+              whiteSpace: 'nowrap',
+              '&:hover': { background: 'rgba(196,233,191,0.08)', borderColor: 'rgba(196,233,191,0.6)' },
+            }}
+          >
+            {t('upgradeSeeBtn')}
+          </Button>
+        </Box>
+      )}
 
       {/* ── Action buttons (compact) ── */}
       <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 1 }}>
@@ -1397,6 +1440,82 @@ function DashboardClient({ isCoachView = false }) {
                 </Paper>
               )
             })}
+        </Box>
+      )}
+
+      {/* ── Premium locked teaser (free users only) ── */}
+      {isFreeUser && (
+        <Box sx={{ mt: 3 }}>
+          <Typography sx={{ fontSize: '11px', fontWeight: 700, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.7px', mb: 1.25 }}>
+            {t('upgradeOnlineBanner')}
+          </Typography>
+          <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1 }}>
+
+            {/* Card 1 — Online programs */}
+            <Paper
+              onClick={() => setView('programs')}
+              sx={{
+                p: 2, borderRadius: '14px', cursor: 'pointer',
+                border: '1px solid rgba(196,233,191,0.15)',
+                background: 'linear-gradient(145deg, rgba(196,233,191,0.04) 0%, rgba(0,0,0,0) 100%)',
+                position: 'relative', overflow: 'hidden',
+                transition: `all 0.18s ${EASE.standard}`,
+                '&:hover': { borderColor: 'rgba(196,233,191,0.35)', transform: 'translateY(-1px)' },
+              }}
+            >
+              {/* Lock badge */}
+              <Box sx={{
+                position: 'absolute', top: 8, right: 8,
+                width: 20, height: 20, borderRadius: '6px',
+                background: 'rgba(0,0,0,0.5)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>
+                <svg width="10" height="12" viewBox="0 0 10 12" fill="none">
+                  <rect x="1" y="5" width="8" height="7" rx="1.5" fill="rgba(255,255,255,0.5)" />
+                  <path d="M2.5 5V3.5a2.5 2.5 0 0 1 5 0V5" stroke="rgba(255,255,255,0.5)" strokeWidth="1.5" strokeLinecap="round" />
+                </svg>
+              </Box>
+              <Typography sx={{ fontSize: '13px', fontWeight: 800, color: C.text, mb: 0.5, pr: 2.5 }}>
+                {t('lockedPrograms')}
+              </Typography>
+              <Typography sx={{ fontSize: '11px', color: C.muted, lineHeight: 1.45 }}>
+                {t('lockedProgramsDesc')}
+              </Typography>
+            </Paper>
+
+            {/* Card 2 — Studio */}
+            <Paper
+              onClick={() => window.open('../studio.html', '_blank')}
+              sx={{
+                p: 2, borderRadius: '14px', cursor: 'pointer',
+                border: '1px solid rgba(170,169,205,0.15)',
+                background: 'linear-gradient(145deg, rgba(170,169,205,0.04) 0%, rgba(0,0,0,0) 100%)',
+                position: 'relative', overflow: 'hidden',
+                transition: `all 0.18s ${EASE.standard}`,
+                '&:hover': { borderColor: 'rgba(170,169,205,0.35)', transform: 'translateY(-1px)' },
+              }}
+            >
+              {/* Lock badge */}
+              <Box sx={{
+                position: 'absolute', top: 8, right: 8,
+                width: 20, height: 20, borderRadius: '6px',
+                background: 'rgba(0,0,0,0.5)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>
+                <svg width="10" height="12" viewBox="0 0 10 12" fill="none">
+                  <rect x="1" y="5" width="8" height="7" rx="1.5" fill="rgba(255,255,255,0.5)" />
+                  <path d="M2.5 5V3.5a2.5 2.5 0 0 1 5 0V5" stroke="rgba(255,255,255,0.5)" strokeWidth="1.5" strokeLinecap="round" />
+                </svg>
+              </Box>
+              <Typography sx={{ fontSize: '13px', fontWeight: 800, color: C.text, mb: 0.5, pr: 2.5 }}>
+                {t('lockedStudio')}
+              </Typography>
+              <Typography sx={{ fontSize: '11px', color: C.muted, lineHeight: 1.45 }}>
+                {t('lockedStudioDesc')}
+              </Typography>
+            </Paper>
+
+          </Box>
         </Box>
       )}
 

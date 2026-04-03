@@ -211,12 +211,13 @@ export function AppProvider({ children }) {
   async function handleRegisterClient(name, pass, email = null) {
     const exists = clients.find(c => !c.is_coach && c.name.toLowerCase() === name.toLowerCase())
     if (exists) return t('errClientExists')
-    const row = { name, password: pass, calorie_target: 2000, protein_target: 140, is_coach: false, modules: [] }
+    const FREE_MODULES = ['nutrition_tracking', 'weight_tracking', 'steps_tracking']
+    const row = { name, password: pass, calorie_target: 2000, protein_target: 140, is_coach: false, modules: FREE_MODULES }
     if (email) row.email = email
     const data = await DB.insert('clients', row)
     const newClient = {
       id: data.id, name, password: pass, is_coach: false,
-      calorieTarget: 2000, proteinTarget: 140, modules: [],
+      calorieTarget: 2000, proteinTarget: 140, modules: FREE_MODULES,
       meals: [], workouts: [], weightLogs: [], tasks: [], reactions: [],
       reminderSettings: { protein: true, weight: true, foodLog: true, coach: true },
     }
@@ -226,7 +227,7 @@ export function AppProvider({ children }) {
       setSelIdx(newRealIdx)
       return updated
     })
-    setAuth({ isLoggedIn: true, role: 'client', name, id: data.id, modules: [] })
+    setAuth({ isLoggedIn: true, role: 'client', name, id: data.id, modules: FREE_MODULES })
 
     // Notify coaches/admins about the new registration
     DB.insertNotification('Система', name, 'registration', name)

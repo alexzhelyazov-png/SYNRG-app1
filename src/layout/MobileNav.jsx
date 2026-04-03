@@ -35,7 +35,7 @@ function getNavItems(auth, admin) {
   const items = [{ view: 'dashboard', Icon: DashboardIcon, labelKey: 'navDashboard' }]
   if (hasModule(modules, 'nutrition_tracking') || hasModule(modules, 'weight_tracking'))
     items.push({ view: 'progress', Icon: TrendingUpIcon, labelKey: 'navProgress' })
-  if (hasModule(modules, 'program_access'))       items.push({ view: 'programs', Icon: PlayCircleOutlineIcon, labelKey: 'navPrograms' })
+  items.push({ view: 'programs', Icon: PlayCircleOutlineIcon, labelKey: 'navPrograms' })
   if (hasModule(modules, 'booking_access'))       items.push({ view: 'schedule', Icon: CalendarMonthIcon, labelKey: 'navBookSlot' })
   if (modules.includes('synrg_method'))           items.push({ view: 'synrg_method', Icon: SpaIcon, labelKey: 'navSynrgMethod' })
   return items

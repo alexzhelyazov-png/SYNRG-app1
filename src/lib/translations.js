@@ -807,6 +807,15 @@ export const T = {
     deleteAccountTitle:    'Изтриване на акаунт',
     deleteAccountConfirm:  'Сигурен ли си? Всички твои данни (хранителен дневник, тренировки, тегло, стъпки) ще бъдат изтрити безвъзвратно.',
     deleteAccountBtn:      'Да, изтрий всичко',
+
+    // ── Free user upgrade ────────────────────────────
+    upgradeOnlineBanner:   'SYNRG ONLINE',
+    upgradeOnlineDesc:     'Програми · Резервации · Треньор · SYNRG метод',
+    upgradeSeeBtn:         'Виж →',
+    lockedPrograms:        'Онлайн програми',
+    lockedProgramsDesc:    'Тренировъчни и хранителни режими',
+    lockedStudio:          'Студио тренировки',
+    lockedStudioDesc:      'Персонални тренировки на живо',
   },
 
   en: {
@@ -1617,5 +1626,14 @@ export const T = {
     deleteAccountTitle:    'Delete account',
     deleteAccountConfirm:  'Are you sure? All your data (food diary, workouts, weight, steps) will be permanently deleted.',
     deleteAccountBtn:      'Yes, delete everything',
+
+    // ── Free user upgrade ────────────────────────────
+    upgradeOnlineBanner:   'SYNRG ONLINE',
+    upgradeOnlineDesc:     'Programs · Bookings · Coach · SYNRG method',
+    upgradeSeeBtn:         'View →',
+    lockedPrograms:        'Online programs',
+    lockedProgramsDesc:    'Training & nutrition plans',
+    lockedStudio:          'Studio training',
+    lockedStudioDesc:      'Personal training sessions',
   },
 }

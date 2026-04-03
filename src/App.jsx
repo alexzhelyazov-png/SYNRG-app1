@@ -324,7 +324,7 @@ function AppShell() {
                 {view === 'schedule'  && auth.role !== 'client' && <Schedule />}
                 {view === 'steps'     && (auth.role !== 'client' || hasModule(auth.modules, 'nutrition_tracking') || hasModule(auth.modules, 'weight_tracking')) && <StepsTracker />}
                 {view === 'workout'  && <ClientWorkout />}
-                {view === 'programs'  && (auth.role !== 'client' || hasModule(auth.modules, 'program_access')) && <Programs />}
+                {view === 'programs'  && (auth.role === 'coach' || auth.role === 'admin' || auth.role === 'client') && <Programs />}
                 {view === 'notifications' && auth.role === 'coach' && <Notifications />}
                 {view === 'recipes'      && auth.role !== 'client' && <Recipes />}
                 {view === 'admin'     && admin && <Admin />}
