@@ -7,6 +7,7 @@ import LeaderboardIcon        from '@mui/icons-material/Leaderboard'
 import PlayCircleOutlineIcon  from '@mui/icons-material/PlayCircleOutline'
 import CalendarMonthIcon      from '@mui/icons-material/CalendarMonth'
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings'
+import MenuBookIcon           from '@mui/icons-material/MenuBook'
 import PersonIcon            from '@mui/icons-material/Person'
 import AssignmentIcon         from '@mui/icons-material/Assignment'
 import SpaIcon                from '@mui/icons-material/Spa'
@@ -24,6 +25,7 @@ function getNavItems(auth, admin) {
       { view: 'schedule',  Icon: CalendarMonthIcon, labelKey: 'navSchedule'  },
       { view: 'ranking',   Icon: LeaderboardIcon,   labelKey: 'navRanking'   },
       { view: 'tasks',     Icon: AssignmentIcon,    labelKey: 'navTasks'     },
+      { view: 'recipes',   Icon: MenuBookIcon,      labelKey: 'navRecipes'   },
     ]
     if (admin) items.push({ view: 'admin', Icon: AdminPanelSettingsIcon, labelKey: 'navAdmin' })
     return items
