@@ -9,6 +9,7 @@ import CalendarMonthIcon      from '@mui/icons-material/CalendarMonth'
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings'
 import PersonIcon            from '@mui/icons-material/Person'
 import AssignmentIcon         from '@mui/icons-material/Assignment'
+import SpaIcon                from '@mui/icons-material/Spa'
 import { useApp }             from '../context/AppContext'
 import { isAdmin }            from '../lib/bookingUtils'
 import { hasModule }          from '../lib/modules'
@@ -34,11 +35,12 @@ function getNavItems(auth, admin) {
     items.push({ view: 'progress', Icon: TrendingUpIcon, labelKey: 'navProgress' })
   if (hasModule(modules, 'program_access'))       items.push({ view: 'programs', Icon: PlayCircleOutlineIcon, labelKey: 'navPrograms' })
   if (hasModule(modules, 'booking_access'))       items.push({ view: 'schedule', Icon: CalendarMonthIcon, labelKey: 'navBookSlot' })
+  if (modules.includes('synrg_method'))           items.push({ view: 'synrg_method', Icon: SpaIcon, labelKey: 'navSynrgMethod' })
   return items
 }
 
 // ── Shared pill-style nav button ─────────────────────────────
-function NavAction({ value, Icon, label, isSelected, onClick, ...rest }) {
+function NavAction({ value, Icon, label, isSelected, onClick, badge, ...rest }) {
   return (
     <BottomNavigationAction
       value={value}
@@ -58,6 +60,18 @@ function NavAction({ value, Icon, label, isSelected, onClick, ...rest }) {
             transition: `transform 0.2s ${EASE.spring}`,
           }}>
             <Icon sx={{ fontSize: '20px', color: isSelected ? C.purple : C.muted }} />
+            {badge > 0 && (
+              <Box sx={{
+                position: 'absolute', top: -4, right: -6,
+                minWidth: 16, height: 16, borderRadius: '8px',
+                background: '#c4e9bf', color: '#111',
+                fontSize: '9px', fontWeight: 900,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                px: 0.4, lineHeight: 1,
+              }}>
+                {badge > 9 ? '9+' : badge}
+              </Box>
+            )}
           </Box>
         </Box>
       }
@@ -82,6 +96,7 @@ export default function MobileNav() {
     viewingCoach, setViewingCoach,
     coachClientMode, setCoachClientMode,
     client, saveWorkoutDraft,
+    unreadFeedCount,
   } = useApp()
 
   const admin = isAdmin(auth)
@@ -109,31 +124,20 @@ export default function MobileNav() {
           sx={{ height: '64px', background: 'transparent', borderTop: 'none' }}
         >
           {/* Role-specific nav items */}
-          {navItems.map(({ view: v, Icon, labelKey }) => (
-            <NavAction
-              key={v}
-              value={v}
-              Icon={Icon}
-              label={t(labelKey)}
-              isSelected={view === v && !viewingCoach}
-            />
-          ))}
+          {navItems.map(({ view: v, Icon, labelKey }) => {
+            const showBadge = unreadFeedCount > 0 && (v === 'progress' || v === 'ranking')
+            return (
+              <NavAction
+                key={v}
+                value={v}
+                Icon={Icon}
+                label={t(labelKey)}
+                isSelected={view === v && !viewingCoach}
+                badge={showBadge ? unreadFeedCount : 0}
+              />
+            )
+          })}
 
-          {/* Моят тракер (coach + admin) */}
-          {(auth.role === 'coach' || auth.role === 'admin') && (
-            <NavAction
-              value="__tracker__"
-              Icon={PersonIcon}
-              label={t('myTrackerTitle')}
-              isSelected={view === 'dashboard' && viewingCoach === auth.name}
-              onClick={() => {
-                if (coachClientMode && client?.id) saveWorkoutDraft(client.id)
-                setViewingCoach(auth.name)
-                setView('dashboard')
-                setShowClientMenu(false)
-              }}
-            />
-          )}
 
         </BottomNavigation>
       </Box>

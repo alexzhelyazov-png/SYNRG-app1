@@ -124,6 +124,11 @@ export const MONTHLY_BADGES = [
   { id: 'm_weight_loss_bronze', monthly: true, xp: 50,  tier: 'bronze', series: 'm_weight_loss', muiIcon: 'TrendingDown', condType: 'monthly_weight_loss', condValue: 1 },
   { id: 'm_weight_loss_silver', monthly: true, xp: 90,  tier: 'silver', series: 'm_weight_loss', muiIcon: 'TrendingDown', condType: 'monthly_weight_loss', condValue: 2 },
   { id: 'm_weight_loss_gold',   monthly: true, xp: 120, tier: 'gold',   series: 'm_weight_loss', muiIcon: 'TrendingDown', condType: 'monthly_weight_loss', condValue: 4 },
+
+  // ── m_community series ──
+  { id: 'm_community_bronze', monthly: true, xp: 10, tier: 'bronze', series: 'm_community', muiIcon: 'AutoAwesome', condType: 'monthly_count', condField: 'communityCount', condValue: 1  },
+  { id: 'm_community_silver', monthly: true, xp: 20, tier: 'silver', series: 'm_community', muiIcon: 'AutoAwesome', condType: 'monthly_count', condField: 'communityCount', condValue: 5  },
+  { id: 'm_community_gold',   monthly: true, xp: 35, tier: 'gold',   series: 'm_community', muiIcon: 'AutoAwesome', condType: 'monthly_count', condField: 'communityCount', condValue: 10 },
 ]
 
 // Combined for backward compatibility
@@ -199,11 +204,15 @@ function collectMonthlyStats(client, monthKey) {
     const parts = String(dateStr || '').split('.')
     return parts.length === 3 && parts[1] === month && parts[2] === year
   }
+  const matchISO = (isoStr) => (isoStr || '').substring(0, 7) === monthKey
 
   const meals    = (client.meals      || []).filter(m => matchMonth(m.date))
   const weights  = (client.weightLogs || []).filter(w => matchMonth(w.date))
   const workouts = (client.workouts   || []).filter(w => matchMonth(w.date))
   const steps    = (client.stepsLogs  || []).filter(s => matchMonth(s.date))
+
+  const communityCount = (client.communityPosts    || []).filter(p => matchISO(p.created_at)).length
+                       + (client.communityComments || []).filter(c => matchISO(c.created_at)).length
 
   const stepsDateSet = new Set(steps.map(s => s.date))
   const allDateSet = new Set([
@@ -233,6 +242,7 @@ function collectMonthlyStats(client, monthKey) {
     calTargetDays,
     protTargetDays,
     monthWeightLoss: Math.max(0, monthWeightLoss),
+    communityCount,
   }
 }
 
@@ -251,6 +261,9 @@ function getDistinctMonthKeys(client) {
   ;(client.weightLogs || []).forEach(w => addDate(w.date))
   ;(client.workouts   || []).forEach(w => addDate(w.date))
   ;(client.stepsLogs  || []).forEach(s => addDate(s.date))
+  // Community posts/comments use ISO dates
+  ;(client.communityPosts    || []).forEach(p => { const m = (p.created_at || '').substring(0, 7); if (m) keys.add(m) })
+  ;(client.communityComments || []).forEach(c => { const m = (c.created_at || '').substring(0, 7); if (m) keys.add(m) })
   return [...keys].sort()
 }
 

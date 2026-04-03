@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import ClientWorkout from './ClientWorkout'
-import { Box, Typography, TextField, Button, Chip, Paper, Switch, Collapse, Tabs, Tab, IconButton, Tooltip } from '@mui/material'
+import { Box, Typography, TextField, Button, Chip, Paper, Switch, Collapse, Tabs, Tab, IconButton, Tooltip, Dialog, DialogTitle, DialogContent, DialogActions } from '@mui/material'
 import ArrowBackIcon from '@mui/icons-material/ArrowBack'
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline'
 import EditIcon from '@mui/icons-material/Edit'
@@ -10,6 +10,7 @@ import MonitorWeightIcon from '@mui/icons-material/MonitorWeight'
 import DirectionsWalkIcon from '@mui/icons-material/DirectionsWalk'
 import AssignmentIcon from '@mui/icons-material/Assignment'
 import FitnessCenterIcon from '@mui/icons-material/FitnessCenter'
+import MenuBookIcon from '@mui/icons-material/MenuBook'
 import { useApp } from '../context/AppContext'
 import { useBooking } from '../context/BookingContext'
 import { WORKOUT_CATEGORIES } from '../lib/constants'
@@ -401,23 +402,44 @@ function Sparkline({ data, width = 120, height = 36, color = C.purple }) {
 }
 
 // ─── Mini SVG Bar chart (steps) ──────────────────────────────────
-function MiniBarChart({ data, width = 200, height = 48, color = C.purple }) {
+function fmtK(v) {
+  if (!v) return ''
+  if (v >= 1000) return (v / 1000 % 1 === 0 ? v / 1000 : (v / 1000).toFixed(1)) + 'к'
+  return String(v)
+}
+
+function MiniBarChart({ data, width = 200, height = 48, color = C.purple, showValues = false }) {
   if (!data || data.length === 0) return null
   const max = Math.max(...data.map(d => d.value)) || 1
   const barW = Math.min(22, (width - (data.length - 1) * 3) / data.length)
   const gap = 3
-  const labelH = 14
-  const chartH = height - labelH
+  const topLabelH = showValues ? 14 : 0
+  const botLabelH = 14
+  const chartH = height - botLabelH - topLabelH
+  const svgW = data.length * (barW + gap) - gap
   return (
-    <svg width={data.length * (barW + gap) - gap} height={height} style={{ display: 'block' }}>
+    <svg width={svgW} height={height} style={{ display: 'block' }}>
       {data.map((d, i) => {
         const x = i * (barW + gap)
         const barH = Math.max(2, (d.value / max) * (chartH - 2))
-        const y = chartH - barH
+        const y = topLabelH + (chartH - barH)
         return (
           <g key={i}>
-            <rect x={x} y={y} width={barW} height={barH} rx={3} fill={d.value > 0 ? color : 'rgba(255,255,255,0.06)'} opacity={d.value > 0 ? 0.85 : 1} />
-            <text x={x + barW / 2} y={height - 1} textAnchor="middle" fill="rgba(255,255,255,0.35)" fontSize="9" fontFamily="sans-serif">{d.label}</text>
+            {/* value label above bar */}
+            {showValues && d.value > 0 && (
+              <text x={x + barW / 2} y={topLabelH - 2} textAnchor="middle"
+                fill="rgba(255,255,255,0.6)" fontSize="8" fontFamily="sans-serif" fontWeight="700">
+                {fmtK(d.value)}
+              </text>
+            )}
+            <rect x={x} y={y} width={barW} height={barH} rx={3}
+              fill={d.value > 0 ? color : 'rgba(255,255,255,0.06)'}
+              opacity={d.value > 0 ? 0.85 : 1} />
+            {/* day label below bar */}
+            <text x={x + barW / 2} y={height - 1} textAnchor="middle"
+              fill="rgba(255,255,255,0.35)" fontSize="9" fontFamily="sans-serif">
+              {d.label}
+            </text>
           </g>
         )
       })}
@@ -993,15 +1015,22 @@ export function ClientDetail() {
                 <Typography sx={{ fontSize: '13px', color: C.muted }}>{t('noStepsLogs')}</Typography>
               ) : (
                 <>
-                  <Box sx={{ display: 'flex', alignItems: 'flex-end', gap: 1, mb: 2 }}>
-                    <Typography sx={{ fontSize: '32px', fontWeight: 800, color: C.text, lineHeight: 1, fontFamily: "'MontBlanc', sans-serif" }}>
-                      {avgSteps.toLocaleString('bg-BG')}
-                    </Typography>
-                    <Typography sx={{ fontSize: '13px', fontWeight: 600, color: C.muted, mb: '3px' }}>
-                      {t('stepsUnit')} / {t('dayLbl') || 'ден'}
-                    </Typography>
+                  {/* Average + total row */}
+                  <Box sx={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', mb: 0.5 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'flex-end', gap: 1 }}>
+                      <Typography sx={{ fontSize: '32px', fontWeight: 800, color: C.text, lineHeight: 1, fontFamily: "'MontBlanc', sans-serif" }}>
+                        {avgSteps.toLocaleString('bg-BG')}
+                      </Typography>
+                      <Typography sx={{ fontSize: '13px', fontWeight: 600, color: C.muted, mb: '3px' }}>
+                        {t('stepsUnit')} / {t('dayLbl') || 'ден'}
+                      </Typography>
+                    </Box>
                   </Box>
-                  <MiniBarChart data={barData} width={240} height={56} color={C.purple} />
+                  {/* Total & days context */}
+                  <Typography sx={{ fontSize: '11px', color: C.muted, mb: 2 }}>
+                    {`Общо: ${stepsWithData.reduce((s, x) => s + x.value, 0).toLocaleString('bg-BG')} стъпки за ${stepsWithData.length} ${stepsWithData.length === 1 ? 'ден' : 'дни'} от последните 7`}
+                  </Typography>
+                  <MiniBarChart data={barData} width={240} height={72} color={C.purple} showValues />
                 </>
               )}
             </Paper>
@@ -1014,7 +1043,7 @@ export function ClientDetail() {
 
 // ─── Client / tracker view ────────────────────────────────────────
 function DashboardClient({ isCoachView = false }) {
-  const { client, auth, t, setView, viewingCoach } = useApp()
+  const { client, auth, t, setView, viewingCoach, feedPosts, postReactions, postComments, markFeedSeen, setPendingProgressTab } = useApp()
   const { slots, myBookings, myPlan, bookingBusy, loadSlots, loadMyBookings, loadMyPlan, cancelBookingForSlot } = useBooking()
 
   const [tab, setTab] = useState(0)
@@ -1043,6 +1072,26 @@ function DashboardClient({ isCoachView = false }) {
   // Recorded workouts this week
   const weekWorkouts = (client.workouts || []).filter(w => w.date >= weekStartStr && w.date <= weekEndStr)
 
+  // ── Daily streak (food OR weight OR steps) ──
+  const streak = (() => {
+    const mealDates   = new Set((client.meals      || []).map(m => m.date))
+    const weightDates = new Set((client.weightLogs || []).map(w => w.date))
+    const stepsDates  = new Set((client.stepsLogs  || []).map(s => s.date))
+    let count = 0
+    const now = new Date()
+    for (let i = 0; i < 365; i++) {
+      const d = new Date(now)
+      d.setDate(now.getDate() - i)
+      const dd = String(d.getDate()).padStart(2, '0')
+      const mm = String(d.getMonth() + 1).padStart(2, '0')
+      const yyyy = d.getFullYear()
+      const key = `${dd}.${mm}.${yyyy}`
+      if (mealDates.has(key) || weightDates.has(key) || stepsDates.has(key)) count++
+      else break
+    }
+    return count
+  })()
+
   // ─── Coach tracker view (with tabs) ───
   if (isCoachView) {
     return (
@@ -1062,8 +1111,27 @@ function DashboardClient({ isCoachView = false }) {
           </Typography>
         </Box>
 
-        <Box sx={{ mb: 2.5, animation: `fadeInUp 0.22s ${EASE.decelerate} both` }}>
+        <Box sx={{ mb: 2.5, animation: `fadeInUp 0.22s ${EASE.decelerate} both`, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <Typography variant="h2" sx={{ mb: 0.5 }}>{title}</Typography>
+          <Box sx={{
+            display: 'flex', flexDirection: 'column', alignItems: 'center',
+            px: 1.5, py: 1, borderRadius: '14px',
+            background: streak > 0
+              ? 'linear-gradient(135deg, rgba(255,180,0,0.12) 0%, rgba(255,100,0,0.08) 100%)'
+              : 'rgba(255,255,255,0.03)',
+            border: streak > 0 ? '1px solid rgba(255,160,0,0.3)' : `1px solid ${C.border}`,
+            minWidth: 56, flexShrink: 0,
+          }}>
+            <Typography sx={{ fontSize: '9px', fontWeight: 700, color: streak > 0 ? 'rgba(255,180,0,0.6)' : C.muted, textTransform: 'uppercase', letterSpacing: '0.5px', mb: 0.25 }}>
+              Runstreak
+            </Typography>
+            <Typography sx={{ fontSize: '22px', fontWeight: 900, lineHeight: 1, color: streak > 0 ? '#FFB300' : C.muted, fontFamily: "'MontBlanc', sans-serif" }}>
+              {streak}
+            </Typography>
+            <Typography sx={{ fontSize: '8px', fontWeight: 700, color: streak > 0 ? 'rgba(255,180,0,0.6)' : C.muted, textTransform: 'uppercase', letterSpacing: '0.4px', mt: 0.25 }}>
+              {streak === 1 ? 'ден подред' : 'дни подред'}
+            </Typography>
+          </Box>
         </Box>
 
         <Tabs
@@ -1143,76 +1211,55 @@ function DashboardClient({ isCoachView = false }) {
     <>
       <ReminderBanners />
 
-      {/* ── Greeting ── */}
-      <Box sx={{ mb: 2, animation: `fadeInUp 0.22s ${EASE.decelerate} both` }}>
-        <Typography variant="h2" sx={{ mb: 0.5 }}>{title}</Typography>
-        <Typography sx={{ color: C.muted, fontSize: '14px' }}>{t('yourProgress')}</Typography>
+      {/* ── Greeting + Streak ── */}
+      <Box sx={{ mb: 2, animation: `fadeInUp 0.22s ${EASE.decelerate} both`, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <Box>
+          <Typography variant="h2" sx={{ mb: 0.5 }}>{title}</Typography>
+          <Typography sx={{ color: C.muted, fontSize: '14px' }}>{t('yourProgress')}</Typography>
+        </Box>
+        <Box sx={{
+          display: 'flex', flexDirection: 'column', alignItems: 'center',
+          px: 1.5, py: 1, borderRadius: '14px',
+          background: streak > 0
+            ? 'linear-gradient(135deg, rgba(255,180,0,0.12) 0%, rgba(255,100,0,0.08) 100%)'
+            : 'rgba(255,255,255,0.03)',
+          border: streak > 0
+            ? '1px solid rgba(255,160,0,0.3)'
+            : `1px solid ${C.border}`,
+          minWidth: 56, flexShrink: 0,
+        }}>
+          <Typography sx={{
+            fontSize: '9px', fontWeight: 700,
+            color: streak > 0 ? 'rgba(255,180,0,0.6)' : C.muted,
+            textTransform: 'uppercase', letterSpacing: '0.5px', mb: 0.25,
+          }}>
+            Runstreak
+          </Typography>
+          <Typography sx={{
+            fontSize: '22px', fontWeight: 900, lineHeight: 1,
+            color: streak > 0 ? '#FFB300' : C.muted,
+            fontFamily: "'MontBlanc', sans-serif",
+          }}>
+            {streak}
+          </Typography>
+          <Typography sx={{
+            fontSize: '8px', fontWeight: 700,
+            color: streak > 0 ? 'rgba(255,180,0,0.6)' : C.muted,
+            textTransform: 'uppercase', letterSpacing: '0.4px', mt: 0.25,
+          }}>
+            {streak === 1 ? 'ден подред' : 'дни подред'}
+          </Typography>
+        </Box>
       </Box>
 
-      {/* ── Next session ── */}
-      {showBooking && myPlan && (
-        <Paper sx={{ p: 1.5, px: 2, mb: 1.5, borderRadius: '14px', border: `1px solid ${C.border}`,
-          display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Box>
-            <Typography sx={{ fontSize: '11px', color: C.muted, fontWeight: 700, letterSpacing: '0.5px', mb: 0.25 }}>
-              {t('nextSessionLbl')}
-            </Typography>
-            <Typography sx={{ fontSize: '14px', fontWeight: 700, color: nextSession ? C.text : C.muted }}>
-              {nextSession ? `${bgDate(nextSession.slot.slot_date)}, ${nextSession.slot.start_time?.slice(0,5)}` : t('noUpcoming')}
-            </Typography>
-          </Box>
-          {nextSession && !isCoachView && (
-            <Button size="small" disabled={bookingBusy}
-              onClick={() => cancelBookingForSlot(nextSession.slot.id)}
-              sx={{
-                fontSize: '11px', py: '4px', px: 1.5,
-                color: '#F87171', border: '1px solid rgba(248,113,113,0.3)',
-                borderRadius: '100px',
-                '&:hover': { background: 'rgba(248,113,113,0.08)', borderColor: '#F87171' },
-              }}>
-              {t('cancelBookingBtn')}
-            </Button>
-          )}
-        </Paper>
-      )}
-
-      {/* ── Plan info: Credits + Expiry ── */}
-      {showBooking && myPlan && (
-        <Box sx={{ display: 'flex', gap: 1.5, mb: 2 }}>
-          <Paper sx={{ flex: 1, p: 2, textAlign: 'center', borderRadius: '18px', border: `1px solid ${C.border}` }}>
-            <Typography sx={{ fontSize: '32px', fontWeight: 800, color: C.text, fontFamily: "'MontBlanc', sans-serif", lineHeight: 1 }}>
-              {myPlan.plan_type === 'unlimited' ? '∞' : credits}
-            </Typography>
-            <Typography sx={{ fontSize: '12px', color: C.muted, fontWeight: 600, mt: 0.75 }}>
-              {t('remainingSessionsLbl')}
-            </Typography>
-          </Paper>
-          <Paper sx={{ flex: 1, p: 2, textAlign: 'center', borderRadius: '18px', border: `1px solid ${C.border}` }}>
-            <Typography sx={{ fontSize: '16px', fontWeight: 700, color: C.text, lineHeight: 1.2 }}>
-              {fmtValidTo(myPlan)}
-            </Typography>
-            <Typography sx={{ fontSize: '12px', color: C.muted, fontWeight: 600, mt: 0.75 }}>
-              {daysLeft !== null && daysLeft > 0
-                ? `${t('expiresInLbl')} ${daysLeft} ${t('daysLbl')}`
-                : daysLeft !== null && daysLeft <= 0 ? t('planExpired') : t('validUntil')}
-            </Typography>
-          </Paper>
-        </Box>
-      )}
-
-      {showBooking && !myPlan && (
-        <Paper sx={{ p: '14px 16px', mb: 2, borderRadius: '16px', border: '1px solid rgba(248,113,113,0.3)', background: 'rgba(248,113,113,0.06)' }}>
-          <Typography sx={{ fontSize: '14px', color: '#F87171', fontWeight: 700 }}>{t('noPlan')}</Typography>
-        </Paper>
-      )}
-
-      {/* ── +Добави храна / +Добави тегло ── */}
-      <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1.5 }}>
+      {/* ── Action buttons (compact) ── */}
+      <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 1 }}>
         {[
           hasModule(auth.modules, 'nutrition_tracking') && { key: 'food', view: 'food', color: '#5EC6D0', Icon: RestaurantIcon, label: t('addFoodBtn') },
           hasModule(auth.modules, 'weight_tracking') && { key: 'weight', view: 'weight', color: '#C8C5FF', Icon: MonitorWeightIcon, label: t('addWeightBtn') },
           (hasModule(auth.modules, 'nutrition_tracking') || hasModule(auth.modules, 'weight_tracking')) && { key: 'steps', view: 'steps', color: '#FFD070', Icon: DirectionsWalkIcon, label: t('addStepsBtn') },
           { key: 'workout', view: 'workout', color: '#A78BFA', Icon: FitnessCenterIcon, label: t('addWorkoutBtn') },
+          !isCoachView && { key: 'recipes', view: 'recipes', color: '#5a6e5a', Icon: MenuBookIcon, label: 'Рецепти — скоро' },
           { key: 'tasks', view: 'tasks', color: '#F87171', Icon: AssignmentIcon, label: t('navTasks'),
             badge: (() => {
               const seen = localStorage.getItem(`tasksLastSeen_${client.id}`) || '1970'
@@ -1224,42 +1271,132 @@ function DashboardClient({ isCoachView = false }) {
             setView(view)
           }}
             sx={{
-              p: '16px 12px', borderRadius: '14px', cursor: 'pointer',
+              p: '10px 6px', borderRadius: '12px', cursor: 'pointer',
               border: `1px solid ${color}25`,
               background: `linear-gradient(145deg, ${color}0A 0%, var(--c-cardDeep) 100%)`,
               transition: `all 0.2s ${EASE.standard}`,
-              '&:hover': { transform: 'translateY(-2px)', borderColor: `${color}50`, boxShadow: `0 0 20px ${color}20` },
-              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1, textAlign: 'center',
+              '&:hover': { transform: 'translateY(-1px)', borderColor: `${color}50` },
+              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.75, textAlign: 'center',
               position: 'relative',
             }}>
             <Box sx={{
-              width: 48, height: 48, borderRadius: '12px', mx: 'auto',
+              width: 36, height: 36, borderRadius: '10px',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              background: `${color}28`, border: `2px solid ${color}70`,
-              boxShadow: `0 0 14px ${color}22`,
+              background: `${color}28`, border: `1.5px solid ${color}70`,
               position: 'relative',
             }}>
-              <Icon sx={{ fontSize: 24, color }} />
+              <Icon sx={{ fontSize: 18, color }} />
               {badge > 0 && (
                 <Box sx={{
-                  position: 'absolute', top: -6, right: -6,
-                  width: 20, height: 20, borderRadius: '50%',
+                  position: 'absolute', top: -5, right: -5,
+                  width: 16, height: 16, borderRadius: '50%',
                   background: '#F87171', color: '#fff',
-                  fontSize: '11px', fontWeight: 800,
+                  fontSize: '9px', fontWeight: 800,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  boxShadow: '0 2px 6px rgba(248,113,113,0.5)',
                 }}>
                   {badge}
                 </Box>
               )}
             </Box>
-            <Typography sx={{ fontSize: '13px', fontWeight: 800, color: C.text, lineHeight: 1.3 }}>
+            <Typography sx={{ fontSize: '12px', fontWeight: 700, color: C.text, lineHeight: 1.2 }}>
               {label}
             </Typography>
-            <Typography sx={{ fontSize: '11px', color: C.muted }}>{t('tapToLog')}</Typography>
           </Paper>
         ))}
       </Box>
+
+      {/* ── Recipe preview ── */}
+      {false && !isCoachView && (
+        <Box sx={{ mt: 2.5 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.25 }}>
+            <Typography sx={{ fontSize: '12px', fontWeight: 700, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.6px' }}>
+              Не знаеш какво да хапнеш?
+            </Typography>
+            <Button size="small" onClick={() => setView('recipes')}
+              sx={{ fontSize: '11px', color: C.primary, p: '2px 8px', minWidth: 0, textTransform: 'none' }}>
+              Виж всички →
+            </Button>
+          </Box>
+          <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1 }}>
+            {[
+              { name: 'Омлет с домати', kcal: Math.round(360 * ((client.calorieTarget || 2000) / 2000)), cat: 'Закуска', color: '#FFD070' },
+              { name: 'Пилешко с ориз', kcal: Math.round(480 * ((client.calorieTarget || 2000) / 2000)), cat: 'Обяд', color: '#5EC6D0' },
+            ].map(r => (
+              <Paper key={r.name} onClick={() => setView('recipes')} sx={{
+                p: 1.5, borderRadius: '12px', cursor: 'pointer',
+                border: `1px solid ${C.border}`,
+                background: 'rgba(255,255,255,0.02)',
+                '&:hover': { borderColor: 'rgba(196,233,191,0.25)', transform: 'translateY(-1px)' },
+                transition: `all 0.15s ${EASE.standard}`,
+              }}>
+                <Chip label={r.cat} size="small" sx={{ mb: 0.75, height: 18, fontSize: '10px', fontWeight: 700, color: r.color, background: `${r.color}15`, border: `1px solid ${r.color}30` }} />
+                <Typography sx={{ fontSize: '13px', fontWeight: 700, color: C.text, lineHeight: 1.3, mb: 0.5 }}>{r.name}</Typography>
+                <Typography sx={{ fontSize: '12px', color: '#F97316', fontWeight: 700 }}>{r.kcal} kcal</Typography>
+              </Paper>
+            ))}
+          </Box>
+        </Box>
+      )}
+
+      {/* ── Community preview ── */}
+      {!isCoachView && feedPosts.filter(p => p.author_name !== auth.name).length > 0 && (
+        <Box sx={{ mt: 2.5 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.25 }}>
+            <Typography sx={{ fontSize: '12px', fontWeight: 700, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.6px' }}>
+              {t('communityLbl') || 'Общност'}
+            </Typography>
+            <Button size="small" onClick={() => { markFeedSeen(); setPendingProgressTab('feed'); setView('progress') }}
+              sx={{ fontSize: '11px', color: C.primary, p: '2px 8px', minWidth: 0, textTransform: 'none' }}>
+              {t('seeAllLbl') || 'Виж всички'} →
+            </Button>
+          </Box>
+          {feedPosts
+            .filter(p => p.author_name !== auth.name)
+            .slice(0, 3)
+            .map(post => {
+              const reactions = postReactions.filter(r => r.post_id === post.id).length
+              const comments  = postComments.filter(c => c.post_id === post.id).length
+              return (
+                <Paper key={post.id} onClick={() => { markFeedSeen(); setPendingProgressTab('feed'); setView('progress') }}
+                  sx={{
+                    p: 1.5, mb: 1, borderRadius: '12px', cursor: 'pointer',
+                    border: `1px solid ${C.border}`,
+                    background: 'rgba(255,255,255,0.02)',
+                    '&:hover': { borderColor: C.primaryA20, background: 'rgba(170,169,205,0.05)' },
+                    transition: `all 0.15s ${EASE.standard}`,
+                  }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.75 }}>
+                    <Box sx={{
+                      width: 26, height: 26, borderRadius: '50%', flexShrink: 0,
+                      background: C.primaryA20,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    }}>
+                      <Typography sx={{ fontSize: '11px', fontWeight: 800, color: C.primary }}>
+                        {post.author_name?.[0]?.toUpperCase()}
+                      </Typography>
+                    </Box>
+                    <Typography sx={{ fontSize: '12px', fontWeight: 700, color: C.text }}>
+                      {post.author_name}
+                    </Typography>
+                  </Box>
+                  <Typography sx={{
+                    fontSize: '13px', color: C.text, lineHeight: 1.4,
+                    overflow: 'hidden', display: '-webkit-box',
+                    WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
+                  }}>
+                    {post.content}
+                  </Typography>
+                  {(reactions > 0 || comments > 0) && (
+                    <Box sx={{ display: 'flex', gap: 1.5, mt: 0.75 }}>
+                      {reactions > 0 && <Typography sx={{ fontSize: '11px', color: C.muted }}>{reactions} реакции</Typography>}
+                      {comments  > 0 && <Typography sx={{ fontSize: '11px', color: C.muted }}>{comments} коментара</Typography>}
+                    </Box>
+                  )}
+                </Paper>
+              )
+            })}
+        </Box>
+      )}
     </>
   )
 }
@@ -1362,8 +1499,9 @@ export function ClientSchedule() {
     bookSlot, cancelBookingForSlot,
   } = useBooking()
 
-  const [loaded,    setLoaded]    = useState(false)
-  const [dayOffset, setDayOffset] = useState(0) // first day offset from today
+  const [loaded,      setLoaded]      = useState(false)
+  const [dayOffset,   setDayOffset]   = useState(0) // first day offset from today
+  const [confirmSlot, setConfirmSlot] = useState(null) // slot pending free-pass confirmation
 
   useEffect(() => {
     if (!auth.id) return
@@ -1397,8 +1535,20 @@ export function ClientSchedule() {
     return await bookSlot(slotId)
   }
 
-  async function handleCancel(slotId) {
-    return await cancelBookingForSlot(slotId)
+  async function handleCancel(slotId, opts = {}) {
+    return await cancelBookingForSlot(slotId, opts)
+  }
+
+  async function handleCancelClick(slot) {
+    const check = canClientCancel(slot, myPlan)
+    if (check.lateCancel) { setConfirmSlot(slot); return }
+    await handleCancel(slot.id, {})
+  }
+
+  async function handleConfirmFreePass() {
+    if (!confirmSlot) return
+    setConfirmSlot(null)
+    await handleCancel(confirmSlot.id, { useFreePass: true })
   }
 
   return (
@@ -1407,28 +1557,53 @@ export function ClientSchedule() {
         {t('navBookSlot')}
       </Typography>
 
-      {/* ── Compact header: Credits + My sessions ─────────────── */}
+      {/* ── Compact header: Credits + Expiry + My sessions ──────── */}
+      {!myPlan && (
+        <Paper sx={{ p: '14px 16px', mb: 2.5, borderRadius: '16px', border: '1px solid rgba(248,113,113,0.3)', background: 'rgba(248,113,113,0.06)' }}>
+          <Typography sx={{ fontSize: '14px', color: '#F87171', fontWeight: 700 }}>{t('noPlan')}</Typography>
+        </Paper>
+      )}
       {myPlan && (
         <Box sx={{ mb: 2.5 }}>
-          {/* Remaining credits */}
-          <Paper sx={{
-            p: 1.75, borderRadius: '14px', mb: 1.5,
-            border: `1px solid ${C.primaryA20}`,
-            background: 'linear-gradient(135deg, rgba(170,169,205,0.08) 0%, rgba(170,169,205,0.04) 100%)',
-            display: 'flex', alignItems: 'center', gap: 2,
-          }}>
-            <Typography sx={{ fontSize: '30px', fontWeight: 800, color: C.text, lineHeight: 1 }}>
-              {isUnlim ? '∞' : rem}
-              {!isUnlim && (
-                <Box component="span" sx={{ fontSize: '13px', color: C.muted, fontWeight: 400, ml: 0.75 }}>
-                  / {myPlan.credits_total}
-                </Box>
-              )}
-            </Typography>
-            <Typography sx={{ fontSize: '11px', color: C.muted, fontWeight: 600 }}>
-              {t('remainingSessionsLbl')}
-            </Typography>
-          </Paper>
+          {/* Credits + Expiry side by side */}
+          <Box sx={{ display: 'flex', gap: 1.5, mb: 1.5 }}>
+            <Paper sx={{
+              flex: 1, p: 1.75, borderRadius: '14px',
+              border: `1px solid ${C.primaryA20}`,
+              background: 'linear-gradient(135deg, rgba(170,169,205,0.08) 0%, rgba(170,169,205,0.04) 100%)',
+              textAlign: 'center',
+            }}>
+              <Typography sx={{ fontSize: '30px', fontWeight: 800, color: C.text, lineHeight: 1 }}>
+                {isUnlim ? '∞' : rem}
+                {!isUnlim && (
+                  <Box component="span" sx={{ fontSize: '13px', color: C.muted, fontWeight: 400, ml: 0.5 }}>
+                    / {myPlan.credits_total}
+                  </Box>
+                )}
+              </Typography>
+              <Typography sx={{ fontSize: '11px', color: C.muted, fontWeight: 600, mt: 0.5 }}>
+                {t('remainingSessionsLbl')}
+              </Typography>
+            </Paper>
+            <Paper sx={{
+              flex: 1, p: 1.75, borderRadius: '14px',
+              border: `1px solid ${C.border}`,
+              background: 'rgba(255,255,255,0.03)',
+              textAlign: 'center',
+            }}>
+              <Typography sx={{ fontSize: '16px', fontWeight: 700, color: C.text, lineHeight: 1.3 }}>
+                {fmtValidTo(myPlan)}
+              </Typography>
+              <Typography sx={{ fontSize: '11px', color: C.muted, fontWeight: 600, mt: 0.5 }}>
+                {(() => {
+                  const dl = daysUntilExpiry(myPlan)
+                  return dl !== null && dl > 0
+                    ? `${t('expiresInLbl')} ${dl} ${t('daysLbl')}`
+                    : dl !== null && dl <= 0 ? t('planExpired') : t('validUntil')
+                })()}
+              </Typography>
+            </Paper>
+          </Box>
 
           {/* My sessions list */}
           <Paper sx={{
@@ -1457,9 +1632,9 @@ export function ClientSchedule() {
                       {fmtTime(slot.start_time)} – {fmtTime(slot.end_time)} · {slot.coach_name}
                     </Typography>
                   </Box>
-                  {canClientCancel(slot).ok && (
+                  {canClientCancel(slot, myPlan).ok && (
                     <Button size="small" disabled={bookingBusy}
-                      onClick={() => handleCancel(slot.id)}
+                      onClick={() => handleCancelClick(slot)}
                       sx={{
                         minWidth: 'auto', fontSize: '11px', py: '4px', px: 1.25,
                         color: '#F87171', border: '1px solid rgba(248,113,113,0.3)',
@@ -1550,7 +1725,7 @@ export function ClientSchedule() {
                     daySlots.map(slot => {
                       const isBooked    = (myBookings || []).some(b => b.slot_id === slot.id && b.status === 'active')
                       const bookCheck   = !isBooked ? canClientBook(slot, myPlan, myBookings || []) : { ok: false }
-                      const cancelCheck = isBooked  ? canClientCancel(slot) : { ok: false }
+                      const cancelCheck = isBooked  ? canClientCancel(slot, myPlan) : { ok: false }
                       const isFull      = (slot.booked_count || 0) >= slot.capacity
                       const freeCount   = slot.capacity - (slot.booked_count || 0)
 
@@ -1599,10 +1774,11 @@ export function ClientSchedule() {
                               </Typography>
                               {cancelCheck.ok && (
                                 <Button size="small" fullWidth disabled={bookingBusy}
-                                  onClick={() => handleCancel(slot.id)}
+                                  onClick={() => handleCancelClick(slot)}
                                   sx={{
                                     fontSize: '10px', py: 0.4,
-                                    border: `1px solid rgba(248,113,113,0.3)`, color: '#F87171',
+                                    border: `1px solid ${cancelCheck.lateCancel ? 'rgba(248,113,113,0.6)' : 'rgba(248,113,113,0.3)'}`,
+                                    color: '#F87171',
                                     borderRadius: '8px',
                                     '&:hover': { border: '1px solid #F87171', background: 'rgba(248,113,113,0.08)' },
                                     '&.Mui-disabled': { opacity: 0.5 },
@@ -1638,6 +1814,30 @@ export function ClientSchedule() {
           </Box>
         </>
       )}
+
+      {/* Free-pass confirmation dialog */}
+      <Dialog open={!!confirmSlot} onClose={() => setConfirmSlot(null)} maxWidth="xs" fullWidth
+        PaperProps={{ sx: { background: '#1e1e2e', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '20px' } }}>
+        <DialogTitle sx={{ fontWeight: 800, fontSize: '15px' }}>
+          {lang === 'bg' ? 'Безплатна отмяна' : 'Free cancellation'}
+        </DialogTitle>
+        <DialogContent>
+          <Typography sx={{ fontSize: '13px', color: 'rgba(255,255,255,0.7)', lineHeight: 1.6 }}>
+            {lang === 'bg'
+              ? 'Часът е по-малко от 24ч. Ще използваш безплатната си отмяна за този абонамент. Следваща отмяна в последния момент ще изгори кредит.'
+              : 'This session is less than 24h away. You will use your free late cancellation for this subscription. Next last-minute cancel will consume a credit.'}
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2, gap: 1 }}>
+          <Button onClick={() => setConfirmSlot(null)} sx={{ color: 'rgba(255,255,255,0.5)' }}>
+            {lang === 'bg' ? 'Назад' : 'Back'}
+          </Button>
+          <Button variant="contained" onClick={handleConfirmFreePass}
+            sx={{ background: '#F87171', color: '#fff', fontWeight: 700, '&:hover': { background: '#ef4444' } }}>
+            {lang === 'bg' ? 'Отмени часа' : 'Cancel session'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   )
 }

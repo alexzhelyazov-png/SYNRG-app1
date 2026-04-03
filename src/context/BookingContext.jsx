@@ -90,6 +90,7 @@ export function BookingProvider({ children }) {
       const slot = slots.find(s => s.id === slotId)
       const timeInfo = slot ? `${slot.slot_date} ${slot.start_time?.slice(0, 5)}` : ''
       DB.insertNotification(auth.name, auth.name, 'booking', `${auth.name} си записа час: ${timeInfo}`)
+      DB.notifyBookingChange('booking', auth.name, slot?.slot_date || '', slot?.start_time?.slice(0, 5) || '')
       return { ok: true }
     } catch (e) {
       return { error: e.message || 'Грешка при записване' }
@@ -99,7 +100,7 @@ export function BookingProvider({ children }) {
   }, [auth, slots, loadSlots, loadMyBookings, loadMyPlan])
 
   // ── Client: cancel booking ────────────────────────────────
-  const cancelBookingForSlot = useCallback(async (slotId) => {
+  const cancelBookingForSlot = useCallback(async (slotId, { useFreePass = false } = {}) => {
     setBookingBusy(true)
     try {
       const slot = slots.find(s => s.id === slotId)
@@ -108,16 +109,21 @@ export function BookingProvider({ children }) {
         p_client_id: auth.id,
       })
       if (result?.error) return { error: result.error }
+      // Mark free pass as used on the active plan
+      if (useFreePass && myPlan?.id) {
+        await DB.update('client_plans', myPlan.id, { late_cancel_used: true })
+      }
       await Promise.all([loadSlots(), loadMyBookings(auth.id), loadMyPlan(auth.id)])
       const timeInfo = slot ? `${slot.slot_date} ${slot.start_time?.slice(0, 5)}` : ''
       DB.insertNotification(auth.name, auth.name, 'cancel', `${auth.name} отмени час: ${timeInfo}`)
+      DB.notifyBookingChange('cancel', auth.name, slot?.slot_date || '', slot?.start_time?.slice(0, 5) || '')
       return { ok: true }
     } catch (e) {
       return { error: e.message || 'Грешка при отказ' }
     } finally {
       setBookingBusy(false)
     }
-  }, [auth, slots, loadSlots, loadMyBookings, loadMyPlan])
+  }, [auth, myPlan, slots, loadSlots, loadMyBookings, loadMyPlan])
 
   // Coach/admin cancels a booking on behalf of a specific client
   const cancelBookingForClient = useCallback(async (slotId, clientId) => {
@@ -325,9 +331,11 @@ export function BookingProvider({ children }) {
       if (result?.error) return { error: result.error }
       await loadSlots()
       await loadSlotBookings([slotId])
+      const slot = slots.find(s => s.id === slotId)
+      DB.notifyBookingChange('booking', clientName, slot?.slot_date || '', slot?.start_time?.slice(0, 5) || '')
       return { ok: true }
     } catch (e) { return { error: e.message } }
-  }, [loadSlots, loadSlotBookings])
+  }, [loadSlots, loadSlotBookings, slots])
 
   // ── Admin: manually remove client from slot ───────────────
   const adminRemoveFromSlot = useCallback(async (slotId, clientId, returnCredit = true) => {
@@ -338,11 +346,14 @@ export function BookingProvider({ children }) {
         p_return_credit: returnCredit,
       })
       if (result?.error) return { error: result.error }
+      const slot = slots.find(s => s.id === slotId)
+      const booking = slotBookings[slotId]?.find(b => b.client_id === clientId)
+      DB.notifyBookingChange('cancel', booking?.client_name || 'Клиент', slot?.slot_date || '', slot?.start_time?.slice(0, 5) || '')
       await loadSlots()
       await loadSlotBookings([slotId])
       return { ok: true }
     } catch (e) { return { error: e.message } }
-  }, [loadSlots, loadSlotBookings])
+  }, [loadSlots, loadSlotBookings, slots, slotBookings])
 
   return (
     <BookingCtx.Provider value={{

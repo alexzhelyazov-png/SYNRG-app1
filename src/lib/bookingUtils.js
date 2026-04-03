@@ -94,11 +94,14 @@ export function canClientBook(slot, plan, myBookings = []) {
   return { ok: true }
 }
 
-export function canClientCancel(slot) {
+export function canClientCancel(slot, plan) {
   if (!slot) return { ok: false, reason: 'Слотът не е намерен' }
-  if (hoursUntilSlot(slot) < 2)
-    return { ok: false, reason: 'Отказването е възможно до 2 часа предварително' }
-  return { ok: true }
+  const hours = hoursUntilSlot(slot)
+  // Normal case: more than 24h away — free cancel
+  if (hours >= 24) return { ok: true, lateCancel: false }
+  // Within 24h — only allowed if free pass not yet used this subscription
+  if (plan && !plan.late_cancel_used) return { ok: true, lateCancel: true }
+  return { ok: false, reason: 'Отмяна е възможна само до 24ч предварително' }
 }
 
 // ── Date helpers ──────────────────────────────────────────────

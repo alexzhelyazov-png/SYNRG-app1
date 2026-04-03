@@ -111,17 +111,53 @@ Deno.serve(async (req: Request) => {
         status: "active",
       });
 
-      // 2. Get current client modules
-      const clients = await sbQuery("clients", `?select=modules&id=eq.${client_id}`);
+      // 2. Get current client modules + email for confirmation
+      const clients = await sbQuery("clients", `?select=modules,email,name&id=eq.${client_id}`);
       const currentModules: string[] = clients?.[0]?.modules || [];
 
       // 3. Merge remote modules (don't duplicate, don't override existing)
       const merged = [...new Set([...currentModules, ...REMOTE_MODULES])];
 
-      // 4. Update client modules if changed
-      if (merged.length !== currentModules.length) {
-        await sbPatch("clients", client_id, { modules: merged });
-        console.log(`Updated modules for client ${client_id}:`, merged);
+      // 4. Update client modules + account_type
+      const modulesChanged = merged.length !== currentModules.length;
+      await sbPatch("clients", client_id, {
+        ...(modulesChanged ? { modules: merged } : {}),
+        account_type: "online",
+      });
+      if (modulesChanged) console.log(`Updated modules for client ${client_id}:`, merged);
+
+      // 5. Send purchase confirmation email via Brevo
+      const clientRow = clients?.[0];
+      const clientEmail = clientRow?.email;
+      const clientName  = clientRow?.name || "клиент";
+      if (clientEmail) {
+        const amountDisplay = session.amount_total
+          ? (session.amount_total / 100).toFixed(0) + " " + (session.currency?.toUpperCase() || "BGN")
+          : "";
+        const html = `<div style="font-family:sans-serif;padding:24px;background:#1a1a1a;color:#e0e0e0;border-radius:16px;max-width:520px">`
+          + `<h2 style="color:#c4e9bf;margin:0 0 16px">Успешна покупка!</h2>`
+          + `<p>Здравей, <strong>${clientName}</strong>!</p>`
+          + `<p>Плащането ти е потвърдено${amountDisplay ? " (" + amountDisplay + ")" : ""}.</p>`
+          + `<p>Достъпът до програмата е активиран. Отвори приложението и ще намериш съдържанието в секция <strong>Програми</strong>.</p>`
+          + `<hr style="border:none;border-top:1px solid #333;margin:20px 0">`
+          + `<p style="font-size:12px;color:#666">SYNRG Beyond Fitness</p></div>`;
+        try {
+          await fetch(`${SUPABASE_URL}/functions/v1/mailerlite-sync`, {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${Deno.env.get("SUPABASE_ANON_KEY") || ""}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              action: "send_email",
+              email: clientEmail,
+              name: clientName,
+              fields: {},
+              subject: "Успешна покупка — SYNRG Beyond Fitness",
+              html,
+            }),
+          });
+        } catch (e) { console.warn("Email send failed:", e); }
       }
 
       console.log(`Purchase recorded for client ${client_id}, program ${program_id}`);

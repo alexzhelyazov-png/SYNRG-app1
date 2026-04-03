@@ -1,9 +1,9 @@
 import { useState } from 'react'
-import { Box, Typography, Paper, Chip, Dialog, TextField, Button, IconButton } from '@mui/material'
+import { Box, Typography, Paper, Dialog, IconButton, Chip } from '@mui/material'
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline'
-import SendIcon from '@mui/icons-material/Send'
 import { useApp } from '../context/AppContext'
 import { C, EASE } from '../theme'
+import CommunityFeed from './CommunityFeed'
 import { ALLTIME_BADGES, MONTHLY_BADGES, TIER_COLORS, getLevelName } from '../lib/gamification'
 import MonitorWeightIcon        from '@mui/icons-material/MonitorWeight'
 import RestaurantIcon           from '@mui/icons-material/Restaurant'
@@ -40,13 +40,39 @@ const PODIUM_H     = [130, 110, 90]
 const PODIUM_ORDER = [1, 0, 2] // 2nd, 1st, 3rd in display order
 
 export default function Ranking() {
-  const { auth, ranking, t, lang, feedPosts, addFeedPost, deleteFeedPost } = useApp()
+  const { auth, ranking, t, lang, markFeedSeen } = useApp()
   const isMobile = window.innerWidth < 640
   const [viewProfile, setViewProfile] = useState(null)
-  const [postText, setPostText] = useState('')
+  const [tab, setTab] = useState('ranking') // 'ranking' | 'feed'
+
+  function switchTab(key) {
+    setTab(key)
+    if (key === 'feed' && markFeedSeen) markFeedSeen()
+  }
 
   return (
     <>
+      {/* ── Sub-tabs (coach view) ─────────────────────── */}
+      <Box sx={{ display: 'flex', gap: 0.75, mb: 3 }}>
+        {[
+          { key: 'ranking', label: t('navRanking') },
+          { key: 'feed',    label: lang === 'bg' ? 'Стена' : 'Feed' },
+        ].map(({ key, label }) => (
+          <Box key={key} onClick={() => switchTab(key)} sx={{
+            px: 2.5, py: 1, borderRadius: '100px', cursor: 'pointer',
+            fontSize: '14px', fontWeight: 700,
+            background: tab === key ? 'rgba(196,233,191,0.15)' : 'transparent',
+            color: tab === key ? '#c4e9bf' : 'rgba(255,255,255,0.5)',
+            border: `1px solid ${tab === key ? '#c4e9bf' : 'rgba(255,255,255,0.12)'}`,
+            transition: 'all 0.22s',
+          }}>
+            {label}
+          </Box>
+        ))}
+      </Box>
+
+      {tab === 'feed' && <CommunityFeed />}
+      {tab === 'ranking' && <>
       {/* ── Header ────────────────────────────────────── */}
       <Box sx={{
         mb:        3.5,
@@ -328,93 +354,7 @@ export default function Ranking() {
       }}>
         {t('rankFooterXP')}
       </Typography>
-
-      {/* ── Community Feed ────────────────────────────────── */}
-      <Paper sx={{ mt: 4, p: 2.5, animation: `fadeInUp 0.3s ${EASE.decelerate} 0.5s both` }}>
-        <Typography variant="h3" sx={{ mb: 2 }}>{t('feedTitle')}</Typography>
-
-        {/* Post input */}
-        <Box sx={{ display: 'flex', gap: 1, mb: 2.5 }}>
-          <TextField
-            fullWidth size="small"
-            placeholder={t('feedPlaceholder')}
-            value={postText}
-            onChange={e => setPostText(e.target.value)}
-            onKeyDown={e => {
-              if (e.key === 'Enter' && !e.shiftKey && postText.trim()) {
-                e.preventDefault()
-                addFeedPost(postText.trim())
-                setPostText('')
-              }
-            }}
-            multiline maxRows={3}
-            sx={{
-              '& .MuiInputBase-input': { color: C.text, fontSize: '14px' },
-              '& .MuiOutlinedInput-notchedOutline': { borderColor: C.border },
-            }}
-          />
-          <Button variant="contained" size="small" disabled={!postText.trim()}
-            onClick={() => { addFeedPost(postText.trim()); setPostText('') }}
-            sx={{ background: C.primary, color: C.primaryOn, fontWeight: 700, minWidth: 0, px: 2, alignSelf: 'flex-end' }}>
-            <SendIcon sx={{ fontSize: 18 }} />
-          </Button>
-        </Box>
-
-        {/* Posts list */}
-        {feedPosts.length === 0 ? (
-          <Typography sx={{ color: C.muted, fontSize: '13px', textAlign: 'center', py: 2 }}>
-            {t('feedEmpty')}
-          </Typography>
-        ) : (
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-            {feedPosts.slice(0, 50).map((post, i) => {
-              const isOwn = post.client_id === auth.id || post.author_name === auth.name
-              const isCoach = auth.role === 'coach' || auth.role === 'admin'
-              const diff = Date.now() - new Date(post.created_at).getTime()
-              const mins = Math.floor(diff / 60000)
-              const timeStr = mins < 1 ? (lang === 'bg' ? 'сега' : 'now')
-                : mins < 60 ? `${mins} ${lang === 'bg' ? 'мин.' : 'min'}`
-                : mins < 1440 ? `${Math.floor(mins / 60)} ${lang === 'bg' ? 'ч.' : 'h'}`
-                : `${Math.floor(mins / 1440)} ${lang === 'bg' ? 'д.' : 'd'}`
-              return (
-                <Box key={post.id} sx={{
-                  display: 'flex', gap: 1.5, py: 1.5,
-                  borderBottom: i < feedPosts.length - 1 ? `1px solid ${C.border}` : 'none',
-                  animation: `fadeIn 0.2s ${EASE.standard} both`,
-                  animationDelay: `${i * 0.03}s`,
-                }}>
-                  <Box sx={{
-                    width: 32, height: 32, borderRadius: '50%', flexShrink: 0,
-                    background: isOwn ? C.primaryContainer : 'rgba(255,255,255,0.08)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: '13px', fontWeight: 800, color: isOwn ? C.purple : C.muted,
-                  }}>
-                    {(post.author_name || '?').charAt(0).toUpperCase()}
-                  </Box>
-                  <Box sx={{ flex: 1, minWidth: 0 }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.25 }}>
-                      <Typography sx={{ fontSize: '13px', fontWeight: 700, color: isOwn ? C.purple : C.text }}>
-                        {post.author_name}
-                      </Typography>
-                      <Typography sx={{ fontSize: '11px', color: C.muted }}>{timeStr}</Typography>
-                    </Box>
-                    <Typography sx={{ fontSize: '14px', color: C.text, lineHeight: 1.5, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
-                      {post.content}
-                    </Typography>
-                  </Box>
-                  {(isOwn || isCoach) && (
-                    <IconButton size="small" onClick={() => deleteFeedPost(post.id)}
-                      sx={{ color: C.muted, opacity: 0.4, alignSelf: 'flex-start', p: 0.5,
-                        '&:hover': { opacity: 1, color: '#F87171' } }}>
-                      <DeleteOutlineIcon sx={{ fontSize: 14 }} />
-                    </IconButton>
-                  )}
-                </Box>
-              )
-            })}
-          </Box>
-        )}
-      </Paper>
+      </>}
 
       {/* ── Badge Profile Dialog ── */}
       {viewProfile && (() => {

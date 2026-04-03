@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect, useRef } from 'react'
 import { Box, Typography, Dialog, IconButton } from '@mui/material'
 import Ranking from './Ranking'
+import CommunityFeed from './CommunityFeed'
 import { useApp } from '../context/AppContext'
 import { C, EASE } from '../theme'
 import {
@@ -62,24 +63,46 @@ function BadgeIcon({ muiIcon, size = 24, color: clr = C.muted }) {
    Main Progress page — Gamification v3
    ═══════════════════════════════════════════════════════════════ */
 export default function Progress() {
-  const { client, auth, ranking, t, lang, dismissBadge } = useApp()
+  const { client, auth, ranking, t, lang, dismissBadge, markFeedSeen, feedPosts, postComments, unreadFeedCount, pendingProgressTab, setPendingProgressTab } = useApp()
   const isMobile = window.innerWidth < 640
   const [selectedBadge, setSelectedBadge] = useState(null)
-  const [tab, setTab] = useState('progress') // 'progress' | 'ranking'
+  const [tab, setTab] = useState(() => pendingProgressTab || 'progress') // 'progress' | 'ranking' | 'feed'
+
+  // Consume pending deep-link tab once on mount
+  useEffect(() => {
+    if (pendingProgressTab) {
+      setTab(pendingProgressTab)
+      if (pendingProgressTab === 'feed' && markFeedSeen) markFeedSeen()
+      setPendingProgressTab(null)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  function switchTab(key) {
+    setTab(key)
+    if (key === 'feed' && markFeedSeen) markFeedSeen()
+  }
+
+  // ── Enrich client with community data for badge evaluation ──
+  const clientWithCommunity = useMemo(() => ({
+    ...client,
+    communityPosts:    feedPosts.filter(p => p.author_name === client.name),
+    communityComments: postComments.filter(c => c.author_name === client.name),
+  }), [client, feedPosts, postComments])
 
   // ── All-time gamification data ─────────────────────────────
-  const earnedIds  = useMemo(() => evaluateBadges(client), [client.meals, client.weightLogs, client.workouts, client.stepsLogs])
+  const earnedIds  = useMemo(() => evaluateBadges(clientWithCommunity), [clientWithCommunity])
   const earnedSet  = useMemo(() => new Set(earnedIds), [earnedIds])
-  const totalXP    = useMemo(() => computeTotalXP(earnedIds, client), [earnedIds, client])
+  const totalXP    = useMemo(() => computeTotalXP(earnedIds, clientWithCommunity), [earnedIds, clientWithCommunity])
   const levelData  = useMemo(() => computeLevel(totalXP), [totalXP])
   const levelName  = getLevelName(levelData.level, lang)
-  const nextBadges = useMemo(() => getNextBadges(client, earnedIds, 3), [client, earnedIds])
+  const nextBadges = useMemo(() => getNextBadges(clientWithCommunity, earnedIds, 3), [clientWithCommunity, earnedIds])
 
   // ── Monthly gamification data ──────────────────────────────
   const currentMonthKey   = useMemo(() => getCurrentMonthKey(), [])
-  const monthlyEarnedIds  = useMemo(() => evaluateMonthlyBadgesForMonth(client, currentMonthKey), [client, currentMonthKey])
+  const monthlyEarnedIds  = useMemo(() => evaluateMonthlyBadgesForMonth(clientWithCommunity, currentMonthKey), [clientWithCommunity, currentMonthKey])
   const monthlyEarnedSet  = useMemo(() => new Set(monthlyEarnedIds), [monthlyEarnedIds])
-  const monthlyXP         = useMemo(() => computeMonthlyXP(client), [client])
+  const monthlyXP         = useMemo(() => computeMonthlyXP(clientWithCommunity), [clientWithCommunity])
 
   // ── Monthly badge series for grid ──────────────────────────
   const monthlySeriesKeys = useMemo(() => {
@@ -168,8 +191,12 @@ export default function Progress() {
     <>
       {/* ── Sub-tabs ────────────────────────────────────────── */}
       <Box sx={{ display: 'flex', gap: 0.75, mb: 3 }}>
-        {['progress', 'ranking'].map(key => (
-          <Box key={key} onClick={() => setTab(key)} sx={{
+        {[
+          { key: 'progress', label: lang === 'bg' ? 'Моите значки' : 'My Badges' },
+          { key: 'ranking',  label: t('navRanking') },
+          { key: 'feed',     label: lang === 'bg' ? 'Стена' : 'Feed', badge: unreadFeedCount },
+        ].map(({ key, label, badge }) => (
+          <Box key={key} onClick={() => switchTab(key)} sx={{
             px: 2.5, py: 1, borderRadius: '100px', cursor: 'pointer',
             fontSize: '14px', fontWeight: 700,
             background: tab === key ? C.primary : 'transparent',
@@ -177,13 +204,26 @@ export default function Progress() {
             border: `1px solid ${tab === key ? C.primary : C.loganBorder}`,
             transition: 'all 0.22s',
             '&:hover': tab === key ? {} : { borderColor: C.logan, background: C.loganDeep },
+            display: 'flex', alignItems: 'center', gap: 0.75, position: 'relative',
           }}>
-            {key === 'progress' ? t('navProgress') : t('navRanking')}
+            {label}
+            {badge > 0 && tab !== key && (
+              <Box sx={{
+                minWidth: 18, height: 18, borderRadius: '9px',
+                background: '#F87171', color: '#fff',
+                fontSize: '10px', fontWeight: 900,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                px: 0.5, lineHeight: 1,
+              }}>
+                {badge > 9 ? '9+' : badge}
+              </Box>
+            )}
           </Box>
         ))}
       </Box>
 
       {tab === 'ranking' && <Ranking />}
+      {tab === 'feed'    && <CommunityFeed />}
       {tab === 'progress' && <>
       {/* ── Header ───────────────────────────────────────────── */}
       <Box sx={{ mb: 2.5 }}>
@@ -197,7 +237,7 @@ export default function Progress() {
 
       {/* ── Mini Leaderboard ─────────────────────────────────── */}
       {ranking.length >= 2 && (
-        <Box onClick={() => setTab('ranking')} sx={{
+        <Box onClick={() => switchTab('ranking')} sx={{
           mb: 2, p: 1.5, borderRadius: '14px', cursor: 'pointer',
           border: `1px solid ${C.border}`,
           background: 'rgba(255,255,255,0.02)',

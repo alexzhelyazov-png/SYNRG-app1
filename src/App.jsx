@@ -27,6 +27,7 @@ import WeightTracker  from './pages/WeightTracker'
 import Progress, { BadgeUnlockedToast, LevelUpCelebration } from './pages/Progress'
 import Ranking        from './pages/Ranking'
 import Tasks, { AllClientsTasks } from './pages/Tasks'
+import SynrgMethod from './pages/SynrgMethod'
 import Booking        from './pages/Booking'
 import Schedule       from './pages/Schedule'
 import Admin          from './pages/Admin'
@@ -34,6 +35,7 @@ import Programs       from './pages/Programs'
 import StepsTracker   from './pages/StepsTracker'
 import ClientWorkout  from './pages/ClientWorkout'
 import Notifications  from './pages/Notifications'
+import Recipes        from './pages/Recipes'
 
 import ConfirmDeleteModal from './components/ConfirmDeleteModal'
 
@@ -316,6 +318,7 @@ function AppShell() {
                 {view === 'ranking'   && <Ranking />}
                 {view === 'tasks'     && (auth.role === 'coach' || auth.role === 'admin') && <AllClientsTasks />}
                 {view === 'tasks'     && auth.role === 'client' && <Tasks />}
+                {view === 'synrg_method' && auth.role === 'client' && hasModule(auth.modules, 'synrg_method') && <SynrgMethod />}
                 {view === 'booking'   && (auth.role !== 'client' || hasModule(auth.modules, 'booking_access'))     && <Booking />}
                 {view === 'schedule'  && auth.role === 'client' && hasModule(auth.modules, 'booking_access')       && <ClientSchedule />}
                 {view === 'schedule'  && auth.role !== 'client' && <Schedule />}
@@ -323,6 +326,7 @@ function AppShell() {
                 {view === 'workout'  && <ClientWorkout />}
                 {view === 'programs'  && (auth.role !== 'client' || hasModule(auth.modules, 'program_access')) && <Programs />}
                 {view === 'notifications' && auth.role === 'coach' && <Notifications />}
+                {view === 'recipes'      && auth.role !== 'client' && <Recipes />}
                 {view === 'admin'     && admin && <Admin />}
               </>
             )}

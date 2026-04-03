@@ -711,12 +711,13 @@ function AdminScheduleTab({ t, lang }) {
     return res
   }
 
-  async function handleRemove(slotId, clientId) {
-    const res = await adminRemoveFromSlot(slotId, clientId, true)
+  async function handleRemove(slotId, clientId, returnCredit) {
+    const res = await adminRemoveFromSlot(slotId, clientId, returnCredit)
     if (!res?.error) {
-      showSnackbar(t('removeFromSlot') + ' ✓')
+      showSnackbar(returnCredit ? 'Отменено — кредитът е върнат' : 'Отменено — кредитът е изгорен')
       await loadSlotBookings([slotId])
     }
+    setRemoveTarget(null)
   }
 
   const grouped = groupByDate(slots)
@@ -805,7 +806,8 @@ function AdminScheduleTab({ t, lang }) {
                             <Typography sx={{ fontSize: '13px', color: C.text }}>{b.client_name}</Typography>
                           </Box>
                           <Tooltip title={t('removeFromSlot')} arrow>
-                            <IconButton size="small" onClick={() => handleRemove(slot.id, b.client_id)}
+                            <IconButton size="small"
+                              onClick={() => setRemoveTarget({ slotId: slot.id, clientId: b.client_id, name: b.client_name, time: `${slot.slot_date} ${slot.start_time?.slice(0,5)}` })}
                               sx={{ color: C.muted, '&:hover': { color: '#F87171' } }}>
                               <PersonRemoveIcon sx={{ fontSize: 13 }} />
                             </IconButton>
@@ -829,6 +831,38 @@ function AdminScheduleTab({ t, lang }) {
         <AddClientDialog open={!!addTarget} onClose={() => setAddTarget(null)} onAdd={handleAddClient}
           slot={addTarget} realClients={rc} t={t} />
       )}
+
+      {/* Admin remove — credit choice dialog */}
+      <Dialog open={!!removeTarget} onClose={() => setRemoveTarget(null)} maxWidth="xs" fullWidth
+        PaperProps={{ sx: { background: '#1e1e2e', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '20px' } }}>
+        <DialogTitle sx={{ fontWeight: 800, fontSize: '15px' }}>
+          Отмяна на час
+        </DialogTitle>
+        <DialogContent>
+          <Typography sx={{ fontSize: '13px', color: 'rgba(255,255,255,0.7)', mb: 0.5 }}>
+            <strong>{removeTarget?.name}</strong> · {removeTarget?.time}
+          </Typography>
+          <Typography sx={{ fontSize: '13px', color: 'rgba(255,255,255,0.5)' }}>
+            Какво да стане с кредита?
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2, gap: 1, flexDirection: 'column', alignItems: 'stretch' }}>
+          <Button variant="contained" fullWidth
+            onClick={() => handleRemove(removeTarget.slotId, removeTarget.clientId, true)}
+            sx={{ background: C.primary, color: '#0f1c11', fontWeight: 700 }}>
+            Върни кредита
+          </Button>
+          <Button variant="outlined" fullWidth
+            onClick={() => handleRemove(removeTarget.slotId, removeTarget.clientId, false)}
+            sx={{ borderColor: '#F87171', color: '#F87171', fontWeight: 700,
+              '&:hover': { background: 'rgba(248,113,113,0.08)', borderColor: '#F87171' } }}>
+            Изгори кредита
+          </Button>
+          <Button fullWidth onClick={() => setRemoveTarget(null)} sx={{ color: 'rgba(255,255,255,0.4)' }}>
+            Откажи
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   )
 }
@@ -976,8 +1010,10 @@ function PlansTab({ t }) {
 // ── Clients Tab ──────────────────────────────────────────────
 // ── Client Module Editor ──────────────────────────────────────
 function ClientModuleEditor({ clientId, currentModules, t, lang }) {
-  const { updateClientModules, showSnackbar } = useApp()
-  const [modules, setModules] = useState(currentModules || [])
+  const { updateClientModules, showSnackbar, clients } = useApp()
+  // Always read fresh from context so stale planDlg snapshot doesn't matter
+  const liveModules = clients.find(c => c.id === clientId)?.modules || currentModules || []
+  const [modules, setModules] = useState(liveModules)
   const [open, setOpen] = useState(false)
 
   function toggleModule(key) {
@@ -994,7 +1030,7 @@ function ClientModuleEditor({ clientId, currentModules, t, lang }) {
   return (
     <>
       <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', alignItems: 'center' }}>
-        {(currentModules || []).length > 0 ? (currentModules || []).map(m => (
+        {liveModules.length > 0 ? liveModules.map(m => (
           <Chip key={m} label={MODULE_DEFS[m]?.[lang === 'bg' ? 'labelBg' : 'labelEn'] || m}
             size="small"
             sx={{ fontSize: '9px', height: '20px', background: C.primaryContainer, color: C.text }} />
@@ -1002,7 +1038,7 @@ function ClientModuleEditor({ clientId, currentModules, t, lang }) {
           <Chip label={t('noModules')} size="small" variant="outlined"
             sx={{ fontSize: '9px', height: '20px', borderColor: C.border, color: C.muted }} />
         )}
-        <IconButton size="small" onClick={() => { setModules(currentModules || []); setOpen(true) }}
+        <IconButton size="small" onClick={() => { setModules(liveModules); setOpen(true) }}
           sx={{ width: 20, height: 20 }}>
           <EditIcon sx={{ fontSize: 12, color: C.muted }} />
         </IconButton>
@@ -1657,6 +1693,295 @@ function DashboardTab({ t, lang, setTab }) {
   )
 }
 
+// ── Admin SYNRG Method Tab ───────────────────────────────────
+const SHOW_CONDITIONS = [
+  { value: 'always',   labelBg: 'Винаги',                  labelEn: 'Always' },
+  { value: 'steps',    labelBg: 'Малко крачки (low/medium)',labelEn: 'Low/medium steps' },
+  { value: 'soda',     labelBg: 'Пие газирано',             labelEn: 'Drinks soda' },
+  { value: 'packaged', labelBg: 'Яде пакетирано',           labelEn: 'Eats packaged food' },
+  { value: 'fried',    labelBg: 'Яде пържено',              labelEn: 'Eats fried food' },
+  { value: 'nuts',     labelBg: 'Яде ядки',                 labelEn: 'Eats nuts' },
+  { value: 'alcohol',  labelBg: 'Пие алкохол',              labelEn: 'Drinks alcohol' },
+]
+
+function HabitDialog({ habit, onClose, onSave, lang }) {
+  const isBg = lang !== 'en'
+  const isNew = !habit?.id
+  const [form, setForm] = useState({
+    label_bg:      habit?.label_bg      || '',
+    label_en:      habit?.label_en      || '',
+    why_bg:        habit?.why_bg        || '',
+    why_en:        habit?.why_en        || '',
+    practical_bg:  (habit?.practical_bg || []).join('\n'),
+    practical_en:  (habit?.practical_en || []).join('\n'),
+    week:          habit?.week          || 1,
+    show_condition:habit?.show_condition|| 'always',
+    no_kcal:       habit?.no_kcal       || false,
+    enabled:       habit?.enabled       !== false,
+    habit_key:     habit?.habit_key     || '',
+    sort_order:    habit?.sort_order    || 0,
+  })
+  const set = (k, v) => setForm(p => ({ ...p, [k]: v }))
+
+  function handleSave() {
+    onSave({
+      ...form,
+      week:         Number(form.week),
+      sort_order:   Number(form.sort_order),
+      practical_bg: form.practical_bg.split('\n').map(s => s.trim()).filter(Boolean),
+      practical_en: form.practical_en.split('\n').map(s => s.trim()).filter(Boolean),
+    })
+  }
+
+  return (
+    <Dialog open onClose={onClose} maxWidth="sm" fullWidth PaperProps={{ sx: { background: '#1e1e2e' } }}>
+      <DialogTitle sx={{ fontWeight: 800, fontSize: '16px' }}>
+        {isNew ? 'Нов навик' : 'Редактирай навик'}
+      </DialogTitle>
+      <DialogContent sx={{ display: 'grid', gap: 2, pt: '12px !important' }}>
+        {isNew && (
+          <TextField label="habit_key (уникален ID)" size="small" value={form.habit_key}
+            onChange={e => set('habit_key', e.target.value)} />
+        )}
+        <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1 }}>
+          <FormControl size="small">
+            <InputLabel>Седмица</InputLabel>
+            <Select value={form.week} label="Седмица" onChange={e => set('week', e.target.value)}>
+              {[1,2,3,4,5].map(w => <MenuItem key={w} value={w}>{w}</MenuItem>)}
+            </Select>
+          </FormControl>
+          <FormControl size="small">
+            <InputLabel>Показва се при</InputLabel>
+            <Select value={form.show_condition} label="Показва се при" onChange={e => set('show_condition', e.target.value)}>
+              {SHOW_CONDITIONS.map(c => <MenuItem key={c.value} value={c.value}>{isBg ? c.labelBg : c.labelEn}</MenuItem>)}
+            </Select>
+          </FormControl>
+        </Box>
+        <TextField label="Лейбъл BG" size="small" value={form.label_bg} onChange={e => set('label_bg', e.target.value)} />
+        <TextField label="Лейбъл EN" size="small" value={form.label_en} onChange={e => set('label_en', e.target.value)} />
+        <TextField label="Обяснение BG" size="small" multiline rows={4} value={form.why_bg} onChange={e => set('why_bg', e.target.value)}
+          helperText="Използвай {weight} за тегло, {kcal_steps} за калории крачки" />
+        <TextField label="Обяснение EN" size="small" multiline rows={4} value={form.why_en} onChange={e => set('why_en', e.target.value)} />
+        <TextField label="Съвети BG (по един на ред)" size="small" multiline rows={3} value={form.practical_bg} onChange={e => set('practical_bg', e.target.value)} />
+        <TextField label="Съвети EN (по един на ред)" size="small" multiline rows={3} value={form.practical_en} onChange={e => set('practical_en', e.target.value)} />
+        <Box sx={{ display: 'flex', gap: 2 }}>
+          <TextField label="Ред (sort_order)" size="small" type="number" value={form.sort_order}
+            onChange={e => set('sort_order', e.target.value)} sx={{ width: 120 }} />
+          <FormControlLabel control={<Checkbox checked={form.no_kcal} onChange={e => set('no_kcal', e.target.checked)} />} label="Без калориен блок" />
+          <FormControlLabel control={<Checkbox checked={form.enabled} onChange={e => set('enabled', e.target.checked)} />} label="Активен" />
+        </Box>
+      </DialogContent>
+      <DialogActions sx={{ px: 3, pb: 2 }}>
+        <Button onClick={onClose}>Откажи</Button>
+        <Button variant="contained" onClick={handleSave} disabled={!form.label_bg || (!isNew || form.habit_key)}>Запази</Button>
+      </DialogActions>
+    </Dialog>
+  )
+}
+
+const GOAL_LABEL = { lose: 'Сваляне', maintain: 'Поддръжка', gain: 'Покачване' }
+const STEPS_LABEL = { low: 'под 5 000', medium: '5–8 000', high: '8–12 000', very_high: 'над 12 000' }
+
+function synrgWeek(startedAt) {
+  if (!startedAt) return null
+  const days = Math.floor((Date.now() - new Date(startedAt).getTime()) / 86400000)
+  return Math.min(5, Math.floor(days / 7) + 1)
+}
+
+function AdminSynrgTab() {
+  const { synrgHabits, setSynrgHabits, showSnackbar, lang, clients } = useApp()
+  const [dlg,     setDlg]     = useState(null)
+  const [delId,   setDelId]   = useState(null)
+  const [section, setSection] = useState('clients') // 'clients' | 'habits'
+  const isBg = lang !== 'en'
+
+  const synrgClients = clients.filter(c => (c.modules || []).includes('synrg_method') && !c.is_coach)
+  const active  = synrgClients.filter(c => c.synrgStartedAt)
+  const pending = synrgClients.filter(c => !c.synrgStartedAt)
+
+  async function handleSave(form) {
+    try {
+      if (dlg?.id) {
+        await DB.update('synrg_habits', dlg.id, form)
+        setSynrgHabits(prev => prev.map(h => h.id === dlg.id ? { ...h, ...form } : h).sort((a,b) => a.sort_order - b.sort_order))
+      } else {
+        const saved = await DB.insert('synrg_habits', form)
+        setSynrgHabits(prev => [...prev, saved].sort((a,b) => a.sort_order - b.sort_order))
+      }
+      showSnackbar('Запазено')
+      setDlg(null)
+    } catch(e) { showSnackbar('Грешка: ' + e.message, 'error') }
+  }
+
+  async function handleDelete(id) {
+    try {
+      await DB.deleteById('synrg_habits', id)
+      setSynrgHabits(prev => prev.filter(h => h.id !== id))
+      showSnackbar('Изтрито')
+      setDelId(null)
+    } catch(e) { showSnackbar('Грешка: ' + e.message, 'error') }
+  }
+
+  return (
+    <Box>
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+        <Typography variant="h2">SYNRG Метод</Typography>
+        <Box sx={{ display: 'flex', gap: 1 }}>
+          <Button size="small" variant={section === 'clients' ? 'contained' : 'outlined'}
+            onClick={() => setSection('clients')}
+            sx={{ fontSize: '12px', ...(section === 'clients' ? { background: C.primary, color: '#0f1c11' } : { borderColor: C.border, color: C.muted }) }}>
+            Клиенти ({active.length})
+          </Button>
+          <Button size="small" variant={section === 'habits' ? 'contained' : 'outlined'}
+            onClick={() => setSection('habits')}
+            sx={{ fontSize: '12px', ...(section === 'habits' ? { background: C.primary, color: '#0f1c11' } : { borderColor: C.border, color: C.muted }) }}>
+            Навици
+          </Button>
+        </Box>
+      </Box>
+
+      {/* ── Clients overview ── */}
+      {section === 'clients' && (
+        <Box>
+          {/* Active — filled quiz */}
+          <Typography sx={{ fontSize: '11px', fontWeight: 800, letterSpacing: '1.5px', textTransform: 'uppercase', color: C.primary, mb: 1 }}>
+            Попълнили анкетата — {active.length}
+          </Typography>
+          <Paper sx={{ overflow: 'hidden', mb: 3 }}>
+            {active.length === 0 && (
+              <Typography sx={{ p: 2, color: C.muted, fontSize: '13px' }}>Няма попълнили</Typography>
+            )}
+            {active.map((c, i) => {
+              const week  = synrgWeek(c.synrgStartedAt)
+              const quiz  = c.synrgQuiz || {}
+              return (
+                <Box key={c.id}>
+                  <Box sx={{ px: 2, py: '12px', display: 'flex', alignItems: 'flex-start', gap: 2 }}>
+                    {/* Avatar */}
+                    <Box sx={{ width: 32, height: 32, borderRadius: '50%', background: C.primaryContainer,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontSize: '13px', fontWeight: 800, color: C.text, flexShrink: 0 }}>
+                      {c.name.charAt(0).toUpperCase()}
+                    </Box>
+                    <Box sx={{ flex: 1, minWidth: 0 }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                        <Typography sx={{ fontWeight: 700, fontSize: '14px' }}>{c.name}</Typography>
+                        <Chip label={`Седмица ${week}`} size="small"
+                          sx={{ fontSize: '10px', height: '18px', background: C.primaryContainer, color: C.text }} />
+                        {quiz.goal && (
+                          <Chip label={GOAL_LABEL[quiz.goal] || quiz.goal} size="small"
+                            sx={{ fontSize: '10px', height: '18px', background: 'rgba(255,255,255,0.06)', color: C.muted }} />
+                        )}
+                      </Box>
+                      <Box sx={{ display: 'flex', gap: 2, mt: 0.5, flexWrap: 'wrap' }}>
+                        {quiz.weight && <Typography sx={{ fontSize: '12px', color: C.muted }}>{quiz.weight} кг</Typography>}
+                        {quiz.height && <Typography sx={{ fontSize: '12px', color: C.muted }}>{quiz.height} см</Typography>}
+                        {c.proteinTarget > 0 && <Typography sx={{ fontSize: '12px', color: C.muted }}>{c.proteinTarget}г протеин</Typography>}
+                        {c.calorieTarget > 0 && <Typography sx={{ fontSize: '12px', color: C.muted }}>{c.calorieTarget} ккал</Typography>}
+                        {quiz.steps && <Typography sx={{ fontSize: '12px', color: C.muted }}>Крачки: {STEPS_LABEL[quiz.steps] || quiz.steps}</Typography>}
+                      </Box>
+                      <Typography sx={{ fontSize: '11px', color: C.muted, mt: 0.25 }}>
+                        Започнал: {c.synrgStartedAt}
+                      </Typography>
+                    </Box>
+                  </Box>
+                  {i < active.length - 1 && <Divider sx={{ borderColor: C.border, mx: 2 }} />}
+                </Box>
+              )
+            })}
+          </Paper>
+
+          {/* Pending — have module but not filled */}
+          {pending.length > 0 && (
+            <>
+              <Typography sx={{ fontSize: '11px', fontWeight: 800, letterSpacing: '1.5px', textTransform: 'uppercase', color: C.muted, mb: 1 }}>
+                Не са попълнили анкетата — {pending.length}
+              </Typography>
+              <Paper sx={{ overflow: 'hidden' }}>
+                {pending.map((c, i) => (
+                  <Box key={c.id}>
+                    <Box sx={{ px: 2, py: '10px', display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                      <Box sx={{ width: 28, height: 28, borderRadius: '50%', background: 'rgba(255,255,255,0.06)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontSize: '12px', fontWeight: 800, color: C.muted }}>
+                        {c.name.charAt(0).toUpperCase()}
+                      </Box>
+                      <Typography sx={{ fontSize: '13px', color: C.muted }}>{c.name}</Typography>
+                    </Box>
+                    {i < pending.length - 1 && <Divider sx={{ borderColor: C.border, mx: 2 }} />}
+                  </Box>
+                ))}
+              </Paper>
+            </>
+          )}
+        </Box>
+      )}
+
+      {/* ── Habits editor ── */}
+      {section === 'habits' && (
+        <Box>
+          <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
+            <Button variant="contained" size="small" startIcon={<AddIcon />} onClick={() => setDlg({})}>
+              Нов навик
+            </Button>
+          </Box>
+      {[1, 2, 3, 4, 5].map(week => {
+        const habits = synrgHabits.filter(h => h.week === week)
+        return (
+          <Box key={week} sx={{ mb: 3 }}>
+            <Typography sx={{ fontSize: '11px', fontWeight: 800, letterSpacing: '1.5px', textTransform: 'uppercase', color: C.primary, mb: 1 }}>
+              Седмица {week}
+            </Typography>
+            <Paper sx={{ overflow: 'hidden' }}>
+              {habits.length === 0 && (
+                <Typography sx={{ p: 2, color: C.muted, fontSize: '13px' }}>Няма навици</Typography>
+              )}
+              {habits.map((h, i) => (
+                <Box key={h.id}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, px: 2, py: '12px' }}>
+                    <Box sx={{ flex: 1, minWidth: 0 }}>
+                      <Typography sx={{ fontWeight: 700, fontSize: '14px', color: h.enabled ? C.text : C.muted }}>
+                        {isBg ? h.label_bg : h.label_en}
+                      </Typography>
+                      <Typography sx={{ fontSize: '11px', color: C.muted }}>
+                        {SHOW_CONDITIONS.find(c => c.value === h.show_condition)?.[isBg ? 'labelBg' : 'labelEn']} · #sort {h.sort_order}
+                        {!h.enabled && ' · '}
+                        {!h.enabled && <span style={{ color: '#ff6b6b' }}>неактивен</span>}
+                      </Typography>
+                    </Box>
+                    <IconButton size="small" onClick={() => setDlg(h)} sx={{ color: C.muted }}>
+                      <EditIcon sx={{ fontSize: '16px' }} />
+                    </IconButton>
+                    <IconButton size="small" onClick={() => setDelId(h.id)} sx={{ color: C.danger }}>
+                      <DeleteOutlineIcon sx={{ fontSize: '16px' }} />
+                    </IconButton>
+                  </Box>
+                  {i < habits.length - 1 && <Divider sx={{ borderColor: C.border, mx: 2 }} />}
+                </Box>
+              ))}
+            </Paper>
+          </Box>
+        )
+      })}
+
+      {dlg !== null && <HabitDialog habit={Object.keys(dlg).length ? dlg : null} lang={lang} onClose={() => setDlg(null)} onSave={handleSave} />}
+
+      {delId && (
+        <Dialog open onClose={() => setDelId(null)} PaperProps={{ sx: { background: '#1e1e2e' } }}>
+          <DialogTitle>Изтрий навика?</DialogTitle>
+          <DialogContent><Typography>Това действие е необратимо.</Typography></DialogContent>
+          <DialogActions>
+            <Button onClick={() => setDelId(null)}>Откажи</Button>
+            <Button color="error" variant="contained" onClick={() => handleDelete(delId)}>Изтрий</Button>
+          </DialogActions>
+        </Dialog>
+      )}
+        </Box>
+      )}
+    </Box>
+  )
+}
+
 // ── Main Admin Page ──────────────────────────────────────────
 export default function Admin() {
   const { t, lang, auth } = useApp()
@@ -1672,6 +1997,7 @@ export default function Admin() {
     { label: t('siteTab'),         key: 5 },
     { label: t('adminPrograms'),   key: 6 },
     { label: t('subscriptionsTab'), key: 7 },
+    { label: 'SYNRG Метод',        key: 8 },
   ]
 
   return (
@@ -1711,6 +2037,7 @@ export default function Admin() {
       {tab === 5 && <SiteTab />}
       {tab === 6 && <ProgramsTab />}
       {tab === 7 && <SubscriptionsTab t={t} lang={lang} />}
+      {tab === 8 && <AdminSynrgTab />}
     </Box>
   )
 }

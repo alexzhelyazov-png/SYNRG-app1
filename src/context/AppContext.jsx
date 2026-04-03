@@ -23,6 +23,7 @@ export function AppProvider({ children }) {
   const [loading,      setLoading]      = useState(true)
   const [loadError,    setLoadError]    = useState('')
   const [notifications, setNotifications] = useState([])
+  const [synrgHabits,  setSynrgHabits]  = useState([])
   const [viewingCoach, setViewingCoach] = useState(null) // coach name being viewed, or null
 
   // ── Theme — always dark ──────────────────────────────────────
@@ -43,6 +44,7 @@ export function AppProvider({ children }) {
   const [showClientMenu, setShowClientMenu] = useState(false)
   const [confirmDelete,  setConfirmDelete]  = useState(null)
   const [coachClientMode, setCoachClientMode] = useState(false) // true after coach explicitly clicks a client
+  const [pendingProgressTab, setPendingProgressTab] = useState(null) // deep-link to a Progress sub-tab
 
   // ── Snackbar ─────────────────────────────────────────────────
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' })
@@ -54,7 +56,9 @@ export function AppProvider({ children }) {
   }, [])
 
   // ── Feed state ──────────────────────────────────────────────
-  const [feedPosts, setFeedPosts] = useState([])
+  const [feedPosts,     setFeedPosts]     = useState([])
+  const [postReactions, setPostReactions] = useState([]) // { id, post_id, author_name, emoji }
+  const [postComments,  setPostComments]  = useState([]) // { id, post_id, author_name, content, created_at }
 
   // ── Workout form state ────────────────────────────────────────
   const [exName,          setExName]          = useState('')
@@ -89,10 +93,10 @@ export function AppProvider({ children }) {
     setLoadError('')
     try {
       await DB.seedIfEmpty()
-      const [rawCoaches, rawClients, meals, workouts, weights, tasks, taskComments, reactions, stepsRaw, postsRaw] = await Promise.all([
+      const [rawCoaches, rawClients, meals, workouts, weights, tasks, taskComments, reactions, stepsRaw, postsRaw, rawSynrgHabits, rawPostReactions, rawPostComments] = await Promise.all([
         DB.selectAll('coaches'),
         DB.selectAll('clients'),
-        DB.selectAll('meals'),
+        DB.selectAll('meals', '&order=id.desc&limit=5000'),
         DB.selectAll('workouts'),
         DB.selectAll('weight_logs'),
         DB.selectAll('tasks'),
@@ -100,6 +104,9 @@ export function AppProvider({ children }) {
         DB.selectAll('reactions'),
         DB.selectAll('steps_logs').catch(() => []),
         DB.selectAll('community_posts').catch(() => []),
+        DB.selectAll('synrg_habits').catch(() => []),
+        DB.selectAll('post_reactions').catch(() => []),
+        DB.selectAll('post_comments', '&order=created_at.asc').catch(() => []),
       ])
 
       setCoaches(rawCoaches.map(c => ({ name: c.name, password: c.password, id: c.id })))
@@ -145,8 +152,13 @@ export function AppProvider({ children }) {
               ? JSON.parse(c.reminder_settings)
               : c.reminder_settings)
           : { protein: true, weight: true, foodLog: true, coach: true },
+        synrgStartedAt: c.synrg_started_at || null,
+        synrgQuiz:      c.synrg_quiz       || null,
       })))
       setFeedPosts((postsRaw || []).sort((a, b) => (b.created_at || '').localeCompare(a.created_at || '')))
+      setPostReactions(rawPostReactions || [])
+      setPostComments(rawPostComments || [])
+      setSynrgHabits((rawSynrgHabits || []).sort((a, b) => a.sort_order - b.sort_order))
     } catch(e) {
       console.error('loadAll error:', JSON.stringify(e), e?.message)
       setLoadError(`${e?.name || 'Error'}: ${e?.message || JSON.stringify(e)}`)
@@ -316,7 +328,12 @@ export function AppProvider({ children }) {
   )
 
   const foodTotals = useMemo(
-    () => mealsForDate.reduce((a, m) => ({ kcal: a.kcal + Number(m.kcal || 0), protein: a.protein + Number(m.protein || 0) }), { kcal: 0, protein: 0 }),
+    () => mealsForDate.reduce((a, m) => ({
+      kcal:    a.kcal    + Number(m.kcal    || 0),
+      protein: a.protein + Number(m.protein || 0),
+      carbs:   a.carbs   + Number(m.carbs   || 0),
+      fat:     a.fat     + Number(m.fat     || 0),
+    }), { kcal: 0, protein: 0, carbs: 0, fat: 0 }),
     [mealsForDate]
   )
 
@@ -384,6 +401,26 @@ export function AppProvider({ children }) {
     return notifications.filter(n => n.from_coach !== auth.name && n.created_at > lastNotifSeen).length
   }, [notifications, auth, lastNotifSeen])
 
+  // ── Unread feed count ─────────────────────────────────────────
+  const feedKey = auth.id ? `synrg_lastSeenFeed_${auth.id}` : 'synrg_lastSeenFeed'
+  const [lastSeenFeed, setLastSeenFeed] = useState(() => localStorage.getItem(feedKey) || '')
+  // Reload per-user key whenever auth changes (login / switch account)
+  useEffect(() => {
+    setLastSeenFeed(localStorage.getItem(feedKey) || '')
+  }, [auth.id]) // eslint-disable-line react-hooks/exhaustive-deps
+  function markFeedSeen() {
+    const now = new Date().toISOString()
+    setLastSeenFeed(now)
+    localStorage.setItem(feedKey, now)
+  }
+  const unreadFeedCount = useMemo(() => {
+    if (!auth.isLoggedIn) return 0
+    const since = lastSeenFeed
+    const newPosts    = feedPosts.filter(p => (!since || p.created_at > since) && p.author_name !== auth.name).length
+    const newComments = postComments.filter(c => (!since || c.created_at > since) && c.author_name !== auth.name).length
+    return newPosts + newComments
+  }, [feedPosts, postComments, lastSeenFeed, auth])
+
   // ── Update helpers ────────────────────────────────────────────
   function updateClient(fn) {
     if (viewingCoach) {
@@ -403,14 +440,31 @@ export function AppProvider({ children }) {
 
   async function addMealToClient(clientId, meal) {
     if (isTrackerReadOnly) return
-    const data = await DB.insert('meals', {
-      client_id: clientId, date: meal.date, label: meal.label,
-      grams: meal.grams, kcal: meal.kcal, protein: meal.protein,
-    })
+    // Optimistic update — show immediately with temp ID
+    const tmpId = 'tmp_' + Date.now()
     setClients(prev => prev.map(c => c.id === clientId
-      ? { ...c, meals: [...c.meals, { ...meal, id: data.id }] }
+      ? { ...c, meals: [...c.meals, { ...meal, id: tmpId }] }
       : c
     ))
+    try {
+      const data = await DB.insert('meals', {
+        client_id: clientId, date: meal.date, label: meal.label,
+        grams: meal.grams, kcal: meal.kcal, protein: meal.protein,
+        carbs: meal.carbs || 0, fat: meal.fat || 0,
+      })
+      // Replace temp ID with real DB ID
+      setClients(prev => prev.map(c => c.id === clientId
+        ? { ...c, meals: c.meals.map(m => m.id === tmpId ? { ...m, id: data.id } : m) }
+        : c
+      ))
+    } catch(e) {
+      // Rollback on failure and notify user
+      setClients(prev => prev.map(c => c.id === clientId
+        ? { ...c, meals: c.meals.filter(m => m.id !== tmpId) }
+        : c
+      ))
+      showSnackbar('Грешка при запазване на храна', 'error')
+    }
   }
 
   async function deleteMealFromClient(clientId, mealId) {
@@ -487,17 +541,68 @@ export function AppProvider({ children }) {
 
   // ── Feed actions ────────────────────────────────────────────
   async function addFeedPost(content) {
-    const data = await DB.insert('community_posts', {
-      client_id: auth.id,
-      author_name: auth.name,
-      content,
-    })
-    setFeedPosts(prev => [data, ...prev])
+    const tmpId = 'tmp_' + Date.now()
+    const tmpPost = { id: tmpId, client_id: auth.id, author_name: auth.name, content, created_at: new Date().toISOString() }
+    setFeedPosts(prev => [tmpPost, ...prev])
+    try {
+      const data = await DB.insert('community_posts', { client_id: auth.id, author_name: auth.name, content })
+      if (data) {
+        setFeedPosts(prev => prev.map(p => p.id === tmpId ? data : p))
+        DB.insertNotification(auth.name, 'Стена', 'feed_post', content.substring(0, 80))
+      } else {
+        setFeedPosts(prev => prev.filter(p => p.id !== tmpId))
+        showSnackbar('Грешка при публикуване', 'error')
+      }
+    } catch {
+      setFeedPosts(prev => prev.filter(p => p.id !== tmpId))
+      showSnackbar('Грешка при публикуване', 'error')
+    }
   }
 
   async function deleteFeedPost(postId) {
     await DB.deleteById('community_posts', postId)
     setFeedPosts(prev => prev.filter(p => p.id !== postId))
+    setPostReactions(prev => prev.filter(r => r.post_id !== postId))
+    setPostComments(prev => prev.filter(c => c.post_id !== postId))
+  }
+
+  // ── Post reactions ───────────────────────────────────────────
+  async function togglePostReaction(postId, emoji) {
+    const existing = postReactions.find(
+      r => r.post_id === postId && r.author_name === auth.name && r.emoji === emoji
+    )
+    if (existing) {
+      setPostReactions(prev => prev.filter(r => r.id !== existing.id))
+      await DB.deleteById('post_reactions', existing.id)
+    } else {
+      const tmpId = 'tmp_r_' + Date.now()
+      const tmp = { id: tmpId, post_id: postId, author_name: auth.name, emoji, created_at: new Date().toISOString() }
+      setPostReactions(prev => [...prev, tmp])
+      try {
+        const data = await DB.insert('post_reactions', { post_id: postId, author_name: auth.name, emoji })
+        if (data) setPostReactions(prev => prev.map(r => r.id === tmpId ? data : r))
+        else setPostReactions(prev => prev.filter(r => r.id !== tmpId))
+      } catch { setPostReactions(prev => prev.filter(r => r.id !== tmpId)) }
+    }
+  }
+
+  // ── Post comments ────────────────────────────────────────────
+  async function addPostComment(postId, content) {
+    const tmpId = 'tmp_c_' + Date.now()
+    const tmp = { id: tmpId, post_id: postId, author_name: auth.name, content, created_at: new Date().toISOString() }
+    setPostComments(prev => [...prev, tmp])
+    try {
+      const data = await DB.insert('post_comments', { post_id: postId, author_name: auth.name, content })
+      if (data) {
+        setPostComments(prev => prev.map(c => c.id === tmpId ? data : c))
+        DB.insertNotification(auth.name, 'Стена', 'feed_comment', content.substring(0, 80))
+      } else setPostComments(prev => prev.filter(c => c.id !== tmpId))
+    } catch { setPostComments(prev => prev.filter(c => c.id !== tmpId)) }
+  }
+
+  async function deletePostComment(commentId) {
+    setPostComments(prev => prev.filter(c => c.id !== commentId))
+    await DB.deleteById('post_comments', commentId)
   }
 
   async function deleteClient(clientId) {
@@ -663,6 +768,8 @@ export function AppProvider({ children }) {
       grams,
       kcal:    Math.round((food.kcal    / 100) * grams),
       protein: Math.round(((food.protein / 100) * grams) * 10) / 10,
+      carbs:   Math.round(((food.carbs   || 0) / 100) * grams * 10) / 10,
+      fat:     Math.round(((food.fat     || 0) / 100) * grams * 10) / 10,
       date:    todayDate(),
     }
     addMealToClient(client.id, meal)
@@ -678,6 +785,8 @@ export function AppProvider({ children }) {
       grams,
       kcal:    Math.round((food.kcal    / 100) * grams),
       protein: Math.round(((food.protein / 100) * grams) * 10) / 10,
+      carbs:   Math.round(((food.carbs   || 0) / 100) * grams * 10) / 10,
+      fat:     Math.round(((food.fat     || 0) / 100) * grams * 10) / 10,
       date:    todayDate(),
     }
     addMealToClient(client.id, meal)
@@ -685,13 +794,15 @@ export function AppProvider({ children }) {
     showSnackbar(`${food.label} ${t('foodAddedSuffix')}`)
   }
 
-  function addBarcodeFood(name, grams, kcalPer100, protPer100) {
+  function addBarcodeFood(name, grams, kcalPer100, protPer100, carbsPer100 = 0, fatPer100 = 0) {
     if (!grams || isNaN(grams)) { showSnackbar(t('warningGrams'), 'warning'); return }
     const meal = {
       label:   name,
       grams,
-      kcal:    Math.round((kcalPer100 / 100) * grams),
-      protein: Math.round(((protPer100 / 100) * grams) * 10) / 10,
+      kcal:    Math.round((kcalPer100  / 100) * grams),
+      protein: Math.round(((protPer100  / 100) * grams) * 10) / 10,
+      carbs:   Math.round(((carbsPer100 / 100) * grams) * 10) / 10,
+      fat:     Math.round(((fatPer100   / 100) * grams) * 10) / 10,
       date:    todayDate(),
     }
     addMealToClient(client.id, meal)
@@ -824,6 +935,7 @@ export function AppProvider({ children }) {
     // Coach tracker viewing
     viewingCoach, setViewingCoach,
     coachClientMode, setCoachClientMode,
+    pendingProgressTab, setPendingProgressTab,
     isReadOnly,
     isTrackerReadOnly,
     // Snackbar
@@ -868,6 +980,8 @@ export function AppProvider({ children }) {
     saveWeightLog, deleteWeightLog,
     saveStepsLog, deleteStepsLog,
     feedPosts, addFeedPost, deleteFeedPost,
+    postReactions, postComments, togglePostReaction, addPostComment, deletePostComment,
+    unreadFeedCount, markFeedSeen,
     deleteClient,
     addFoodFromModal, addQuickFood, addBarcodeFood,
     saveWeight, saveSteps, addExercise, saveWorkout, deleteWorkout, updateWorkout,
@@ -876,6 +990,7 @@ export function AppProvider({ children }) {
     updateReminderSettings,
     updateClientModules,
     dismissBadge,
+    synrgHabits, setSynrgHabits,
   }
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>

@@ -38,8 +38,8 @@ async function sbFetchSafe(url, options) {
 }
 
 const SB = {
-  async selectAll(table) {
-    return (await sbFetch(sbUrl(table, '?select=*'), { headers: sbHeaders() })) || []
+  async selectAll(table, extra = '') {
+    return (await sbFetch(sbUrl(table, '?select=*' + extra), { headers: sbHeaders() })) || []
   },
   async insert(table, row) {
     const data = await sbFetch(sbUrl(table), {
@@ -112,7 +112,7 @@ const impl = isUsingSupabase ? SB : LS
 
 // ── Public API ───────────────────────────────────────────────
 export const DB = {
-  selectAll:  (table)               => impl.selectAll(table),
+  selectAll:  (table, extra)        => impl.selectAll(table, extra),
   insert:     (table, row)          => impl.insert(table, row),
   update:     (table, id, patch)    => impl.update(table, id, patch),
   deleteById: (table, id)           => impl.deleteById(table, id),
@@ -609,6 +609,29 @@ export const DB = {
           is_coach: true,
         })
       }
+    }
+  },
+
+  // ── Notify coaches about booking/cancellation ─────────────
+  async notifyBookingChange(type, clientName, slotDate, slotTime) {
+    if (!isUsingSupabase) return
+    const action = type === 'booking' ? 'записа час' : 'отмени час'
+    const subject = `${clientName} ${action}: ${slotDate} ${slotTime}`
+    const color = type === 'booking' ? '#c4e9bf' : '#f27c92'
+    const label = type === 'booking' ? 'Нов запис' : 'Отказан час'
+    const html = `<div style="font-family:sans-serif;padding:24px;background:#1a1a1a;color:#e0e0e0;border-radius:16px;max-width:480px">`
+      + `<h2 style="color:${color};margin:0 0 16px">${label}</h2>`
+      + `<p><strong>Клиент:</strong> ${clientName}</p>`
+      + `<p><strong>Дата:</strong> ${slotDate}</p>`
+      + `<p><strong>Час:</strong> ${slotTime}</p>`
+      + `<hr style="border:none;border-top:1px solid #333;margin:20px 0">`
+      + `<p style="font-size:12px;color:#666">SYNRG App</p></div>`
+    const recipients = [
+      { email: 'info@synrg-beyondfitness.com', name: 'Алекс' },
+      { email: 'elina.esokolova@gmail.com', name: 'Елина' },
+    ]
+    for (const r of recipients) {
+      this.syncToMailerLite('send_email', r.email, r.name, {}, subject, html)
     }
   },
 

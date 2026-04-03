@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import {
   Box, Typography, Paper, Button, Chip, CircularProgress, Divider, Alert,
+  Dialog, DialogTitle, DialogContent, DialogActions,
 } from '@mui/material'
 import CalendarMonthIcon    from '@mui/icons-material/CalendarMonth'
 import AccessTimeIcon       from '@mui/icons-material/AccessTime'
@@ -130,10 +131,11 @@ function NextBookingCard({ slots, myBookings, t, lang }) {
 
 // ── Single Slot Row ──────────────────────────────────────────
 function SlotRow({ slot, plan, myBookings, onBook, onCancel, busy, t, lang }) {
-  const [actionErr, setActionErr] = useState('')
-  const isBooked = myBookings.some(b => b.slot_id === slot.id && b.status === 'active')
-  const bookCheck   = !isBooked ? canClientBook(slot, plan, myBookings)   : { ok: false }
-  const cancelCheck = isBooked  ? canClientCancel(slot)                    : { ok: false }
+  const [actionErr,  setActionErr]  = useState('')
+  const [confirmOpen, setConfirmOpen] = useState(false)
+  const isBooked    = myBookings.some(b => b.slot_id === slot.id && b.status === 'active')
+  const bookCheck   = !isBooked ? canClientBook(slot, plan, myBookings) : { ok: false }
+  const cancelCheck = isBooked  ? canClientCancel(slot, plan)           : { ok: false }
   const isFull      = (slot.booked_count || 0) >= slot.capacity
   const isPast      = new Date(`${slot.slot_date}T${slot.start_time}`) <= new Date()
 
@@ -143,9 +145,17 @@ function SlotRow({ slot, plan, myBookings, onBook, onCancel, busy, t, lang }) {
     if (res?.error) setActionErr(res.error)
   }
 
-  async function handleCancel() {
+  async function handleCancelClick() {
+    if (cancelCheck.lateCancel) { setConfirmOpen(true); return }
     setActionErr('')
-    const res = await onCancel(slot.id)
+    const res = await onCancel(slot.id, {})
+    if (res?.error) setActionErr(res.error)
+  }
+
+  async function handleConfirmFreePass() {
+    setConfirmOpen(false)
+    setActionErr('')
+    const res = await onCancel(slot.id, { useFreePass: true })
     if (res?.error) setActionErr(res.error)
   }
 
@@ -205,8 +215,10 @@ function SlotRow({ slot, plan, myBookings, onBook, onCancel, busy, t, lang }) {
               </Typography>
             </Box>
             {cancelCheck.ok ? (
-              <Button size="small" variant="outlined" disabled={busy} onClick={handleCancel}
-                sx={{ fontSize: '10px', py: 0.25, px: 1, borderColor: C.border, color: C.muted,
+              <Button size="small" variant="outlined" disabled={busy} onClick={handleCancelClick}
+                sx={{ fontSize: '10px', py: 0.25, px: 1,
+                  borderColor: cancelCheck.lateCancel ? '#F87171' : C.border,
+                  color: cancelCheck.lateCancel ? '#F87171' : C.muted,
                   '&:hover': { borderColor: '#F87171', color: '#F87171' },
                   minWidth: 0, lineHeight: 1.5 }}>
                 {t('cancelBookingBtn')}
@@ -216,6 +228,29 @@ function SlotRow({ slot, plan, myBookings, onBook, onCancel, busy, t, lang }) {
                 {cancelCheck.reason}
               </Typography>
             )}
+            {/* Free-pass confirmation dialog */}
+            <Dialog open={confirmOpen} onClose={() => setConfirmOpen(false)} maxWidth="xs" fullWidth
+              PaperProps={{ sx: { background: '#1e1e2e', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '20px' } }}>
+              <DialogTitle sx={{ fontWeight: 800, fontSize: '15px' }}>
+                {lang === 'bg' ? 'Безплатна отмяна' : 'Free cancellation'}
+              </DialogTitle>
+              <DialogContent>
+                <Typography sx={{ fontSize: '13px', color: 'rgba(255,255,255,0.7)', lineHeight: 1.6 }}>
+                  {lang === 'bg'
+                    ? 'Часът е по-малко от 24ч. Ще използваш безплатната си отмяна за този абонамент. Следваща отмяна в последния момент ще изгори кредит.'
+                    : 'This session is less than 24h away. You will use your free late cancellation for this subscription. Next last-minute cancel will consume a credit.'}
+                </Typography>
+              </DialogContent>
+              <DialogActions sx={{ px: 3, pb: 2, gap: 1 }}>
+                <Button onClick={() => setConfirmOpen(false)} sx={{ color: 'rgba(255,255,255,0.5)' }}>
+                  {lang === 'bg' ? 'Назад' : 'Back'}
+                </Button>
+                <Button variant="contained" onClick={handleConfirmFreePass}
+                  sx={{ background: '#F87171', color: '#fff', fontWeight: 700, '&:hover': { background: '#ef4444' } }}>
+                  {lang === 'bg' ? 'Отмени часа' : 'Cancel session'}
+                </Button>
+              </DialogActions>
+            </Dialog>
           </Box>
         ) : isFull ? (
           <Chip label={t('fullLabel')} size="small" variant="outlined"
@@ -270,8 +305,8 @@ export default function Booking() {
     return res
   }
 
-  async function handleCancel(slotId) {
-    const res = await cancelBookingForSlot(slotId)
+  async function handleCancel(slotId, opts = {}) {
+    const res = await cancelBookingForSlot(slotId, opts)
     return res
   }
 

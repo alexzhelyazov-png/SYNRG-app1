@@ -15,7 +15,9 @@ import PersonIcon            from '@mui/icons-material/Person'
 import CalendarMonthIcon     from '@mui/icons-material/CalendarMonth'
 import EventIcon             from '@mui/icons-material/Event'
 import PlayCircleOutlineIcon from '@mui/icons-material/PlayCircleOutline'
+import SpaIcon               from '@mui/icons-material/Spa'
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings'
+import MenuBookIcon           from '@mui/icons-material/MenuBook'
 import { useApp }            from '../context/AppContext'
 import { C, EASE }           from '../theme'
 import { isAdmin }           from '../lib/bookingUtils'
@@ -36,6 +38,7 @@ function getNavItems(auth, admin) {
       { view: 'ranking',   labelKey: 'navRanking',   Icon: LeaderboardIcon },
       { view: 'tasks',     labelKey: 'navTasks',     Icon: AssignmentIcon },
     ]
+    coachItems.push({ view: 'recipes', labelKey: 'navRecipes', Icon: MenuBookIcon })
     if (admin) coachItems.push({ view: 'admin', labelKey: 'navAdmin', Icon: AdminPanelSettingsIcon })
     return coachItems
   }
@@ -46,6 +49,7 @@ function getNavItems(auth, admin) {
     items.push({ view: 'progress', labelKey: 'navProgress', Icon: TrendingUpIcon })
   if (hasModule(modules, 'program_access'))       items.push({ view: 'programs', labelKey: 'navPrograms', Icon: PlayCircleOutlineIcon })
   if (hasModule(modules, 'booking_access'))      items.push({ view: 'schedule', labelKey: 'navBookSlot', Icon: EventIcon })
+  if (modules.includes('synrg_method'))          items.push({ view: 'synrg_method', labelKey: 'navSynrgMethod', Icon: SpaIcon })
   return items
 }
 
@@ -56,7 +60,7 @@ export default function Sidebar() {
     coaches, coachProfiles,
     viewingCoach, setViewingCoach,
     coachClientMode, setCoachClientMode,
-    unreadNotifCount,
+    unreadNotifCount, unreadFeedCount,
     lang, setLang, t,
     client, saveWorkoutDraft,
   } = useApp()
@@ -137,6 +141,8 @@ export default function Sidebar() {
       <List sx={{ px: 0, py: 0.5, flexShrink: 0 }}>
         {navItems.map(({ view: v, labelKey, Icon }) => {
           const isActive = view === v && !viewingCoach
+          // Show feed badge on 'ranking' (coach) and 'progress' (client)
+          const showFeedBadge = unreadFeedCount > 0 && (v === 'ranking' || v === 'progress')
           return (
             <Tooltip key={v} title={!open ? t(labelKey) : ''} placement="right" arrow>
               <ListItemButton
@@ -147,52 +153,47 @@ export default function Sidebar() {
                   px: open ? 2 : 0, mx: open ? 1.5 : 1, my: '2px', minHeight: 44,
                 }}
               >
-                <ListItemIcon sx={{ minWidth: open ? 38 : 'unset', justifyContent: 'center', color: isActive ? C.purple : C.muted }}>
+                <ListItemIcon sx={{ minWidth: open ? 38 : 'unset', justifyContent: 'center', color: isActive ? C.purple : C.muted, position: 'relative' }}>
                   <Icon sx={{ fontSize: '20px' }} />
+                  {/* Small dot on icon when sidebar is collapsed */}
+                  {showFeedBadge && !open && (
+                    <Box sx={{
+                      position: 'absolute', top: -1, right: -1,
+                      width: 10, height: 10, borderRadius: '50%',
+                      background: '#F87171',
+                      boxShadow: '0 0 6px rgba(248,113,113,0.7)',
+                    }} />
+                  )}
                 </ListItemIcon>
                 {open && (
-                  <ListItemText primary={t(labelKey)} sx={{
-                    '& .MuiListItemText-primary': {
-                      color:      isActive ? C.purple : C.text,
-                      fontWeight: isActive ? 700 : 500,
-                      fontSize:   '14px',
-                    }
-                  }} />
+                  <Box sx={{ display: 'flex', alignItems: 'center', flex: 1, minWidth: 0 }}>
+                    <ListItemText primary={t(labelKey)} sx={{
+                      flex: 'none',
+                      '& .MuiListItemText-primary': {
+                        color:      isActive ? C.purple : C.text,
+                        fontWeight: isActive ? 700 : 500,
+                        fontSize:   '14px',
+                      }
+                    }} />
+                    {showFeedBadge && (
+                      <Box sx={{
+                        ml: 1,
+                        minWidth: 18, height: 18, borderRadius: '9px',
+                        background: '#c4e9bf', color: '#111',
+                        fontSize: '10px', fontWeight: 900,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        px: 0.5,
+                      }}>
+                        {unreadFeedCount > 9 ? '9+' : unreadFeedCount}
+                      </Box>
+                    )}
+                  </Box>
                 )}
               </ListItemButton>
             </Tooltip>
           )
         })}
 
-        {/* Моят тракер (coach + admin) */}
-        {(auth.role === 'coach' || auth.role === 'admin') && (() => {
-          const isTrackerActive = view === 'dashboard' && viewingCoach === auth.name
-          return (
-            <Tooltip title={!open ? t('myTrackerTitle') : ''} placement="right" arrow>
-              <ListItemButton
-                selected={isTrackerActive}
-                onClick={() => selectCoachTracker(auth.name)}
-                sx={{
-                  justifyContent: open ? 'flex-start' : 'center',
-                  px: open ? 2 : 0, mx: open ? 1.5 : 1, my: '2px', minHeight: 44,
-                }}
-              >
-                <ListItemIcon sx={{ minWidth: open ? 38 : 'unset', justifyContent: 'center', color: isTrackerActive ? C.purple : C.muted }}>
-                  <PersonIcon sx={{ fontSize: '20px' }} />
-                </ListItemIcon>
-                {open && (
-                  <ListItemText primary={t('myTrackerTitle')} sx={{
-                    '& .MuiListItemText-primary': {
-                      color:      isTrackerActive ? C.purple : C.text,
-                      fontWeight: isTrackerActive ? 700 : 500,
-                      fontSize:   '14px',
-                    }
-                  }} />
-                )}
-              </ListItemButton>
-            </Tooltip>
-          )
-        })()}
 
         {/* Notifications (coach only) — navigates to dedicated page */}
         {auth.role === 'coach' && (() => {

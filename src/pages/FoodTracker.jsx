@@ -225,8 +225,14 @@ export default function FoodTracker() {
               <Typography variant="body2" sx={{ fontWeight: 700, color: C.text }}>
                 {t('totalLbl')}: {foodTotals.kcal} kcal
               </Typography>
+              <Typography variant="body2" sx={{ fontWeight: 700, color: C.primary }}>
+                {fmt1(foodTotals.protein)}{t('gUnit')} Б
+              </Typography>
+              <Typography variant="body2" sx={{ fontWeight: 700, color: '#FFD070' }}>
+                {fmt1(foodTotals.carbs)}{t('gUnit')} В
+              </Typography>
               <Typography variant="body2" sx={{ fontWeight: 700, color: C.purple }}>
-                {fmt1(foodTotals.protein)}{t('gUnit')} {t('proteinShortLbl')}
+                {fmt1(foodTotals.fat)}{t('gUnit')} М
               </Typography>
             </Box>
           </>

@@ -8,6 +8,7 @@ export const MODULE_KEYS = {
   TRAINING_PLAN_ACCESS: 'training_plan_access',
   PROGRAM_ACCESS:       'program_access',      // Future
   PLANNER_ACCESS:       'planner_access',       // Future
+  SYNRG_METHOD:         'synrg_method',
 }
 
 export const MODULE_DEFS = {
@@ -18,6 +19,7 @@ export const MODULE_DEFS = {
   training_plan_access: { labelBg: 'Тренировъчен план',     labelEn: 'Training Plan Access', group: 'studio' },
   program_access:       { labelBg: 'Онлайн програма',       labelEn: 'Online Program',       group: 'digital' },
   planner_access:       { labelBg: 'Дигитален планер',      labelEn: 'Digital Planner',      group: 'digital' },
+  synrg_method:         { labelBg: 'SYNRG метод',           labelEn: 'SYNRG Method',         group: 'method'  },
 }
 
 export const MODULE_PRESETS = {
@@ -27,7 +29,7 @@ export const MODULE_PRESETS = {
 
 // Modules the admin can toggle per client
 export const ADMIN_MANAGEABLE_MODULES = [
-  'studio_access', 'booking_access', 'weight_tracking', 'nutrition_tracking', 'training_plan_access', 'program_access',
+  'studio_access', 'booking_access', 'weight_tracking', 'nutrition_tracking', 'training_plan_access', 'program_access', 'synrg_method',
 ]
 
 /** Check if a client (or modules array) has a specific module */
