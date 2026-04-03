@@ -1043,10 +1043,12 @@ export function ClientDetail() {
 
 // ─── Client / tracker view ────────────────────────────────────────
 function DashboardClient({ isCoachView = false }) {
-  const { client, auth, t, setView, viewingCoach, feedPosts, postReactions, postComments, markFeedSeen, setPendingProgressTab } = useApp()
+  const { client, auth, t, setView, viewingCoach, feedPosts, postReactions, postComments, markFeedSeen, setPendingProgressTab, deleteClient, logout } = useApp()
   const { slots, myBookings, myPlan, bookingBusy, loadSlots, loadMyBookings, loadMyPlan, cancelBookingForSlot } = useBooking()
 
   const [tab, setTab] = useState(0)
+  const [showDeleteAccount, setShowDeleteAccount] = useState(false)
+  const [deletingAccount,   setDeletingAccount]   = useState(false)
 
   // Load booking data for client (not in coach-viewing-own-tracker mode)
   useEffect(() => {
@@ -1397,6 +1399,68 @@ function DashboardClient({ isCoachView = false }) {
             })}
         </Box>
       )}
+
+      {/* ── Delete account (clients only, not coach-view) ── */}
+      {!isCoachView && (
+        <Box sx={{ mt: 4, pt: 2.5, borderTop: `1px solid ${C.border}` }}>
+          <Button
+            onClick={() => setShowDeleteAccount(true)}
+            size="small"
+            sx={{
+              color: C.muted,
+              fontSize: '12px',
+              fontWeight: 600,
+              textTransform: 'none',
+              opacity: 0.6,
+              '&:hover': { color: '#F87171', opacity: 1 },
+            }}
+          >
+            {t('deleteMyAccount')}
+          </Button>
+        </Box>
+      )}
+
+      {/* Delete account confirmation dialog */}
+      <Dialog
+        open={showDeleteAccount}
+        onClose={() => !deletingAccount && setShowDeleteAccount(false)}
+        maxWidth="xs"
+        fullWidth
+        PaperProps={{ sx: { borderRadius: '20px' } }}
+      >
+        <DialogTitle sx={{ fontWeight: 800, fontSize: '17px', pb: 1 }}>
+          {t('deleteAccountTitle')}
+        </DialogTitle>
+        <DialogContent>
+          <Typography sx={{ fontSize: '14px', color: C.muted, lineHeight: 1.6 }}>
+            {t('deleteAccountConfirm')}
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 3, pt: 0, gap: 1 }}>
+          <Button
+            onClick={() => setShowDeleteAccount(false)}
+            variant="outlined"
+            fullWidth
+            disabled={deletingAccount}
+          >
+            {t('cancelLbl')}
+          </Button>
+          <Button
+            onClick={async () => {
+              setDeletingAccount(true)
+              await deleteClient(auth.id)
+              logout()
+            }}
+            variant="contained"
+            color="error"
+            fullWidth
+            disabled={deletingAccount}
+            sx={{ fontWeight: 800 }}
+          >
+            {deletingAccount ? t('saving') : t('deleteAccountBtn')}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </>
   )
 }

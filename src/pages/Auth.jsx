@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Box, Paper, Typography, TextField, Button, Alert, Dialog, useMediaQuery, useTheme, InputAdornment, IconButton } from '@mui/material'
+import { Box, Paper, Typography, TextField, Button, Alert, Dialog, useMediaQuery, useTheme, InputAdornment, IconButton, Checkbox, FormControlLabel } from '@mui/material'
 import ArrowBackIcon from '@mui/icons-material/ArrowBack'
 import GetAppIcon from '@mui/icons-material/GetApp'
 import VisibilityIcon from '@mui/icons-material/Visibility'
@@ -8,6 +8,7 @@ import { useApp } from '../context/AppContext'
 import { DB, isUsingSupabase } from '../lib/db'
 import { C, EASE } from '../theme'
 import SynrgLogomark from '../layout/SynrgLogomark'
+import PrivacyPolicyDialog from '../components/PrivacyPolicyDialog'
 
 const isStandalone = window.navigator.standalone || window.matchMedia('(display-mode: standalone)').matches
 const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent)
@@ -32,6 +33,8 @@ export default function Auth() {
   const [success, setSuccess] = useState('')
   const [loading, setLoading] = useState(false)
   const [showInstall, setShowInstall] = useState(false)
+  const [consentGdpr, setConsentGdpr] = useState(false)
+  const [showPrivacy, setShowPrivacy] = useState(false)
 
   // PWA install prompt
   const [deferredPrompt, setDeferredPrompt] = useState(null)
@@ -51,6 +54,7 @@ export default function Auth() {
     setPass2('')
     setResetCode('')
     setResetEmail('')
+    setConsentGdpr(false)
   }
 
   async function handleSubmit() {
@@ -65,6 +69,7 @@ export default function Auth() {
       if (trimmedEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
         setError(t('errEmailInvalid')); return
       }
+      if (!consentGdpr) { setError(t('errConsentRequired')); return }
       setLoading(true)
       const err = await handleRegisterClient(name.trim(), pass, trimmedEmail || null)
       setLoading(false)
@@ -389,6 +394,38 @@ export default function Auth() {
               />
             )}
 
+            {/* GDPR consent checkbox — only during registration */}
+            {isRegister && (
+              <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 0.5, mt: 0.25 }}>
+                <Checkbox
+                  checked={consentGdpr}
+                  onChange={e => setConsentGdpr(e.target.checked)}
+                  size="small"
+                  sx={{
+                    color: C.border,
+                    '&.Mui-checked': { color: C.purple },
+                    p: '2px',
+                    mt: '1px',
+                  }}
+                />
+                <Typography sx={{ fontSize: '12px', color: C.muted, lineHeight: 1.55 }}>
+                  {t('consentPre')}{' '}
+                  <Box
+                    component="span"
+                    onClick={() => setShowPrivacy(true)}
+                    sx={{
+                      color: C.purple,
+                      cursor: 'pointer',
+                      textDecoration: 'underline',
+                      '&:hover': { opacity: 0.8 },
+                    }}
+                  >
+                    {t('privacyPolicyLink')}
+                  </Box>
+                </Typography>
+              </Box>
+            )}
+
             {error && (
               <Alert severity="error" sx={{ borderRadius: '12px', fontSize: '13px', py: 0.75 }}>
                 {error}
@@ -529,6 +566,9 @@ export default function Auth() {
           {t('closeBtn')}
         </Button>
       </Dialog>
+
+      {/* Privacy Policy Dialog */}
+      <PrivacyPolicyDialog open={showPrivacy} onClose={() => setShowPrivacy(false)} />
     </Box>
   )
 }

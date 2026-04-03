@@ -797,6 +797,16 @@ export const T = {
     addResource:        'Нов ресурс',
     editResource:       'Редактирай ресурс',
     categoryLbl:        'Категория',
+
+    // ── GDPR / Privacy ───────────────────────────────
+    privacyPolicyTitle:    'Политика за поверителност',
+    consentPre:            'Прочетох и приемам',
+    privacyPolicyLink:     'Политиката за поверителност',
+    errConsentRequired:    'Трябва да приемеш политиката за поверителност',
+    deleteMyAccount:       'Изтрий акаунта ми',
+    deleteAccountTitle:    'Изтриване на акаунт',
+    deleteAccountConfirm:  'Сигурен ли си? Всички твои данни (хранителен дневник, тренировки, тегло, стъпки) ще бъдат изтрити безвъзвратно.',
+    deleteAccountBtn:      'Да, изтрий всичко',
   },
 
   en: {
@@ -1597,5 +1607,15 @@ export const T = {
     addResource:        'New resource',
     editResource:       'Edit resource',
     categoryLbl:        'Category',
+
+    // ── GDPR / Privacy ───────────────────────────────
+    privacyPolicyTitle:    'Privacy Policy',
+    consentPre:            'I have read and accept the',
+    privacyPolicyLink:     'Privacy Policy',
+    errConsentRequired:    'You must accept the privacy policy',
+    deleteMyAccount:       'Delete my account',
+    deleteAccountTitle:    'Delete account',
+    deleteAccountConfirm:  'Are you sure? All your data (food diary, workouts, weight, steps) will be permanently deleted.',
+    deleteAccountBtn:      'Yes, delete everything',
   },
 }
