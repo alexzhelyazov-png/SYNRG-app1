@@ -175,14 +175,14 @@ export default function Sidebar() {
                   {isLocked && (
                     <Box sx={{
                       position: 'absolute', bottom: -2, right: open ? -2 : -4,
-                      width: 12, height: 12, borderRadius: '4px',
-                      background: 'rgba(20,24,22,0.95)',
-                      border: '1px solid rgba(255,255,255,0.08)',
+                      width: 14, height: 14, borderRadius: '4px',
+                      background: '#FFB800',
+                      boxShadow: '0 0 6px rgba(255,184,0,0.55)',
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                     }}>
-                      <svg width="6" height="7" viewBox="0 0 6 8" fill="none">
-                        <rect x="0.5" y="3.5" width="5" height="4" rx="1" fill="rgba(196,209,205,0.45)" />
-                        <path d="M1.5 3.5V2.5a1.5 1.5 0 0 1 3 0v1" stroke="rgba(196,209,205,0.45)" strokeWidth="1.1" strokeLinecap="round" />
+                      <svg width="7" height="8" viewBox="0 0 6 8" fill="none">
+                        <rect x="0.5" y="3.5" width="5" height="4" rx="1" fill="#1a1200" />
+                        <path d="M1.5 3.5V2.5a1.5 1.5 0 0 1 3 0v1" stroke="#1a1200" strokeWidth="1.3" strokeLinecap="round" />
                       </svg>
                     </Box>
                   )}
