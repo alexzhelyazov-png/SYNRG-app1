@@ -446,24 +446,35 @@ export function AppProvider({ children }) {
       ? { ...c, meals: [...c.meals, { ...meal, id: tmpId }] }
       : c
     ))
-    try {
-      const data = await DB.insert('meals', {
-        client_id: clientId, date: meal.date, label: meal.label,
-        grams: meal.grams, kcal: meal.kcal, protein: meal.protein,
-        carbs: meal.carbs || 0, fat: meal.fat || 0,
-      })
-      // Replace temp ID with real DB ID
-      setClients(prev => prev.map(c => c.id === clientId
-        ? { ...c, meals: c.meals.map(m => m.id === tmpId ? { ...m, id: data.id } : m) }
-        : c
-      ))
-    } catch(e) {
-      // Rollback on failure and notify user
+
+    // Try up to 3 times before giving up (handles mobile network glitches)
+    const payload = {
+      client_id: clientId, date: meal.date, label: meal.label,
+      grams: meal.grams, kcal: meal.kcal, protein: meal.protein,
+      carbs: meal.carbs || 0, fat: meal.fat || 0,
+    }
+    let saved = false
+    for (let attempt = 0; attempt < 3; attempt++) {
+      if (attempt > 0) await new Promise(r => setTimeout(r, 800 * attempt))
+      try {
+        const data = await DB.insert('meals', payload)
+        // Replace temp ID with real DB ID
+        setClients(prev => prev.map(c => c.id === clientId
+          ? { ...c, meals: c.meals.map(m => m.id === tmpId ? { ...m, id: data.id } : m) }
+          : c
+        ))
+        saved = true
+        break
+      } catch { /* retry */ }
+    }
+
+    if (!saved) {
+      // All 3 attempts failed — rollback and show clear error
       setClients(prev => prev.map(c => c.id === clientId
         ? { ...c, meals: c.meals.filter(m => m.id !== tmpId) }
         : c
       ))
-      showSnackbar('Грешка при запазване на храна', 'error')
+      showSnackbar('Неуспешно запазване — провери интернет и опитай пак', 'error')
     }
   }
 
