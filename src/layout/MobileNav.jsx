@@ -45,8 +45,8 @@ function getNavItems(auth, admin) {
   // Schedule: always visible — locked with indicator if no booking_access
   items.push({ view: 'schedule', Icon: CalendarMonthIcon, labelKey: 'navBookSlot', isLocked: !hasBookingAccess })
 
-  if (modules.includes('synrg_method'))
-    items.push({ view: 'synrg_method', Icon: SpaIcon, labelKey: 'navSynrgMethod' })
+  // SYNRG Method: always visible — locked if no synrg_method module
+  items.push({ view: 'synrg_method', Icon: SpaIcon, labelKey: 'navSynrgMethod', isLocked: !modules.includes('synrg_method') })
   return items
 }
 
