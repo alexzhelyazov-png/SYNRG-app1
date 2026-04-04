@@ -115,15 +115,28 @@ export function AppProvider({ children }) {
     setLoadError('')
     try {
       await DB.seedIfEmpty()
+
+      // ── Determine role from localStorage (auth state may not be set yet at cold boot) ──
+      let sessionAuth = { role: null, id: null }
+      try { sessionAuth = JSON.parse(localStorage.getItem('synrg_auth') || '{}') } catch {}
+      const isClientRole = sessionAuth.role === 'client' && sessionAuth.id
+
+      // ── Meal query: per-client for client role (prevents 50k global cap), global for coaches ──
+      // Coach/admin fetches last 2 years to bound payload; client fetches only their own rows (no cap risk).
+      const twoYearsAgo = new Date(Date.now() - 730 * 86400000).toISOString().slice(0, 10)
+      const mealQuery = isClientRole
+        ? `&client_id=eq.${sessionAuth.id}&order=id.desc&limit=50000`
+        : `&order=id.desc&created_at=gte.${twoYearsAgo}&limit=100000`
+
       const [rawCoaches, rawClients, meals, workouts, weights, tasks, taskComments, reactions, stepsRaw, postsRaw, rawSynrgHabits, rawPostReactions, rawPostComments] = await Promise.all([
         DB.selectAll('coaches'),
         DB.selectAll('clients'),
-        DB.selectAll('meals', '&order=id.desc&limit=50000'),
-        DB.selectAll('workouts'),
-        DB.selectAll('weight_logs'),
+        DB.selectAll('meals', mealQuery),
+        DB.selectAll('workouts').catch(() => []),
+        DB.selectAll('weight_logs').catch(() => []),
         DB.selectAll('tasks').catch(() => []),
         DB.selectAll('task_comments').catch(() => []),
-        DB.selectAll('reactions'),
+        DB.selectAll('reactions').catch(() => []),
         DB.selectAll('steps_logs').catch(() => []),
         DB.selectAll('community_posts').catch(() => []),
         DB.selectAll('synrg_habits').catch(() => []),
