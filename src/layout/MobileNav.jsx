@@ -10,7 +10,6 @@ import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings'
 import MenuBookIcon           from '@mui/icons-material/MenuBook'
 import PersonIcon            from '@mui/icons-material/Person'
 import AssignmentIcon         from '@mui/icons-material/Assignment'
-import SpaIcon                from '@mui/icons-material/Spa'
 import { useApp }             from '../context/AppContext'
 import { isAdmin }            from '../lib/bookingUtils'
 import { hasModule }          from '../lib/modules'
@@ -44,9 +43,6 @@ function getNavItems(auth, admin) {
 
   // Schedule: always visible — locked with indicator if no booking_access
   items.push({ view: 'schedule', Icon: CalendarMonthIcon, labelKey: 'navBookSlot', isLocked: !hasBookingAccess })
-
-  // SYNRG Method: always visible — locked if no synrg_method module
-  items.push({ view: 'synrg_method', Icon: SpaIcon, labelKey: 'navSynrgMethod', isLocked: !modules.includes('synrg_method') })
   return items
 }
 

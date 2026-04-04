@@ -35,7 +35,7 @@ export function computeReminders(client) {
   // ── Weight reminder ──────────────────────────────────────────
   if (settings.weight !== false) {
     const sorted = [...(client.weightLogs || [])]
-      .sort((a, b) => b.date.localeCompare(a.date))
+      .sort((a, b) => parseDate(b.date) - parseDate(a.date))
     const last = sorted[0]
     if (!last) {
       reminders.push({ id: 'weight', type: 'weight', daysSince: null })

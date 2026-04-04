@@ -15,7 +15,6 @@ import PersonIcon            from '@mui/icons-material/Person'
 import CalendarMonthIcon     from '@mui/icons-material/CalendarMonth'
 import EventIcon             from '@mui/icons-material/Event'
 import PlayCircleOutlineIcon from '@mui/icons-material/PlayCircleOutline'
-import SpaIcon               from '@mui/icons-material/Spa'
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings'
 import MenuBookIcon           from '@mui/icons-material/MenuBook'
 import { useApp }            from '../context/AppContext'
@@ -56,9 +55,6 @@ function getNavItems(auth, admin) {
 
   // Schedule: always visible — locked with indicator if no booking_access
   items.push({ view: 'schedule', labelKey: 'navBookSlot', Icon: EventIcon, isLocked: !hasBookingAccess })
-
-  // SYNRG Method: always visible — locked if no synrg_method module
-  items.push({ view: 'synrg_method', labelKey: 'navSynrgMethod', Icon: SpaIcon, isLocked: !modules.includes('synrg_method') })
   return items
 }
 

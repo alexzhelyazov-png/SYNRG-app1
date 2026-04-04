@@ -462,6 +462,7 @@ export function ClientDetail() {
   const [tab, setTab] = useState(0)
   const [subView, setSubView] = useState(null) // 'weight' | null
   const [editingTargets, setEditingTargets] = useState(null) // { cal, prot }
+  const [mealDayDlg, setMealDayDlg] = useState(null) // date string DD.MM.YYYY or null
   const [editCredits, setEditCredits] = useState(null)   // credits_used value or null
   const [editValidTo, setEditValidTo] = useState(null)   // date string or null
   const [editingWorkout, setEditingWorkout] = useState(null) // { id, items: [...] } or null
@@ -489,9 +490,10 @@ export function ClientDetail() {
   const mealsByDate = {}
   ;(client.meals || []).forEach(m => {
     if (m.date && last7.includes(m.date)) {
-      if (!mealsByDate[m.date]) mealsByDate[m.date] = { kcal: 0, protein: 0 }
+      if (!mealsByDate[m.date]) mealsByDate[m.date] = { kcal: 0, protein: 0, items: [] }
       mealsByDate[m.date].kcal    += (m.kcal || m.calories || 0)
       mealsByDate[m.date].protein += (m.protein || 0)
+      mealsByDate[m.date].items.push(m)
     }
   })
 
@@ -980,12 +982,18 @@ export function ClientDetail() {
                 const hasMeals = !!mealsByDate[date]
                 const dayStr = parseDate(date).toLocaleDateString('bg-BG', { day: 'numeric', month: 'short', weekday: 'short' })
                 return (
-                  <Box key={date} sx={{
-                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                    py: '8px',
-                    borderBottom: i < 6 ? `1px solid ${C.border}` : 'none',
-                    opacity: hasMeals ? 1 : 0.45,
-                  }}>
+                  <Box key={date}
+                    onClick={() => hasMeals && setMealDayDlg(date)}
+                    sx={{
+                      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                      py: '8px',
+                      borderBottom: i < 6 ? `1px solid ${C.border}` : 'none',
+                      opacity: hasMeals ? 1 : 0.45,
+                      cursor: hasMeals ? 'pointer' : 'default',
+                      borderRadius: '8px', mx: -1, px: 1,
+                      transition: 'background 0.15s',
+                      '&:hover': hasMeals ? { background: 'rgba(255,255,255,0.035)' } : {},
+                    }}>
                     <Typography sx={{ fontSize: '13px', color: hasMeals ? C.text : C.muted, fontWeight: hasMeals ? 600 : 400 }}>
                       {dayStr}
                     </Typography>
@@ -1004,6 +1012,54 @@ export function ClientDetail() {
                   </Box>
                 )
               })}
+
+              {/* ── Meal day detail dialog ── */}
+              {mealDayDlg && mealsByDate[mealDayDlg] && (
+                <Dialog open onClose={() => setMealDayDlg(null)} maxWidth="xs" fullWidth
+                  PaperProps={{ sx: { borderRadius: '20px', background: C.card, border: `1px solid ${C.border}`, p: 0 } }}>
+                  <DialogTitle sx={{ px: 3, pt: 2.5, pb: 1.5, borderBottom: `1px solid ${C.border}` }}>
+                    <Typography sx={{ fontWeight: 800, fontSize: '16px', color: C.text, fontFamily: "'MontBlanc', sans-serif" }}>
+                      {parseDate(mealDayDlg).toLocaleDateString('bg-BG', { weekday: 'long', day: 'numeric', month: 'long' })}
+                    </Typography>
+                    <Typography sx={{ fontSize: '12px', color: C.muted, mt: 0.25 }}>
+                      {Math.round(mealsByDate[mealDayDlg].kcal)} kcal · {Math.round(mealsByDate[mealDayDlg].protein)}g протеин
+                    </Typography>
+                  </DialogTitle>
+                  <DialogContent sx={{ px: 2.5, py: 1.5 }}>
+                    {mealsByDate[mealDayDlg].items.map((m, idx) => (
+                      <Box key={m.id || idx} sx={{
+                        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                        py: '9px',
+                        borderBottom: idx < mealsByDate[mealDayDlg].items.length - 1
+                          ? `1px solid ${C.border}` : 'none',
+                      }}>
+                        <Box>
+                          <Typography sx={{ fontSize: '13px', fontWeight: 600, color: C.text }}>
+                            {m.label}
+                          </Typography>
+                          <Typography sx={{ fontSize: '11px', color: C.muted }}>
+                            {m.grams}g
+                          </Typography>
+                        </Box>
+                        <Box sx={{ textAlign: 'right' }}>
+                          <Typography sx={{ fontSize: '13px', fontWeight: 700, color: C.text }}>
+                            {Math.round(m.kcal || 0)} kcal
+                          </Typography>
+                          <Typography sx={{ fontSize: '11px', color: C.purple, fontWeight: 600 }}>
+                            {Math.round(m.protein || 0)}g P
+                          </Typography>
+                        </Box>
+                      </Box>
+                    ))}
+                  </DialogContent>
+                  <DialogActions sx={{ px: 2.5, pb: 2 }}>
+                    <Button onClick={() => setMealDayDlg(null)} size="small"
+                      sx={{ color: C.muted, fontSize: '13px', fontWeight: 600 }}>
+                      Затвори
+                    </Button>
+                  </DialogActions>
+                </Dialog>
+              )}
             </Paper>
 
             {/* ── 4. Средни стъпки на ден ── */}

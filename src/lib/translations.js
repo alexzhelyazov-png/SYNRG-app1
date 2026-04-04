@@ -454,6 +454,45 @@ export const T = {
     unlimitedPlan:      'Безлимитен план',
     expensesTab:        'Разходи',
     totalExpensesLbl:   'Разход',
+
+    // ── Orders tab ────────────────────────────────────────────
+    ordersTab:          'Поръчки',
+    noOrders:           'Няма поръчки за този период',
+    orderStatusPaid:    'Платено',
+    orderStatusPending: 'Изчакване',
+    orderStatusFailed:  'Неуспешно',
+
+    // ── Broadcast email ───────────────────────────────────────
+    broadcastBtn:       'Изпрати имейл',
+    broadcastTitle:     'Изпрати имейл до клиенти',
+    broadcastTargetLbl: 'Получатели',
+    broadcastTargetAll: 'Всички клиенти',
+    broadcastTargetFree:'Безплатни потребители',
+    broadcastTargetPaid:'Платени клиенти',
+    broadcastSubject:   'Тема',
+    broadcastMessage:   'Съобщение',
+    broadcastSending:   'Изпращане...',
+    broadcastSent:      'Изпратено успешно!',
+    broadcastSendBtn:   'Изпрати',
+
+    // ── Leads dashboard ───────────────────────────────────────
+    leadsTitle:         'Потенциални клиенти',
+    leadsHot:           'Горещи',
+    leadsWarm:          'Топли',
+    leadsCold:          'Студени',
+    leadsLastActive:    'Последна активност',
+    leadsDaySince:      'дни от регистрация',
+    sendOfferBtn:       'Изпрати оферта',
+    noLeads:            'Няма потенциални клиенти',
+
+    // ── Analytics extras ──────────────────────────────────────
+    mrrLbl:             'MRR (студио)',
+    conversionLbl:      'Конверсия',
+    activeClientsLbl:   'Активни (30д)',
+    planBreakdownLbl:   'Разпределение по план',
+    onlineRevenueLbl:   'Онлайн',
+    studioRevenueLbl:   'Студио',
+
     addExpenseBtn:      'Добави разход',
     expenseCategoryLbl: 'Категория',
     expenseAmountLbl:   'Сума (€)',
@@ -788,6 +827,7 @@ export const T = {
     uploadingVideo:     'Качване на видео...',
     tabMyPrograms:      'Моите програми',
     tabResources:       'Ресурси',
+    tabSynrgMethod:     'SYNRG метод',
     resourcesTitle:     'Ресурси',
     resourcesOverline:  'Бонус съдържание',
     noResources:        'Няма налични ресурси',
@@ -1274,6 +1314,45 @@ export const T = {
     unlimitedPlan:      'Unlimited plan',
     expensesTab:        'Expenses',
     totalExpensesLbl:   'Expenses',
+
+    // ── Orders tab ────────────────────────────────────────────
+    ordersTab:          'Orders',
+    noOrders:           'No orders for this period',
+    orderStatusPaid:    'Paid',
+    orderStatusPending: 'Pending',
+    orderStatusFailed:  'Failed',
+
+    // ── Broadcast email ───────────────────────────────────────
+    broadcastBtn:       'Send email',
+    broadcastTitle:     'Send email to clients',
+    broadcastTargetLbl: 'Recipients',
+    broadcastTargetAll: 'All clients',
+    broadcastTargetFree:'Free users',
+    broadcastTargetPaid:'Paid clients',
+    broadcastSubject:   'Subject',
+    broadcastMessage:   'Message',
+    broadcastSending:   'Sending...',
+    broadcastSent:      'Sent successfully!',
+    broadcastSendBtn:   'Send',
+
+    // ── Leads dashboard ───────────────────────────────────────
+    leadsTitle:         'Leads',
+    leadsHot:           'Hot',
+    leadsWarm:          'Warm',
+    leadsCold:          'Cold',
+    leadsLastActive:    'Last active',
+    leadsDaySince:      'days since registration',
+    sendOfferBtn:       'Send offer',
+    noLeads:            'No leads',
+
+    // ── Analytics extras ──────────────────────────────────────
+    mrrLbl:             'MRR (studio)',
+    conversionLbl:      'Conversion',
+    activeClientsLbl:   'Active (30d)',
+    planBreakdownLbl:   'Plan breakdown',
+    onlineRevenueLbl:   'Online',
+    studioRevenueLbl:   'Studio',
+
     addExpenseBtn:      'Add Expense',
     expenseCategoryLbl: 'Category',
     expenseAmountLbl:   'Amount (€)',
@@ -1607,6 +1686,7 @@ export const T = {
     uploadingVideo:     'Uploading video...',
     tabMyPrograms:      'My Programs',
     tabResources:       'Resources',
+    tabSynrgMethod:     'SYNRG Method',
     resourcesTitle:     'Resources',
     resourcesOverline:  'Bonus content',
     noResources:        'No resources available',

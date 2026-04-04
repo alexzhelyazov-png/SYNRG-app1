@@ -1,5 +1,27 @@
 import { createContext, useContext, useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { DB } from '../lib/db'
+
+// ── Pending meal localStorage rescue (survives PWA kill on iOS) ──
+const PENDING_MEALS_KEY = 'synrg_pending_v2'
+
+// Normalize meal dates: legacy DB rows may be YYYY-MM-DD, app uses DD.MM.YYYY
+function normalizeMealDate(date) {
+  if (!date) return date
+  if (/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    const [y, m, d] = date.split('-')
+    return `${d}.${m}.${y}`
+  }
+  return date
+}
+function lsReadPending() {
+  try { return JSON.parse(localStorage.getItem(PENDING_MEALS_KEY) || '{}') } catch { return {} }
+}
+function lsWritePending(obj) {
+  try {
+    if (!Object.keys(obj).length) localStorage.removeItem(PENDING_MEALS_KEY)
+    else localStorage.setItem(PENDING_MEALS_KEY, JSON.stringify(obj))
+  } catch {}
+}
 import { foodDB, quickFoods } from '../lib/constants'
 import { T } from '../lib/translations'
 import {
@@ -96,11 +118,11 @@ export function AppProvider({ children }) {
       const [rawCoaches, rawClients, meals, workouts, weights, tasks, taskComments, reactions, stepsRaw, postsRaw, rawSynrgHabits, rawPostReactions, rawPostComments] = await Promise.all([
         DB.selectAll('coaches'),
         DB.selectAll('clients'),
-        DB.selectAll('meals', '&order=id.desc&limit=5000'),
+        DB.selectAll('meals', '&order=id.desc&limit=50000'),
         DB.selectAll('workouts'),
         DB.selectAll('weight_logs'),
-        DB.selectAll('tasks'),
-        DB.selectAll('task_comments'),
+        DB.selectAll('tasks').catch(() => []),
+        DB.selectAll('task_comments').catch(() => []),
         DB.selectAll('reactions'),
         DB.selectAll('steps_logs').catch(() => []),
         DB.selectAll('community_posts').catch(() => []),
@@ -112,25 +134,58 @@ export function AppProvider({ children }) {
       setCoaches(rawCoaches.map(c => ({ name: c.name, password: c.password, id: c.id })))
       if (rawCoaches.length) setSelCoach(sc => sc || rawCoaches[0].name)
 
-      setClients(rawClients.map(c => ({
+      // Check localStorage for any meals that were pending when the app was killed
+      const pendingLS    = lsReadPending()
+      const pendingLSArr = Object.entries(pendingLS)
+
+      setClients(rawClients.map(c => {
+        // Normalize dates: DB may store YYYY-MM-DD, app uses DD.MM.YYYY
+        const dbMeals = meals.filter(m => m.client_id === c.id)
+          .map(m => ({ ...m, date: normalizeMealDate(m.date) }))
+        // Rescued meals: in localStorage but NOT yet in DB (dedup by date+label+grams+kcal)
+        const rescued = pendingLSArr
+          .filter(([, e]) => e.clientId === c.id)
+          .filter(([, { payload: p }]) => !dbMeals.some(m =>
+            m.date === p.date && m.label === p.label &&
+            Number(m.grams) === Number(p.grams) && Math.round(Number(m.kcal)) === Math.round(Number(p.kcal))
+          ))
+          .map(([tmpId, { payload: p }]) => ({
+            id: tmpId, label: p.label, grams: p.grams, kcal: p.kcal,
+            protein: p.protein, carbs: p.carbs || 0, fat: p.fat || 0, date: p.date,
+          }))
+        // Clean up localStorage entries that ARE already in DB
+        pendingLSArr
+          .filter(([, e]) => e.clientId === c.id)
+          .forEach(([tmpId, { payload: p }]) => {
+            if (dbMeals.some(m =>
+              m.date === p.date && m.label === p.label &&
+              Number(m.grams) === Number(p.grams) && Math.round(Number(m.kcal)) === Math.round(Number(p.kcal))
+            )) { const ls = lsReadPending(); delete ls[tmpId]; lsWritePending(ls) }
+          })
+        return {
         id:             c.id,
         name:           c.name,
         password:       c.password,
         email:          c.email || null,
+        created_at:     c.created_at || null,
         is_coach:       c.is_coach || false,
         calorieTarget:  c.calorie_target  || c.calorieTarget  || 2000,
         proteinTarget:  c.protein_target  || c.proteinTarget  || 140,
-        meals: meals.filter(m => m.client_id === c.id).map(m => ({
-          id: m.id, label: m.label, grams: m.grams, kcal: m.kcal, protein: m.protein, date: m.date,
-        })),
+        meals: [
+          ...dbMeals.map(m => ({
+            id: m.id, label: m.label, grams: m.grams, kcal: m.kcal,
+            protein: m.protein, carbs: m.carbs || 0, fat: m.fat || 0, date: m.date,
+          })),
+          ...rescued,
+        ],
         workouts: workouts.filter(w => w.client_id === c.id)
           .sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))
           .map(w => ({ id: w.id, date: w.date, coach: w.coach, category: w.category, items: w.items || [] })),
         weightLogs: weights.filter(w => w.client_id === c.id)
-          .sort((a, b) => a.date.localeCompare(b.date))
+          .sort((a, b) => parseDate(a.date) - parseDate(b.date))
           .map(w => ({ id: w.id, date: w.date, weight: Number(w.weight) })),
         stepsLogs: stepsRaw.filter(s => s.client_id === c.id)
-          .sort((a, b) => a.date.localeCompare(b.date))
+          .sort((a, b) => parseDate(a.date) - parseDate(b.date))
           .map(s => ({ id: s.id, date: s.date, steps: Number(s.steps) })),
         tasks: tasks
           .filter(tk => tk.client_id === c.id)
@@ -154,7 +209,35 @@ export function AppProvider({ children }) {
           : { protein: true, weight: true, foodLog: true, coach: true },
         synrgStartedAt: c.synrg_started_at || null,
         synrgQuiz:      c.synrg_quiz       || null,
-      })))
+        }
+      }))
+
+      // Retry saving rescued pending meals from localStorage (async, after state settles)
+      if (pendingLSArr.length) {
+        setTimeout(() => {
+          pendingLSArr.forEach(([tmpId, { clientId, payload }]) => {
+            const dbMeals = meals.filter(m => m.client_id === clientId)
+            const alreadyInDB = dbMeals.some(m =>
+              m.date === payload.date && m.label === payload.label &&
+              Number(m.grams) === Number(payload.grams) && Math.round(Number(m.kcal)) === Math.round(Number(payload.kcal))
+            )
+            if (alreadyInDB) return // Already in DB, localStorage cleanup done above
+            // Not in DB — retry save
+            DB.insert('meals', payload)
+              .then(data => {
+                if (data?.id) {
+                  setClients(prev => prev.map(c => c.id === clientId
+                    ? { ...c, meals: c.meals.map(m => m.id === tmpId ? { ...m, id: data.id } : m) }
+                    : c
+                  ))
+                }
+                const ls = lsReadPending(); delete ls[tmpId]; lsWritePending(ls)
+              })
+              .catch(() => { /* network down — will retry on next app load */ })
+          })
+        }, 1500)
+      }
+
       setFeedPosts((postsRaw || []).sort((a, b) => (b.created_at || '').localeCompare(a.created_at || '')))
       setPostReactions(rawPostReactions || [])
       setPostComments(rawPostComments || [])
@@ -167,6 +250,34 @@ export function AppProvider({ children }) {
   }, [])
 
   useEffect(() => { loadAll() }, [loadAll])
+
+  // ── Re-sync meals when app returns to foreground (mobile PWA) ────
+  useEffect(() => {
+    async function onVisible() {
+      if (document.visibilityState !== 'visible') return
+      try {
+        const freshMeals = await DB.selectAll('meals', '&order=id.desc&limit=50000')
+        setClients(prev => prev.map(c => {
+          const saved = freshMeals.filter(m => m.client_id === c.id).map(m => ({
+            id: m.id, label: m.label, grams: m.grams, kcal: m.kcal,
+            protein: m.protein, carbs: m.carbs || 0, fat: m.fat || 0,
+            date: normalizeMealDate(m.date),
+          }))
+          // Keep tmp_ meals that are NOT already saved to DB (prevents duplicates when
+          // a 204 response left a tmpId in state but the meal was actually inserted)
+          const pending = c.meals
+            .filter(m => String(m.id).startsWith('tmp_'))
+            .filter(m => !saved.some(s =>
+              s.date === m.date && s.label === m.label &&
+              Number(s.grams) === Number(m.grams) && Math.round(Number(s.kcal)) === Math.round(Number(m.kcal))
+            ))
+          return { ...c, meals: [...saved, ...pending] }
+        }))
+      } catch { /* silent — offline */ }
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
+  }, [])
 
   // ── Notification polling (coaches only, every 60s) ────────────
   const notifTimerRef = useRef(null)
@@ -181,6 +292,45 @@ export function AppProvider({ children }) {
     notifTimerRef.current = setInterval(pollNotifications, 60000)
     return () => clearInterval(notifTimerRef.current)
   }, [auth.isLoggedIn, auth.role, pollNotifications])
+
+  // ── Periodic data sync for coaches (every 2 min) — keeps ranking/XP fresh ──
+  useEffect(() => {
+    if (!auth.isLoggedIn || (auth.role !== 'coach' && auth.role !== 'admin')) return
+    async function syncFresh() {
+      try {
+        const [freshMeals, freshWeights, freshSteps] = await Promise.all([
+          DB.selectAll('meals', '&order=id.desc&limit=50000'),
+          DB.selectAll('weight_logs'),
+          DB.selectAll('steps_logs').catch(() => []),
+        ])
+        setClients(prev => prev.map(c => {
+          const saved = freshMeals.filter(m => m.client_id === c.id).map(m => ({
+            id: m.id, label: m.label, grams: m.grams, kcal: m.kcal,
+            protein: m.protein, carbs: m.carbs || 0, fat: m.fat || 0,
+            date: normalizeMealDate(m.date),
+          }))
+          const pending = c.meals
+            .filter(m => String(m.id).startsWith('tmp_'))
+            .filter(m => !saved.some(s =>
+              s.date === m.date && s.label === m.label &&
+              Number(s.grams) === Number(m.grams) && Math.round(Number(s.kcal)) === Math.round(Number(m.kcal))
+            ))
+          return {
+            ...c,
+            meals: [...saved, ...pending],
+            weightLogs: freshWeights.filter(w => w.client_id === c.id)
+              .sort((a, b) => parseDate(a.date) - parseDate(b.date))
+              .map(w => ({ id: w.id, date: w.date, weight: Number(w.weight) })),
+            stepsLogs: freshSteps.filter(s => s.client_id === c.id)
+              .sort((a, b) => parseDate(a.date) - parseDate(b.date))
+              .map(s => ({ id: s.id, date: s.date, steps: Number(s.steps) })),
+          }
+        }))
+      } catch { /* silent — offline */ }
+    }
+    const interval = setInterval(syncFresh, 120000)
+    return () => clearInterval(interval)
+  }, [auth.isLoggedIn, auth.role])
 
   // ── Auth ──────────────────────────────────────────────────────
   async function handleLogin(name, pass) {
@@ -441,51 +591,92 @@ export function AppProvider({ children }) {
 
   async function addMealToClient(clientId, meal) {
     if (isTrackerReadOnly) return
-    // Optimistic update — show immediately with temp ID
-    const tmpId = 'tmp_' + Date.now()
-    setClients(prev => prev.map(c => c.id === clientId
-      ? { ...c, meals: [...c.meals, { ...meal, id: tmpId }] }
-      : c
-    ))
-
-    // Try up to 3 times before giving up (handles mobile network glitches)
+    const tmpId = 'tmp_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7)
     const payload = {
       client_id: clientId, date: meal.date, label: meal.label,
       grams: meal.grams, kcal: meal.kcal, protein: meal.protein,
       carbs: meal.carbs || 0, fat: meal.fat || 0,
     }
+
+    // Persist to localStorage BEFORE optimistic update — survives PWA kill on iOS/Android
+    const lsBefore = lsReadPending()
+    lsBefore[tmpId] = { clientId, payload }
+    lsWritePending(lsBefore)
+
+    // Optimistic update — show immediately with temp ID
+    setClients(prev => prev.map(c => c.id === clientId
+      ? { ...c, meals: [...c.meals, { ...meal, id: tmpId }] }
+      : c
+    ))
+
+    // Try up to 5 times with exponential backoff
     let saved = false
-    for (let attempt = 0; attempt < 3; attempt++) {
-      if (attempt > 0) await new Promise(r => setTimeout(r, 800 * attempt))
+    for (let attempt = 0; attempt < 5; attempt++) {
+      if (attempt > 0) await new Promise(r => setTimeout(r, 1000 * attempt))
       try {
         const data = await DB.insert('meals', payload)
-        // Replace temp ID with real DB ID
-        setClients(prev => prev.map(c => c.id === clientId
-          ? { ...c, meals: c.meals.map(m => m.id === tmpId ? { ...m, id: data.id } : m) }
-          : c
-        ))
+        // Replace temp ID with real DB ID (data may be null if server returns 204)
+        if (data?.id) {
+          setClients(prev => prev.map(c => c.id === clientId
+            ? { ...c, meals: c.meals.map(m => m.id === tmpId ? { ...m, id: data.id } : m) }
+            : c
+          ))
+        }
+        // Successfully saved — remove from localStorage
+        const lsAfter = lsReadPending()
+        delete lsAfter[tmpId]
+        lsWritePending(lsAfter)
         saved = true
         break
       } catch { /* retry */ }
     }
 
     if (!saved) {
-      // All 3 attempts failed — rollback and show clear error
+      // All attempts failed — keep the meal visible but flag it so user knows to retry
+      // Leave in localStorage — will be retried on next app load
       setClients(prev => prev.map(c => c.id === clientId
-        ? { ...c, meals: c.meals.filter(m => m.id !== tmpId) }
+        ? { ...c, meals: c.meals.map(m => m.id === tmpId ? { ...m, _failed: true } : m) }
         : c
       ))
-      showSnackbar('Неуспешно запазване — провери интернет и опитай пак', 'error')
+      showSnackbar('Храната НЕ е запазена — провери интернет и въведи отново', 'error')
     }
   }
 
   async function deleteMealFromClient(clientId, mealId) {
     if (isTrackerReadOnly) return
-    await DB.deleteById('meals', mealId)
-    setClients(prev => prev.map(c => c.id === clientId
-      ? { ...c, meals: c.meals.filter(m => m.id !== mealId) }
-      : c
-    ))
+
+    // Pending/unsaved meal (never reached DB) — just clean localStorage and state
+    if (String(mealId).startsWith('tmp_')) {
+      const ls = lsReadPending()
+      delete ls[mealId]
+      lsWritePending(ls)
+      setClients(prev => prev.map(c => c.id === clientId
+        ? { ...c, meals: c.meals.filter(m => m.id !== mealId) }
+        : c
+      ))
+      return
+    }
+
+    // Real DB meal — optimistic delete, restore on failure
+    let deletedMeal = null
+    setClients(prev => prev.map(c => {
+      if (c.id !== clientId) return c
+      deletedMeal = c.meals.find(m => m.id === mealId) || null
+      return { ...c, meals: c.meals.filter(m => m.id !== mealId) }
+    }))
+
+    try {
+      await DB.deleteById('meals', mealId)
+    } catch {
+      // Network failure — restore the meal so nothing is lost
+      if (deletedMeal) {
+        setClients(prev => prev.map(c => c.id === clientId
+          ? { ...c, meals: [...c.meals, deletedMeal] }
+          : c
+        ))
+      }
+      showSnackbar('Грешка при изтриване — провери интернет', 'error')
+    }
   }
 
   async function saveWorkoutToClient(clientId, workout) {
@@ -519,7 +710,7 @@ export function AppProvider({ children }) {
     setClients(prev => prev.map(c => {
       if (c.id !== clientId) return c
       const logs = c.weightLogs.filter(l => l.date !== date)
-      return { ...c, weightLogs: [...logs, { id: data.id, date, weight: Number(weight) }].sort((a, b) => a.date.localeCompare(b.date)) }
+      return { ...c, weightLogs: [...logs, { id: data.id, date, weight: Number(weight) }].sort((a, b) => parseDate(a.date) - parseDate(b.date)) }
     }))
   }
 
@@ -538,7 +729,7 @@ export function AppProvider({ children }) {
     setClients(prev => prev.map(c => {
       if (c.id !== clientId) return c
       const logs = (c.stepsLogs || []).filter(l => l.date !== date)
-      return { ...c, stepsLogs: [...logs, { id: data.id, date, steps: Number(steps) }].sort((a, b) => a.date.localeCompare(b.date)) }
+      return { ...c, stepsLogs: [...logs, { id: data.id, date, steps: Number(steps) }].sort((a, b) => parseDate(a.date) - parseDate(b.date)) }
     }))
   }
 

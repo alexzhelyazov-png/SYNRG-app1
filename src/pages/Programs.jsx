@@ -74,7 +74,7 @@ function formatPrice(cents, currency, t) {
 }
 
 // ── Programs List View ──────────────────────────────────────
-function ProgramsList({ programs, progress, lessons, purchases, onSelect, onBuy, buyLoading, t, lang, auth }) {
+function ProgramsList({ programs, progress, lessons, purchases, onSelect, onBuy, buyLoading, t, lang, auth, setView }) {
   const n = (p) => lang === 'en' && p.name_en ? p.name_en : p.name_bg
   const d = (p) => lang === 'en' && p.description_en ? p.description_en : p.description_bg
 
@@ -94,6 +94,68 @@ function ProgramsList({ programs, progress, lessons, purchases, onSelect, onBuy,
       )}
 
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2.5 }}>
+        {/* SYNRG Method — virtual program card, always last */}
+        {auth.role === 'client' && (() => {
+          const hasSynrg = hasModule(auth.modules || [], 'synrg_method')
+          return (
+            <Paper
+              key="synrg_method_card"
+              onClick={() => { if (hasSynrg) setView('synrg_method') }}
+              sx={{
+                cursor: hasSynrg ? 'pointer' : 'default',
+                overflow: 'hidden', p: 0,
+                animation: `fadeInUp 0.3s ${EASE.standard} both`,
+                animationDelay: `${programs.length * 0.08}s`,
+                opacity: hasSynrg ? 1 : 0.85,
+                '&:hover': hasSynrg ? { transform: 'translateY(-3px)' } : {},
+              }}
+            >
+              {/* Cover — gradient */}
+              <Box sx={{
+                width: '100%', pt: '50%', position: 'relative',
+                background: `linear-gradient(135deg, rgba(170,169,205,0.35) 0%, rgba(196,233,191,0.2) 100%)`,
+              }}>
+                {!hasSynrg && (
+                  <Box sx={{
+                    position: 'absolute', top: 12, right: 12,
+                    background: 'rgba(0,0,0,0.65)', color: '#fff',
+                    borderRadius: '12px', px: 1.25, py: 0.4,
+                    fontSize: '11px', fontWeight: 800, letterSpacing: '0.5px',
+                    display: 'flex', alignItems: 'center', gap: 0.5,
+                  }}>
+                    <LockSvg />
+                    SYNRG ONLINE
+                  </Box>
+                )}
+              </Box>
+              {/* Card body */}
+              <Box sx={{ p: 2.5 }}>
+                <Typography sx={{ fontWeight: 800, fontSize: '18px', color: C.text, mb: 0.5, lineHeight: 1.3 }}>
+                  {lang === 'en' ? 'SYNRG Method' : 'SYNRG метод'}
+                </Typography>
+                <Typography sx={{
+                  fontSize: '13px', color: C.muted, mb: 2, lineHeight: 1.5,
+                  display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
+                }}>
+                  {lang === 'en'
+                    ? '5-week habit-building program — included with SYNRG ONLINE'
+                    : '5-седмична програма за здравословни навици — включена в SYNRG ONLINE'}
+                </Typography>
+                {hasSynrg ? (
+                  <Button fullWidth variant="contained" size="small"
+                    onClick={(e) => { e.stopPropagation(); setView('synrg_method') }}>
+                    {t('startProgram')}
+                  </Button>
+                ) : (
+                  <Button fullWidth variant="contained" size="small" disabled
+                    sx={{ '&.Mui-disabled': { background: 'rgba(196,209,205,0.08) !important', color: 'rgba(196,209,205,0.35) !important' } }}>
+                    {lang === 'en' ? 'Included with SYNRG ONLINE' : 'Включен в SYNRG ONLINE'}
+                  </Button>
+                )}
+              </Box>
+            </Paper>
+          )
+        })()}
         {programs.map((prog, i) => {
           const hasAccess = canAccessProgram(auth, prog, purchases)
           const isPaid = prog.price_cents > 0
@@ -730,7 +792,7 @@ function StepView({ step, allSteps, progress, onBack, onToggle, onNavigate, t, l
 // MAIN PROGRAMS PAGE
 // ══════════════════════════════════════════════════════════════
 export default function Programs() {
-  const { auth, t, lang, showSnackbar } = useApp()
+  const { auth, t, lang, showSnackbar, setView } = useApp()
 
   const [tab, setTab] = useState('programs') // 'programs' | 'resources'
   const [programs, setPrograms]   = useState([])
@@ -943,7 +1005,7 @@ export default function Programs() {
       {tab === 'programs' && (
         <ProgramsList programs={programs} progress={progress} lessons={lessons} purchases={purchases}
           onSelect={(p) => { setSelectedProgram(p); window.scrollTo({ top: 0, behavior: 'smooth' }) }}
-          onBuy={handleBuy} buyLoading={buyLoading} t={t} lang={lang} auth={auth} />
+          onBuy={handleBuy} buyLoading={buyLoading} t={t} lang={lang} auth={auth} setView={setView} />
       )}
       {tab === 'resources' && (
         <ResourcesList resources={resources} resourceSteps={resourceSteps} resourceProgress={resourceProgress}

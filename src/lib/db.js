@@ -46,6 +46,7 @@ const SB = {
       method: 'POST',
       headers: sbHeaders({ 'Prefer': 'return=representation' }),
       body: JSON.stringify(row),
+      keepalive: true, // Survive page unload / iOS PWA backgrounding
     })
     return Array.isArray(data) ? data[0] : data
   },

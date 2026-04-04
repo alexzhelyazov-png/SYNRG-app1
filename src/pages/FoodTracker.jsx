@@ -1,6 +1,7 @@
-import { Box, Typography, TextField, Button, Chip, Paper, IconButton } from '@mui/material'
-import ChevronLeftIcon  from '@mui/icons-material/ChevronLeft'
-import ChevronRightIcon from '@mui/icons-material/ChevronRight'
+import { Box, Typography, TextField, Button, Chip, Paper, IconButton, Tooltip } from '@mui/material'
+import ChevronLeftIcon    from '@mui/icons-material/ChevronLeft'
+import ChevronRightIcon   from '@mui/icons-material/ChevronRight'
+import WarningAmberIcon   from '@mui/icons-material/WarningAmber'
 import { useApp } from '../context/AppContext'
 import { quickFoods, foodDB, foodLabel } from '../lib/constants'
 import { C, EASE } from '../theme'
@@ -182,12 +183,23 @@ export default function FoodTracker() {
                   borderRadius: '8px',
                   px:           1,
                   mx:           -1,
-                  '&:hover':    { background: 'rgba(255,255,255,0.025)' },
+                  background:   item._failed ? 'rgba(255,100,80,0.08)' : undefined,
+                  outline:      item._failed ? '1px solid rgba(255,100,80,0.3)' : undefined,
+                  '&:hover':    { background: item._failed ? 'rgba(255,100,80,0.12)' : 'rgba(255,255,255,0.025)' },
                   animation:    `fadeIn 0.2s ${EASE.standard} both`,
                   animationDelay: `${i * 0.04}s`,
                 }}
               >
-                <Typography sx={{ fontWeight: 600, fontSize: '14px' }}>{lang === 'en' ? (foodDB[item.key]?.labelEn || item.label) : item.label}</Typography>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+                  {item._failed && (
+                    <Tooltip title="Не е запазено — провери интернет" placement="top">
+                      <WarningAmberIcon sx={{ fontSize: 15, color: 'rgba(255,160,60,0.85)', flexShrink: 0 }} />
+                    </Tooltip>
+                  )}
+                  <Typography sx={{ fontWeight: 600, fontSize: '14px', color: item._failed ? 'rgba(255,180,120,0.9)' : undefined }}>
+                    {lang === 'en' ? (foodDB[item.key]?.labelEn || item.label) : item.label}
+                  </Typography>
+                </Box>
                 <Typography variant="body2" sx={{ color: C.muted }}>{item.grams}{t('gUnit')}</Typography>
                 {!isMobile && (
                   <Typography variant="body2" sx={{ color: C.text }}>

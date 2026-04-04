@@ -5,6 +5,7 @@ import {
   MenuItem, Select, FormControl, InputLabel, CircularProgress,
   Tab, Tabs, Alert, Collapse, useMediaQuery,
   Checkbox, FormControlLabel,
+  RadioGroup, Radio, FormLabel, LinearProgress,
 } from '@mui/material'
 import { useTheme }          from '@mui/material/styles'
 import CalendarMonthIcon     from '@mui/icons-material/CalendarMonth'
@@ -24,6 +25,8 @@ import ExpandLessIcon        from '@mui/icons-material/ExpandLess'
 import ChevronLeftIcon       from '@mui/icons-material/ChevronLeft'
 import ChevronRightIcon      from '@mui/icons-material/ChevronRight'
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings'
+import EmailIcon               from '@mui/icons-material/Email'
+import LocalFireDepartmentIcon from '@mui/icons-material/LocalFireDepartment'
 import Switch                from '@mui/material/Switch'
 import { useApp }            from '../context/AppContext'
 import SiteTab               from './AdminSiteTab'
@@ -38,10 +41,21 @@ import {
   occupancyStr, planLabel, fmtValidTo, isPlanActive, creditsRemaining,
   daysUntilExpiry, effectiveValidTo, isFullAdmin,
 } from '../lib/bookingUtils'
+import { parseDate } from '../lib/utils'
 
 const PLAN_TYPES = ['8', '12', 'unlimited']
 const DEFAULT_PRICES = { '8': 154, '12': 179, 'unlimited': 202 }
 const WEEKDAY_KEYS = [1, 2, 3, 4, 5, 6, 0] // Mon–Sun display order
+
+// ── Branded email HTML builder ────────────────────────────────
+function buildBroadcastHtml(text) {
+  const escaped = (text || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br/>')
+  return `<div style="font-family:sans-serif;max-width:520px;margin:0 auto;padding:32px;background:#111;color:#e0e0e0;border-radius:16px">
+    <h2 style="color:#c4e9bf;margin:0 0 16px;font-size:20px;font-weight:800">SYNRG Beyond Fitness</h2>
+    <div style="font-size:15px;line-height:1.7;color:#ccc">${escaped}</div>
+    <p style="margin-top:32px;font-size:12px;color:#555">synrg-beyondfitness.com</p>
+  </div>`
+}
 
 // ── Stat Card (dashboard) ────────────────────────────────────
 function StatCard({ icon: Icon, label, value, color, onClick }) {
@@ -911,6 +925,132 @@ function AddClientDialog({ open, onClose, onAdd, slot, realClients, t }) {
   )
 }
 
+// ── Broadcast Email Dialog ────────────────────────────────────
+function BroadcastDialog({ open, onClose, clients, allPlans, t, singleClient }) {
+  const [target,   setTarget]   = useState(singleClient ? 'single' : 'free')
+  const [subject,  setSubject]  = useState('')
+  const [message,  setMessage]  = useState('')
+  const [sending,  setSending]  = useState(false)
+  const [sent,     setSent]     = useState(false)
+  const [progress, setProgress] = useState(0)
+
+  function isFreeClient(c) {
+    const mods = c.modules || []
+    return mods.length > 0 &&
+      !['studio_access', 'program_access', 'booking_access'].some(m => mods.includes(m)) &&
+      !allPlans.find(p => p.client_id === c.id && p.status === 'active')
+  }
+
+  const recipients = (() => {
+    if (singleClient) return singleClient.email ? [singleClient] : []
+    const base = clients.filter(c => c.email)
+    if (target === 'all')  return base
+    if (target === 'free') return base.filter(isFreeClient)
+    if (target === 'paid') return base.filter(c => allPlans.find(p => p.client_id === c.id && p.status === 'active'))
+    return []
+  })()
+
+  async function handleSend() {
+    if (!subject.trim() || !message.trim() || recipients.length === 0) return
+    setSending(true)
+    setProgress(0)
+    const html = buildBroadcastHtml(message)
+    for (let i = 0; i < recipients.length; i++) {
+      const r = recipients[i]
+      await DB.syncToMailerLite('send_email', r.email, r.name, {}, subject.trim(), html)
+      setProgress(Math.round(((i + 1) / recipients.length) * 100))
+    }
+    setSending(false)
+    setSent(true)
+  }
+
+  function handleClose() {
+    setTarget(singleClient ? 'single' : 'free')
+    setSubject(''); setMessage(''); setSending(false); setSent(false); setProgress(0)
+    onClose()
+  }
+
+  const inputSx = {
+    '& .MuiInputBase-input':               { color: '#e0e0e0' },
+    '& .MuiOutlinedInput-notchedOutline':  { borderColor: 'rgba(255,255,255,0.15)' },
+    '& .MuiInputLabel-root':               { color: 'rgba(255,255,255,0.4)' },
+    '& .MuiInputBase-input::-webkit-scrollbar': { width: '4px' },
+  }
+
+  return (
+    <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth
+      PaperProps={{ sx: { borderRadius: '20px', background: '#1a1a1a', border: '1px solid rgba(255,255,255,0.1)' } }}>
+      <DialogTitle sx={{ fontWeight: 700, color: '#e0e0e0', display: 'flex', alignItems: 'center', gap: 1 }}>
+        <EmailIcon sx={{ fontSize: 20, color: '#c4e9bf' }} />
+        {t('broadcastTitle')}
+      </DialogTitle>
+      <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, pt: '8px !important' }}>
+
+        {/* Target selector — only show when not single */}
+        {!singleClient && (
+          <FormControl component="fieldset">
+            <FormLabel sx={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)', mb: 0.5 }}>
+              {t('broadcastTargetLbl')}
+            </FormLabel>
+            <RadioGroup row value={target} onChange={e => setTarget(e.target.value)}>
+              {[
+                { val: 'all',  label: t('broadcastTargetAll') },
+                { val: 'free', label: t('broadcastTargetFree') },
+                { val: 'paid', label: t('broadcastTargetPaid') },
+              ].map(({ val, label }) => (
+                <FormControlLabel key={val} value={val} control={<Radio size="small" sx={{ color: 'rgba(255,255,255,0.4)', '&.Mui-checked': { color: '#c4e9bf' } }} />}
+                  label={<Typography sx={{ fontSize: '13px', color: '#ccc' }}>{label}</Typography>} />
+              ))}
+            </RadioGroup>
+          </FormControl>
+        )}
+
+        {/* Recipient count */}
+        <Typography sx={{ fontSize: '12px', color: 'rgba(255,255,255,0.45)', mt: -1.5 }}>
+          {t('broadcastTargetLbl')}: {recipients.length} {recipients.length === 1 ? 'клиент' : 'клиента'}{recipients.length < (singleClient ? 1 : clients.filter(c => c.email).length) && ` (${clients.filter(c => c.email).length - recipients.length} нямат имейл)`}
+        </Typography>
+
+        <TextField label={t('broadcastSubject')} size="small" fullWidth
+          value={subject} onChange={e => setSubject(e.target.value)} sx={inputSx} />
+
+        <TextField label={t('broadcastMessage')} size="small" fullWidth multiline rows={6}
+          value={message} onChange={e => setMessage(e.target.value)} sx={inputSx} />
+
+        {/* Progress bar during send */}
+        {sending && (
+          <Box>
+            <LinearProgress variant="determinate" value={progress}
+              sx={{ borderRadius: '4px', height: '6px', backgroundColor: 'rgba(196,233,191,0.15)',
+                '& .MuiLinearProgress-bar': { backgroundColor: '#c4e9bf' } }} />
+            <Typography sx={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', mt: 0.5 }}>
+              {t('broadcastSending')} {progress}%
+            </Typography>
+          </Box>
+        )}
+
+        {sent && (
+          <Alert severity="success" sx={{ borderRadius: '10px', background: 'rgba(196,233,191,0.1)', color: '#c4e9bf' }}>
+            {t('broadcastSent')}
+          </Alert>
+        )}
+      </DialogContent>
+      <DialogActions sx={{ px: 3, pb: 2.5, gap: 1 }}>
+        <Button onClick={handleClose} sx={{ color: 'rgba(255,255,255,0.4)' }}>
+          {sent ? 'Затвори' : 'Откажи'}
+        </Button>
+        {!sent && (
+          <Button variant="contained" onClick={handleSend}
+            disabled={sending || !subject.trim() || !message.trim() || recipients.length === 0}
+            sx={{ background: '#c4e9bf', color: '#0f1c11', fontWeight: 700,
+              '&:disabled': { background: 'rgba(196,233,191,0.2)', color: 'rgba(255,255,255,0.3)' } }}>
+            {sending ? <CircularProgress size={16} sx={{ color: '#0f1c11' }} /> : t('broadcastSendBtn')}
+          </Button>
+        )}
+      </DialogActions>
+    </Dialog>
+  )
+}
+
 // ── Plans Tab ────────────────────────────────────────────────
 function PlansTab({ t }) {
   const { realClients, showSnackbar } = useApp()
@@ -1107,10 +1247,16 @@ function ClientsTab({ t }) {
 
   const searchMatch = (c) => !clientSearch || c.name.toLowerCase().includes(clientSearch.toLowerCase())
 
+  const isFreeRegistered = c => {
+    const mods = c.modules || []
+    return mods.length > 0 &&
+      !mods.includes('studio_access') && !mods.includes('program_access') && !mods.includes('booking_access') &&
+      !getClientPlan(c.id)
+  }
   const pending  = realClients.filter(c => {
     if (!searchMatch(c)) return false
     const p = getClientPlan(c.id)
-    if (!p) return (c.modules || []).includes('studio_access')
+    if (!p) return (c.modules || []).includes('studio_access') || isFreeRegistered(c)
     return !isPlanActive(p)
   })
   const active   = realClients.filter(c => {
@@ -1216,7 +1362,9 @@ function ClientsTab({ t }) {
 // ── Analytics Tab (monthly) ───────────────────────────────────
 function AnalyticsTab({ t }) {
   const { allPlans, loadAllPlans } = useBooking()
-  const [expenses, setExpenses] = useState([])
+  const { realClients } = useApp()
+  const [expenses,          setExpenses]          = useState([])
+  const [programPurchases,  setProgramPurchases]  = useState([])
   const [month, setMonth] = useState(() => {
     const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
   })
@@ -1224,6 +1372,7 @@ function AnalyticsTab({ t }) {
   useEffect(() => {
     loadAllPlans()
     DB.selectAll('expenses').then(rows => setExpenses(rows || []))
+    DB.selectAll('program_purchases').then(rows => setProgramPurchases(rows || [])).catch(() => {})
   }, []) // eslint-disable-line
 
   // Filter by selected month
@@ -1246,6 +1395,44 @@ function AnalyticsTab({ t }) {
   const revenue = monthPlans.reduce((sum, p) => sum + (Number(p.price) || 0), 0)
   const expTotal = monthExpenses.reduce((sum, e) => sum + (Number(e.amount) || 0), 0)
   const profit = revenue - expTotal
+
+  // ── Extra metrics ──────────────────────────────────────────
+  // Online revenue (program_purchases) for month
+  const onlineOrders = programPurchases.filter(o => {
+    const d = (o.created_at || '').slice(0, 10)
+    return d >= monthStart && d < nextMonth &&
+      (o.status === 'paid' || o.status === 'complete' || o.status === 'succeeded')
+  })
+  const onlineRev = onlineOrders.reduce((s, o) => s + (Number(o.amount_total || o.amount || 0) / 100), 0)
+
+  // Conversion rate
+  const activePlanIds = new Set(allPlans.filter(p => p.status === 'active').map(p => p.client_id))
+  const paidCount  = activePlanIds.size
+  const convRate   = realClients.length ? Math.round(paidCount / realClients.length * 100) : 0
+
+  // Active clients last 30 days
+  const thirtyAgo = new Date(Date.now() - 30 * 86400000)
+  function lastActiveDate(c) {
+    const dates = [
+      ...(c.meals      || []).map(m => m.date),
+      ...(c.weightLogs || []).map(w => w.date),
+      ...(c.stepsLogs  || []).map(s => s.date),
+      ...(c.workouts   || []).map(w => w.date),
+    ].filter(Boolean)
+    if (!dates.length) return null
+    return dates.sort((a, b) => parseDate(b) - parseDate(a))[0]
+  }
+  const activeCount = realClients.filter(c => {
+    const last = lastActiveDate(c)
+    return last && parseDate(last) >= thirtyAgo
+  }).length
+
+  // Plan breakdown
+  const activePlans    = allPlans.filter(p => p.status === 'active')
+  const plan8Count     = activePlans.filter(p => p.plan_type === '8').length
+  const plan12Count    = activePlans.filter(p => p.plan_type === '12').length
+  const planUCount     = activePlans.filter(p => p.plan_type === 'unlimited').length
+  const planTotal      = plan8Count + plan12Count + planUCount || 1
 
   // Month navigation
   const prevMonth = () => {
@@ -1276,6 +1463,17 @@ function AnalyticsTab({ t }) {
         fontFamily: "'MontBlanc', sans-serif", lineHeight: 1, letterSpacing: '-1px' }}>
         {value} <Typography component="span" sx={{ fontSize: '18px', fontWeight: 600,
           color: positive ? C.text : '#F87171', fontFamily: "'MontBlanc', sans-serif" }}>€</Typography>
+      </Typography>
+    </Paper>
+  )
+
+  const miniStat = (label, value, unit = '') => (
+    <Paper sx={{ p: 2, borderRadius: '14px', flex: 1, border: `1px solid ${C.border}`, background: 'rgba(255,255,255,0.02)' }}>
+      <Typography sx={{ fontSize: '10px', color: C.muted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.6px', mb: 0.5 }}>
+        {label}
+      </Typography>
+      <Typography sx={{ fontSize: '22px', fontWeight: 800, color: C.text, fontFamily: "'MontBlanc', sans-serif", lineHeight: 1 }}>
+        {value}<Typography component="span" sx={{ fontSize: '14px', fontWeight: 600, color: C.muted }}>{unit}</Typography>
       </Typography>
     </Paper>
   )
@@ -1311,6 +1509,67 @@ function AnalyticsTab({ t }) {
           {profit >= 0 ? '+' : ''}{profit} €
         </Typography>
       </Paper>
+
+      {/* ── Extra metrics ── */}
+      <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap' }}>
+        {miniStat(t('conversionLbl'), `${convRate}`, '%')}
+        {miniStat(t('activeClientsLbl'), activeCount)}
+        {miniStat(t('onlineRevenueLbl'), onlineRev.toFixed(0), ' €')}
+      </Box>
+
+      {/* Studio vs Online revenue split */}
+      {(revenue > 0 || onlineRev > 0) && (
+        <Paper sx={{ p: 2, borderRadius: '14px', border: `1px solid ${C.border}` }}>
+          <Typography sx={{ fontSize: '10px', color: C.muted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.6px', mb: 1.5 }}>
+            {t('studioRevenueLbl')} vs {t('onlineRevenueLbl')}
+          </Typography>
+          {[
+            { label: t('studioRevenueLbl'), val: revenue,    color: '#aaa9cd' },
+            { label: t('onlineRevenueLbl'), val: onlineRev,  color: '#c4e9bf' },
+          ].map(({ label, val, color }) => {
+            const total = Math.max(revenue + onlineRev, 1)
+            const pct = Math.round(val / total * 100)
+            return (
+              <Box key={label} sx={{ mb: 1 }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.4 }}>
+                  <Typography sx={{ fontSize: '12px', color: C.muted }}>{label}</Typography>
+                  <Typography sx={{ fontSize: '12px', fontWeight: 700, color }}>{val.toFixed(0)} € ({pct}%)</Typography>
+                </Box>
+                <LinearProgress variant="determinate" value={pct}
+                  sx={{ borderRadius: '4px', height: '5px', backgroundColor: 'rgba(255,255,255,0.07)',
+                    '& .MuiLinearProgress-bar': { backgroundColor: color } }} />
+              </Box>
+            )
+          })}
+        </Paper>
+      )}
+
+      {/* Plan breakdown */}
+      {activePlans.length > 0 && (
+        <Paper sx={{ p: 2, borderRadius: '14px', border: `1px solid ${C.border}` }}>
+          <Typography sx={{ fontSize: '10px', color: C.muted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.6px', mb: 1.5 }}>
+            {t('planBreakdownLbl')} ({activePlans.length})
+          </Typography>
+          {[
+            { label: '8 тр.', count: plan8Count,  color: '#60A5FA' },
+            { label: '12 тр.', count: plan12Count, color: '#aaa9cd' },
+            { label: 'Unlimited', count: planUCount, color: '#c4e9bf' },
+          ].map(({ label, count, color }) => {
+            const pct = Math.round(count / planTotal * 100)
+            return (
+              <Box key={label} sx={{ mb: 1 }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.4 }}>
+                  <Typography sx={{ fontSize: '12px', color: C.muted }}>{label}</Typography>
+                  <Typography sx={{ fontSize: '12px', fontWeight: 700, color }}>{count} ({pct}%)</Typography>
+                </Box>
+                <LinearProgress variant="determinate" value={pct}
+                  sx={{ borderRadius: '4px', height: '5px', backgroundColor: 'rgba(255,255,255,0.07)',
+                    '& .MuiLinearProgress-bar': { backgroundColor: color } }} />
+              </Box>
+            )
+          })}
+        </Paper>
+      )}
     </Box>
   )
 }
@@ -1539,8 +1798,9 @@ function CoachesTab({ t }) {
 function DashboardTab({ t, lang, setTab }) {
   const { realClients, showSnackbar, setConfirmDelete, updateClientModules } = useApp()
   const { allPlans, loadAllPlans, activatePlan, extendPlan, adjustCredits } = useBooking()
-  const [loaded, setLoaded] = useState(false)
-  const [planDlg, setPlanDlg] = useState(null)
+  const [loaded,       setLoaded]       = useState(false)
+  const [planDlg,      setPlanDlg]      = useState(null)
+  const [broadcastDlg, setBroadcastDlg] = useState(null) // null | 'free' | { singleClient }
 
   useEffect(() => {
     loadAllPlans().then(() => setLoaded(true))
@@ -1548,6 +1808,33 @@ function DashboardTab({ t, lang, setTab }) {
 
   function getActivePlan(clientId) {
     return allPlans.find(p => p.client_id === clientId && p.status === 'active') || null
+  }
+
+  // ── Lead helpers ──────────────────────────────────────────
+  function computeLastActive(c) {
+    const dates = [
+      ...(c.meals      || []).map(m => m.date),
+      ...(c.weightLogs || []).map(w => w.date),
+      ...(c.stepsLogs  || []).map(s => s.date),
+      ...(c.workouts   || []).map(w => w.date),
+    ].filter(Boolean)
+    if (!dates.length) return null
+    return dates.sort((a, b) => parseDate(b) - parseDate(a))[0]
+  }
+
+  const todayMs = Date.now()
+  function scoreLead(c) {
+    const last = computeLastActive(c)
+    if (!last) return 'cold'
+    const days = Math.round((todayMs - parseDate(last)) / 86400000)
+    if (days <= 7)  return 'hot'
+    if (days <= 30) return 'warm'
+    return 'cold'
+  }
+
+  function daysSinceReg(c) {
+    if (!c.created_at) return null
+    return Math.round((todayMs - new Date(c.created_at).getTime()) / 86400000)
   }
 
   async function handleAddPlan(client) {
@@ -1580,7 +1867,14 @@ function DashboardTab({ t, lang, setTab }) {
     await loadAllPlans()
   }
 
-  const newRegs    = realClients.filter(c => !(c.modules || []).length)
+  const isFreeReg  = c => {
+    const mods = c.modules || []
+    return mods.length > 0 &&
+      !mods.includes('studio_access') && !mods.includes('program_access') && !mods.includes('booking_access') &&
+      !getActivePlan(c.id)
+  }
+  const newRegs    = realClients.filter(c => !(c.modules || []).length || isFreeReg(c))
+  const leads      = newRegs.filter(isFreeReg) // free registered users only (not empty-module ghosts)
   const pending    = realClients.filter(c => !getActivePlan(c.id) && (c.modules || []).includes('studio_access'))
   const expiring   = realClients.filter(c => {
     const p = getActivePlan(c.id)
@@ -1683,11 +1977,201 @@ function DashboardTab({ t, lang, setTab }) {
         </>
       )}
 
+      {/* Leads section */}
+      {leads.length > 0 && (
+        <>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+            <LocalFireDepartmentIcon sx={{ fontSize: 16, color: '#FBBF24' }} />
+            <Typography sx={{ fontWeight: 700, fontSize: '14px', color: '#FBBF24', flex: 1 }}>
+              {t('leadsTitle')} ({leads.length})
+            </Typography>
+            <Tooltip title={t('broadcastBtn')} arrow>
+              <IconButton size="small" onClick={() => setBroadcastDlg('free')}
+                sx={{ color: '#60A5FA', border: '1px solid rgba(96,165,250,0.3)', borderRadius: '8px',
+                  '&:hover': { background: 'rgba(96,165,250,0.1)' } }}>
+                <EmailIcon sx={{ fontSize: 16 }} />
+              </IconButton>
+            </Tooltip>
+          </Box>
+          <Paper sx={{ borderRadius: '14px', border: '1px solid rgba(251,191,36,0.2)', mb: 2, overflow: 'hidden' }}>
+            {leads.map(c => {
+              const score   = scoreLead(c)
+              const lastAct = computeLastActive(c)
+              const dReg    = daysSinceReg(c)
+              const scoreColor = score === 'hot' ? '#c4e9bf' : score === 'warm' ? '#FBBF24' : 'rgba(255,255,255,0.3)'
+              const scoreLabel = score === 'hot' ? t('leadsHot') : score === 'warm' ? t('leadsWarm') : t('leadsCold')
+              return (
+                <Box key={c.id} sx={{ px: 2, py: 1.25, display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap',
+                  borderBottom: `1px solid ${C.border}`, '&:last-child': { borderBottom: 'none' } }}>
+                  <Typography sx={{ fontWeight: 600, fontSize: '13px', color: C.text, flex: 1, minWidth: 80 }}>{c.name}</Typography>
+                  <Chip label={scoreLabel} size="small" sx={{
+                    height: '18px', fontSize: '10px', fontWeight: 700,
+                    background: `${scoreColor}22`, color: scoreColor, border: `1px solid ${scoreColor}44`,
+                  }} />
+                  {lastAct && (
+                    <Typography sx={{ fontSize: '11px', color: C.muted, display: { xs: 'none', sm: 'block' } }}>
+                      {lastAct}
+                    </Typography>
+                  )}
+                  {dReg !== null && (
+                    <Typography sx={{ fontSize: '11px', color: C.muted }}>
+                      {dReg}{'\u00A0'}{t('leadsDaySince')}
+                    </Typography>
+                  )}
+                  <Tooltip title={t('sendOfferBtn')} arrow>
+                    <IconButton size="small" onClick={() => setBroadcastDlg({ singleClient: c })}
+                      sx={{ color: '#60A5FA', '&:hover': { color: '#93C5FD' } }}>
+                      <EmailIcon sx={{ fontSize: 15 }} />
+                    </IconButton>
+                  </Tooltip>
+                </Box>
+              )
+            })}
+          </Paper>
+        </>
+      )}
+
       {planDlg && (
         <PlanDialog open={!!planDlg} onClose={() => setPlanDlg(null)}
           onActivate={handleActivate} onExtend={handleExtend}
           onAdjust={handleAdjust} onTogglePaid={handleTogglePaid}
           client={planDlg.client} plan={planDlg.plan} t={t} />
+      )}
+
+      {broadcastDlg && (
+        <BroadcastDialog
+          open
+          onClose={() => setBroadcastDlg(null)}
+          clients={realClients}
+          allPlans={allPlans}
+          t={t}
+          singleClient={broadcastDlg?.singleClient || null}
+        />
+      )}
+    </Box>
+  )
+}
+
+// ── Orders Tab (Online purchases) ────────────────────────────
+function OrdersTab({ t }) {
+  const { realClients } = useApp()
+  const [orders,  setOrders]  = useState([])
+  const [loaded,  setLoaded]  = useState(false)
+  const [month,   setMonth]   = useState(() => {
+    const d = new Date()
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+  })
+
+  useEffect(() => {
+    DB.selectAll('program_purchases').then(rows => {
+      setOrders(rows || [])
+      setLoaded(true)
+    }).catch(() => setLoaded(true))
+  }, [])
+
+  const monthStart = `${month}-01`
+  const nextMonth = (() => {
+    const [y, m] = month.split('-').map(Number)
+    return m === 12 ? `${y + 1}-01-01` : `${y}-${String(m + 1).padStart(2, '0')}-01`
+  })()
+
+  const filtered = orders.filter(o => {
+    const d = (o.created_at || '').slice(0, 10)
+    return d >= monthStart && d < nextMonth
+  })
+
+  const totalRev = filtered.filter(o => o.status === 'paid' || o.status === 'complete' || o.status === 'succeeded')
+    .reduce((s, o) => s + (Number(o.amount_total || o.amount || 0) / 100), 0)
+
+  const prevMonthFn = () => {
+    const [y, m] = month.split('-').map(Number)
+    setMonth(m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, '0')}`)
+  }
+  const nextMonthFn = () => {
+    const [y, m] = month.split('-').map(Number)
+    setMonth(m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, '0')}`)
+  }
+
+  const MONTH_NAMES_BG = ['', 'Януари', 'Февруари', 'Март', 'Април', 'Май', 'Юни', 'Юли', 'Август', 'Септември', 'Октомври', 'Ноември', 'Декември']
+  const [y, m] = month.split('-').map(Number)
+  const monthLabel = `${MONTH_NAMES_BG[m]} ${y}`
+
+  function statusChip(status) {
+    const isPaid = status === 'paid' || status === 'complete' || status === 'succeeded'
+    const color = isPaid ? '#c4e9bf' : status === 'pending' ? '#FBBF24' : '#F87171'
+    const label = isPaid ? t('orderStatusPaid') : status === 'pending' ? t('orderStatusPending') : t('orderStatusFailed')
+    return (
+      <Chip label={label} size="small" sx={{
+        height: '20px', fontSize: '10px', fontWeight: 700,
+        background: `${color}22`, color,
+        border: `1px solid ${color}44`,
+      }} />
+    )
+  }
+
+  return (
+    <Box>
+      {/* Month nav */}
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2, mb: 2.5 }}>
+        <IconButton size="small" onClick={prevMonthFn} sx={{ color: 'rgba(255,255,255,0.4)' }}>
+          <Typography sx={{ fontSize: '18px', fontWeight: 800 }}>‹</Typography>
+        </IconButton>
+        <Typography sx={{ fontSize: '16px', fontWeight: 800, color: '#e0e0e0', minWidth: '160px', textAlign: 'center' }}>
+          {monthLabel}
+        </Typography>
+        <IconButton size="small" onClick={nextMonthFn} sx={{ color: 'rgba(255,255,255,0.4)' }}>
+          <Typography sx={{ fontSize: '18px', fontWeight: 800 }}>›</Typography>
+        </IconButton>
+      </Box>
+
+      {/* Summary */}
+      <Paper sx={{ p: 2, borderRadius: '14px', border: '1px solid rgba(196,233,191,0.2)',
+        background: 'rgba(196,233,191,0.04)', mb: 2.5, display: 'flex', alignItems: 'center', gap: 2 }}>
+        <Typography sx={{ fontSize: '11px', color: 'rgba(255,255,255,0.5)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.6px', flex: 1 }}>
+          {t('onlineRevenueLbl')} · {filtered.length} поръчки
+        </Typography>
+        <Typography sx={{ fontSize: '24px', fontWeight: 800, color: '#c4e9bf', fontFamily: "'MontBlanc', sans-serif" }}>
+          {totalRev.toFixed(0)} <Typography component="span" sx={{ fontSize: '14px', fontWeight: 600, color: '#c4e9bf' }}>€</Typography>
+        </Typography>
+      </Paper>
+
+      {!loaded ? (
+        <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+          <CircularProgress size={24} sx={{ color: '#c4e9bf' }} />
+        </Box>
+      ) : filtered.length === 0 ? (
+        <Typography sx={{ color: 'rgba(255,255,255,0.4)', textAlign: 'center', py: 3 }}>{t('noOrders')}</Typography>
+      ) : (
+        <Paper sx={{ borderRadius: '14px', border: '1px solid rgba(255,255,255,0.08)', overflow: 'hidden' }}>
+          {filtered
+            .slice()
+            .sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))
+            .map((o, idx) => {
+              const client = realClients.find(c => c.id === o.client_id)
+              const amount = (Number(o.amount_total || o.amount || 0) / 100).toFixed(0)
+              const date   = (o.created_at || '').slice(0, 10)
+              return (
+                <Box key={o.id || idx} sx={{
+                  px: 2, py: 1.25, display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap',
+                  borderBottom: '1px solid rgba(255,255,255,0.06)', '&:last-child': { borderBottom: 'none' },
+                }}>
+                  <Typography sx={{ fontWeight: 600, fontSize: '13px', color: '#e0e0e0', flex: 1, minWidth: 100 }}>
+                    {client?.name || o.client_name || '-'}
+                  </Typography>
+                  <Typography sx={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)', flex: 2, minWidth: 120 }}>
+                    {o.program_title || o.product_name || '-'}
+                  </Typography>
+                  <Typography sx={{ fontSize: '13px', fontWeight: 700, color: '#c4e9bf', minWidth: 60, textAlign: 'right' }}>
+                    {amount} €
+                  </Typography>
+                  <Typography sx={{ fontSize: '11px', color: 'rgba(255,255,255,0.35)', minWidth: 80 }}>
+                    {date}
+                  </Typography>
+                  {statusChip(o.status)}
+                </Box>
+              )
+            })}
+        </Paper>
       )}
     </Box>
   )
@@ -1998,6 +2482,7 @@ export default function Admin() {
     { label: t('adminPrograms'),   key: 6 },
     { label: t('subscriptionsTab'), key: 7 },
     { label: 'SYNRG Метод',        key: 8 },
+    ...(fullAdmin ? [{ label: t('ordersTab'), key: 9 }] : []),
   ]
 
   return (
@@ -2038,6 +2523,7 @@ export default function Admin() {
       {tab === 6 && <ProgramsTab />}
       {tab === 7 && <SubscriptionsTab t={t} lang={lang} />}
       {tab === 8 && <AdminSynrgTab />}
+      {tab === 9 && <OrdersTab t={t} />}
     </Box>
   )
 }
