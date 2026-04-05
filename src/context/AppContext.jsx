@@ -121,23 +121,32 @@ export function AppProvider({ children }) {
       try { sessionAuth = JSON.parse(localStorage.getItem('synrg_auth') || '{}') } catch {}
       const isClientRole = sessionAuth.role === 'client' && sessionAuth.id
 
-      // ── Meal query: per-client for client role (prevents 50k global cap), global for coaches ──
-      // Coach/admin fetches last 2 years to bound payload; client fetches only their own rows (no cap risk).
+      // ── Query bounds: per-client for client role, date-bounded for coaches ──
+      // Prevents unbounded table scans at scale (1000 clients × daily entries = millions of rows).
       const twoYearsAgo = new Date(Date.now() - 730 * 86400000).toISOString().slice(0, 10)
       const mealQuery = isClientRole
         ? `&client_id=eq.${sessionAuth.id}&order=id.desc&limit=50000`
         : `&order=id.desc&created_at=gte.${twoYearsAgo}&limit=100000`
+      const workoutQuery = isClientRole
+        ? `&client_id=eq.${sessionAuth.id}&order=id.desc&limit=10000`
+        : `&order=id.desc&created_at=gte.${twoYearsAgo}&limit=50000`
+      const weightQuery = isClientRole
+        ? `&client_id=eq.${sessionAuth.id}&order=id.desc&limit=5000`
+        : `&order=id.desc&created_at=gte.${twoYearsAgo}&limit=20000`
+      const stepsQuery = isClientRole
+        ? `&client_id=eq.${sessionAuth.id}&order=id.desc&limit=5000`
+        : `&order=id.desc&created_at=gte.${twoYearsAgo}&limit=20000`
 
       const [rawCoaches, rawClients, meals, workouts, weights, tasks, taskComments, reactions, stepsRaw, postsRaw, rawSynrgHabits, rawPostReactions, rawPostComments] = await Promise.all([
         DB.selectAll('coaches'),
         DB.selectAll('clients'),
         DB.selectAll('meals', mealQuery),
-        DB.selectAll('workouts').catch(() => []),
-        DB.selectAll('weight_logs').catch(() => []),
+        DB.selectAll('workouts', workoutQuery).catch(() => []),
+        DB.selectAll('weight_logs', weightQuery).catch(() => []),
         DB.selectAll('tasks').catch(() => []),
         DB.selectAll('task_comments').catch(() => []),
         DB.selectAll('reactions').catch(() => []),
-        DB.selectAll('steps_logs').catch(() => []),
+        DB.selectAll('steps_logs', stepsQuery).catch(() => []),
         DB.selectAll('community_posts').catch(() => []),
         DB.selectAll('synrg_habits').catch(() => []),
         DB.selectAll('post_reactions').catch(() => []),
