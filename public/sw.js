@@ -1,4 +1,4 @@
-const CACHE = 'synrg-v6';
+const CACHE = 'synrg-v7';
 const BASE = '/synrg-website/app/';
 const ASSETS = [BASE, BASE + 'index.html'];
 
@@ -16,6 +16,9 @@ self.addEventListener('activate', e => {
 
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
+  // Never intercept cross-origin requests (Supabase API, CDNs, etc.)
+  // Only cache same-origin app assets (HTML, JS, CSS, images)
+  if (!e.request.url.startsWith(self.location.origin)) return;
   e.respondWith(
     fetch(e.request)
       .then(r => {

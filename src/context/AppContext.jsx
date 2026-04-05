@@ -164,26 +164,27 @@ export function AppProvider({ children }) {
         // Normalize dates: DB may store YYYY-MM-DD, app uses DD.MM.YYYY
         const dbMeals = meals.filter(m => m.client_id === c.id)
           .map(m => ({ ...m, date: normalizeMealDate(m.date) }))
-        // Rescued meals: in localStorage but NOT yet in DB (dedup by date+label+grams+kcal)
-        const rescued = pendingLSArr
-          .filter(([, e]) => e.clientId === c.id)
-          .filter(([, { payload: p }]) => !dbMeals.some(m =>
+        // Rescued meals: in localStorage but NOT yet in DB (count-aware dedup)
+        const usedDbIds = new Set()
+        const clientPending = pendingLSArr.filter(([, e]) => e.clientId === c.id)
+        const rescued = []
+        for (const [tmpId, { payload: p }] of clientPending) {
+          const match = dbMeals.find(m =>
+            !usedDbIds.has(m.id) &&
             m.date === p.date && m.label === p.label &&
             Number(m.grams) === Number(p.grams) && Math.round(Number(m.kcal)) === Math.round(Number(p.kcal))
-          ))
-          .map(([tmpId, { payload: p }]) => ({
-            id: tmpId, label: p.label, grams: p.grams, kcal: p.kcal,
-            protein: p.protein, carbs: p.carbs || 0, fat: p.fat || 0, date: p.date,
-          }))
-        // Clean up localStorage entries that ARE already in DB
-        pendingLSArr
-          .filter(([, e]) => e.clientId === c.id)
-          .forEach(([tmpId, { payload: p }]) => {
-            if (dbMeals.some(m =>
-              m.date === p.date && m.label === p.label &&
-              Number(m.grams) === Number(p.grams) && Math.round(Number(m.kcal)) === Math.round(Number(p.kcal))
-            )) { const ls = lsReadPending(); delete ls[tmpId]; lsWritePending(ls) }
-          })
+          )
+          if (match) {
+            usedDbIds.add(match.id)
+            // Already in DB — clean up localStorage
+            const ls = lsReadPending(); delete ls[tmpId]; lsWritePending(ls)
+          } else {
+            rescued.push({
+              id: tmpId, label: p.label, grams: p.grams, kcal: p.kcal,
+              protein: p.protein, carbs: p.carbs || 0, fat: p.fat || 0, date: p.date,
+            })
+          }
+        }
         return {
         id:             c.id,
         name:           c.name,
@@ -278,21 +279,34 @@ export function AppProvider({ children }) {
     async function onVisible() {
       if (document.visibilityState !== 'visible') return
       try {
-        const freshMeals = await DB.selectAll('meals', '&order=id.desc&limit=50000')
+        let visAuth = { role: null, id: null }
+        try { visAuth = JSON.parse(localStorage.getItem('synrg_auth') || '{}') } catch {}
+        const visIsClient = visAuth.role === 'client' && visAuth.id
+        const visTwoYearsAgo = new Date(Date.now() - 730 * 86400000).toISOString().slice(0, 10)
+        const visQuery = visIsClient
+          ? `&client_id=eq.${visAuth.id}&order=id.desc&limit=50000`
+          : `&order=id.desc&created_at=gte.${visTwoYearsAgo}&limit=100000`
+        const freshMeals = await DB.selectAll('meals', visQuery)
         setClients(prev => prev.map(c => {
           const saved = freshMeals.filter(m => m.client_id === c.id).map(m => ({
             id: m.id, label: m.label, grams: m.grams, kcal: m.kcal,
             protein: m.protein, carbs: m.carbs || 0, fat: m.fat || 0,
             date: normalizeMealDate(m.date),
           }))
-          // Keep tmp_ meals that are NOT already saved to DB (prevents duplicates when
-          // a 204 response left a tmpId in state but the meal was actually inserted)
+          // Count-aware dedup: each saved meal "consumes" at most one tmp_ match.
+          // Prevents N identical tmp_ entries from all being removed when only M < N are in DB.
+          const usedIds = new Set()
           const pending = c.meals
             .filter(m => String(m.id).startsWith('tmp_'))
-            .filter(m => !saved.some(s =>
-              s.date === m.date && s.label === m.label &&
-              Number(s.grams) === Number(m.grams) && Math.round(Number(s.kcal)) === Math.round(Number(m.kcal))
-            ))
+            .filter(tm => {
+              const match = saved.find(s =>
+                !usedIds.has(s.id) &&
+                s.date === tm.date && s.label === tm.label &&
+                Number(s.grams) === Number(tm.grams) && Math.round(Number(s.kcal)) === Math.round(Number(tm.kcal))
+              )
+              if (match) { usedIds.add(match.id); return false }
+              return true
+            })
           return { ...c, meals: [...saved, ...pending] }
         }))
       } catch { /* silent — offline */ }
@@ -331,12 +345,18 @@ export function AppProvider({ children }) {
             protein: m.protein, carbs: m.carbs || 0, fat: m.fat || 0,
             date: normalizeMealDate(m.date),
           }))
+          const usedIds2 = new Set()
           const pending = c.meals
             .filter(m => String(m.id).startsWith('tmp_'))
-            .filter(m => !saved.some(s =>
-              s.date === m.date && s.label === m.label &&
-              Number(s.grams) === Number(m.grams) && Math.round(Number(s.kcal)) === Math.round(Number(m.kcal))
-            ))
+            .filter(tm => {
+              const match = saved.find(s =>
+                !usedIds2.has(s.id) &&
+                s.date === tm.date && s.label === tm.label &&
+                Number(s.grams) === Number(tm.grams) && Math.round(Number(s.kcal)) === Math.round(Number(tm.kcal))
+              )
+              if (match) { usedIds2.add(match.id); return false }
+              return true
+            })
           return {
             ...c,
             meals: [...saved, ...pending],
@@ -634,7 +654,27 @@ export function AppProvider({ children }) {
     // Try up to 5 times with exponential backoff
     let saved = false
     for (let attempt = 0; attempt < 5; attempt++) {
-      if (attempt > 0) await new Promise(r => setTimeout(r, 1000 * attempt))
+      if (attempt > 0) {
+        await new Promise(r => setTimeout(r, 1000 * attempt))
+        // Before retrying: check if the meal was ALREADY saved in a previous attempt
+        // whose response was dropped (prevents duplicate DB rows from retries)
+        try {
+          const existing = await DB.selectAll('meals',
+            `&client_id=eq.${clientId}&date=eq.${payload.date}&label=eq.${encodeURIComponent(payload.label)}&grams=eq.${payload.grams}&order=id.desc&limit=1`
+          )
+          if (existing && existing.length > 0) {
+            const realId = existing[0].id
+            setClients(prev => prev.map(c => c.id === clientId
+              ? { ...c, meals: c.meals.map(m => m.id === tmpId ? { ...m, id: realId } : m) }
+              : c
+            ))
+            const lsCheck = lsReadPending(); delete lsCheck[tmpId]; lsWritePending(lsCheck)
+            saved = true
+            break
+          }
+        } catch { /* check failed — proceed with retry insert */ }
+        if (saved) break
+      }
       try {
         const data = await DB.insert('meals', payload)
         // Replace temp ID with real DB ID (data may be null if server returns 204)

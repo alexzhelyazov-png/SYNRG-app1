@@ -39,7 +39,7 @@ async function sbFetchSafe(url, options) {
 
 const SB = {
   async selectAll(table, extra = '') {
-    return (await sbFetch(sbUrl(table, '?select=*' + extra), { headers: sbHeaders() })) || []
+    return (await sbFetch(sbUrl(table, '?select=*' + extra), { headers: sbHeaders(), cache: 'no-store' })) || []
   },
   async insert(table, row) {
     const data = await sbFetch(sbUrl(table), {
@@ -65,7 +65,7 @@ const SB = {
     })
   },
   async findWhere(table, field, value) {
-    return (await sbFetch(sbUrl(table, `?select=*&${field}=eq.${encodeURIComponent(value)}`), { headers: sbHeaders() })) || []
+    return (await sbFetch(sbUrl(table, `?select=*&${field}=eq.${encodeURIComponent(value)}`), { headers: sbHeaders(), cache: 'no-store' })) || []
   },
 }
 
