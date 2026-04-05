@@ -1870,7 +1870,7 @@ function CoachesTab({ t }) {
 }
 
 // ── Dashboard Tab ────────────────────────────────────────────
-function DashboardTab({ t, lang, setTab }) {
+function DashboardTab({ t, lang, goTo }) {
   const { realClients, showSnackbar, setConfirmDelete, updateClientModules } = useApp()
   const { allPlans, loadAllPlans, activatePlan, extendPlan, adjustCredits } = useBooking()
   const [loaded,       setLoaded]       = useState(false)
@@ -1967,10 +1967,10 @@ function DashboardTab({ t, lang, setTab }) {
     <Box>
       {/* Summary cards */}
       <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', mb: 3 }}>
-        {newRegs.length > 0 && <StatCard icon={PersonAddIcon} label={t('newRegistrations')} value={newRegs.length} color="#60A5FA" onClick={() => setTab(1)} />}
-        <StatCard icon={PeopleIcon}       label={t('pendingCard')}  value={pending.length}   color="#F87171" onClick={() => setTab(1)} />
-        <StatCard icon={WarningAmberIcon} label={t('expiringCard')} value={expiring.length}  color="#FB923C" onClick={() => setTab(1)} />
-        <StatCard icon={CreditCardIcon}   label={t('lowCredCard')}  value={lowCred.length}   color="#FBBF24" onClick={() => setTab(1)} />
+        {newRegs.length > 0 && <StatCard icon={PersonAddIcon} label={t('newRegistrations')} value={newRegs.length} color="#60A5FA" onClick={() => goTo('clients', 'clients')} />}
+        <StatCard icon={PeopleIcon}       label={t('pendingCard')}  value={pending.length}   color="#F87171" onClick={() => goTo('clients', 'clients')} />
+        <StatCard icon={WarningAmberIcon} label={t('expiringCard')} value={expiring.length}  color="#FB923C" onClick={() => goTo('clients', 'clients')} />
+        <StatCard icon={CreditCardIcon}   label={t('lowCredCard')}  value={lowCred.length}   color="#FBBF24" onClick={() => goTo('clients', 'clients')} />
       </Box>
 
       {/* New registrations */}
@@ -2544,21 +2544,50 @@ function AdminSynrgTab() {
 // ── Main Admin Page ──────────────────────────────────────────
 export default function Admin() {
   const { t, lang, auth } = useApp()
-  const [tab, setTab] = useState(0)
   const fullAdmin = isFullAdmin(auth)
 
-  const TABS = [
-    { label: t('adminDashboard'),  key: 0 },
-    { label: t('clientsMgmt'),     key: 1 },
-    ...(fullAdmin ? [{ label: t('analyticsTab'), key: 2 }] : []),
-    { label: t('coachesTab'),      key: 3 },
-    ...(fullAdmin ? [{ label: t('expensesTab'), key: 4 }] : []),
-    { label: t('siteTab'),         key: 5 },
-    { label: t('adminPrograms'),   key: 6 },
-    { label: t('subscriptionsTab'), key: 7 },
-    { label: 'SYNRG Метод',        key: 8 },
-    ...(fullAdmin ? [{ label: t('ordersTab'), key: 9 }] : []),
+  // ── 2-level navigation state ──────────────────────────────
+  const [section,    setSection]    = useState('dashboard')
+  const [clientSub,  setClientSub]  = useState('clients')
+  const [financeSub, setFinanceSub] = useState('analytics')
+  const [contentSub, setContentSub] = useState('programs')
+
+  // Navigate from DashboardTab stat cards
+  function goTo(sec, sub) {
+    setSection(sec)
+    if (sec === 'clients' && sub) setClientSub(sub)
+    if (sec === 'finance' && sub) setFinanceSub(sub)
+    if (sec === 'content' && sub) setContentSub(sub)
+  }
+
+  // ── Section definitions ───────────────────────────────────
+  const SECTIONS = [
+    { key: 'dashboard', label: 'Табло' },
+    { key: 'clients',   label: 'Клиенти' },
+    ...(fullAdmin ? [{ key: 'finance', label: 'Финанси' }] : []),
+    { key: 'content',   label: 'Съдържание' },
   ]
+
+  const SUB_TABS = {
+    clients: [
+      { key: 'clients',       label: t('clientsMgmt')     || 'Клиенти' },
+      { key: 'coaches',       label: t('coachesTab')      || 'Треньори' },
+      { key: 'subscriptions', label: t('subscriptionsTab')|| 'Абонаменти' },
+    ],
+    finance: [
+      { key: 'analytics', label: t('analyticsTab') || 'Аналитика' },
+      { key: 'expenses',  label: t('expensesTab')  || 'Разходи' },
+      { key: 'orders',    label: t('ordersTab')    || 'Поръчки' },
+    ],
+    content: [
+      { key: 'programs', label: t('adminPrograms') || 'Програми' },
+      { key: 'synrg',    label: 'SYNRG' },
+      { key: 'site',     label: t('siteTab')       || 'Сайт' },
+    ],
+  }
+
+  const activeSub    = section === 'clients' ? clientSub  : section === 'finance' ? financeSub  : contentSub
+  const setActiveSub = section === 'clients' ? setClientSub : section === 'finance' ? setFinanceSub : setContentSub
 
   return (
     <Box sx={{ maxWidth: 860, mx: 'auto' }}>
@@ -2569,36 +2598,62 @@ export default function Admin() {
         </Typography>
       </Box>
 
-      {/* Tabs */}
-      <Box sx={{
-        display: 'flex', gap: 0.75, mb: 2.5, flexWrap: 'wrap',
-      }}>
-        {TABS.map(({ label, key }) => (
-          <Box key={key} onClick={() => setTab(key)} sx={{
+      {/* Main section nav */}
+      <Box sx={{ display: 'flex', gap: 0.75, mb: section === 'dashboard' ? 2.5 : 1.5, flexWrap: 'wrap' }}>
+        {SECTIONS.map(s => (
+          <Box key={s.key} onClick={() => setSection(s.key)} sx={{
             px: 2, py: 0.75, borderRadius: '100px', cursor: 'pointer',
             fontSize: '13px', fontWeight: 700,
-            background: tab === key ? C.primary : 'transparent',
-            color:      tab === key ? C.primaryOn : C.text,
-            border:     `1px solid ${tab === key ? C.primary : C.loganBorder}`,
+            background: section === s.key ? C.primary : 'transparent',
+            color:      section === s.key ? C.primaryOn : C.text,
+            border:     `1px solid ${section === s.key ? C.primary : C.loganBorder}`,
             transition: 'all 0.22s',
-            '&:hover': tab === key ? {} : { borderColor: C.logan, background: C.loganDeep },
-          }}>
-            {label}
-          </Box>
+            '&:hover':  section === s.key ? {} : { borderColor: C.logan, background: C.loganDeep },
+          }}>{s.label}</Box>
         ))}
       </Box>
 
-      {/* Tab content */}
-      {tab === 0 && <DashboardTab t={t} lang={lang} setTab={setTab} />}
-      {tab === 1 && <ClientsTab t={t} />}
-      {tab === 2 && <AnalyticsTab t={t} />}
-      {tab === 3 && <CoachesTab t={t} />}
-      {tab === 4 && <ExpensesTab t={t} />}
-      {tab === 5 && <SiteTab />}
-      {tab === 6 && <ProgramsTab />}
-      {tab === 7 && <SubscriptionsTab t={t} lang={lang} />}
-      {tab === 8 && <AdminSynrgTab />}
-      {tab === 9 && <OrdersTab t={t} />}
+      {/* Sub-tab nav (hidden on Табло) */}
+      {SUB_TABS[section] && (
+        <Box sx={{ display: 'flex', gap: 0.5, mb: 2.5, flexWrap: 'wrap',
+                   pb: 1.5, borderBottom: `1px solid ${C.border}` }}>
+          {SUB_TABS[section].map(sub => {
+            const isActive = activeSub === sub.key
+            return (
+              <Box key={sub.key} onClick={() => setActiveSub(sub.key)} sx={{
+                px: 1.5, py: 0.5, borderRadius: '100px', cursor: 'pointer',
+                fontSize: '12px', fontWeight: 700,
+                background: isActive ? 'rgba(255,255,255,0.1)' : 'transparent',
+                color:      isActive ? C.text : C.muted,
+                border:     `1px solid ${isActive ? C.border : 'transparent'}`,
+                transition: 'all 0.18s',
+                '&:hover':  { color: C.text, background: 'rgba(255,255,255,0.06)' },
+              }}>{sub.label}</Box>
+            )
+          })}
+        </Box>
+      )}
+
+      {/* Section content */}
+      {section === 'dashboard' && <DashboardTab t={t} lang={lang} goTo={goTo} />}
+
+      {section === 'clients' && <>
+        {clientSub === 'clients'       && <ClientsTab t={t} />}
+        {clientSub === 'coaches'       && <CoachesTab t={t} />}
+        {clientSub === 'subscriptions' && <SubscriptionsTab t={t} lang={lang} />}
+      </>}
+
+      {section === 'finance' && fullAdmin && <>
+        {financeSub === 'analytics' && <AnalyticsTab t={t} />}
+        {financeSub === 'expenses'  && <ExpensesTab t={t} />}
+        {financeSub === 'orders'    && <OrdersTab t={t} />}
+      </>}
+
+      {section === 'content' && <>
+        {contentSub === 'programs' && <ProgramsTab />}
+        {contentSub === 'synrg'    && <AdminSynrgTab />}
+        {contentSub === 'site'     && <SiteTab />}
+      </>}
     </Box>
   )
 }
