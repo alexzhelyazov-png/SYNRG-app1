@@ -1365,6 +1365,8 @@ function AnalyticsTab({ t }) {
   const { realClients } = useApp()
   const [expenses,          setExpenses]          = useState([])
   const [programPurchases,  setProgramPurchases]  = useState([])
+  const [appEvents,         setAppEvents]         = useState([])
+  const [featureDays,       setFeatureDays]       = useState(30)
   const [month, setMonth] = useState(() => {
     const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
   })
@@ -1373,6 +1375,8 @@ function AnalyticsTab({ t }) {
     loadAllPlans()
     DB.selectAll('expenses').then(rows => setExpenses(rows || []))
     DB.selectAll('program_purchases').then(rows => setProgramPurchases(rows || [])).catch(() => {})
+    DB.selectAll('app_events', '&select=event,client_id,created_at&order=created_at.desc&limit=100000')
+      .catch(() => []).then(rows => setAppEvents(rows || []))
   }, []) // eslint-disable-line
 
   // Filter by selected month
@@ -1433,6 +1437,38 @@ function AnalyticsTab({ t }) {
   const plan12Count    = activePlans.filter(p => p.plan_type === '12').length
   const planUCount     = activePlans.filter(p => p.plan_type === 'unlimited').length
   const planTotal      = plan8Count + plan12Count + planUCount || 1
+
+  // ── Feature usage analytics ────────────────────────────────
+  const featureCutoff  = new Date(Date.now() - featureDays * 86400000)
+  const allRealClients = realClients.filter(c => !c.is_coach)
+  const totalClients   = allRealClients.length
+
+  function uniqClients(rows, dateField) {
+    return new Set(rows.filter(r => {
+      const raw = r[dateField]
+      if (!raw) return false
+      const d = typeof raw === 'string' && raw.includes('T') ? new Date(raw) : parseDate(raw)
+      return d && d >= featureCutoff
+    }).map(r => r.client_id)).size
+  }
+
+  const allMealsFlat    = allRealClients.flatMap(c => (c.meals     || []).map(m => ({ client_id: c.id, date: m.date })))
+  const allWeightsFlat  = allRealClients.flatMap(c => (c.weightLogs|| []).map(w => ({ client_id: c.id, date: w.date })))
+  const allStepsFlat    = allRealClients.flatMap(c => (c.stepsLogs || []).map(s => ({ client_id: c.id, date: s.date })))
+  const allWorkoutsFlat = allRealClients.flatMap(c => (c.workouts  || []).map(w => ({ client_id: c.id, date: w.date })))
+
+  const featureRows = [
+    { key: 'workouts', label: 'Тренировки', color: '#c4e9bf', count: uniqClients(allWorkoutsFlat, 'date') },
+    { key: 'food',     label: 'Храна',      color: '#c4e9bf', count: uniqClients(allMealsFlat,    'date') },
+    { key: 'weight',   label: 'Тегло',      color: '#c4e9bf', count: uniqClients(allWeightsFlat,  'date') },
+    { key: 'steps',    label: 'Крачки',     color: '#c4e9bf', count: uniqClients(allStepsFlat,    'date') },
+    { key: 'ranking',  label: 'Класация',   color: '#aaa9cd', count: uniqClients(appEvents.filter(e => e.event === 'ranking_viewed'),  'created_at') },
+    { key: 'feed',     label: 'Стена',      color: '#aaa9cd', count: uniqClients(appEvents.filter(e => e.event === 'feed_viewed'),     'created_at') },
+    { key: 'program',  label: 'Програми',   color: '#aaa9cd', count: uniqClients(appEvents.filter(e => e.event === 'program_opened'), 'created_at') },
+    { key: 'lesson',   label: 'Уроци',      color: '#aaa9cd', count: uniqClients(appEvents.filter(e => e.event === 'lesson_viewed'),  'created_at') },
+    { key: 'recipe',   label: 'Рецепти',    color: '#aaa9cd', count: uniqClients(appEvents.filter(e => e.event === 'recipe_opened'),  'created_at') },
+    { key: 'resource', label: 'Ресурси',    color: '#aaa9cd', count: uniqClients(appEvents.filter(e => e.event === 'resource_opened'),'created_at') },
+  ].sort((a, b) => b.count - a.count)
 
   // Month navigation
   const prevMonth = () => {
@@ -1543,6 +1579,45 @@ function AnalyticsTab({ t }) {
           })}
         </Paper>
       )}
+
+      {/* Feature usage */}
+      <Paper sx={{ p: 2, borderRadius: '14px', border: `1px solid ${C.border}`, mt: 1 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
+          <Typography sx={{ fontSize: '10px', color: C.muted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.6px' }}>
+            Използване на функциите
+          </Typography>
+          <Box sx={{ display: 'flex', gap: 0.5 }}>
+            {[7, 30, 90].map(d => (
+              <Box key={d} onClick={() => setFeatureDays(d)} sx={{
+                px: 1.5, py: 0.3, borderRadius: '100px', cursor: 'pointer', fontSize: '11px', fontWeight: 700,
+                background: featureDays === d ? C.accent : 'transparent',
+                color:      featureDays === d ? '#000'   : C.muted,
+                border:     `1px solid ${featureDays === d ? C.accent : C.border}`,
+                transition: 'all 0.15s',
+              }}>{d}д</Box>
+            ))}
+          </Box>
+        </Box>
+        {featureRows.map((row, i) => {
+          const pct = totalClients ? Math.round(row.count / totalClients * 100) : 0
+          return (
+            <Box key={row.key} sx={{ mb: i === featureRows.length - 1 ? 0 : 1.5 }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.4 }}>
+                <Typography sx={{ fontSize: '12px', color: C.text, fontWeight: 600 }}>{row.label}</Typography>
+                <Typography sx={{ fontSize: '12px', color: C.muted }}>
+                  {row.count} / {totalClients}
+                  <Box component="span" sx={{ ml: 0.8, color: row.count > 0 ? row.color : C.muted, fontWeight: 700 }}>
+                    {pct}%
+                  </Box>
+                </Typography>
+              </Box>
+              <LinearProgress variant="determinate" value={pct}
+                sx={{ borderRadius: '4px', height: '5px', backgroundColor: 'rgba(255,255,255,0.07)',
+                  '& .MuiLinearProgress-bar': { backgroundColor: row.count > 0 ? row.color : 'rgba(255,255,255,0.12)', borderRadius: '4px' } }} />
+            </Box>
+          )
+        })}
+      </Paper>
 
       {/* Plan breakdown */}
       {activePlans.length > 0 && (

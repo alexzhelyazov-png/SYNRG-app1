@@ -8,6 +8,7 @@ import AccessTimeIcon        from '@mui/icons-material/AccessTime'
 import LocalFireDepartmentIcon from '@mui/icons-material/LocalFireDepartment'
 import AddIcon               from '@mui/icons-material/Add'
 import { useApp } from '../context/AppContext'
+import { DB } from '../lib/db'
 import RECIPES, { RECIPE_CATEGORIES, recipePortionGrams } from '../lib/recipes'
 
 const C = {
@@ -474,7 +475,7 @@ function RecipeCard({ recipe, onClick, onLog }) {
 
 // ─── Main page ────────────────────────────────────────────────────────────────
 export default function Recipes() {
-  const { addBarcodeFood, isTrackerReadOnly } = useApp()
+  const { addBarcodeFood, isTrackerReadOnly, auth } = useApp()
 
   const [category,   setCategory]   = useState('all')
   const [selected,   setSelected]   = useState(null)
@@ -544,7 +545,7 @@ export default function Recipes() {
           <RecipeCard
             key={recipe.id}
             recipe={recipe}
-            onClick={() => setSelected(recipe)}
+            onClick={() => { DB.trackEvent(auth.id, 'recipe_opened', recipe.id); setSelected(recipe) }}
             onLog={canLog ? () => setLogRecipe(recipe) : null}
           />
         ))}

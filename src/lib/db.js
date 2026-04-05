@@ -636,6 +636,20 @@ export const DB = {
     }
   },
 
+  // ── Feature usage analytics (fire and forget) ──────────────
+  trackEvent(clientId, event, refId = null) {
+    if (!isUsingSupabase || !clientId) return
+    // Rate-limit: once per browser session per (event + refId) combo
+    const sk = `evt_${event}_${refId || ''}`
+    try { if (sessionStorage.getItem(sk)) return; sessionStorage.setItem(sk, '1') } catch {}
+    // Fire and forget — never blocks UI, never throws
+    sbFetch(sbUrl('app_events'), {
+      method: 'POST',
+      headers: sbHeaders({ 'Prefer': 'return=minimal' }),
+      body: JSON.stringify({ client_id: clientId, event, ref_id: refId }),
+    }).catch(() => {})
+  },
+
   // ── MailerLite sync (via Supabase Edge Function) ──────────
   async syncToMailerLite(action, email, name, fields = {}, subject, html) {
     if (!isUsingSupabase || !email) return

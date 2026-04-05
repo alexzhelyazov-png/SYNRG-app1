@@ -3,6 +3,7 @@ import { Box, Typography, Dialog, IconButton } from '@mui/material'
 import Ranking from './Ranking'
 import CommunityFeed from './CommunityFeed'
 import { useApp } from '../context/AppContext'
+import { DB } from '../lib/db'
 import { C, EASE } from '../theme'
 import {
   ALLTIME_BADGES, MONTHLY_BADGES, BADGES, PR_EXERCISES, getCurrentPRs,
@@ -81,6 +82,8 @@ export default function Progress() {
   function switchTab(key) {
     setTab(key)
     if (key === 'feed' && markFeedSeen) markFeedSeen()
+    if (key === 'ranking') DB.trackEvent(auth.id, 'ranking_viewed')
+    if (key === 'feed')    DB.trackEvent(auth.id, 'feed_viewed')
   }
 
   // ── Enrich client with community data for badge evaluation ──

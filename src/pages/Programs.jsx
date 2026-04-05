@@ -960,7 +960,7 @@ export default function Programs() {
       modules={modules.filter(m => m.program_id === selectedProgram.id)}
       lessons={lessons.filter(l => l.program_id === selectedProgram.id)}
       progress={progress} onBack={() => setSelectedProgram(null)}
-      onLesson={(l) => { setSelectedLesson(l); window.scrollTo({ top: 0, behavior: 'smooth' }) }}
+      onLesson={(l) => { DB.trackEvent(auth.id, 'lesson_viewed', l.id); setSelectedLesson(l); window.scrollTo({ top: 0, behavior: 'smooth' }) }}
       onToggle={toggleLesson} t={t} lang={lang} />
   }
 
@@ -1004,13 +1004,13 @@ export default function Programs() {
       {/* Tab content */}
       {tab === 'programs' && (
         <ProgramsList programs={programs} progress={progress} lessons={lessons} purchases={purchases}
-          onSelect={(p) => { setSelectedProgram(p); window.scrollTo({ top: 0, behavior: 'smooth' }) }}
+          onSelect={(p) => { DB.trackEvent(auth.id, 'program_opened', p.id); setSelectedProgram(p); window.scrollTo({ top: 0, behavior: 'smooth' }) }}
           onBuy={handleBuy} buyLoading={buyLoading} t={t} lang={lang} auth={auth} setView={setView} />
       )}
       {tab === 'resources' && (
         <ResourcesList resources={resources} resourceSteps={resourceSteps} resourceProgress={resourceProgress}
           hasAccess={hasResourceAccess}
-          onSelect={(r) => { setSelectedResource(r); window.scrollTo({ top: 0, behavior: 'smooth' }) }}
+          onSelect={(r) => { DB.trackEvent(auth.id, 'resource_opened', r.id); setSelectedResource(r); window.scrollTo({ top: 0, behavior: 'smooth' }) }}
           t={t} lang={lang} />
       )}
     </Box>
