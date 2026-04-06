@@ -1,5 +1,5 @@
-const CACHE = 'synrg-v7';
-const BASE = '/synrg-website/app/';
+const CACHE = 'synrg-v8';
+const BASE = '/app/';
 const ASSETS = [BASE, BASE + 'index.html'];
 
 self.addEventListener('install', e => {

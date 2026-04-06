@@ -9,6 +9,8 @@ function sbHeaders(extra = {}) {
     'apikey': SUPABASE_KEY,
     'Authorization': `Bearer ${SUPABASE_KEY}`,
     'Content-Type': 'application/json',
+    'Cache-Control': 'no-cache, no-store',
+    'Pragma': 'no-cache',
     ...extra,
   }
 }
