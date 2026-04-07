@@ -20,9 +20,12 @@ const CartSvg = () => (
   <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M7 18c-1.1 0-1.99.9-1.99 2S5.9 22 7 22s2-.9 2-2-.9-2-2-2zM1 2v2h2l3.6 7.59-1.35 2.45c-.16.28-.25.61-.25.96 0 1.1.9 2 2 2h12v-2H7.42c-.14 0-.25-.11-.25-.25l.03-.12.9-1.63h7.45c.75 0 1.41-.41 1.75-1.03l3.58-6.49c.08-.14.12-.31.12-.48 0-.55-.45-1-1-1H5.21l-.94-2H1zm16 16c-1.1 0-1.99.9-1.99 2s.89 2 1.99 2 2-.9 2-2-.9-2-2-2z"/></svg>
 )
 import { useApp }          from '../context/AppContext'
+import { useBooking }      from '../context/BookingContext'
+import NoPlanBanner        from '../components/NoPlanBanner'
 import { DB }              from '../lib/db'
 import { parseVideoUrl, getVideoThumbnail } from '../lib/videoUtils'
 import { hasModule }       from '../lib/modules'
+import { isPlanActive }    from '../lib/bookingUtils'
 import { C, EASE }         from '../theme'
 
 // ── Video Embed Component ───────────────────────────────────
@@ -55,16 +58,17 @@ function VideoEmbed({ url }) {
   )
 }
 
-/** Check if client can access a program (purchased or studio client) */
-function canAccessProgram(auth, prog, purchases) {
+/** Check if client can access a program (purchased, or studio client with active plan).
+ *  `planActive` is a precomputed boolean so we don't call isPlanActive per program. */
+function canAccessProgram(auth, prog, purchases, planActive) {
   // Coaches/admins always have access
   if (auth.role === 'coach') return true
-  // Free programs (no price)
-  if (!prog.price_cents || prog.price_cents === 0) return true
-  // Studio clients get all programs free
-  if (hasModule(auth.modules, 'studio_access')) return true
-  // Check if purchased
+  // A purchased program is always accessible (lifetime access)
   if (purchases.some(p => p.program_id === prog.id)) return true
+  // Free programs (no price) — accessible only with an active plan
+  if ((!prog.price_cents || prog.price_cents === 0) && planActive) return true
+  // Studio clients get all programs free — but only while their plan is active
+  if (hasModule(auth.modules, 'studio_access') && planActive) return true
   return false
 }
 
@@ -74,7 +78,7 @@ function formatPrice(cents, currency, t) {
 }
 
 // ── Programs List View ──────────────────────────────────────
-function ProgramsList({ programs, progress, lessons, purchases, onSelect, onBuy, buyLoading, t, lang, auth, setView }) {
+function ProgramsList({ programs, progress, lessons, purchases, onSelect, onBuy, buyLoading, t, lang, auth, setView, planActive }) {
   const n = (p) => lang === 'en' && p.name_en ? p.name_en : p.name_bg
   const d = (p) => lang === 'en' && p.description_en ? p.description_en : p.description_bg
 
@@ -87,6 +91,11 @@ function ProgramsList({ programs, progress, lessons, purchases, onSelect, onBuy,
         {t('programsTitle')}
       </Typography>
 
+      {/* No-active-plan banner — shown when a client's plan has expired */}
+      {auth.role === 'client' && !planActive && (
+        <NoPlanBanner cta="programs" sx={{ mb: 2.5 }} />
+      )}
+
       {programs.length === 0 && (
         <Paper sx={{ p: 4, textAlign: 'center' }}>
           <Typography sx={{ color: C.muted, fontSize: '15px' }}>{t('noPrograms')}</Typography>
@@ -96,7 +105,7 @@ function ProgramsList({ programs, progress, lessons, purchases, onSelect, onBuy,
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2.5 }}>
         {/* SYNRG Method — virtual program card, always last */}
         {auth.role === 'client' && (() => {
-          const hasSynrg = hasModule(auth.modules || [], 'synrg_method')
+          const hasSynrg = hasModule(auth.modules || [], 'synrg_method') && planActive
           return (
             <Paper
               key="synrg_method_card"
@@ -157,10 +166,10 @@ function ProgramsList({ programs, progress, lessons, purchases, onSelect, onBuy,
           )
         })()}
         {programs.map((prog, i) => {
-          const hasAccess = canAccessProgram(auth, prog, purchases)
+          const hasAccess = canAccessProgram(auth, prog, purchases, planActive)
           const isPaid = prog.price_cents > 0
           const isPurchased = purchases.some(p => p.program_id === prog.id)
-          const isStudioFree = hasModule(auth.modules, 'studio_access') && isPaid
+          const isStudioFree = hasModule(auth.modules, 'studio_access') && isPaid && planActive
           const progLessons   = lessons.filter(l => l.program_id === prog.id)
           const completedCount = hasAccess ? progLessons.filter(l => progress.some(p => p.lesson_id === l.id)).length : 0
           const totalCount     = progLessons.length
@@ -793,6 +802,19 @@ function StepView({ step, allSteps, progress, onBack, onToggle, onNavigate, t, l
 // ══════════════════════════════════════════════════════════════
 export default function Programs() {
   const { auth, t, lang, showSnackbar, setView } = useApp()
+  const { myPlan, loadMyPlan } = useBooking()
+
+  // Load the current client's plan only if it hasn't been loaded for this client yet.
+  // Avoids re-fetching every time the user navigates to Programs when Booking/Dashboard
+  // have already loaded the plan.
+  useEffect(() => {
+    if (auth.role !== 'client' || !auth.id) return
+    if (myPlan && myPlan.client_id === auth.id) return
+    loadMyPlan(auth.id)
+  }, [auth.id, auth.role, myPlan, loadMyPlan])
+
+  // Single source of truth for "does this client currently have an active plan"
+  const planActive = auth.role === 'coach' ? true : isPlanActive(myPlan)
 
   const [tab, setTab] = useState('programs') // 'programs' | 'resources'
   const [programs, setPrograms]   = useState([])
@@ -824,11 +846,10 @@ export default function Programs() {
     }
   }, [])
 
-  // Resources access: studio clients OR clients who purchased any program
+  // Resources access: coach, OR purchased any program, OR studio/program module with an active plan
   const hasResourceAccess = auth.role === 'coach'
-    || hasModule(auth.modules, 'studio_access')
-    || hasModule(auth.modules, 'program_access')
     || purchases.length > 0
+    || ((hasModule(auth.modules, 'studio_access') || hasModule(auth.modules, 'program_access')) && planActive)
 
   // Load all data
   const loadData = useCallback(async () => {
@@ -1005,7 +1026,7 @@ export default function Programs() {
       {tab === 'programs' && (
         <ProgramsList programs={programs} progress={progress} lessons={lessons} purchases={purchases}
           onSelect={(p) => { DB.trackEvent(auth.id, 'program_opened', p.id); setSelectedProgram(p); window.scrollTo({ top: 0, behavior: 'smooth' }) }}
-          onBuy={handleBuy} buyLoading={buyLoading} t={t} lang={lang} auth={auth} setView={setView} />
+          onBuy={handleBuy} buyLoading={buyLoading} t={t} lang={lang} auth={auth} setView={setView} planActive={planActive} />
       )}
       {tab === 'resources' && (
         <ResourcesList resources={resources} resourceSteps={resourceSteps} resourceProgress={resourceProgress}

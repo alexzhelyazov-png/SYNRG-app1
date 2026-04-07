@@ -128,6 +128,11 @@ BEGIN
     RETURN jsonb_build_object('error', 'Вашият план е изтекъл');
   END IF;
 
+  -- Slot must fall within the active plan period — can't book past plan expiry
+  IF v_slot.slot_date > v_eff_valid_to THEN
+    RETURN jsonb_build_object('error', 'Часът е след края на плана ви');
+  END IF;
+
   IF v_plan.plan_type IN ('8', '12') THEN
     IF v_plan.credits_used >= v_plan.credits_total THEN
       RETURN jsonb_build_object('error', 'Нямате оставащи кредити');

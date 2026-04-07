@@ -12,6 +12,7 @@ import CreditCardIcon       from '@mui/icons-material/CreditCard'
 import CheckCircleIcon      from '@mui/icons-material/CheckCircle'
 import { useApp }           from '../context/AppContext'
 import { useBooking }       from '../context/BookingContext'
+import NoPlanBanner         from '../components/NoPlanBanner'
 import { C }                from '../theme'
 import {
   canClientBook, canClientCancel,
@@ -23,17 +24,7 @@ import {
 // ── Plan Status Card ─────────────────────────────────────────
 function PlanCard({ plan, t, lang }) {
   if (!plan || !isPlanActive(plan)) {
-    return (
-      <Paper sx={{ p: 2.5, mb: 2, borderRadius: '16px', border: `1px solid rgba(248,113,113,0.3)`, background: 'rgba(248,113,113,0.06)' }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-          <CreditCardIcon sx={{ fontSize: 18, color: '#F87171' }} />
-          <Typography sx={{ fontWeight: 700, fontSize: '14px', color: '#F87171' }}>
-            {t('myPlanTitle')}
-          </Typography>
-        </Box>
-        <Typography sx={{ fontSize: '13px', color: C.muted }}>{t('noPlanDesc')}</Typography>
-      </Paper>
-    )
+    return <NoPlanBanner cta="booking" />
   }
 
   const rem      = creditsRemaining(plan)

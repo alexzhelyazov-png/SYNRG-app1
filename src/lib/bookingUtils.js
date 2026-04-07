@@ -88,6 +88,12 @@ export function canClientBook(slot, plan, myBookings = []) {
   if (!isPlanActive(plan))
     return { ok: false, reason: 'Нямате активен план' }
 
+  // Slot must fall within the active plan period — can't book past plan expiry.
+  // (isPlanActive already guarantees validTo is non-null and in the future.)
+  const validTo = effectiveValidTo(plan)
+  if (slot.slot_date > validTo)
+    return { ok: false, reason: 'Часът е след края на плана ви' }
+
   if (plan.plan_type !== 'unlimited' && creditsRemaining(plan) <= 0)
     return { ok: false, reason: 'Нямате оставащи кредити' }
 
