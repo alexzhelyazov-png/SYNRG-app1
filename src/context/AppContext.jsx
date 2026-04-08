@@ -1077,9 +1077,38 @@ export function AppProvider({ children }) {
   }
 
   // ── Weight actions ────────────────────────────────────────────
+  // Sanity guards (protect the gamification/ranking from typos like "81500" or "9.6")
+  const WEIGHT_MIN_KG     = 20
+  const WEIGHT_MAX_KG     = 300
+  const WEIGHT_JUMP_KG    = 10   // ask for confirmation beyond this delta vs. last log
+
   function saveWeight() {
-    const w = Number(String(weightInput).replace(',', '.'))
+    const raw = String(weightInput).trim().replace(',', '.')
+    const w = Number(raw)
     if (!w || isNaN(w)) { showSnackbar(t('warningWeight'), 'warning'); return }
+
+    // Missing-decimal detection (e.g. "81500" instead of "81.5")
+    if (w >= 1000 && !raw.includes('.')) {
+      showSnackbar(t('warningWeightNoDecimal'), 'warning')
+      return
+    }
+
+    // Absolute bounds — plausible human range
+    if (w < WEIGHT_MIN_KG || w > WEIGHT_MAX_KG) {
+      showSnackbar(t('warningWeightRange'), 'warning')
+      return
+    }
+
+    // Sanity check vs. the latest recorded weight — big jumps require confirmation
+    const logs = [...(client.weightLogs || [])].sort((a, b) => parseDate(a.date) - parseDate(b.date))
+    const last = logs[logs.length - 1]
+    if (last && Math.abs(w - Number(last.weight)) >= WEIGHT_JUMP_KG) {
+      const msg = t('confirmWeightJump')
+        .replace('{prev}', fmt1(Number(last.weight)))
+        .replace('{new}',  fmt1(w))
+      if (!window.confirm(msg)) return
+    }
+
     const date = inputToDate(weightDate)
     saveWeightLog(client.id, date, w)
     setWeightInput('')

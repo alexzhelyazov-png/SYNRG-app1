@@ -354,6 +354,9 @@ export const T = {
     warningValidFood:   'Избери валидна храна',
     warningGrams:       'Въведи грамаж',
     warningWeight:      'Въведи валидно тегло',
+    warningWeightRange: 'Теглото трябва да е между 20 и 300 кг',
+    warningWeightNoDecimal: 'Изглежда сте пропуснали десетичната точка. Пример: 81.5',
+    confirmWeightJump:  'Последното записано тегло беше {prev} кг. Сигурни ли сте, че новото е {new} кг?',
     warningExFields:    'Попълни всички полета',
 
     // ── Food Modal ────────────────────────────────────
@@ -1215,6 +1218,9 @@ export const T = {
     warningValidFood:   'Select a valid food item',
     warningGrams:       'Enter amount (g)',
     warningWeight:      'Enter a valid weight',
+    warningWeightRange: 'Weight must be between 20 and 300 kg',
+    warningWeightNoDecimal: 'Looks like you missed the decimal point. Example: 81.5',
+    confirmWeightJump:  'Your last recorded weight was {prev} kg. Are you sure the new one is {new} kg?',
     warningExFields:    'Fill in all fields',
 
     // ── Food Modal ────────────────────────────────────
