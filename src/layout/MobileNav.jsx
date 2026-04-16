@@ -144,6 +144,14 @@ export default function MobileNav() {
           showLabels
           onChange={(_, newView) => {
             if (newView === '__clients__' || newView === '__tracker__') return
+            if (newView === '__mytracker__') {
+              if (coachClientMode && client?.id) saveWorkoutDraft(client.id)
+              setViewingCoach(auth.name)
+              setView('dashboard')
+              setShowClientMenu(false)
+              setCoachClientMode(false)
+              return
+            }
             // Locked item → redirect to Programs (upgrade/buy page)
             const item = navItems.find(n => n.view === newView)
             if (item?.isLocked) {
@@ -177,6 +185,17 @@ export default function MobileNav() {
             )
           })}
 
+          {/* My Tracker (coach/admin only) */}
+          {auth.role !== 'client' && (
+            <NavAction
+              value="__mytracker__"
+              Icon={TrendingUpIcon}
+              label={t('myTrackerTitle')}
+              isSelected={view === 'dashboard' && viewingCoach === auth.name}
+              badge={0}
+              isLocked={false}
+            />
+          )}
 
         </BottomNavigation>
       </Box>

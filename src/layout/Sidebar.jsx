@@ -222,6 +222,30 @@ export default function Sidebar() {
         })}
 
 
+        {/* My Tracker (coach only) */}
+        {auth.role !== 'client' && (() => {
+          const isMyTrackerActive = view === 'dashboard' && viewingCoach === auth.name
+          return (
+            <Tooltip title={!open ? t('myTrackerTitle') : ''} placement="right" arrow>
+              <ListItemButton
+                selected={isMyTrackerActive}
+                onClick={() => {
+                  if (coachClientMode && client?.id) saveWorkoutDraft(client.id)
+                  setViewingCoach(auth.name)
+                  setView('dashboard')
+                  setCoachClientMode(false)
+                }}
+                sx={{ justifyContent: open ? 'flex-start' : 'center', px: open ? 2 : 0, mx: open ? 1.5 : 1, my: '2px', minHeight: 44 }}
+              >
+                <ListItemIcon sx={{ minWidth: open ? 38 : 'unset', justifyContent: 'center', color: isMyTrackerActive ? C.purple : C.muted }}>
+                  <TrendingUpIcon sx={{ fontSize: '20px' }} />
+                </ListItemIcon>
+                {open && <ListItemText primary={t('myTrackerTitle')} sx={{ '& .MuiListItemText-primary': { color: isMyTrackerActive ? C.purple : C.text, fontWeight: isMyTrackerActive ? 700 : 500, fontSize: '14px' } }} />}
+              </ListItemButton>
+            </Tooltip>
+          )
+        })()}
+
         {/* Notifications (coach only) — navigates to dedicated page */}
         {auth.role === 'coach' && (() => {
           const isActive = view === 'notifications'
