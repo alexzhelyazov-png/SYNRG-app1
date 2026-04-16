@@ -40,9 +40,12 @@ async function sbFetchSafe(url, options) {
 }
 
 // Paginated select — bypasses PostgREST's server-side max-rows cap by fetching
-// in chunks of PAGE_SIZE using Range headers. Without this, queries with
+// in chunks of PAGE_SIZE using offset/limit. Without this, queries with
 // limit=100000 silently return only the first 1000 rows (PostgREST default cap),
 // causing admin to miss clients' meals/weights/steps → wrong XP computation.
+// We use offset/limit instead of Range headers because an offset past the end
+// returns 200 OK with [] — while Range past end returns 416 which would throw
+// and abort the entire syncFresh, breaking XP updates.
 const PAGE_SIZE = 1000
 async function sbFetchPaginated(table, extra = '') {
   // Respect caller's explicit limit — if it's <= PAGE_SIZE just do a single request
@@ -51,21 +54,22 @@ async function sbFetchPaginated(table, extra = '') {
   if (explicitLimit <= PAGE_SIZE) {
     return (await sbFetch(sbUrl(table, '?select=*' + extra), { headers: sbHeaders(), cache: 'no-store' })) || []
   }
-  // Strip any existing limit from the query; we'll control it via Range headers
+  // Strip caller's limit — we'll control it per-page via limit/offset
   const extraNoLimit = extra.replace(/(?:^|&)limit=\d+/g, '')
   const all = []
   let offset = 0
   // Safety cap: never loop forever; cap at whatever the caller asked for (or 500k)
   const hardCap = Math.min(explicitLimit, 500000)
   while (offset < hardCap) {
-    const to = Math.min(offset + PAGE_SIZE - 1, hardCap - 1)
+    const remaining = hardCap - offset
+    const pageSize = Math.min(PAGE_SIZE, remaining)
     const page = await sbFetch(
-      sbUrl(table, '?select=*' + extraNoLimit),
-      { headers: sbHeaders({ 'Range-Unit': 'items', 'Range': `${offset}-${to}` }), cache: 'no-store' }
+      sbUrl(table, `?select=*${extraNoLimit}&limit=${pageSize}&offset=${offset}`),
+      { headers: sbHeaders(), cache: 'no-store' }
     ) || []
     all.push(...page)
-    if (page.length < PAGE_SIZE) break  // last page reached
-    offset += PAGE_SIZE
+    if (page.length < pageSize) break  // short page → reached end
+    offset += pageSize
   }
   return all
 }
