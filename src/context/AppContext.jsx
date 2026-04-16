@@ -326,8 +326,10 @@ export function AppProvider({ children }) {
   // would compute lower XP than the client does from their own view.
   const feedPostsRef    = useRef([])
   const postCommentsRef = useRef([])
+  const clientsRef      = useRef([])
   feedPostsRef.current    = feedPosts
   postCommentsRef.current = postComments
+  clientsRef.current      = clients
 
   // ── Notification polling (coaches only, every 60s) ────────────
   const notifTimerRef = useRef(null)
@@ -377,65 +379,81 @@ export function AppProvider({ children }) {
           setPostComments(freshComments)
           postCommentsRef.current = freshComments
         }
-        // xpPayload is populated synchronously inside the setState callback below
-        let xpPayload = null
-        setClients(prev => {
-          const merged = prev.map(c => {
-            const saved = freshMeals.filter(m => m.client_id === c.id).map(m => ({
-              id: m.id, label: m.label, grams: m.grams, kcal: m.kcal,
-              protein: m.protein, carbs: m.carbs || 0, fat: m.fat || 0,
-              date: normalizeMealDate(m.date),
-            }))
-            const usedIds2 = new Set()
-            const pending = c.meals
-              .filter(m => String(m.id).startsWith('tmp_'))
-              .filter(tm => {
-                const match = saved.find(s =>
-                  !usedIds2.has(s.id) &&
-                  s.date === tm.date && s.label === tm.label &&
-                  Number(s.grams) === Number(tm.grams) && Math.round(Number(s.kcal)) === Math.round(Number(tm.kcal))
-                )
-                if (match) { usedIds2.add(match.id); return false }
-                return true
-              })
-            return {
-              ...c,
-              meals: [...saved, ...pending],
-              weightLogs: freshWeights.filter(w => w.client_id === c.id)
-                .sort((a, b) => parseDate(a.date) - parseDate(b.date))
-                .map(w => ({ id: w.id, date: w.date, weight: Number(w.weight) })),
-              stepsLogs: freshSteps.filter(s => s.client_id === c.id)
-                .sort((a, b) => parseDate(a.date) - parseDate(b.date))
-                .map(s => ({ id: s.id, date: s.date, steps: Number(s.steps) })),
-              ...(freshWorkouts ? {
-                workouts: freshWorkouts.filter(w => w.client_id === c.id)
-                  .sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))
-                  .map(w => ({ id: w.id, date: w.date, coach: w.coach, category: w.category, items: w.items || [] })),
-              } : {}),
-            }
-          })
-          // Compute XP for all non-coach clients from fresh merged data.
-          // Must enrich with community data (posts/comments) — XP system uses these
-          // for m_community_* badges; without them admin computes lower XP than client.
-          const curFeed     = feedPostsRef.current || []
-          const curComments = postCommentsRef.current || []
-          xpPayload = merged.filter(c => !c.is_coach).map(c => {
-            const enriched = {
-              ...c,
-              communityPosts:    curFeed.filter(p => p.author_name === c.name),
-              communityComments: curComments.filter(cm => cm.author_name === c.name),
-            }
-            const earnedIds = evaluateBadges(enriched)
-            const totalXP   = computeTotalXP(earnedIds, enriched)
-            const monthlyXP = computeMonthlyXP(enriched)
-            const { level } = computeLevel(totalXP)
-            return { id: c.id, xp_monthly: monthlyXP, xp_total: totalXP, xp_level: level }
-          })
-          return merged
+        // Compute merged state OUTSIDE setClients so xpPayload is deterministic.
+        // (React 18 setState updaters may be deferred; relying on side effects
+        // inside them can leave xpPayload null when batchUpdateXP runs.)
+        const prevClients = clientsRef.current || []
+        const merged = prevClients.map(c => {
+          const saved = freshMeals.filter(m => m.client_id === c.id).map(m => ({
+            id: m.id, label: m.label, grams: m.grams, kcal: m.kcal,
+            protein: m.protein, carbs: m.carbs || 0, fat: m.fat || 0,
+            date: normalizeMealDate(m.date),
+          }))
+          const usedIds2 = new Set()
+          const pending = (c.meals || [])
+            .filter(m => String(m.id).startsWith('tmp_'))
+            .filter(tm => {
+              const match = saved.find(s =>
+                !usedIds2.has(s.id) &&
+                s.date === tm.date && s.label === tm.label &&
+                Number(s.grams) === Number(tm.grams) && Math.round(Number(s.kcal)) === Math.round(Number(tm.kcal))
+              )
+              if (match) { usedIds2.add(match.id); return false }
+              return true
+            })
+          return {
+            ...c,
+            meals: [...saved, ...pending],
+            weightLogs: freshWeights.filter(w => w.client_id === c.id)
+              .sort((a, b) => parseDate(a.date) - parseDate(b.date))
+              .map(w => ({ id: w.id, date: w.date, weight: Number(w.weight) })),
+            stepsLogs: freshSteps.filter(s => s.client_id === c.id)
+              .sort((a, b) => parseDate(a.date) - parseDate(b.date))
+              .map(s => ({ id: s.id, date: s.date, steps: Number(s.steps) })),
+            ...(freshWorkouts ? {
+              workouts: freshWorkouts.filter(w => w.client_id === c.id)
+                .sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))
+                .map(w => ({ id: w.id, date: w.date, coach: w.coach, category: w.category, items: w.items || [] })),
+            } : {}),
+          }
         })
-        // Write authoritative XP to DB — clients read from here
-        if (xpPayload?.length) DB.batchUpdateXP(xpPayload).catch(() => {})
-      } catch { /* silent — offline */ }
+
+        // Compute XP for all non-coach clients from fresh merged data.
+        // Must enrich with community data (posts/comments) — XP system uses these
+        // for m_community_* badges; without them admin computes lower XP than client.
+        const curFeed     = feedPostsRef.current || []
+        const curComments = postCommentsRef.current || []
+        const xpPayload = merged.filter(c => !c.is_coach && c.id).map(c => {
+          const enriched = {
+            ...c,
+            communityPosts:    curFeed.filter(p => p.author_name === c.name),
+            communityComments: curComments.filter(cm => cm.author_name === c.name),
+          }
+          const earnedIds = evaluateBadges(enriched)
+          const totalXP   = computeTotalXP(earnedIds, enriched)
+          const monthlyXP = computeMonthlyXP(enriched)
+          const { level } = computeLevel(totalXP)
+          return { id: c.id, xp_monthly: monthlyXP, xp_total: totalXP, xp_level: level }
+        })
+
+        // Update state with merged clients (fresh meals/weights/steps/workouts)
+        setClients(merged)
+        clientsRef.current = merged
+
+        // Write authoritative XP to DB — clients read from here.
+        // Await so any error surfaces in catch below (was silently swallowed before).
+        if (xpPayload.length) {
+          try {
+            console.log('[syncFresh] Writing XP to DB:', xpPayload.length, 'clients',
+              xpPayload.map(x => `${x.id.slice(0,8)}=${x.xp_monthly}`).join(' '))
+            await DB.batchUpdateXP(xpPayload)
+          } catch (err) {
+            console.error('[syncFresh] batchUpdateXP failed:', err)
+          }
+        }
+      } catch (err) {
+        console.warn('[syncFresh] failed:', err)
+      }
     }
     syncFresh()  // run immediately so DB is up-to-date right on login
     const interval = setInterval(syncFresh, 120000)

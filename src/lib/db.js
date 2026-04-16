@@ -289,13 +289,34 @@ export const DB = {
   async batchUpdateXP(updates) {
     // updates: [{ id, xp_monthly, xp_total, xp_level }, ...]
     if (!isUsingSupabase || !updates.length) return
-    await Promise.all(updates.map(u =>
-      sbFetchSafe(sbUrl('clients', `?id=eq.${u.id}`), {
-        method:  'PATCH',
-        headers: { ...sbHeaders(), Prefer: 'return=minimal' },
-        body:    JSON.stringify({ xp_monthly: u.xp_monthly, xp_total: u.xp_total, xp_level: u.xp_level }),
-      })
-    ))
+    // Surface failures instead of silently swallowing — previous version used
+    // sbFetchSafe which returned null on RLS-denied / column-missing errors,
+    // leaving DB stale and clients seeing wrong XP vs admin's local compute.
+    const results = await Promise.all(updates.map(async u => {
+      try {
+        const res = await fetch(sbUrl('clients', `?id=eq.${u.id}`), {
+          method:  'PATCH',
+          headers: { ...sbHeaders(), Prefer: 'return=minimal' },
+          body:    JSON.stringify({ xp_monthly: u.xp_monthly, xp_total: u.xp_total, xp_level: u.xp_level }),
+        })
+        if (!res.ok) {
+          const text = await res.text().catch(() => '')
+          return { id: u.id, ok: false, status: res.status, err: text }
+        }
+        return { id: u.id, ok: true }
+      } catch (err) {
+        return { id: u.id, ok: false, err: String(err) }
+      }
+    }))
+    const failed = results.filter(r => !r.ok)
+    if (failed.length) {
+      console.error('[batchUpdateXP] Failed writes:', failed.length, '/', updates.length, failed.slice(0, 3))
+      // Throw so caller can log the first failure — but only if ALL failed
+      // (partial failures are logged but don't break the sync cycle).
+      if (failed.length === updates.length) {
+        throw new Error(`batchUpdateXP: all ${updates.length} writes failed. First error: ${JSON.stringify(failed[0])}`)
+      }
+    }
   },
 
   // ── Booking: all completed bookings with coach info ────────
