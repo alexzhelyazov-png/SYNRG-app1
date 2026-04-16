@@ -28,7 +28,7 @@ import {
   todayDate, dateToInput, inputToDate, parseDate,
   fmt1, avgArr, sameDateStr,
 } from '../lib/utils'
-import { computeXPRanking } from '../lib/gamification'
+import { computeXPRanking, computeTotalXP, computeMonthlyXP, computeLevel, evaluateBadges } from '../lib/gamification'
 import { applyColors } from '../theme'
 
 const AppContext = createContext(null)
@@ -194,6 +194,9 @@ export function AppProvider({ children }) {
         is_coach:       c.is_coach || false,
         calorieTarget:  c.calorie_target  || c.calorieTarget  || 2000,
         proteinTarget:  c.protein_target  || c.proteinTarget  || 140,
+        xp_monthly:     c.xp_monthly  || 0,
+        xp_total:       c.xp_total    || 0,
+        xp_level:       c.xp_level    || 1,
         meals: [
           ...dbMeals.map(m => ({
             id: m.id, label: m.label, grams: m.grams, kcal: m.kcal,
@@ -315,6 +318,14 @@ export function AppProvider({ children }) {
     return () => document.removeEventListener('visibilitychange', onVisible)
   }, [])
 
+  // ── Refs so periodic-sync closures always see latest community data ──
+  // XP computation uses communityPosts/communityComments; without these the admin
+  // would compute lower XP than the client does from their own view.
+  const feedPostsRef    = useRef([])
+  const postCommentsRef = useRef([])
+  feedPostsRef.current    = feedPosts
+  postCommentsRef.current = postComments
+
   // ── Notification polling (coaches only, every 60s) ────────────
   const notifTimerRef = useRef(null)
   const pollNotifications = useCallback(async () => {
@@ -329,48 +340,116 @@ export function AppProvider({ children }) {
     return () => clearInterval(notifTimerRef.current)
   }, [auth.isLoggedIn, auth.role, pollNotifications])
 
-  // ── Periodic data sync for coaches (every 2 min) — keeps ranking/XP fresh ──
+  // ── Periodic data sync for coaches/admin (every 2 min + immediately on login) ──
+  // Admin is the SOLE authority for XP: computes from fresh data (meals + workouts + weight
+  // + steps) and writes authoritative values to DB. Clients read from DB — so everyone
+  // always sees the same numbers with no competing writes.
   useEffect(() => {
     if (!auth.isLoggedIn || (auth.role !== 'coach' && auth.role !== 'admin')) return
     async function syncFresh() {
       try {
-        const [freshMeals, freshWeights, freshSteps] = await Promise.all([
+        const twoYearsAgo = new Date(Date.now() - 730 * 86400000).toISOString().slice(0, 10)
+        const [freshMeals, freshWeights, freshSteps, freshWorkouts, freshPosts, freshComments] = await Promise.all([
           DB.selectAll('meals', '&order=id.desc&limit=50000'),
           DB.selectAll('weight_logs'),
           DB.selectAll('steps_logs').catch(() => []),
+          DB.selectAll('workouts', `&order=id.desc&created_at=gte.${twoYearsAgo}&limit=50000`).catch(() => null),
+          // Community posts/comments affect m_community_* badges → must be refreshed too
+          DB.selectAll('community_posts').catch(() => null),
+          DB.selectAll('post_comments', '&order=created_at.asc').catch(() => null),
         ])
-        setClients(prev => prev.map(c => {
-          const saved = freshMeals.filter(m => m.client_id === c.id).map(m => ({
-            id: m.id, label: m.label, grams: m.grams, kcal: m.kcal,
-            protein: m.protein, carbs: m.carbs || 0, fat: m.fat || 0,
-            date: normalizeMealDate(m.date),
-          }))
-          const usedIds2 = new Set()
-          const pending = c.meals
-            .filter(m => String(m.id).startsWith('tmp_'))
-            .filter(tm => {
-              const match = saved.find(s =>
-                !usedIds2.has(s.id) &&
-                s.date === tm.date && s.label === tm.label &&
-                Number(s.grams) === Number(tm.grams) && Math.round(Number(s.kcal)) === Math.round(Number(tm.kcal))
-              )
-              if (match) { usedIds2.add(match.id); return false }
-              return true
-            })
-          return {
-            ...c,
-            meals: [...saved, ...pending],
-            weightLogs: freshWeights.filter(w => w.client_id === c.id)
-              .sort((a, b) => parseDate(a.date) - parseDate(b.date))
-              .map(w => ({ id: w.id, date: w.date, weight: Number(w.weight) })),
-            stepsLogs: freshSteps.filter(s => s.client_id === c.id)
-              .sort((a, b) => parseDate(a.date) - parseDate(b.date))
-              .map(s => ({ id: s.id, date: s.date, steps: Number(s.steps) })),
-          }
-        }))
+        // Push fresh community data into state + refs so XP computation below uses it
+        if (freshPosts) {
+          const sorted = [...freshPosts].sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))
+          setFeedPosts(sorted)
+          feedPostsRef.current = sorted
+        }
+        if (freshComments) {
+          setPostComments(freshComments)
+          postCommentsRef.current = freshComments
+        }
+        // xpPayload is populated synchronously inside the setState callback below
+        let xpPayload = null
+        setClients(prev => {
+          const merged = prev.map(c => {
+            const saved = freshMeals.filter(m => m.client_id === c.id).map(m => ({
+              id: m.id, label: m.label, grams: m.grams, kcal: m.kcal,
+              protein: m.protein, carbs: m.carbs || 0, fat: m.fat || 0,
+              date: normalizeMealDate(m.date),
+            }))
+            const usedIds2 = new Set()
+            const pending = c.meals
+              .filter(m => String(m.id).startsWith('tmp_'))
+              .filter(tm => {
+                const match = saved.find(s =>
+                  !usedIds2.has(s.id) &&
+                  s.date === tm.date && s.label === tm.label &&
+                  Number(s.grams) === Number(tm.grams) && Math.round(Number(s.kcal)) === Math.round(Number(tm.kcal))
+                )
+                if (match) { usedIds2.add(match.id); return false }
+                return true
+              })
+            return {
+              ...c,
+              meals: [...saved, ...pending],
+              weightLogs: freshWeights.filter(w => w.client_id === c.id)
+                .sort((a, b) => parseDate(a.date) - parseDate(b.date))
+                .map(w => ({ id: w.id, date: w.date, weight: Number(w.weight) })),
+              stepsLogs: freshSteps.filter(s => s.client_id === c.id)
+                .sort((a, b) => parseDate(a.date) - parseDate(b.date))
+                .map(s => ({ id: s.id, date: s.date, steps: Number(s.steps) })),
+              ...(freshWorkouts ? {
+                workouts: freshWorkouts.filter(w => w.client_id === c.id)
+                  .sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))
+                  .map(w => ({ id: w.id, date: w.date, coach: w.coach, category: w.category, items: w.items || [] })),
+              } : {}),
+            }
+          })
+          // Compute XP for all non-coach clients from fresh merged data.
+          // Must enrich with community data (posts/comments) — XP system uses these
+          // for m_community_* badges; without them admin computes lower XP than client.
+          const curFeed     = feedPostsRef.current || []
+          const curComments = postCommentsRef.current || []
+          xpPayload = merged.filter(c => !c.is_coach).map(c => {
+            const enriched = {
+              ...c,
+              communityPosts:    curFeed.filter(p => p.author_name === c.name),
+              communityComments: curComments.filter(cm => cm.author_name === c.name),
+            }
+            const earnedIds = evaluateBadges(enriched)
+            const totalXP   = computeTotalXP(earnedIds, enriched)
+            const monthlyXP = computeMonthlyXP(enriched)
+            const { level } = computeLevel(totalXP)
+            return { id: c.id, xp_monthly: monthlyXP, xp_total: totalXP, xp_level: level }
+          })
+          return merged
+        })
+        // Write authoritative XP to DB — clients read from here
+        if (xpPayload?.length) DB.batchUpdateXP(xpPayload).catch(() => {})
       } catch { /* silent — offline */ }
     }
+    syncFresh()  // run immediately so DB is up-to-date right on login
     const interval = setInterval(syncFresh, 120000)
+    return () => clearInterval(interval)
+  }, [auth.isLoggedIn, auth.role])
+
+  // ── Client: periodically re-read XP from DB (admin writes there every 2 min) ──
+  // Ensures clients see up-to-date ranking without any self-computation.
+  useEffect(() => {
+    if (!auth.isLoggedIn || auth.role !== 'client') return
+    async function refreshXP() {
+      try {
+        const freshClients = await DB.selectAll('clients').catch(() => null)
+        if (!freshClients?.length) return
+        setClients(prev => prev.map(c => {
+          const fc = freshClients.find(x => x.id === c.id)
+          if (!fc) return c
+          return { ...c, xp_monthly: fc.xp_monthly || 0, xp_total: fc.xp_total || 0, xp_level: fc.xp_level || 1 }
+        }))
+      } catch { /* silent */ }
+    }
+    refreshXP()  // run immediately on login to pick up latest admin-written values
+    const interval = setInterval(refreshXP, 300000)  // every 5 min
     return () => clearInterval(interval)
   }, [auth.isLoggedIn, auth.role])
 
@@ -476,10 +555,26 @@ export function AppProvider({ children }) {
   }, [loading])
 
   // ── Computed: real clients (no coach profiles) ────────────────
-  const realClients = useMemo(() => clients.filter(c => !c.is_coach), [clients])
+  // Enriched with community data so ALL downstream XP/badge computation is consistent
+  // (Progress ranking, App.jsx BadgeUnlockWatcher, BadgeDetailDialog progress bars, etc.)
+  const realClients = useMemo(
+    () => clients.filter(c => !c.is_coach).map(c => ({
+      ...c,
+      communityPosts:    feedPosts.filter(p => p.author_name === c.name),
+      communityComments: postComments.filter(cm => cm.author_name === c.name),
+    })),
+    [clients, feedPosts, postComments]
+  )
 
   // ── Computed: coach profiles (shadow clients for coaches) ──────
-  const coachProfiles = useMemo(() => clients.filter(c => c.is_coach), [clients])
+  const coachProfiles = useMemo(
+    () => clients.filter(c => c.is_coach).map(c => ({
+      ...c,
+      communityPosts:    feedPosts.filter(p => p.author_name === c.name),
+      communityComments: postComments.filter(cm => cm.author_name === c.name),
+    })),
+    [clients, feedPosts, postComments]
+  )
 
   // ── actualIdx points into realClients for both roles ──────────
   const actualIdx = useMemo(() => {
@@ -575,7 +670,28 @@ export function AppProvider({ children }) {
   )
 
   // ── Ranking excludes coach profiles ───────────────────────────
-  const ranking  = useMemo(() => computeXPRanking(realClients), [realClients])
+  const isCoachOrAdmin = auth.role === 'coach' || auth.role === 'admin'
+
+  const ranking = useMemo(() => {
+    if (isCoachOrAdmin) {
+      // realClients is already enriched with community data (see realClients useMemo),
+      // so computeXPRanking includes m_community_* badges — matches what each client
+      // computes from their own Progress page.
+      return computeXPRanking(realClients)
+    }
+    // Client role: read from DB (written by admin's periodic sync every 2 min).
+    // All clients read the same DB values → everyone sees an identical ranking.
+    return [...realClients]
+      .map(c => ({
+        name:        c.name,
+        clientId:    c.id,
+        xp:          c.xp_monthly || 0,
+        totalXP:     c.xp_total   || 0,
+        level:       c.xp_level   || 1,
+        badge_count: 0,
+      }))
+      .sort((a, b) => b.xp - a.xp)
+  }, [realClients, isCoachOrAdmin])
   const kcalPct  = Math.min((foodTotals.kcal    / (client.calorieTarget || 1)) * 100, 100)
   const protPct  = Math.min((foodTotals.protein / (client.proteinTarget || 1)) * 100, 100)
 
