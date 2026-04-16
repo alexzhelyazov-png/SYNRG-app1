@@ -39,9 +39,40 @@ async function sbFetchSafe(url, options) {
   } catch { return null }
 }
 
+// Paginated select — bypasses PostgREST's server-side max-rows cap by fetching
+// in chunks of PAGE_SIZE using Range headers. Without this, queries with
+// limit=100000 silently return only the first 1000 rows (PostgREST default cap),
+// causing admin to miss clients' meals/weights/steps → wrong XP computation.
+const PAGE_SIZE = 1000
+async function sbFetchPaginated(table, extra = '') {
+  // Respect caller's explicit limit — if it's <= PAGE_SIZE just do a single request
+  const limitMatch = extra.match(/(?:^|&)limit=(\d+)/)
+  const explicitLimit = limitMatch ? parseInt(limitMatch[1], 10) : Infinity
+  if (explicitLimit <= PAGE_SIZE) {
+    return (await sbFetch(sbUrl(table, '?select=*' + extra), { headers: sbHeaders(), cache: 'no-store' })) || []
+  }
+  // Strip any existing limit from the query; we'll control it via Range headers
+  const extraNoLimit = extra.replace(/(?:^|&)limit=\d+/g, '')
+  const all = []
+  let offset = 0
+  // Safety cap: never loop forever; cap at whatever the caller asked for (or 500k)
+  const hardCap = Math.min(explicitLimit, 500000)
+  while (offset < hardCap) {
+    const to = Math.min(offset + PAGE_SIZE - 1, hardCap - 1)
+    const page = await sbFetch(
+      sbUrl(table, '?select=*' + extraNoLimit),
+      { headers: sbHeaders({ 'Range-Unit': 'items', 'Range': `${offset}-${to}` }), cache: 'no-store' }
+    ) || []
+    all.push(...page)
+    if (page.length < PAGE_SIZE) break  // last page reached
+    offset += PAGE_SIZE
+  }
+  return all
+}
+
 const SB = {
   async selectAll(table, extra = '') {
-    return (await sbFetch(sbUrl(table, '?select=*' + extra), { headers: sbHeaders(), cache: 'no-store' })) || []
+    return sbFetchPaginated(table, extra)
   },
   async insert(table, row) {
     const data = await sbFetch(sbUrl(table), {
@@ -232,6 +263,35 @@ export const DB = {
         .map(b => ({ ...b, slots: { date: b.booking_slots.slot_date, start_time: b.booking_slots.start_time, coach_name: b.booking_slots.coach_name } }))
     }
     return []
+  },
+
+  // ── Booking: client's past attended bookings (status=active, date < today) ──
+  async getClientPastBookings(clientId) {
+    if (isUsingSupabase) {
+      const data = (await sbFetchSafe(
+        sbUrl('slot_bookings', `?select=*,booking_slots(slot_date,start_time,coach_name)&client_id=eq.${clientId}&status=eq.active`),
+        { headers: sbHeaders() }
+      )) || []
+      const today = new Date().toISOString().slice(0, 10)
+      return data
+        .filter(b => b.booking_slots && b.booking_slots.slot_date < today)
+        .sort((a, b) => b.booking_slots.slot_date.localeCompare(a.booking_slots.slot_date))
+        .map(b => ({ ...b, slots: { date: b.booking_slots.slot_date, start_time: b.booking_slots.start_time, coach_name: b.booking_slots.coach_name } }))
+    }
+    return []
+  },
+
+  // ── Ranking: batch-update xp_monthly / xp_total / xp_level on clients ───
+  async batchUpdateXP(updates) {
+    // updates: [{ id, xp_monthly, xp_total, xp_level }, ...]
+    if (!isUsingSupabase || !updates.length) return
+    await Promise.all(updates.map(u =>
+      sbFetchSafe(sbUrl('clients', `?id=eq.${u.id}`), {
+        method:  'PATCH',
+        headers: { ...sbHeaders(), Prefer: 'return=minimal' },
+        body:    JSON.stringify({ xp_monthly: u.xp_monthly, xp_total: u.xp_total, xp_level: u.xp_level }),
+      })
+    ))
   },
 
   // ── Booking: all completed bookings with coach info ────────
