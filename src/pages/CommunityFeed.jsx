@@ -98,6 +98,7 @@ export default function CommunityFeed() {
               reactionCounts[r.emoji] = (reactionCounts[r.emoji] || 0) + 1
             })
             const comments = postComments.filter(c => c.post_id === post.id)
+              .sort((a, b) => (a.created_at || '').localeCompare(b.created_at || ''))
             const commentsOpen = !!expandedComments[post.id]
             const commentText  = commentTexts[post.id] || ''
 
