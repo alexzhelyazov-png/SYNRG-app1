@@ -150,14 +150,18 @@ export function getCurrentMonthKey() {
    ─────────────────────────────────────────────────────────────── */
 
 function collectStats(client) {
-  const meals    = client.meals      || []
-  const weights  = client.weightLogs || []
-  const workouts = client.workouts   || []
-  const steps    = client.stepsLogs  || []
+  const meals          = client.meals          || []
+  const weights        = client.weightLogs     || []
+  const workouts       = client.workouts       || []
+  const steps          = client.stepsLogs      || []
+  // bookedSessions: completed calendar sessions ({ date: 'DD.MM.YYYY', coach })
+  // Kept separate from workouts (which have exercises/items) so UI isn't affected.
+  const bookedSessions = client.bookedSessions || []
 
   const mealDateSet    = new Set(meals.map(m => m.date))
   const weightDateSet  = new Set(weights.map(w => w.date))
-  const workoutDateSet = new Set(workouts.map(w => w.date))
+  // Union of workout-tracker dates AND booking dates — so both count as training days
+  const workoutDateSet = new Set([...workouts.map(w => w.date), ...bookedSessions.map(s => s.date)])
   const stepsDateSet   = new Set(steps.map(s => s.date))
 
   const allDateSet = new Set([...mealDateSet, ...weightDateSet, ...workoutDateSet, ...stepsDateSet])
@@ -172,10 +176,13 @@ function collectStats(client) {
   const calTargetDays  = targetDaysCount(meals, client.calorieTarget || 99999, 'kcal')
   const protTargetDays = targetDaysCount(meals, client.proteinTarget || 99999, 'protein')
 
+  // workoutCount = unique training days (union of tracker + bookings)
+  const totalWorkoutDays = workoutDateSet.size
+
   return {
     mealCount:      meals.length,
     weightCount:    weights.length,
-    workoutCount:   workouts.length,
+    workoutCount:   totalWorkoutDays,
     stepsCount:     steps.length,
     mealDays:       mealDateSet.size,
     weightDays:     weightDateSet.size,
@@ -187,8 +194,8 @@ function collectStats(client) {
     hasPR,
     calTargetDays,
     protTargetDays,
-    consecutiveWorkoutMonths: consecutiveWorkoutMonths(workouts),
-    hasAllRounder:  workouts.length >= 5 && meals.length >= 20 && weights.length >= 5,
+    consecutiveWorkoutMonths: consecutiveWorkoutMonths([...workouts, ...bookedSessions]),
+    hasAllRounder:  totalWorkoutDays >= 5 && meals.length >= 20 && weights.length >= 5,
   }
 }
 
@@ -206,19 +213,23 @@ function collectMonthlyStats(client, monthKey) {
   }
   const matchISO = (isoStr) => (isoStr || '').substring(0, 7) === monthKey
 
-  const meals    = (client.meals      || []).filter(m => matchMonth(m.date))
-  const weights  = (client.weightLogs || []).filter(w => matchMonth(w.date))
-  const workouts = (client.workouts   || []).filter(w => matchMonth(w.date))
-  const steps    = (client.stepsLogs  || []).filter(s => matchMonth(s.date))
+  const meals          = (client.meals          || []).filter(m => matchMonth(m.date))
+  const weights        = (client.weightLogs     || []).filter(w => matchMonth(w.date))
+  const workouts       = (client.workouts       || []).filter(w => matchMonth(w.date))
+  const steps          = (client.stepsLogs      || []).filter(s => matchMonth(s.date))
+  // Completed calendar sessions for this month — dedup with tracker on date
+  const bookedThisMonth = (client.bookedSessions || []).filter(s => matchMonth(s.date))
 
   const communityCount = (client.communityPosts    || []).filter(p => matchISO(p.created_at)).length
                        + (client.communityComments || []).filter(c => matchISO(c.created_at)).length
 
   const stepsDateSet = new Set(steps.map(s => s.date))
+  // Union of workout-tracker dates + booking dates → unique training days
+  const workoutDateSet = new Set([...workouts.map(w => w.date), ...bookedThisMonth.map(s => s.date)])
   const allDateSet = new Set([
     ...meals.map(m => m.date),
     ...weights.map(w => w.date),
-    ...workouts.map(w => w.date),
+    ...workoutDateSet,
     ...stepsDateSet,
   ])
 
@@ -233,7 +244,7 @@ function collectMonthlyStats(client, monthKey) {
   const monthWeightLoss = sortedW.length >= 2 ? sortedW[0].weight - sortedW[sortedW.length - 1].weight : 0
 
   return {
-    workoutCount: workouts.length,
+    workoutCount: workoutDateSet.size, // unique training days: tracker + bookings
     mealCount:    meals.length,
     weightCount:  weights.length,
     stepsDays:    stepsDateSet.size,

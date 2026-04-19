@@ -285,6 +285,24 @@ export const DB = {
     return []
   },
 
+  // ── Booking: all past bookings for ALL clients (for gamification) ──────
+  // Returns [{ clientId, date: 'DD.MM.YYYY', coach }] so gamification can
+  // count booked sessions alongside manually-logged workout-tracker entries.
+  async getAllPastBookings() {
+    if (!isUsingSupabase) return []
+    const today = new Date().toISOString().slice(0, 10)
+    const data = (await sbFetchSafe(
+      sbUrl('slot_bookings', '?select=client_id,booking_slots(slot_date,coach_name)&status=eq.active&limit=50000'),
+      { headers: sbHeaders() }
+    )) || []
+    return data
+      .filter(b => b.booking_slots?.slot_date && b.booking_slots.slot_date < today)
+      .map(b => {
+        const [y, m, d] = b.booking_slots.slot_date.split('-')
+        return { clientId: b.client_id, date: `${d}.${m}.${y}`, coach: b.booking_slots.coach_name || '' }
+      })
+  },
+
   // ── Ranking: batch-update xp_monthly / xp_total / xp_level on clients ───
   async batchUpdateXP(updates) {
     // updates: [{ id, xp_monthly, xp_total, xp_level }, ...]

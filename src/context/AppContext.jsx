@@ -137,7 +137,7 @@ export function AppProvider({ children }) {
         ? `&client_id=eq.${sessionAuth.id}&order=id.desc&limit=5000`
         : `&order=id.desc&created_at=gte.${twoYearsAgo}&limit=20000`
 
-      const [rawCoaches, rawClients, meals, workouts, weights, tasks, taskComments, reactions, stepsRaw, postsRaw, rawSynrgHabits, rawPostReactions, rawPostComments] = await Promise.all([
+      const [rawCoaches, rawClients, meals, workouts, weights, tasks, taskComments, reactions, stepsRaw, postsRaw, rawSynrgHabits, rawPostReactions, rawPostComments, pastBookingsAll] = await Promise.all([
         DB.selectAll('coaches'),
         DB.selectAll('clients'),
         DB.selectAll('meals', mealQuery),
@@ -154,6 +154,9 @@ export function AppProvider({ children }) {
         DB.selectAll('synrg_habits').catch(() => []),
         DB.selectAll('post_reactions', '&limit=50000').catch(() => []),
         DB.selectAll('post_comments', '&order=created_at.desc&limit=100000').catch(() => []),
+        // Completed slot_bookings — needed so gamification counts booked sessions
+        // alongside manually-logged workout-tracker entries.
+        DB.getAllPastBookings().catch(() => []),
       ])
 
       setCoaches(rawCoaches.map(c => ({ name: c.name, password: c.password, id: c.id })))
@@ -210,6 +213,9 @@ export function AppProvider({ children }) {
         workouts: workouts.filter(w => w.client_id === c.id)
           .sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))
           .map(w => ({ id: w.id, date: w.date, coach: w.coach, category: w.category, items: w.items || [] })),
+        // Completed calendar bookings — used by gamification to count training sessions.
+        // Kept separate from workouts (which have exercises/items) to avoid UI side-effects.
+        bookedSessions: pastBookingsAll.filter(b => b.clientId === c.id),
         weightLogs: weights.filter(w => w.client_id === c.id)
           .sort((a, b) => parseDate(a.date) - parseDate(b.date))
           .map(w => ({ id: w.id, date: w.date, weight: Number(w.weight) })),
@@ -358,7 +364,7 @@ export function AppProvider({ children }) {
         // periodic sync returns fewer rows than initial load (PostgREST defaults to
         // max 1000 rows) and SHRINKS the admin's dataset on refresh, silently
         // dropping clients' meals/weights/steps → incorrect XP computation.
-        const [freshMeals, freshWeights, freshSteps, freshWorkouts, freshPosts, freshComments] = await Promise.all([
+        const [freshMeals, freshWeights, freshSteps, freshWorkouts, freshPosts, freshComments, freshBookings] = await Promise.all([
           DB.selectAll('meals',        `&order=id.desc&created_at=gte.${twoYearsAgo}&limit=100000`),
           DB.selectAll('weight_logs',  `&order=id.desc&created_at=gte.${twoYearsAgo}&limit=20000`).catch(() => []),
           DB.selectAll('steps_logs',   `&order=id.desc&created_at=gte.${twoYearsAgo}&limit=20000`).catch(() => []),
@@ -368,6 +374,8 @@ export function AppProvider({ children }) {
           // are never dropped if total exceeds the limit.
           DB.selectAll('community_posts', '&order=created_at.desc&limit=50000').catch(() => null),
           DB.selectAll('post_comments',   '&order=created_at.desc&limit=100000').catch(() => null),
+          // Slot bookings for all clients — needed so XP computation counts booked sessions
+          DB.getAllPastBookings().catch(() => []),
         ])
         // Push fresh community data into state + refs so XP computation below uses it
         if (freshPosts) {
@@ -415,6 +423,7 @@ export function AppProvider({ children }) {
                 .sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))
                 .map(w => ({ id: w.id, date: w.date, coach: w.coach, category: w.category, items: w.items || [] })),
             } : {}),
+            bookedSessions: freshBookings.filter(b => b.clientId === c.id),
           }
         })
 
