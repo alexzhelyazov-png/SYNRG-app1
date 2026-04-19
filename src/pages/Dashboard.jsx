@@ -804,7 +804,10 @@ export function ClientDetail() {
       {/* ══════ Tab 1: Профил ══════ */}
       {tab === 1 && (() => {
         // Weight data
-        const wLogs = [...(client.weightLogs || [])].sort((a, b) => a.date?.localeCompare(b.date))
+        // Use parseDate — DD.MM.YYYY strings sort WRONG lexicographically
+        // (e.g. "30.03.2026" > "18.04.2026" because '3' > '1' as first char,
+        // putting March after April and picking the wrong last entry).
+        const wLogs = [...(client.weightLogs || [])].sort((a, b) => parseDate(a.date) - parseDate(b.date))
         const lastWeight = wLogs.length > 0 ? wLogs[wLogs.length - 1] : null
         const sparkData = wLogs.slice(-10).map(w => Number(w.weight))
 
