@@ -6,6 +6,7 @@ import {
   Collapse,
 } from '@mui/material'
 import CalendarMonthIcon  from '@mui/icons-material/CalendarMonth'
+import LinkIcon            from '@mui/icons-material/Link'
 import AddIcon            from '@mui/icons-material/Add'
 import EditIcon           from '@mui/icons-material/Edit'
 import DeleteOutlineIcon  from '@mui/icons-material/DeleteOutline'
@@ -636,7 +637,29 @@ export default function Schedule() {
           </IconButton>
         </Box>
 
-        {admin && (
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          {/* Google Calendar ICS feed link */}
+          <Tooltip title="Копирай линк за Google Calendar" arrow>
+            <Button
+              startIcon={<LinkIcon sx={{ fontSize: '13px !important' }} />}
+              onClick={() => {
+                const url = 'https://nzrtdqlgljcipfmectwp.supabase.co/functions/v1/calendar-feed'
+                navigator.clipboard.writeText(url).then(() => showSnackbar('Линкът е копиран — добави го в Google Calendar'))
+              }}
+              size="small"
+              sx={{
+                background: 'rgba(122,200,255,0.10)', color: '#7AC8FF',
+                fontWeight: 700, fontSize: '11px', borderRadius: '8px',
+                border: '1px solid rgba(122,200,255,0.25)',
+                px: 1, py: 0.25, textTransform: 'none', minWidth: 0,
+                '&:hover': { background: 'rgba(122,200,255,0.18)' },
+              }}
+            >
+              Google Cal
+            </Button>
+          </Tooltip>
+
+          {admin && (
           <Button
             startIcon={<BoltIcon sx={{ fontSize: '13px !important' }} />}
             onClick={() => setShowShiftDlg(true)}
@@ -651,7 +674,8 @@ export default function Schedule() {
           >
             Нова смяна
           </Button>
-        )}
+          )}
+        </Box>
       </Box>
 
       {/* ── Calendar Grid ─────────────────────────────── */}

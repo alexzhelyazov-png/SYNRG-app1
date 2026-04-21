@@ -453,15 +453,19 @@ function PlanDialog({ open, onClose, onActivate, onExtend, onAdjust, onTogglePai
 function ClientInfoDialog({ open, onClose, client, plan, allClientPlans, workouts, t }) {
   const history = (allClientPlans || []).filter(p => p.id !== plan?.id)
   const [upcomingBookings, setUpcomingBookings] = useState([])
+  const [pastBookings,    setPastBookings]    = useState([])
 
   useEffect(() => {
     if (open && client?.id) {
       DB.getClientUpcomingBookings(client.id).then(data => {
-        // Filter out bookings where slot join returned null (past dates filtered server-side)
         setUpcomingBookings((data || []).filter(b => b.slots))
+      })
+      DB.getClientPastBookings(client.id).then(data => {
+        setPastBookings(data || [])
       })
     } else {
       setUpcomingBookings([])
+      setPastBookings([])
     }
   }, [open, client?.id])
 
@@ -554,16 +558,18 @@ function ClientInfoDialog({ open, onClose, client, plan, allClientPlans, workout
               )}
 
               <Typography sx={{ fontSize: '10px', fontWeight: 800, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.7px', mb: 0.75, mt: 1 }}>
-                {t('workoutHistory')} ({past.length})
+                {t('workoutHistory')} ({pastBookings.length})
               </Typography>
-              {past.length > 0 ? (
+              {pastBookings.length > 0 ? (
                 <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
-                  {past.slice(0, 30).map((w, i) => (
-                    <Chip key={w.id || i} label={w.date} size="small"
+                  {pastBookings.slice(0, 30).map((b, i) => (
+                    <Chip key={b.id || i}
+                      label={`${b.slots.date}${b.slots.coach_name ? ' · ' + b.slots.coach_name : ''}`}
+                      size="small"
                       sx={{ fontSize: '10px', fontWeight: 600, height: 22, background: 'rgba(255,255,255,0.06)', color: C.muted }} />
                   ))}
-                  {past.length > 30 && (
-                    <Chip label={`+${past.length - 30}`} size="small"
+                  {pastBookings.length > 30 && (
+                    <Chip label={`+${pastBookings.length - 30}`} size="small"
                       sx={{ fontSize: '10px', fontWeight: 600, height: 22, background: 'rgba(255,255,255,0.04)', color: C.muted }} />
                   )}
                 </Box>

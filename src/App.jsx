@@ -326,7 +326,7 @@ function AppShell() {
                 {view === 'workout'  && <ClientWorkout />}
                 {view === 'programs'  && (auth.role === 'coach' || auth.role === 'admin' || auth.role === 'client') && <Programs />}
                 {view === 'notifications' && auth.role === 'coach' && <Notifications />}
-                {view === 'recipes'      && auth.role !== 'client' && <Recipes />}
+                {view === 'recipes'      && (auth.role !== 'client' || hasModule(auth.modules, 'program_access') || hasModule(auth.modules, 'training_plan_access')) && <Recipes />}
                 {view === 'admin'     && admin && <Admin />}
               </>
             )}

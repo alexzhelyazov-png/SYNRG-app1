@@ -1363,14 +1363,25 @@ function DashboardClient({ isCoachView = false }) {
           hasModule(auth.modules, 'weight_tracking') && { key: 'weight', view: 'weight', color: '#C8C5FF', Icon: MonitorWeightIcon, label: t('addWeightBtn') },
           (hasModule(auth.modules, 'nutrition_tracking') || hasModule(auth.modules, 'weight_tracking')) && { key: 'steps', view: 'steps', color: '#FFD070', Icon: DirectionsWalkIcon, label: t('addStepsBtn') },
           { key: 'workout', view: 'workout', color: '#A78BFA', Icon: FitnessCenterIcon, label: t('addWorkoutBtn') },
-          !isCoachView && { key: 'recipes', view: 'recipes', color: '#5a6e5a', Icon: MenuBookIcon, label: 'Рецепти — скоро' },
+          !isCoachView && (() => {
+            const recipesUnlocked = hasModule(auth.modules, 'program_access') || hasModule(auth.modules, 'training_plan_access')
+            return {
+              key: 'recipes',
+              view: 'recipes',
+              color: recipesUnlocked ? '#F97316' : '#5a6e5a',
+              Icon: MenuBookIcon,
+              label: 'Рецепти',
+              isLocked: !recipesUnlocked,
+            }
+          })(),
           { key: 'tasks', view: 'tasks', color: '#F87171', Icon: AssignmentIcon, label: t('navTasks'),
             badge: (() => {
               const seen = localStorage.getItem(`tasksLastSeen_${client.id}`) || '1970'
               return (client.tasks || []).filter(tk => tk.status === 'pending' && (tk.created_at || '') > seen).length
             })() },
-        ].filter(Boolean).map(({ key, view, color, Icon, label, badge }) => (
+        ].filter(Boolean).map(({ key, view, color, Icon, label, badge, isLocked }) => (
           <Paper key={key} onClick={() => {
+            if (isLocked) { setView('programs'); return }
             if (key === 'tasks') localStorage.setItem(`tasksLastSeen_${client.id}`, new Date().toISOString())
             setView(view)
           }}
@@ -1399,6 +1410,20 @@ function DashboardClient({ isCoachView = false }) {
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                 }}>
                   {badge}
+                </Box>
+              )}
+              {isLocked && (
+                <Box sx={{
+                  position: 'absolute', bottom: -4, right: -4,
+                  width: 16, height: 16, borderRadius: '5px',
+                  background: '#FFB800',
+                  boxShadow: '0 0 6px rgba(255,184,0,0.55)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>
+                  <svg width="8" height="9" viewBox="0 0 6 8" fill="none">
+                    <rect x="0.5" y="3.5" width="5" height="4" rx="1" fill="#1a1200" />
+                    <path d="M1.5 3.5V2.5a1.5 1.5 0 0 1 3 0v1" stroke="#1a1200" strokeWidth="1.3" strokeLinecap="round" />
+                  </svg>
                 </Box>
               )}
             </Box>
