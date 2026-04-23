@@ -1187,12 +1187,12 @@ export function AppProvider({ children }) {
       protein: Math.round(((food.protein / 100) * grams) * 10) / 10,
       carbs:   Math.round(((food.carbs   || 0) / 100) * grams * 10) / 10,
       fat:     Math.round(((food.fat     || 0) / 100) * grams * 10) / 10,
-      date:    todayDate(),
+      date:    selFoodDate || todayDate(),
     }
     addMealToClient(client.id, meal)
-    setFoodDate(dateToInput(todayDate())) // jump back to today
     setFoodSearch(''); setGramsInput(''); setFoodModalOpen(false)
-    showSnackbar(`${food.label} ${t('foodAddedSuffix')}`)
+    const suffix = selFoodDate && selFoodDate !== todayDate() ? ` (${selFoodDate})` : ''
+    showSnackbar(`${food.label} ${t('foodAddedSuffix')}${suffix}`)
   }
 
   function addQuickFood(key, grams) {
@@ -1204,11 +1204,11 @@ export function AppProvider({ children }) {
       protein: Math.round(((food.protein / 100) * grams) * 10) / 10,
       carbs:   Math.round(((food.carbs   || 0) / 100) * grams * 10) / 10,
       fat:     Math.round(((food.fat     || 0) / 100) * grams * 10) / 10,
-      date:    todayDate(),
+      date:    selFoodDate || todayDate(),
     }
     addMealToClient(client.id, meal)
-    setFoodDate(dateToInput(todayDate())) // jump back to today
-    showSnackbar(`${food.label} ${t('foodAddedSuffix')}`)
+    const suffix = selFoodDate && selFoodDate !== todayDate() ? ` (${selFoodDate})` : ''
+    showSnackbar(`${food.label} ${t('foodAddedSuffix')}${suffix}`)
   }
 
   function addBarcodeFood(name, grams, kcalPer100, protPer100, carbsPer100 = 0, fatPer100 = 0) {
@@ -1220,12 +1220,12 @@ export function AppProvider({ children }) {
       protein: Math.round(((protPer100  / 100) * grams) * 10) / 10,
       carbs:   Math.round(((carbsPer100 / 100) * grams) * 10) / 10,
       fat:     Math.round(((fatPer100   / 100) * grams) * 10) / 10,
-      date:    todayDate(),
+      date:    selFoodDate || todayDate(),
     }
     addMealToClient(client.id, meal)
-    setFoodDate(dateToInput(todayDate())) // jump back to today
     setFoodModalOpen(false)
-    showSnackbar(`${name} ${t('foodAddedSuffix')}`)
+    const suffix = selFoodDate && selFoodDate !== todayDate() ? ` (${selFoodDate})` : ''
+    showSnackbar(`${name} ${t('foodAddedSuffix')}${suffix}`)
   }
 
   // ── Weight actions ────────────────────────────────────────────

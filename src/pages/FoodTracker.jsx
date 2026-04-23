@@ -52,16 +52,35 @@ export default function FoodTracker() {
       {/* ── Header ─────────────────────────── */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2, flexWrap: 'wrap', gap: 1 }}>
         <Typography variant="h2">{t('foodTrackerTitle')}</Typography>
-        {auth.role !== 'client' && (
-          <TextField
-            type="date"
-            value={foodDate}
-            onChange={e => setFoodDate(e.target.value)}
-            sx={{ width: '140px' }}
-            size="small"
-          />
-        )}
+        <TextField
+          type="date"
+          value={foodDate}
+          onChange={e => setFoodDate(e.target.value)}
+          inputProps={{ max: dateToInput(todayDate()) }}
+          sx={{ width: '160px' }}
+          size="small"
+        />
       </Box>
+      {selFoodDate !== todayDate() && (
+        <Box sx={{
+          display: 'flex', alignItems: 'center', gap: 1,
+          mb: 1.5, px: 1.5, py: 0.75, borderRadius: '10px',
+          background: 'rgba(255,208,112,0.08)',
+          border: '1px solid rgba(255,208,112,0.25)',
+        }}>
+          <WarningAmberIcon sx={{ fontSize: 16, color: '#FFD070' }} />
+          <Typography sx={{ fontSize: '12px', fontWeight: 600, color: '#FFD070' }}>
+            Гледаш/добавяш за минал ден: {selFoodDate}
+          </Typography>
+          <Button
+            size="small"
+            onClick={() => setFoodDate(dateToInput(todayDate()))}
+            sx={{ ml: 'auto', fontSize: '11px', color: C.primary, textTransform: 'none', minWidth: 0, p: '2px 8px' }}
+          >
+            Към днес
+          </Button>
+        </Box>
+      )}
 
       {/* ── Compact progress row: Calories | Protein ── */}
       <Paper sx={{
