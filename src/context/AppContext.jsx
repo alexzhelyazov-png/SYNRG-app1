@@ -29,6 +29,7 @@ import {
   fmt1, avgArr, sameDateStr,
 } from '../lib/utils'
 import { computeXPRanking, computeTotalXP, computeMonthlyXP, computeLevel, evaluateBadges } from '../lib/gamification'
+import { isAdmin as isAdminUser, isFullAdmin } from './../lib/bookingUtils'
 import { applyColors } from '../theme'
 
 const AppContext = createContext(null)
@@ -1442,16 +1443,18 @@ export function AppProvider({ children }) {
     if (auth.role === 'client') {
       return coachMessages.filter(m => m.sender_role !== 'client' && !m.read_at).length
     }
+    // Admin (by name or role) → counts across all clients
+    const isAdmn = isAdminUser(auth) || isFullAdmin(auth) || auth.role === 'admin'
+    if (isAdmn) {
+      return coachMessages.filter(m => m.sender_role === 'client' && !m.read_at).length
+    }
+    // Regular coach → only messages from their assigned clients
     if (auth.role === 'coach') {
-      // Count unread messages across THIS coach's assigned clients only
       const myClientIds = new Set(clients.filter(c => c.assigned_coach_id === auth.id).map(c => c.id))
       return coachMessages.filter(m => m.sender_role === 'client' && !m.read_at && myClientIds.has(m.client_id)).length
     }
-    if (auth.role === 'admin') {
-      return coachMessages.filter(m => m.sender_role === 'client' && !m.read_at).length
-    }
     return 0
-  }, [coachMessages, auth.role, auth.id, clients])
+  }, [coachMessages, auth, clients])
 
   async function dismissBadge(badgeId, monthKey = null) {
     const cl = client

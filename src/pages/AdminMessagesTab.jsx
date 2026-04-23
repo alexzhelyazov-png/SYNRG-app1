@@ -5,6 +5,7 @@ import {
 import SendIcon from '@mui/icons-material/Send'
 import ArrowBackIcon from '@mui/icons-material/ArrowBack'
 import { useApp } from '../context/AppContext'
+import { isAdmin, isFullAdmin } from '../lib/bookingUtils'
 import { C } from '../theme'
 
 // ── Admin Messages Tab ────────────────────────────────────────
@@ -17,7 +18,8 @@ export default function AdminMessagesTab() {
     sendCoachMessage, markCoachMessagesRead,
   } = useApp()
 
-  const isAdmin = auth.role === 'admin'
+  // Admin status is determined by name (role is 'coach' for everyone in coaches table)
+  const isAdminUser = isAdmin(auth) || isFullAdmin(auth) || auth.role === 'admin'
   const [selectedClientId, setSelectedClientId] = useState(null)
   const [coachFilter, setCoachFilter] = useState('all') // admin only
   const [draft, setDraft] = useState('')
@@ -25,17 +27,17 @@ export default function AdminMessagesTab() {
   const scrollRef = useRef(null)
 
   // Real (non-shadow) clients with at least some chat context:
-  //   - Coach: only their assigned
+  //   - Coach (non-admin): only their assigned
   //   - Admin: all (respecting coachFilter)
   const eligibleClients = useMemo(() => {
     const real = clients.filter(c => !c.is_coach && c.id)
-    if (auth.role === 'coach') {
+    if (!isAdminUser) {
       return real.filter(c => c.assigned_coach_id === auth.id)
     }
     if (coachFilter === 'all')         return real
     if (coachFilter === 'unassigned')  return real.filter(c => !c.assigned_coach_id)
     return real.filter(c => c.assigned_coach_id === coachFilter)
-  }, [clients, auth.role, auth.id, coachFilter])
+  }, [clients, isAdminUser, auth.id, coachFilter])
 
   // Compute per-client chat summary
   const clientRows = useMemo(() => {
@@ -74,8 +76,8 @@ export default function AdminMessagesTab() {
   async function handleSend() {
     const text = draft.trim()
     if (!text || !selected || sending) return
-    // For admin sending on behalf: use the assigned_coach_id, else fallback (first coach in list).
-    const coachId = selected.assigned_coach_id || (auth.role === 'coach' ? auth.id : null)
+    // For admin sending on behalf: use the assigned_coach_id, else fallback to current user.
+    const coachId = selected.assigned_coach_id || (!isAdminUser ? auth.id : null)
     if (!coachId) {
       alert('Клиентът няма назначен треньор. Първо му назначи треньор.')
       return
@@ -156,7 +158,7 @@ export default function AdminMessagesTab() {
             value={draft}
             onChange={e => setDraft(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend() } }}
-            placeholder={isAdmin ? 'Пишеш като собственик (жълто)...' : 'Съобщение…'}
+            placeholder={isAdminUser ?'Пишеш като собственик (жълто)...' : 'Съобщение…'}
             multiline
             maxRows={4}
             size="small"
@@ -169,11 +171,11 @@ export default function AdminMessagesTab() {
             disabled={!draft.trim() || sending}
             sx={{
               color: '#fff',
-              background: isAdmin ? '#d97706' : C.purple,
+              background: isAdminUser ?'#d97706' : C.purple,
               borderRadius: '12px',
               width: 44, height: 44,
               alignSelf: 'flex-end',
-              '&:hover': { background: isAdmin ? '#d97706' : C.purple, opacity: 0.9 },
+              '&:hover': { background: isAdminUser ?'#d97706' : C.purple, opacity: 0.9 },
               '&:disabled': { background: C.border, color: C.muted },
             }}
           >
