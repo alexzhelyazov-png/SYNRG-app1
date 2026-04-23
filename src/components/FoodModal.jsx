@@ -47,21 +47,59 @@ export default function FoodModal() {
     return result
   })()
 
-  function handleRecentClick(meal) {
-    // Reverse-engineer per-100g macros and re-log via barcode path
-    const kcalPer100  = Math.round((meal.kcal    / meal.grams) * 100)
-    const protPer100  = Math.round((meal.protein / meal.grams) * 100 * 10) / 10
-    const carbsPer100 = meal.carbs ? Math.round((meal.carbs / meal.grams) * 100 * 10) / 10 : 0
-    const fatPer100   = meal.fat   ? Math.round((meal.fat   / meal.grams) * 100 * 10) / 10 : 0
-    addBarcodeFood(meal.label, meal.grams, kcalPer100, protPer100, carbsPer100, fatPer100)
-    resetAndClose()
-  }
+  // Custom food state (for re-logging barcode/AI/recipe items with editable grams)
+  const [customFood, setCustomFood] = useState(null)
+  // customFood = { name, kcalPer100, proteinPer100, carbsPer100, fatPer100 }
 
   // AI photo state
   const [aiFood,     setAiFood]     = useState(null)  // { name, grams, kcal, protein, kcalPer100, proteinPer100 }
   const [aiLoading,  setAiLoading]  = useState(false)
   const [aiError,    setAiError]    = useState('')
   const fileInputRef = useRef(null)
+
+  function handleRecentClick(meal) {
+    // Try to find the food in foodDB by matching the label (case-insensitive)
+    const labelLc = (meal.label || '').toLowerCase().trim()
+    const dbEntry = Object.entries(foodDB).find(([k, f]) => {
+      return k === labelLc
+        || (f.label || '').toLowerCase() === labelLc
+        || (f.labelEn || '').toLowerCase() === labelLc
+    })
+
+    if (dbEntry) {
+      // DB food — use standard DB path so preview + per-piece works
+      const [key, food] = dbEntry
+      setSelectedKey(key)
+      setSearch(foodLabel(food, lang))
+      if (food.perPiece) {
+        const pieces = Math.max(1, Math.round(meal.grams / (food.gramsPerPiece || 55)))
+        setAmount(String(pieces))
+      } else {
+        setAmount(String(meal.grams))
+      }
+      setCustomFood(null)
+      setAiFood(null)
+      setAiError('')
+    } else {
+      // Custom food (AI / barcode / recipe log) — reverse-engineer per-100g, prefill for edit
+      const kcalPer100  = Math.round((meal.kcal    / meal.grams) * 100)
+      const protPer100  = Math.round((meal.protein / meal.grams) * 100 * 10) / 10
+      const carbsPer100 = meal.carbs ? Math.round((meal.carbs / meal.grams) * 100 * 10) / 10 : 0
+      const fatPer100   = meal.fat   ? Math.round((meal.fat   / meal.grams) * 100 * 10) / 10 : 0
+      setCustomFood({
+        name: meal.label,
+        kcalPer100,
+        proteinPer100: protPer100,
+        carbsPer100,
+        fatPer100,
+      })
+      setSearch(meal.label)
+      setAmount(String(meal.grams))
+      setSelectedKey(null)
+      setAiFood(null)
+      setAiError('')
+    }
+  }
 
   const isEn = lang === 'en'
 
@@ -85,13 +123,15 @@ export default function FoodModal() {
     ? Number(amount) * (selectedFood?.gramsPerPiece || 55)
     : Number(amount)
 
-  const isAiMode = !!aiFood
+  const isAiMode     = !!aiFood
+  const isCustomMode = !!customFood && !isAiMode
 
   function handleSelectSuggestion(key) {
     setSelectedKey(key)
     setSearch(foodLabel(foodDB[key], lang))
     setAmount('')
     setAiFood(null)
+    setCustomFood(null)
     setAiError('')
   }
 
@@ -100,6 +140,7 @@ export default function FoodModal() {
     setSelectedKey(null)
     setAmount('')
     setAiFood(null)
+    setCustomFood(null)
     setAiError('')
   }
 
@@ -107,6 +148,20 @@ export default function FoodModal() {
     if (isAiMode) {
       const grams = Number(String(amount).replace(',', '.')) || aiFood.grams
       addBarcodeFood(aiFood.name, grams, aiFood.kcalPer100, aiFood.proteinPer100)
+      resetAndClose()
+      return
+    }
+    if (isCustomMode) {
+      const rawNum = Number(String(amount).replace(',', '.'))
+      if (!rawNum) return
+      addBarcodeFood(
+        customFood.name,
+        rawNum,
+        customFood.kcalPer100,
+        customFood.proteinPer100,
+        customFood.carbsPer100 || 0,
+        customFood.fatPer100   || 0,
+      )
       resetAndClose()
       return
     }
@@ -152,13 +207,16 @@ export default function FoodModal() {
     setSelectedKey(null)
     setAmount('')
     setAiFood(null)
+    setCustomFood(null)
     setAiError('')
     setAiLoading(false)
   }
 
   const canAdd = isAiMode
     ? true  // AI already estimated grams
-    : selectedFood && amount && Number(amount) > 0
+    : isCustomMode
+      ? amount && Number(String(amount).replace(',', '.')) > 0
+      : selectedFood && amount && Number(amount) > 0
 
   // Compute preview values for AI mode
   const aiGrams = isAiMode ? (Number(String(amount).replace(',', '.')) || aiFood.grams) : 0
@@ -354,8 +412,45 @@ export default function FoodModal() {
             </Box>
           )}
 
+          {/* Preview (Custom re-log mode) */}
+          {isCustomMode && (
+            <Box sx={{
+              background:   'rgba(196,233,191,0.06)',
+              border:       '1px solid rgba(196,233,191,0.2)',
+              borderRadius: '10px',
+              px: 2, py: 1.25,
+            }}>
+              <Typography sx={{ fontWeight: 700, fontSize: '13px', color: C.primary, mb: 0.5 }}>
+                {customFood.name}
+              </Typography>
+              <Typography sx={{ color: C.muted, fontSize: '11px' }}>
+                {customFood.kcalPer100} kcal · {customFood.proteinPer100}{t('gUnit')} {t('proteinShortLbl')} / 100{t('gUnit')} — редактирай грамажа по-долу
+              </Typography>
+              {amount && Number(String(amount).replace(',', '.')) > 0 && (
+                <Box sx={{ display: 'flex', gap: 3, mt: 1, pt: 1, borderTop: `1px solid ${C.border}` }}>
+                  <Box>
+                    <Typography sx={{ fontSize: '10px', color: C.muted, textTransform: 'uppercase', letterSpacing: '0.6px' }}>
+                      {t('caloriesLbl')}
+                    </Typography>
+                    <Typography sx={{ fontWeight: 800, color: C.text, fontSize: '15px' }}>
+                      {Math.round((customFood.kcalPer100 / 100) * Number(String(amount).replace(',', '.')))} kcal
+                    </Typography>
+                  </Box>
+                  <Box>
+                    <Typography sx={{ fontSize: '10px', color: C.muted, textTransform: 'uppercase', letterSpacing: '0.6px' }}>
+                      {t('proteinLbl')}
+                    </Typography>
+                    <Typography sx={{ fontWeight: 800, color: C.purple, fontSize: '15px' }}>
+                      {Math.round((customFood.proteinPer100 / 100) * Number(String(amount).replace(',', '.')) * 10) / 10}{t('gUnit')}
+                    </Typography>
+                  </Box>
+                </Box>
+              )}
+            </Box>
+          )}
+
           {/* Preview (DB mode) */}
-          {!isAiMode && selectedFood && amount && Number(amount) > 0 && (
+          {!isAiMode && !isCustomMode && selectedFood && amount && Number(amount) > 0 && (
             <Box sx={{
               background:   C.accentSoft,
               border:       '1px solid rgba(170,169,205,0.25)',
