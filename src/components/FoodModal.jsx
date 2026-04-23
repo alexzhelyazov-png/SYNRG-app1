@@ -26,10 +26,36 @@ async function recognizeFood(base64) {
 }
 
 export default function FoodModal() {
-  const { foodModalOpen, setFoodModalOpen, addFoodFromModal, addBarcodeFood, t, lang } = useApp()
+  const { foodModalOpen, setFoodModalOpen, addFoodFromModal, addBarcodeFood, client, t, lang } = useApp()
   const [search,      setSearch]      = useState('')
   const [selectedKey, setSelectedKey] = useState(null)
   const [amount,      setAmount]      = useState('')
+
+  // Recent unique meals (last 8 distinct foods the client logged)
+  const recentMeals = (() => {
+    const meals = client?.meals || []
+    const seen = new Set()
+    const result = []
+    for (let i = meals.length - 1; i >= 0 && result.length < 8; i--) {
+      const m = meals[i]
+      const key = (m.label || '').toLowerCase().trim()
+      if (!key || seen.has(key)) continue
+      if (!m.grams || m.grams <= 0) continue
+      seen.add(key)
+      result.push(m)
+    }
+    return result
+  })()
+
+  function handleRecentClick(meal) {
+    // Reverse-engineer per-100g macros and re-log via barcode path
+    const kcalPer100  = Math.round((meal.kcal    / meal.grams) * 100)
+    const protPer100  = Math.round((meal.protein / meal.grams) * 100 * 10) / 10
+    const carbsPer100 = meal.carbs ? Math.round((meal.carbs / meal.grams) * 100 * 10) / 10 : 0
+    const fatPer100   = meal.fat   ? Math.round((meal.fat   / meal.grams) * 100 * 10) / 10 : 0
+    addBarcodeFood(meal.label, meal.grams, kcalPer100, protPer100, carbsPer100, fatPer100)
+    resetAndClose()
+  }
 
   // AI photo state
   const [aiFood,     setAiFood]     = useState(null)  // { name, grams, kcal, protein, kcalPer100, proteinPer100 }
@@ -249,6 +275,48 @@ export default function FoodModal() {
                   })}
                 </Box>
               )}
+            </Box>
+          )}
+
+          {/* Recent meals (shown when search is empty) */}
+          {!isAiMode && !aiLoading && !search.trim() && !selectedKey && recentMeals.length > 0 && (
+            <Box>
+              <Typography sx={{ fontSize: '11px', color: C.muted, textTransform: 'uppercase', letterSpacing: '0.6px', mb: 0.75, fontWeight: 700 }}>
+                Последно добавени
+              </Typography>
+              <Box sx={{
+                border:       `1px solid ${C.border}`,
+                borderRadius: '12px',
+                overflow:     'hidden',
+                background:   C.sidebar,
+              }}>
+                {recentMeals.map((meal, idx) => (
+                  <Box
+                    key={`${meal.label}-${idx}`}
+                    onClick={() => handleRecentClick(meal)}
+                    sx={{
+                      px: 1.75, py: 1.25,
+                      cursor: 'pointer',
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1.5,
+                      borderBottom: `1px solid ${C.border}`,
+                      '&:last-child': { borderBottom: 'none' },
+                      '&:hover': { background: C.accentSoft },
+                    }}
+                  >
+                    <Box sx={{ minWidth: 0, flex: 1 }}>
+                      <Typography sx={{ fontWeight: 600, fontSize: '14px', color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {meal.label}
+                      </Typography>
+                      <Typography sx={{ color: C.muted, fontSize: '12px' }}>
+                        {meal.grams}{t('gUnit')} · {Math.round(meal.kcal)} kcal · {meal.protein}{t('gUnit')} {t('proteinShortLbl')}
+                      </Typography>
+                    </Box>
+                    <Typography sx={{ fontSize: '11px', fontWeight: 800, color: C.primary, whiteSpace: 'nowrap' }}>
+                      + Добави
+                    </Typography>
+                  </Box>
+                ))}
+              </Box>
             </Box>
           )}
 
