@@ -15,8 +15,11 @@ export default function AdminMessagesTab() {
   const {
     auth, clients, coaches,
     coachMessages, coachMsgsLoaded,
-    sendCoachMessage, markCoachMessagesRead,
+    sendCoachMessage, markCoachMessagesRead, assignCoach,
   } = useApp()
+
+  // Only real coaches (exclude admin shadow profiles)
+  const realCoaches = coaches.filter(c => !/^Админ/i.test(c.name))
 
   // Admin status is determined by name (role is 'coach' for everyone in coaches table)
   const isAdminUser = isAdmin(auth) || isFullAdmin(auth) || auth.role === 'admin'
@@ -101,16 +104,42 @@ export default function AdminMessagesTab() {
     return (
       <Box sx={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 220px)', minHeight: 420 }}>
         {/* Header */}
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, px: 1.5, py: 1.5, borderBottom: `1px solid ${C.border}` }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, px: 1.5, py: 1.5, borderBottom: `1px solid ${C.border}`, flexWrap: 'wrap' }}>
           <IconButton onClick={() => setSelectedClientId(null)} size="small" sx={{ color: C.muted }}>
             <ArrowBackIcon />
           </IconButton>
-          <Box sx={{ flex: 1 }}>
+          <Box sx={{ flex: 1, minWidth: 0 }}>
             <Typography sx={{ fontSize: 15, fontWeight: 700, color: C.text }}>{selected.name}</Typography>
-            <Typography sx={{ fontSize: 11, color: C.muted }}>
-              Треньор: {assignedCoach?.name || <span style={{ color: '#ff6b6b' }}>не е назначен</span>}
-            </Typography>
+            {!isAdminUser && (
+              <Typography sx={{ fontSize: 11, color: C.muted }}>
+                Треньор: {assignedCoach?.name || <span style={{ color: '#ff6b6b' }}>не е назначен</span>}
+              </Typography>
+            )}
           </Box>
+          {/* Inline coach assignment (admin only) */}
+          {isAdminUser && (
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+              <Typography sx={{ fontSize: 11, color: C.muted, fontWeight: 700 }}>Треньор:</Typography>
+              <select
+                value={selected.assigned_coach_id || ''}
+                onChange={async (e) => {
+                  const newId = e.target.value || null
+                  await assignCoach(selected.id, newId)
+                }}
+                style={{
+                  padding: '6px 8px', fontSize: 12,
+                  background: C.background, color: C.text,
+                  border: `1px solid ${!selected.assigned_coach_id ? '#ef4444' : C.border}`,
+                  borderRadius: 8, outline: 'none', cursor: 'pointer',
+                }}
+              >
+                <option value="">— назначи —</option>
+                {realCoaches.map(c => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
+            </Box>
+          )}
         </Box>
 
         {/* Messages */}
