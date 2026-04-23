@@ -7,6 +7,7 @@ import MenuIcon             from '@mui/icons-material/Menu'
 import CloseIcon            from '@mui/icons-material/Close'
 import LogoutIcon           from '@mui/icons-material/Logout'
 import NotificationsNoneIcon from '@mui/icons-material/NotificationsNone'
+import ChatBubbleOutlineIcon from '@mui/icons-material/ChatBubbleOutline'
 import FitnessCenterIcon    from '@mui/icons-material/FitnessCenter'
 import DirectionsRunIcon    from '@mui/icons-material/DirectionsRun'
 import HomeIcon             from '@mui/icons-material/Home'
@@ -15,6 +16,7 @@ import OndemandVideoIcon    from '@mui/icons-material/OndemandVideo'
 import AttachMoneyIcon      from '@mui/icons-material/AttachMoney'
 import { useApp } from '../context/AppContext'
 import { useBooking } from '../context/BookingContext'
+import { hasModule } from '../lib/modules'
 import { creditsRemaining, daysUntilExpiry, fmtValidTo } from '../lib/bookingUtils'
 import { C, EASE } from '../theme'
 import SynrgLogo from './SynrgLogo'
@@ -34,7 +36,8 @@ function getSiteLinks(t) {
 }
 
 export default function MobileHeader() {
-  const { auth, logout, client, lang, setLang, setView, coachClientMode, setCoachClientMode, setViewingCoach, unreadNotifCount, t, saveWorkoutDraft } = useApp()
+  const { auth, logout, client, lang, setLang, setView, coachClientMode, setCoachClientMode, setViewingCoach, unreadNotifCount, unreadCoachMsgCount, t, saveWorkoutDraft } = useApp()
+  const hasCoachChat = auth.role === 'client' && hasModule(auth.modules, 'synrg_method')
   const { myPlan } = useBooking()
   const [siteMenuOpen, setSiteMenuOpen] = useState(false)
   const [showProfile, setShowProfile] = useState(false)
@@ -111,6 +114,25 @@ export default function MobileHeader() {
               )}
             </Box>
           </Box>
+
+          {/* ── Coach chat (SYNRG Метод clients only) ──────── */}
+          {hasCoachChat && (
+            <IconButton
+              onClick={() => setView('coach_chat')}
+              size="small"
+              aria-label="Треньор"
+              sx={{
+                color:      unreadCoachMsgCount > 0 ? C.purple : C.muted,
+                flexShrink: 0,
+                transition: `color 0.18s ${EASE.standard}`,
+                '&:hover':  { color: C.purple },
+              }}
+            >
+              <Badge badgeContent={unreadCoachMsgCount} color="error" max={9}>
+                <ChatBubbleOutlineIcon sx={{ fontSize: 22 }} />
+              </Badge>
+            </IconButton>
+          )}
 
           {/* ── Notifications (coach only) ──────────────────── */}
           {auth.role === 'coach' && (

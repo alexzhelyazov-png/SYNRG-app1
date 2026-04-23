@@ -36,6 +36,7 @@ import StepsTracker   from './pages/StepsTracker'
 import ClientWorkout  from './pages/ClientWorkout'
 import Notifications  from './pages/Notifications'
 import Recipes        from './pages/Recipes'
+import CoachChat      from './pages/CoachChat'
 
 import ConfirmDeleteModal from './components/ConfirmDeleteModal'
 
@@ -327,6 +328,7 @@ function AppShell() {
                 {view === 'programs'  && (auth.role === 'coach' || auth.role === 'admin' || auth.role === 'client') && <Programs />}
                 {view === 'notifications' && auth.role === 'coach' && <Notifications />}
                 {view === 'recipes'      && (auth.role !== 'client' || hasModule(auth.modules, 'program_access') || hasModule(auth.modules, 'training_plan_access')) && <Recipes />}
+                {view === 'coach_chat'   && auth.role === 'client' && hasModule(auth.modules, 'synrg_method') && <CoachChat />}
                 {view === 'admin'     && admin && <Admin />}
               </>
             )}

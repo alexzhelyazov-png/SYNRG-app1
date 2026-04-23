@@ -32,6 +32,7 @@ import { useApp }            from '../context/AppContext'
 import SiteTab               from './AdminSiteTab'
 import ProgramsTab           from './AdminProgramsTab'
 import SubscriptionsTab      from './AdminSubscriptionsTab'
+import AdminMessagesTab      from './AdminMessagesTab'
 import { useBooking }        from '../context/BookingContext'
 import { C }                 from '../theme'
 import { DB }                from '../lib/db'
@@ -1156,11 +1157,17 @@ function PlansTab({ t }) {
 // ── Clients Tab ──────────────────────────────────────────────
 // ── Client Module Editor ──────────────────────────────────────
 function ClientModuleEditor({ clientId, currentModules, t, lang }) {
-  const { updateClientModules, showSnackbar, clients } = useApp()
+  const { updateClientModules, showSnackbar, clients, coaches, assignCoach } = useApp()
   // Always read fresh from context so stale planDlg snapshot doesn't matter
-  const liveModules = clients.find(c => c.id === clientId)?.modules || currentModules || []
+  const liveClient = clients.find(c => c.id === clientId)
+  const liveModules = liveClient?.modules || currentModules || []
+  const liveAssigned = liveClient?.assigned_coach_id || ''
   const [modules, setModules] = useState(liveModules)
+  const [assignedId, setAssignedId] = useState(liveAssigned)
   const [open, setOpen] = useState(false)
+
+  // Only real coaches (exclude admin shadow profiles "Админ…")
+  const realCoaches = coaches.filter(c => !/^Админ/i.test(c.name))
 
   function toggleModule(key) {
     setModules(prev => prev.includes(key) ? prev.filter(m => m !== key) : [...prev, key])
@@ -1169,6 +1176,9 @@ function ClientModuleEditor({ clientId, currentModules, t, lang }) {
 
   async function handleSave() {
     await updateClientModules(clientId, modules)
+    if (assignedId !== liveAssigned) {
+      await assignCoach(clientId, assignedId || null)
+    }
     showSnackbar(t('modulesSavedMsg'))
     setOpen(false)
   }
@@ -1184,7 +1194,7 @@ function ClientModuleEditor({ clientId, currentModules, t, lang }) {
           <Chip label={t('noModules')} size="small" variant="outlined"
             sx={{ fontSize: '9px', height: '20px', borderColor: C.border, color: C.muted }} />
         )}
-        <IconButton size="small" onClick={() => { setModules(liveModules); setOpen(true) }}
+        <IconButton size="small" onClick={() => { setModules(liveModules); setAssignedId(liveAssigned); setOpen(true) }}
           sx={{ width: 20, height: 20 }}>
           <EditIcon sx={{ fontSize: 12, color: C.muted }} />
         </IconButton>
@@ -1193,6 +1203,26 @@ function ClientModuleEditor({ clientId, currentModules, t, lang }) {
         PaperProps={{ sx: { background: C.card, border: `1px solid ${C.border}`, borderRadius: '20px' } }}>
         <DialogTitle sx={{ color: C.text, fontWeight: 700 }}>{t('editModules')}</DialogTitle>
         <DialogContent>
+          {/* Coach assignment */}
+          <Box sx={{ mb: 2, pb: 2, borderBottom: `1px solid ${C.border}` }}>
+            <Typography sx={{ fontSize: '11px', fontWeight: 700, color: C.muted, mb: 0.75, letterSpacing: '0.06em' }}>
+              НАЗНАЧЕН ТРЕНЬОР
+            </Typography>
+            <select
+              value={assignedId}
+              onChange={e => setAssignedId(e.target.value)}
+              style={{
+                width: '100%', padding: '8px 10px', fontSize: 13,
+                background: C.background, color: C.text, border: `1px solid ${C.border}`,
+                borderRadius: 8, outline: 'none',
+              }}
+            >
+              <option value="">— без треньор —</option>
+              {realCoaches.map(c => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
+          </Box>
           <Box sx={{ display: 'flex', gap: 0.75, mb: 2, flexWrap: 'wrap' }}>
             {Object.entries(MODULE_PRESETS).map(([key]) => (
               <Button key={key} size="small" variant="outlined" onClick={() => applyPreset(key)}
@@ -2577,6 +2607,7 @@ export default function Admin() {
   const SUB_TABS = {
     clients: [
       { key: 'clients',       label: t('clientsMgmt')     || 'Клиенти' },
+      { key: 'messages',      label: 'Съобщения' },
       { key: 'coaches',       label: t('coachesTab')      || 'Треньори' },
       { key: 'subscriptions', label: t('subscriptionsTab')|| 'Абонаменти' },
     ],
@@ -2645,6 +2676,7 @@ export default function Admin() {
 
       {section === 'clients' && <>
         {clientSub === 'clients'       && <ClientsTab t={t} />}
+        {clientSub === 'messages'      && <AdminMessagesTab />}
         {clientSub === 'coaches'       && <CoachesTab t={t} />}
         {clientSub === 'subscriptions' && <SubscriptionsTab t={t} lang={lang} />}
       </>}

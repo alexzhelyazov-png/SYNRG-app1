@@ -755,6 +755,61 @@ export const DB = {
     }).catch(() => {})
   },
 
+  // ── Coach Chat: fetch messages for a client (ordered oldest → newest) ──
+  async getCoachMessages(clientId) {
+    if (!isUsingSupabase || !clientId) return []
+    const rows = await sbFetchSafe(
+      sbUrl('coach_messages', `?select=*&client_id=eq.${clientId}&order=created_at.asc&limit=500`),
+      { headers: sbHeaders(), cache: 'no-store' }
+    )
+    return rows || []
+  },
+
+  // ── Coach Chat: fetch all messages (for admin overview / coach inbox) ──
+  async getAllCoachMessages(limit = 5000) {
+    if (!isUsingSupabase) return []
+    const rows = await sbFetchSafe(
+      sbUrl('coach_messages', `?select=*&order=created_at.desc&limit=${limit}`),
+      { headers: sbHeaders(), cache: 'no-store' }
+    )
+    return rows || []
+  },
+
+  // ── Coach Chat: send message ──────────────────────────────
+  async sendCoachMessage({ clientId, coachId, senderRole, senderName, text }) {
+    if (!isUsingSupabase) return null
+    return await this.insert('coach_messages', {
+      client_id:   clientId,
+      coach_id:    coachId,
+      sender_role: senderRole,
+      sender_name: senderName || null,
+      text,
+    })
+  },
+
+  // ── Coach Chat: mark messages as read (client reads coach's, coach reads client's) ──
+  async markCoachMessagesRead({ clientId, readerRole }) {
+    if (!isUsingSupabase || !clientId) return
+    // Reader is 'client' → marks coach's messages as read (and admin's).
+    // Reader is 'coach' → marks client's messages as read.
+    const senderFilter = readerRole === 'client'
+      ? 'sender_role=in.(coach,admin)'
+      : 'sender_role=eq.client'
+    try {
+      await sbFetch(sbUrl('coach_messages', `?client_id=eq.${clientId}&${senderFilter}&read_at=is.null`), {
+        method: 'PATCH',
+        headers: sbHeaders({ 'Prefer': 'return=minimal' }),
+        body: JSON.stringify({ read_at: new Date().toISOString() }),
+      })
+    } catch { /* silent */ }
+  },
+
+  // ── Coach Chat: assign a coach to a client (admin override) ──
+  async assignCoach(clientId, coachId) {
+    if (!isUsingSupabase || !clientId) return null
+    return await this.update('clients', clientId, { assigned_coach_id: coachId || null })
+  },
+
   // ── MailerLite sync (via Supabase Edge Function) ──────────
   async syncToMailerLite(action, email, name, fields = {}, subject, html) {
     if (!isUsingSupabase || !email) return

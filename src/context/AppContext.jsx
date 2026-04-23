@@ -46,6 +46,9 @@ export function AppProvider({ children }) {
   const [loadError,    setLoadError]    = useState('')
   const [notifications, setNotifications] = useState([])
   const [synrgHabits,  setSynrgHabits]  = useState([])
+  // ── Coach chat state ────────────────────────────────────────
+  const [coachMessages, setCoachMessages] = useState([])       // All messages (coach/admin view) OR client's own thread
+  const [coachMsgsLoaded, setCoachMsgsLoaded] = useState(false)
   const [viewingCoach, setViewingCoach] = useState(null) // coach name being viewed, or null
 
   // ── Theme — always dark ──────────────────────────────────────
@@ -198,6 +201,7 @@ export function AppProvider({ children }) {
         email:          c.email || null,
         created_at:     c.created_at || null,
         is_coach:       c.is_coach || false,
+        assigned_coach_id: c.assigned_coach_id || null,
         calorieTarget:  c.calorie_target  || c.calorieTarget  || 2000,
         proteinTarget:  c.protein_target  || c.proteinTarget  || 140,
         xp_monthly:     c.xp_monthly  || 0,
@@ -1357,6 +1361,98 @@ export function AppProvider({ children }) {
     }
   }
 
+  // ── Coach chat: fetch messages for a specific client ──────
+  const fetchClientMessages = useCallback(async (clientId) => {
+    if (!clientId) return []
+    try {
+      const rows = await DB.getCoachMessages(clientId)
+      return rows
+    } catch (err) {
+      console.warn('[coachChat] fetchClientMessages failed:', err)
+      return []
+    }
+  }, [])
+
+  // ── Coach chat: send a message ────────────────────────────
+  const sendCoachMessage = useCallback(async ({ clientId, coachId, text }) => {
+    if (!clientId || !coachId || !text?.trim()) return null
+    const senderRole = auth.role === 'admin' ? 'admin' : (auth.role === 'coach' ? 'coach' : 'client')
+    try {
+      const row = await DB.sendCoachMessage({
+        clientId, coachId, senderRole,
+        senderName: auth.name || null,
+        text: text.trim(),
+      })
+      // Update local state if loaded
+      setCoachMessages(prev => prev.some(m => m.id === row?.id) ? prev : [...prev, row].filter(Boolean))
+      return row
+    } catch (err) {
+      console.warn('[coachChat] send failed:', err)
+      showSnackbar('Съобщението не беше изпратено', 'error')
+      return null
+    }
+  }, [auth.role, auth.name, showSnackbar])
+
+  // ── Coach chat: mark read ─────────────────────────────────
+  const markCoachMessagesRead = useCallback(async (clientId) => {
+    if (!clientId) return
+    const readerRole = auth.role === 'client' ? 'client' : 'coach'
+    try {
+      await DB.markCoachMessagesRead({ clientId, readerRole })
+      const now = new Date().toISOString()
+      setCoachMessages(prev => prev.map(m => {
+        if (m.client_id !== clientId || m.read_at) return m
+        if (readerRole === 'client' && m.sender_role === 'client') return m
+        if (readerRole === 'coach'  && m.sender_role !== 'client') return m
+        return { ...m, read_at: now }
+      }))
+    } catch { /* silent */ }
+  }, [auth.role])
+
+  // ── Coach chat: assign coach (admin only) ─────────────────
+  const assignCoach = useCallback(async (clientId, coachId) => {
+    if (!clientId) return
+    await DB.assignCoach(clientId, coachId)
+    setClients(prev => prev.map(c => c.id === clientId ? { ...c, assigned_coach_id: coachId || null } : c))
+  }, [])
+
+  // ── Coach chat: polling (client reads their thread, coach/admin read all) ──
+  const coachChatTimerRef = useRef(null)
+  useEffect(() => {
+    if (!auth.isLoggedIn) return
+    let cancelled = false
+    async function poll() {
+      try {
+        if (auth.role === 'client' && auth.id) {
+          const rows = await DB.getCoachMessages(auth.id)
+          if (!cancelled) { setCoachMessages(rows); setCoachMsgsLoaded(true) }
+        } else if (auth.role === 'coach' || auth.role === 'admin') {
+          const rows = await DB.getAllCoachMessages(5000)
+          if (!cancelled) { setCoachMessages(rows); setCoachMsgsLoaded(true) }
+        }
+      } catch { /* silent */ }
+    }
+    poll()
+    coachChatTimerRef.current = setInterval(poll, 30000)
+    return () => { cancelled = true; clearInterval(coachChatTimerRef.current) }
+  }, [auth.isLoggedIn, auth.role, auth.id])
+
+  // Unread count for client (messages from coach/admin, not read)
+  const unreadCoachMsgCount = useMemo(() => {
+    if (auth.role === 'client') {
+      return coachMessages.filter(m => m.sender_role !== 'client' && !m.read_at).length
+    }
+    if (auth.role === 'coach') {
+      // Count unread messages across THIS coach's assigned clients only
+      const myClientIds = new Set(clients.filter(c => c.assigned_coach_id === auth.id).map(c => c.id))
+      return coachMessages.filter(m => m.sender_role === 'client' && !m.read_at && myClientIds.has(m.client_id)).length
+    }
+    if (auth.role === 'admin') {
+      return coachMessages.filter(m => m.sender_role === 'client' && !m.read_at).length
+    }
+    return 0
+  }, [coachMessages, auth.role, auth.id, clients])
+
   async function dismissBadge(badgeId, monthKey = null) {
     const cl = client
     if (!cl?.id) return
@@ -1437,6 +1533,9 @@ export function AppProvider({ children }) {
     updateClientModules,
     dismissBadge,
     synrgHabits, setSynrgHabits,
+    // Coach chat
+    coachMessages, coachMsgsLoaded, unreadCoachMsgCount,
+    fetchClientMessages, sendCoachMessage, markCoachMessagesRead, assignCoach,
   }
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>
