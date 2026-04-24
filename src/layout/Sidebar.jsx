@@ -11,6 +11,7 @@ import LeaderboardIcon       from '@mui/icons-material/Leaderboard'
 import AssignmentIcon        from '@mui/icons-material/Assignment'
 import PeopleIcon            from '@mui/icons-material/People'
 import NotificationsNoneIcon from '@mui/icons-material/NotificationsNone'
+import ChatBubbleOutlineIcon from '@mui/icons-material/ChatBubbleOutline'
 import PersonIcon            from '@mui/icons-material/Person'
 import CalendarMonthIcon     from '@mui/icons-material/CalendarMonth'
 import EventIcon             from '@mui/icons-material/Event'
@@ -65,12 +66,20 @@ export default function Sidebar() {
     coaches, coachProfiles,
     viewingCoach, setViewingCoach,
     coachClientMode, setCoachClientMode,
-    unreadNotifCount, unreadFeedCount,
+    unreadNotifCount, unreadFeedCount, unreadCoachMsgCount,
     lang, setLang, t,
     client, saveWorkoutDraft,
   } = useApp()
 
   const admin = isAdmin(auth)
+  // Chat visibility:
+  //  - client with synrg_method → CoachChat (client side)
+  //  - non-admin coach (e.g. Ицко) → AdminMessagesTab (his clients)
+  const hasCoachChat     = auth.role === 'client' && hasModule(auth.modules, 'synrg_method')
+  const isNonAdminCoach  = auth.role === 'coach' && !admin
+  const showChatEntry    = hasCoachChat || isNonAdminCoach
+  const chatView         = hasCoachChat ? 'coach_chat' : 'coach_chat_admin'
+  const chatLabel        = hasCoachChat ? (t('navCoach') || 'Треньор') : (t('navMessages') || 'Съобщения')
 
   const open    = sidebarOpen
   const navItems = getNavItems(auth, admin)
@@ -241,6 +250,27 @@ export default function Sidebar() {
                   <TrendingUpIcon sx={{ fontSize: '20px' }} />
                 </ListItemIcon>
                 {open && <ListItemText primary={t('myTrackerTitle')} sx={{ '& .MuiListItemText-primary': { color: isMyTrackerActive ? C.purple : C.text, fontWeight: isMyTrackerActive ? 700 : 500, fontSize: '14px' } }} />}
+              </ListItemButton>
+            </Tooltip>
+          )
+        })()}
+
+        {/* Coach chat (client with synrg_method OR non-admin coach) */}
+        {showChatEntry && (() => {
+          const isActive = view === chatView
+          return (
+            <Tooltip title={!open ? chatLabel : ''} placement="right" arrow>
+              <ListItemButton
+                selected={isActive}
+                onClick={() => { if (coachClientMode && client?.id) saveWorkoutDraft(client.id); setView(chatView); setViewingCoach(null); setCoachClientMode(false) }}
+                sx={{ justifyContent: open ? 'flex-start' : 'center', px: open ? 2 : 0, mx: open ? 1.5 : 1, my: '2px', minHeight: 44 }}
+              >
+                <ListItemIcon sx={{ minWidth: open ? 38 : 'unset', justifyContent: 'center', color: isActive ? C.purple : (unreadCoachMsgCount > 0 ? '#F87171' : C.muted) }}>
+                  <Badge badgeContent={unreadCoachMsgCount} color="error" max={9}>
+                    <ChatBubbleOutlineIcon sx={{ fontSize: '20px' }} />
+                  </Badge>
+                </ListItemIcon>
+                {open && <ListItemText primary={chatLabel} sx={{ '& .MuiListItemText-primary': { color: isActive ? C.purple : (unreadCoachMsgCount > 0 ? C.text : C.muted), fontWeight: isActive || unreadCoachMsgCount > 0 ? 700 : 500, fontSize: '14px' } }} />}
               </ListItemButton>
             </Tooltip>
           )
