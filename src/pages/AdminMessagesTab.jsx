@@ -128,14 +128,15 @@ export default function AdminMessagesTab() {
                 }}
                 style={{
                   padding: '6px 8px', fontSize: 12,
-                  background: C.background, color: C.text,
+                  background: C.card, color: C.text,
                   border: `1px solid ${!selected.assigned_coach_id ? '#ef4444' : C.border}`,
                   borderRadius: 8, outline: 'none', cursor: 'pointer',
+                  appearance: 'none', WebkitAppearance: 'none',
                 }}
               >
-                <option value="">— назначи —</option>
+                <option value="" style={{ background: C.card, color: C.text }}>— назначи —</option>
                 {realCoaches.map(c => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
+                  <option key={c.id} value={c.id} style={{ background: C.card, color: C.text }}>{c.name}</option>
                 ))}
               </select>
             </Box>

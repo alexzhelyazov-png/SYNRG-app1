@@ -200,7 +200,7 @@ export default function CoachChat() {
           sx={{
             '& .MuiOutlinedInput-root': {
               borderRadius: '14px',
-              background: C.background,
+              background: C.card,
               fontSize: 14,
             },
           }}

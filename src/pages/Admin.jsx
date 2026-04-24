@@ -1213,13 +1213,14 @@ function ClientModuleEditor({ clientId, currentModules, t, lang }) {
               onChange={e => setAssignedId(e.target.value)}
               style={{
                 width: '100%', padding: '8px 10px', fontSize: 13,
-                background: C.background, color: C.text, border: `1px solid ${C.border}`,
+                background: C.card, color: C.text, border: `1px solid ${C.border}`,
                 borderRadius: 8, outline: 'none',
+                appearance: 'none', WebkitAppearance: 'none',
               }}
             >
-              <option value="">— без треньор —</option>
+              <option value="" style={{ background: C.card, color: C.text }}>— без треньор —</option>
               {realCoaches.map(c => (
-                <option key={c.id} value={c.id}>{c.name}</option>
+                <option key={c.id} value={c.id} style={{ background: C.card, color: C.text }}>{c.name}</option>
               ))}
             </select>
           </Box>

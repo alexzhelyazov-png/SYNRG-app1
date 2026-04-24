@@ -112,7 +112,7 @@ Deno.serve(async (req: Request) => {
       });
 
       // 2. Get current client modules + email for confirmation
-      const clients = await sbQuery("clients", `?select=modules,email,name&id=eq.${client_id}`);
+      const clients = await sbQuery("clients", `?select=modules,email,name,assigned_coach_id&id=eq.${client_id}`);
       const currentModules: string[] = clients?.[0]?.modules || [];
 
       // 3. Merge remote modules (don't duplicate, don't override existing)
@@ -125,6 +125,39 @@ Deno.serve(async (req: Request) => {
         account_type: "online",
       });
       if (modulesChanged) console.log(`Updated modules for client ${client_id}:`, merged);
+
+      // 4b. Auto-assign coach for SYNRG Метод clients (if synrg_method is active and no coach yet)
+      const hasSynrgMethod = merged.includes("synrg_method");
+      const existingAssignedCoach = clients?.[0]?.assigned_coach_id;
+      if (hasSynrgMethod && !existingAssignedCoach) {
+        const ELINA_ID = "1b0a54a2-22c0-49b6-8083-8ed6356e29d2";
+        const ITSKO_ID = "4ce4ed28-1b4c-4a57-8d22-d02a402f45ac";
+        // Count current synrg_method clients per coach to pick the one with fewer
+        const allSynrgClients = await sbQuery(
+          "clients",
+          `?select=assigned_coach_id&modules=cs.${encodeURIComponent('["synrg_method"]')}`
+        ) || [];
+        let elinaCount = 0, itskoCount = 0;
+        for (const c of allSynrgClients) {
+          if (c.assigned_coach_id === ELINA_ID) elinaCount++;
+          else if (c.assigned_coach_id === ITSKO_ID) itskoCount++;
+        }
+        const pickedCoachId = elinaCount <= itskoCount ? ELINA_ID : ITSKO_ID;
+        const pickedCoachName = pickedCoachId === ELINA_ID ? "Елина" : "Ицко";
+        await sbPatch("clients", client_id, { assigned_coach_id: pickedCoachId });
+        console.log(`Auto-assigned coach ${pickedCoachName} to client ${client_id}`);
+
+        // Welcome message from coach
+        try {
+          await sbInsert("coach_messages", {
+            client_id,
+            coach_id: pickedCoachId,
+            sender_role: "coach",
+            sender_name: pickedCoachName,
+            text: `Здравей, ${clients?.[0]?.name || "клиент"}! Аз съм ${pickedCoachName}, твоят ментор в SYNRG Метод. Добре дошъл/дошла! Имаш 2 check-in сесии на месец — пиши ми тук когато имаш въпроси или се нуждаеш от корекция на програмата.`,
+          });
+        } catch (e) { console.warn("Welcome message failed:", e); }
+      }
 
       // 5. Send purchase confirmation email via Brevo
       const clientRow = clients?.[0];
