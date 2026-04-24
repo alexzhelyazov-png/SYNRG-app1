@@ -1367,6 +1367,12 @@ export function AppProvider({ children }) {
 
   // ── Module management (admin) ─────────────────────────────────
   async function updateClientModules(clientId, newModules) {
+    const prevClient = clients.find(c => c.id === clientId)
+    const prevModules = prevClient?.modules || []
+    const hadSynrg = prevModules.includes('synrg_method')
+    const hasSynrg = newModules.includes('synrg_method')
+    const gainedSynrg = hasSynrg && !hadSynrg
+
     await DB.update('clients', clientId, { modules: newModules })
     setClients(prev => prev.map(c => c.id === clientId ? { ...c, modules: newModules } : c))
     // If the currently logged-in client's modules changed, update auth too
@@ -1374,6 +1380,31 @@ export function AppProvider({ children }) {
       const updatedAuth = { ...auth, modules: newModules }
       setAuth(updatedAuth)
       localStorage.setItem('synrg_auth', JSON.stringify(updatedAuth))
+    }
+
+    // Auto-assign coach when synrg_method is newly granted and no coach yet
+    if (gainedSynrg && prevClient && !prevClient.assigned_coach_id) {
+      const ELINA_ID = '1b0a54a2-22c0-49b6-8083-8ed6356e29d2'
+      const ITSKO_ID = '4ce4ed28-1b4c-4a57-8d22-d02a402f45ac'
+      let elinaCount = 0, itskoCount = 0
+      for (const c of clients) {
+        if (!(c.modules || []).includes('synrg_method')) continue
+        if (c.assigned_coach_id === ELINA_ID) elinaCount++
+        else if (c.assigned_coach_id === ITSKO_ID) itskoCount++
+      }
+      const pickedCoachId   = elinaCount <= itskoCount ? ELINA_ID : ITSKO_ID
+      const pickedCoachName = pickedCoachId === ELINA_ID ? 'Елина' : 'Ицко'
+      try {
+        await DB.assignCoach(clientId, pickedCoachId)
+        setClients(prev => prev.map(c => c.id === clientId ? { ...c, assigned_coach_id: pickedCoachId } : c))
+        await DB.sendCoachMessage({
+          clientId,
+          coachId: pickedCoachId,
+          senderRole: 'coach',
+          senderName: pickedCoachName,
+          text: `Здравей, ${prevClient.name || 'клиент'}! Аз съм ${pickedCoachName}, твоят ментор в SYNRG Метод. Добре дошъл/дошла! Имаш 2 check-in сесии на месец — пиши ми тук когато имаш въпроси или се нуждаеш от корекция на програмата.`,
+        })
+      } catch (e) { console.warn('Auto-assign coach failed:', e) }
     }
   }
 
