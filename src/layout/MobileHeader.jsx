@@ -17,7 +17,7 @@ import AttachMoneyIcon      from '@mui/icons-material/AttachMoney'
 import { useApp } from '../context/AppContext'
 import { useBooking } from '../context/BookingContext'
 import { hasModule } from '../lib/modules'
-import { creditsRemaining, daysUntilExpiry, fmtValidTo } from '../lib/bookingUtils'
+import { creditsRemaining, daysUntilExpiry, fmtValidTo, isAdmin as isAdminUser } from '../lib/bookingUtils'
 import { C, EASE } from '../theme'
 import SynrgLogo from './SynrgLogo'
 
@@ -38,6 +38,8 @@ function getSiteLinks(t) {
 export default function MobileHeader() {
   const { auth, logout, client, lang, setLang, setView, coachClientMode, setCoachClientMode, setViewingCoach, unreadNotifCount, unreadCoachMsgCount, t, saveWorkoutDraft } = useApp()
   const hasCoachChat = auth.role === 'client' && hasModule(auth.modules, 'synrg_method')
+  // Non-admin coach (e.g. Ицко) gets a shortcut icon to the messages tab
+  const isNonAdminCoach = auth.role === 'coach' && !isAdminUser(auth)
   const { myPlan } = useBooking()
   const [siteMenuOpen, setSiteMenuOpen] = useState(false)
   const [showProfile, setShowProfile] = useState(false)
@@ -115,12 +117,12 @@ export default function MobileHeader() {
             </Box>
           </Box>
 
-          {/* ── Coach chat (SYNRG Метод clients only) ──────── */}
-          {hasCoachChat && (
+          {/* ── Coach chat (SYNRG Метод clients + non-admin coaches) ──────── */}
+          {(hasCoachChat || isNonAdminCoach) && (
             <IconButton
-              onClick={() => setView('coach_chat')}
+              onClick={() => setView(hasCoachChat ? 'coach_chat' : 'coach_chat_admin')}
               size="small"
-              aria-label="Треньор"
+              aria-label={hasCoachChat ? 'Треньор' : 'Съобщения'}
               sx={{
                 color:      unreadCoachMsgCount > 0 ? C.purple : C.muted,
                 flexShrink: 0,
