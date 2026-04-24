@@ -595,6 +595,21 @@ export function AppProvider({ children }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading])
 
+  // ── Keep auth.modules in sync with DB whenever clients list refreshes ──
+  // This catches admin module changes without requiring a logout/login cycle
+  useEffect(() => {
+    if (!auth.isLoggedIn || auth.role !== 'client' || !auth.id) return
+    const me = clients.find(c => c.id === auth.id)
+    if (!me) return
+    const freshModules = me.modules || []
+    if (JSON.stringify(freshModules) !== JSON.stringify(auth.modules || [])) {
+      const updatedAuth = { ...auth, modules: freshModules }
+      setAuth(updatedAuth)
+      localStorage.setItem('synrg_auth', JSON.stringify(updatedAuth))
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clients])
+
   // ── Computed: real clients (no coach profiles) ────────────────
   // Enriched with community data so ALL downstream XP/badge computation is consistent
   // (Progress ranking, App.jsx BadgeUnlockWatcher, BadgeDetailDialog progress bars, etc.)
