@@ -426,9 +426,6 @@ export default function OnlineHome() {
         </Box>
       </Paper>
 
-      {/* ── Експертен екип (медицинска легитимност) ── */}
-      <ExpertTeam />
-
       {/* ── Week picker strip ── */}
       <Box
         sx={{
@@ -796,6 +793,11 @@ export default function OnlineHome() {
           </Paper>
         </>
       )}
+
+      {/* ── Експертен екип (медицинска легитимност) — най-отдолу ── */}
+      <Box sx={{ mt: 4 }}>
+        <ExpertTeam />
+      </Box>
 
       {/* ── Task explanation dialog ── */}
       <Dialog
