@@ -22,6 +22,7 @@ import { useApp }            from '../context/AppContext'
 import { C, EASE }           from '../theme'
 import { isAdmin }           from '../lib/bookingUtils'
 import { hasModule }         from '../lib/modules'
+import useClientTier         from '../hooks/useClientTier'
 const DRAWER_WIDTH = 272
 const RAIL_WIDTH   = 72
 
@@ -29,16 +30,13 @@ const isStandalone = window.navigator.standalone || window.matchMedia('(display-
 const SITE_HEADER_H = 96
 
 // ── Nav items — adjust per role + modules ─────────────────────
-function getNavItems(auth, admin) {
-  // Coach/admin nav — unchanged
+function getNavItems(auth, admin, isOnlineClient = false, isLead = false) {
+  // Coach/admin nav — streamlined: Tasks/Recipes/Ranking moved under Profile
   if (auth.role !== 'client') {
     const coachItems = [
       { view: 'dashboard', labelKey: 'navDashboard', Icon: DashboardIcon },
       { view: 'schedule',  labelKey: 'navSchedule',  Icon: CalendarMonthIcon },
-      { view: 'ranking',   labelKey: 'navRanking',   Icon: LeaderboardIcon },
-      { view: 'tasks',     labelKey: 'navTasks',     Icon: AssignmentIcon },
     ]
-    coachItems.push({ view: 'recipes', labelKey: 'navRecipes', Icon: MenuBookIcon })
     if (admin) coachItems.push({ view: 'admin', labelKey: 'navAdmin', Icon: AdminPanelSettingsIcon })
     return coachItems
   }
@@ -54,8 +52,12 @@ function getNavItems(auth, admin) {
   // Programs: always visible — locked with indicator if no program_access
   items.push({ view: 'programs', labelKey: 'navPrograms', Icon: PlayCircleOutlineIcon, isLocked: !hasProgramAccess })
 
-  // Schedule: always visible — locked with indicator if no booking_access
-  items.push({ view: 'schedule', labelKey: 'navBookSlot', Icon: EventIcon, isLocked: !hasBookingAccess })
+  // Schedule (Тренировки / Резервации): only for studio clients.
+  // Online clients don't use the physical studio schedule.
+  // Leads (freemium) haven't bought anything — no studio booking for them either.
+  if (!isOnlineClient && !isLead) {
+    items.push({ view: 'schedule', labelKey: 'navBookSlot', Icon: EventIcon, isLocked: !hasBookingAccess })
+  }
   return items
 }
 
@@ -81,8 +83,9 @@ export default function Sidebar() {
   const chatView         = hasCoachChat ? 'coach_chat' : 'coach_chat_admin'
   const chatLabel        = hasCoachChat ? (t('navCoach') || 'Треньор') : (t('navMessages') || 'Съобщения')
 
+  const { isOnline: isOnlineClient, isLead } = useClientTier()
   const open    = sidebarOpen
-  const navItems = getNavItems(auth, admin)
+  const navItems = getNavItems(auth, admin, isOnlineClient, isLead)
 
   function selectCoachTracker(coachName) {
     if (coachClientMode && client?.id) saveWorkoutDraft(client.id)
@@ -162,6 +165,7 @@ export default function Sidebar() {
             <Tooltip key={v} title={!open ? t(labelKey) : ''} placement="right" arrow>
               <ListItemButton
                 selected={isActive}
+                data-tour={`nav-${v}`}
                 onClick={() => {
                   // Locked item → redirect to Programs (upgrade/buy page)
                   if (isLocked) { setView('programs'); setViewingCoach(null); setCoachClientMode(false); return }
@@ -231,25 +235,24 @@ export default function Sidebar() {
         })}
 
 
-        {/* My Tracker (coach only) */}
+        {/* My Profile (coach only) — contains tracker, tasks, recipes, ranking as tabs */}
         {auth.role !== 'client' && (() => {
-          const isMyTrackerActive = view === 'dashboard' && viewingCoach === auth.name
+          const isProfileActive = view === 'profile'
           return (
-            <Tooltip title={!open ? t('myTrackerTitle') : ''} placement="right" arrow>
+            <Tooltip title={!open ? t('navProfile') : ''} placement="right" arrow>
               <ListItemButton
-                selected={isMyTrackerActive}
+                selected={isProfileActive}
                 onClick={() => {
                   if (coachClientMode && client?.id) saveWorkoutDraft(client.id)
-                  setViewingCoach(auth.name)
-                  setView('dashboard')
+                  setView('profile')
                   setCoachClientMode(false)
                 }}
                 sx={{ justifyContent: open ? 'flex-start' : 'center', px: open ? 2 : 0, mx: open ? 1.5 : 1, my: '2px', minHeight: 44 }}
               >
-                <ListItemIcon sx={{ minWidth: open ? 38 : 'unset', justifyContent: 'center', color: isMyTrackerActive ? C.purple : C.muted }}>
+                <ListItemIcon sx={{ minWidth: open ? 38 : 'unset', justifyContent: 'center', color: isProfileActive ? C.purple : C.muted }}>
                   <TrendingUpIcon sx={{ fontSize: '20px' }} />
                 </ListItemIcon>
-                {open && <ListItemText primary={t('myTrackerTitle')} sx={{ '& .MuiListItemText-primary': { color: isMyTrackerActive ? C.purple : C.text, fontWeight: isMyTrackerActive ? 700 : 500, fontSize: '14px' } }} />}
+                {open && <ListItemText primary={t('navProfile')} sx={{ '& .MuiListItemText-primary': { color: isProfileActive ? C.purple : C.text, fontWeight: isProfileActive ? 700 : 500, fontSize: '14px' } }} />}
               </ListItemButton>
             </Tooltip>
           )
@@ -262,6 +265,7 @@ export default function Sidebar() {
             <Tooltip title={!open ? chatLabel : ''} placement="right" arrow>
               <ListItemButton
                 selected={isActive}
+                data-tour="nav-chat"
                 onClick={() => { if (coachClientMode && client?.id) saveWorkoutDraft(client.id); setView(chatView); setViewingCoach(null); setCoachClientMode(false) }}
                 sx={{ justifyContent: open ? 'flex-start' : 'center', px: open ? 2 : 0, mx: open ? 1.5 : 1, my: '2px', minHeight: 44 }}
               >

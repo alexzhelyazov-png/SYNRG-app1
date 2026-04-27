@@ -23,6 +23,7 @@ import { useApp }          from '../context/AppContext'
 import { useBooking }      from '../context/BookingContext'
 import NoPlanBanner        from '../components/NoPlanBanner'
 import { DB }              from '../lib/db'
+import Recipes             from './Recipes'
 import { parseVideoUrl, getVideoThumbnail } from '../lib/videoUtils'
 import { hasModule }       from '../lib/modules'
 import { isPlanActive }    from '../lib/bookingUtils'
@@ -816,7 +817,7 @@ export default function Programs() {
   // Single source of truth for "does this client currently have an active plan"
   const planActive = auth.role === 'coach' ? true : isPlanActive(myPlan)
 
-  const [tab, setTab] = useState('programs') // 'programs' | 'resources'
+  const [tab, setTab] = useState('resources') // 'resources' | 'recipes'
   const [programs, setPrograms]   = useState([])
   const [modules, setModules]     = useState([])
   const [lessons, setLessons]     = useState([])
@@ -1002,12 +1003,14 @@ export default function Programs() {
       onToggleStep={toggleStep} t={t} lang={lang} />
   }
 
-  // ── Main view with sub-tabs ────────────────────────────────
+  // ── Main view with sub-tabs (Ресурси / Рецепти) ────────────
+  // "Моите програми" removed — SYNRG Метод is now the whole app.
+  // The Programs page is now a reference library: educational resources + recipes.
   return (
     <Box>
       {/* Sub-tab bar */}
       <Box sx={{ display: 'flex', gap: 0.75, mb: 3 }}>
-        {['programs', 'resources'].map(key => (
+        {['resources', 'recipes'].map(key => (
           <Box key={key} onClick={() => setTab(key)} sx={{
             px: 2.5, py: 1, borderRadius: '100px', cursor: 'pointer',
             fontSize: '14px', fontWeight: 700,
@@ -1017,23 +1020,18 @@ export default function Programs() {
             transition: 'all 0.22s',
             '&:hover': tab === key ? {} : { borderColor: C.logan, background: C.loganDeep },
           }}>
-            {key === 'programs' ? t('tabMyPrograms') : t('tabResources')}
+            {key === 'resources' ? t('tabResources') : (t('navRecipes') || 'Рецепти')}
           </Box>
         ))}
       </Box>
 
-      {/* Tab content */}
-      {tab === 'programs' && (
-        <ProgramsList programs={programs} progress={progress} lessons={lessons} purchases={purchases}
-          onSelect={(p) => { DB.trackEvent(auth.id, 'program_opened', p.id); setSelectedProgram(p); window.scrollTo({ top: 0, behavior: 'smooth' }) }}
-          onBuy={handleBuy} buyLoading={buyLoading} t={t} lang={lang} auth={auth} setView={setView} planActive={planActive} />
-      )}
       {tab === 'resources' && (
         <ResourcesList resources={resources} resourceSteps={resourceSteps} resourceProgress={resourceProgress}
           hasAccess={hasResourceAccess}
           onSelect={(r) => { DB.trackEvent(auth.id, 'resource_opened', r.id); setSelectedResource(r); window.scrollTo({ top: 0, behavior: 'smooth' }) }}
           t={t} lang={lang} />
       )}
+      {tab === 'recipes' && <Recipes />}
     </Box>
   )
 }

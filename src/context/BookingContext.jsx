@@ -1,14 +1,14 @@
 import { createContext, useContext, useState, useCallback } from 'react'
 import { DB } from '../lib/db'
 import { isoToday, isoDatePlusDays } from '../lib/bookingUtils'
-import { ADMIN_MANAGEABLE_MODULES } from '../lib/modules'
+import { ADMIN_MANAGEABLE_MODULES, FREE_MODULES } from '../lib/modules'
 import { useApp } from './AppContext'
 
 const BookingCtx = createContext(null)
 export const useBooking = () => useContext(BookingCtx)
 
 export function BookingProvider({ children }) {
-  const { auth, showSnackbar, realClients } = useApp()
+  const { auth, showSnackbar, realClients, updateClientModules } = useApp()
 
   // ── State ─────────────────────────────────────────────────
   const [slots,        setSlots]        = useState([])   // enriched with booked_count
@@ -52,12 +52,28 @@ export function BookingProvider({ children }) {
   }, [])
 
   // ── Load a client's active plan ───────────────────────────
+  // If the DB still has the plan marked "active" but its validity window has
+  // already passed, auto-expire it and drop the client down to FREE_MODULES.
   const loadMyPlan = useCallback(async (clientId) => {
     if (!clientId) return null
     const data = await DB.getClientActivePlan(clientId)
+    if (data) {
+      const expiryDate = data.extended_to || data.valid_to
+      if (expiryDate && expiryDate < isoToday()) {
+        try {
+          await DB.update('client_plans', data.id, {
+            status:     'expired',
+            updated_at: new Date().toISOString(),
+          })
+          await updateClientModules(clientId, [...FREE_MODULES])
+        } catch { /* non-fatal */ }
+        setMyPlan(null)
+        return null
+      }
+    }
     setMyPlan(data)
     return data
-  }, [])
+  }, [updateClientModules])
 
   // ── Load all plans (admin) ────────────────────────────────
   const loadAllPlans = useCallback(async () => {
@@ -308,16 +324,27 @@ export function BookingProvider({ children }) {
   }, [loadAllPlans])
 
   // ── Admin: deactivate plan ───────────────────────────────
+  // Also resets the client's modules to the freemium baseline so that,
+  // once their studio plan is gone, they see the free version of the app.
   const deactivatePlan = useCallback(async (planId) => {
     try {
+      // Look up the plan first so we know which client to downgrade.
+      const plan = allPlans.find(p => p.id === planId)
       await DB.update('client_plans', planId, {
         status:     'expired',
         updated_at: new Date().toISOString(),
       })
+      if (plan?.client_id) {
+        // Only downgrade if no OTHER active plan exists for this client.
+        const other = await DB.getClientActivePlan(plan.client_id)
+        if (!other) {
+          await updateClientModules(plan.client_id, [...FREE_MODULES])
+        }
+      }
       await loadAllPlans()
       return { ok: true }
     } catch (e) { return { error: e.message } }
-  }, [loadAllPlans])
+  }, [allPlans, loadAllPlans, updateClientModules])
 
   // ── Admin: manually add client to slot ────────────────────
   const adminAddToSlot = useCallback(async (slotId, clientId, clientName, useCredit = false) => {

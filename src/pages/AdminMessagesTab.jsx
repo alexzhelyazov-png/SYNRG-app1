@@ -6,6 +6,7 @@ import SendIcon from '@mui/icons-material/Send'
 import ArrowBackIcon from '@mui/icons-material/ArrowBack'
 import { useApp } from '../context/AppContext'
 import { isAdmin, isFullAdmin } from '../lib/bookingUtils'
+import { DB } from '../lib/db'
 import { C } from '../theme'
 
 // ── Admin Messages Tab ────────────────────────────────────────
@@ -24,23 +25,35 @@ export default function AdminMessagesTab() {
   // Admin status is determined by name (role is 'coach' for everyone in coaches table)
   const isAdminUser = isAdmin(auth) || isFullAdmin(auth) || auth.role === 'admin'
   const [selectedClientId, setSelectedClientId] = useState(null)
-  const [coachFilter, setCoachFilter] = useState('all') // admin only
+  // Default to Studio — that's where all current clients live. Online will
+  // populate once real Stripe-subscribed clients start signing up.
+  const [clientTypeFilter, setClientTypeFilter] = useState('studio') // 'online' | 'studio'
+  const [onlineClientIds, setOnlineClientIds] = useState(() => new Set())
   const [draft, setDraft] = useState('')
   const [sending, setSending] = useState(false)
   const scrollRef = useRef(null)
 
-  // Real (non-shadow) clients with at least some chat context:
-  //   - Coach (non-admin): only their assigned
-  //   - Admin: all (respecting coachFilter)
+  // A client is ONLINE iff they bought the online program via Stripe — i.e. they have
+  // a row in `program_purchases` (inserted by the stripe-webhook function). Everyone
+  // else (including studio 8/12/unlimited clients, ex-studio, freemium-only) = STUDIO.
+  useEffect(() => {
+    let cancelled = false
+    DB.selectAll('program_purchases').then(rows => {
+      if (cancelled) return
+      const ids = new Set((rows || []).map(r => r.client_id).filter(Boolean))
+      setOnlineClientIds(ids)
+    }).catch(() => { /* silent — treat as no online clients */ })
+    return () => { cancelled = true }
+  }, [])
+
+  const isOnline = (c) => onlineClientIds.has(c.id)
   const eligibleClients = useMemo(() => {
     const real = clients.filter(c => !c.is_coach && c.id)
-    if (!isAdminUser) {
-      return real.filter(c => c.assigned_coach_id === auth.id)
-    }
-    if (coachFilter === 'all')         return real
-    if (coachFilter === 'unassigned')  return real.filter(c => !c.assigned_coach_id)
-    return real.filter(c => c.assigned_coach_id === coachFilter)
-  }, [clients, isAdminUser, auth.id, coachFilter])
+    const scoped = isAdminUser ? real : real.filter(c => c.assigned_coach_id === auth.id)
+    return clientTypeFilter === 'online'
+      ? scoped.filter(isOnline)
+      : scoped.filter(c => !isOnline(c))
+  }, [clients, isAdminUser, auth.id, clientTypeFilter, onlineClientIds])
 
   // Compute per-client chat summary
   const clientRows = useMemo(() => {
@@ -223,25 +236,25 @@ export default function AdminMessagesTab() {
         Съобщения
       </Typography>
 
-      {/* Admin coach filter */}
-      {isAdmin && (
-        <Box sx={{ display: 'flex', gap: 0.75, mb: 2, flexWrap: 'wrap' }}>
-          <FilterChip active={coachFilter === 'all'} onClick={() => setCoachFilter('all')}>
-            Всички
-          </FilterChip>
-          {coaches.filter(c => !/^Админ/i.test(c.name)).map(c => {
-            const count = clients.filter(cl => !cl.is_coach && cl.assigned_coach_id === c.id).length
-            return (
-              <FilterChip key={c.id} active={coachFilter === c.id} onClick={() => setCoachFilter(c.id)}>
-                {c.name} ({count})
+      {/* Online / Studio filter — shown for BOTH admins and regular coaches */}
+      <Box sx={{ display: 'flex', gap: 0.75, mb: 2, flexWrap: 'wrap' }}>
+        {(() => {
+          const real = clients.filter(c => !c.is_coach && c.id)
+          const scoped = isAdminUser ? real : real.filter(c => c.assigned_coach_id === auth.id)
+          const onlineCount = scoped.filter(isOnline).length
+          const studioCount = scoped.filter(c => !isOnline(c)).length
+          return (
+            <>
+              <FilterChip active={clientTypeFilter === 'online'} onClick={() => setClientTypeFilter('online')}>
+                Онлайн ({onlineCount})
               </FilterChip>
-            )
-          })}
-          <FilterChip active={coachFilter === 'unassigned'} onClick={() => setCoachFilter('unassigned')}>
-            Без треньор
-          </FilterChip>
-        </Box>
-      )}
+              <FilterChip active={clientTypeFilter === 'studio'} onClick={() => setClientTypeFilter('studio')}>
+                Студио ({studioCount})
+              </FilterChip>
+            </>
+          )
+        })()}
+      </Box>
 
       {!coachMsgsLoaded && (
         <Typography sx={{ color: C.muted, fontSize: 13, py: 2 }}>Зареждане…</Typography>

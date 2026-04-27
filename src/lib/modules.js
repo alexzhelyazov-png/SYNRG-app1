@@ -27,6 +27,10 @@ export const MODULE_PRESETS = {
   full_access:   ['studio_access', 'booking_access', 'weight_tracking', 'nutrition_tracking', 'training_plan_access'],
 }
 
+// Freemium baseline — what a client sees when they have no active plan
+// (used on registration and when a studio plan expires).
+export const FREE_MODULES = ['nutrition_tracking', 'weight_tracking', 'steps_tracking']
+
 // Modules the admin can toggle per client
 export const ADMIN_MANAGEABLE_MODULES = [
   'studio_access', 'booking_access', 'weight_tracking', 'nutrition_tracking', 'training_plan_access', 'program_access', 'synrg_method',

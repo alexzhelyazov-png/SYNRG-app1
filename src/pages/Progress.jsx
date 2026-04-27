@@ -199,7 +199,11 @@ export default function Progress() {
           { key: 'ranking',  label: t('navRanking') },
           { key: 'feed',     label: lang === 'bg' ? 'Стена' : 'Feed', badge: unreadFeedCount },
         ].map(({ key, label, badge }) => (
-          <Box key={key} onClick={() => switchTab(key)} sx={{
+          <Box
+            key={key}
+            onClick={() => switchTab(key)}
+            data-tour={key === 'progress' ? 'tab-badges' : key === 'ranking' ? 'tab-ranking' : undefined}
+            sx={{
             px: 2.5, py: 1, borderRadius: '100px', cursor: 'pointer',
             fontSize: '14px', fontWeight: 700,
             background: tab === key ? C.primary : 'transparent',

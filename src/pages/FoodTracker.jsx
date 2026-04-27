@@ -2,6 +2,7 @@ import { Box, Typography, TextField, Button, Chip, Paper, IconButton, Tooltip } 
 import ChevronLeftIcon    from '@mui/icons-material/ChevronLeft'
 import ChevronRightIcon   from '@mui/icons-material/ChevronRight'
 import WarningAmberIcon   from '@mui/icons-material/WarningAmber'
+import InfoOutlinedIcon   from '@mui/icons-material/InfoOutlined'
 import { useApp } from '../context/AppContext'
 import { quickFoods, foodDB, foodLabel } from '../lib/constants'
 import { C, EASE } from '../theme'
@@ -16,7 +17,8 @@ export default function FoodTracker() {
     foodDate, setFoodDate,
     setFoodModalOpen,
     mealsForDate, selFoodDate,
-    foodTotals, kcalPct, protPct,
+    foodTotals, kcalPct, protPct, carbsPct, fatPct,
+    carbsTarget, fatTarget,
     addQuickFood, deleteMealFromClient,
     isTrackerReadOnly,
   } = useApp()
@@ -82,41 +84,100 @@ export default function FoodTracker() {
         </Box>
       )}
 
-      {/* ── Compact progress row: Calories | Protein ── */}
+      {/* ── Personal targets banner ───────────────── */}
+      <Box sx={{
+        display: 'flex', alignItems: 'center', gap: 1,
+        mb: 1, px: 1.5, py: 0.75, borderRadius: '10px',
+        background: 'rgba(200,197,255,0.06)',
+        border: '1px solid rgba(200,197,255,0.18)',
+      }}>
+        <InfoOutlinedIcon sx={{ fontSize: 16, color: C.purple, flexShrink: 0 }} />
+        <Typography sx={{ fontSize: '12px', color: C.muted, lineHeight: 1.35 }}>
+          твоите лични дневни таргети — изчислени на база отговорите ти от въпросника
+        </Typography>
+      </Box>
+
+      {/* ── 4-macro progress row: Kcal | P | C | F ── */}
       <Paper sx={{
-        display: 'flex', alignItems: 'center', gap: 2,
-        p: '12px 16px', mb: 2, borderRadius: '14px',
+        display: 'grid',
+        gridTemplateColumns: 'repeat(4, 1fr)',
+        gap: 1,
+        p: '12px 12px', mb: 2, borderRadius: '14px',
         border: `1px solid ${C.border}`,
       }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, flex: 1 }}>
-          <Box sx={{ position: 'relative', flexShrink: 0 }}>
-            <ProgressRing percent={kcalPct} color={C.primary} size={40} />
-            <Box sx={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '9px', fontWeight: 800, color: C.text, fontFamily: "'MontBlanc', sans-serif" }}>
+        {/* Calories */}
+        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.75, position: 'relative' }}>
+          <Box sx={{ position: 'relative' }}>
+            <ProgressRing percent={kcalPct} color={C.primary} size={44} />
+            <Box sx={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: 800, color: C.primary, fontFamily: "'MontBlanc', sans-serif" }}>
               {Math.round(kcalPct)}%
             </Box>
           </Box>
-          <Box>
-            <Typography sx={{ fontSize: '15px', fontWeight: 800, color: C.text, lineHeight: 1, fontFamily: "'MontBlanc', sans-serif" }}>
+          <Box sx={{ textAlign: 'center', minWidth: 0 }}>
+            <Typography sx={{ fontSize: '10px', letterSpacing: 1.2, color: C.muted, textTransform: 'uppercase', fontWeight: 700 }}>
+              калории
+            </Typography>
+            <Typography sx={{ fontSize: '13px', fontWeight: 800, color: C.text, lineHeight: 1.1, fontFamily: "'MontBlanc', sans-serif" }}>
               {fmt1(foodTotals.kcal)}
             </Typography>
-            <Typography sx={{ fontSize: '10px', color: C.muted }}>/ {client.calorieTarget} kcal</Typography>
+            <Typography sx={{ fontSize: '10px', color: C.muted }}>/ {client.calorieTarget || '—'}</Typography>
           </Box>
         </Box>
 
-        <Box sx={{ width: '1px', height: 28, background: C.border, flexShrink: 0 }} />
-
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, flex: 1 }}>
-          <Box sx={{ position: 'relative', flexShrink: 0 }}>
-            <ProgressRing percent={protPct} color={C.purple} size={40} />
-            <Box sx={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '9px', fontWeight: 800, color: C.purple, fontFamily: "'MontBlanc', sans-serif" }}>
+        {/* Protein */}
+        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.75, borderLeft: `1px solid ${C.border}`, pl: 0.5 }}>
+          <Box sx={{ position: 'relative' }}>
+            <ProgressRing percent={protPct} color={C.purple} size={44} />
+            <Box sx={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: 800, color: C.purple, fontFamily: "'MontBlanc', sans-serif" }}>
               {Math.round(protPct)}%
             </Box>
           </Box>
-          <Box>
-            <Typography sx={{ fontSize: '15px', fontWeight: 800, color: C.purple, lineHeight: 1, fontFamily: "'MontBlanc', sans-serif" }}>
+          <Box sx={{ textAlign: 'center', minWidth: 0 }}>
+            <Typography sx={{ fontSize: '10px', letterSpacing: 1.2, color: C.muted, textTransform: 'uppercase', fontWeight: 700 }}>
+              протеин
+            </Typography>
+            <Typography sx={{ fontSize: '13px', fontWeight: 800, color: C.purple, lineHeight: 1.1, fontFamily: "'MontBlanc', sans-serif" }}>
               {fmt1(foodTotals.protein)}{t('gUnit')}
             </Typography>
-            <Typography sx={{ fontSize: '10px', color: C.muted }}>/ {client.proteinTarget}{t('gUnit')} {t('proteinShortLbl')}</Typography>
+            <Typography sx={{ fontSize: '10px', color: C.muted }}>/ {client.proteinTarget || '—'}{t('gUnit')}</Typography>
+          </Box>
+        </Box>
+
+        {/* Carbs */}
+        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.75, borderLeft: `1px solid ${C.border}`, pl: 0.5 }}>
+          <Box sx={{ position: 'relative' }}>
+            <ProgressRing percent={carbsPct} color="#FFD070" size={44} />
+            <Box sx={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: 800, color: '#FFD070', fontFamily: "'MontBlanc', sans-serif" }}>
+              {Math.round(carbsPct)}%
+            </Box>
+          </Box>
+          <Box sx={{ textAlign: 'center', minWidth: 0 }}>
+            <Typography sx={{ fontSize: '10px', letterSpacing: 1.2, color: C.muted, textTransform: 'uppercase', fontWeight: 700 }}>
+              въглехидрати
+            </Typography>
+            <Typography sx={{ fontSize: '13px', fontWeight: 800, color: '#FFD070', lineHeight: 1.1, fontFamily: "'MontBlanc', sans-serif" }}>
+              {fmt1(foodTotals.carbs)}{t('gUnit')}
+            </Typography>
+            <Typography sx={{ fontSize: '10px', color: C.muted }}>/ {carbsTarget || '—'}{t('gUnit')}</Typography>
+          </Box>
+        </Box>
+
+        {/* Fat */}
+        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.75, borderLeft: `1px solid ${C.border}`, pl: 0.5 }}>
+          <Box sx={{ position: 'relative' }}>
+            <ProgressRing percent={fatPct} color="#FF9E80" size={44} />
+            <Box sx={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: 800, color: '#FF9E80', fontFamily: "'MontBlanc', sans-serif" }}>
+              {Math.round(fatPct)}%
+            </Box>
+          </Box>
+          <Box sx={{ textAlign: 'center', minWidth: 0 }}>
+            <Typography sx={{ fontSize: '10px', letterSpacing: 1.2, color: C.muted, textTransform: 'uppercase', fontWeight: 700 }}>
+              мазнини
+            </Typography>
+            <Typography sx={{ fontSize: '13px', fontWeight: 800, color: '#FF9E80', lineHeight: 1.1, fontFamily: "'MontBlanc', sans-serif" }}>
+              {fmt1(foodTotals.fat)}{t('gUnit')}
+            </Typography>
+            <Typography sx={{ fontSize: '10px', color: C.muted }}>/ {fatTarget || '—'}{t('gUnit')}</Typography>
           </Box>
         </Box>
       </Paper>

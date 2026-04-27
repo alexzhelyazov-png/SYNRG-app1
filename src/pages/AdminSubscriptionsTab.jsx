@@ -3,12 +3,13 @@ import { Box, Typography, IconButton, Tooltip } from '@mui/material'
 import { useApp } from '../context/AppContext'
 import { C } from '../theme'
 import { DB } from '../lib/db'
+import { FREE_MODULES } from '../lib/modules'
 
 const PLAN_LABELS = { '8': 'FLEX', '12': 'PROGRESS', 'unlimited': 'PLUS' }
 const PLAN_COLORS = { '8': C.logan, '12': C.primary, 'unlimited': '#c4e9bf' }
 
 export default function SubscriptionsTab({ t, lang }) {
-  const { realClients, showSnackbar } = useApp()
+  const { realClients, showSnackbar, updateClientModules } = useApp()
   const [allPlans, setAllPlans] = useState([])
   const [loading, setLoading] = useState(true)
 
@@ -43,7 +44,15 @@ export default function SubscriptionsTab({ t, lang }) {
   }
 
   async function handleDeactivate(planId) {
+    const plan = allPlans.find(p => p.id === planId)
     await DB.update('client_plans', planId, { status: 'expired' })
+    // If client has no other active plan, drop them down to the freemium view.
+    if (plan?.client_id) {
+      const other = await DB.getClientActivePlan(plan.client_id)
+      if (!other) {
+        try { await updateClientModules(plan.client_id, [...FREE_MODULES]) } catch { /* non-fatal */ }
+      }
+    }
     showSnackbar(lang === 'en' ? 'Plan deactivated' : 'Планът е деактивиран')
     reload()
   }

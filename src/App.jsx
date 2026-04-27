@@ -38,8 +38,13 @@ import Notifications  from './pages/Notifications'
 import Recipes        from './pages/Recipes'
 import CoachChat      from './pages/CoachChat'
 import AdminMessagesTab from './pages/AdminMessagesTab'
+import Profile        from './pages/Profile'
+import OnlineHome     from './pages/OnlineHome'
+import LeadHome       from './pages/LeadHome'
+import useClientTier  from './hooks/useClientTier'
 
 import ConfirmDeleteModal from './components/ConfirmDeleteModal'
+import WelcomeTour        from './components/WelcomeTour'
 
 const isStandalone = window.navigator.standalone || window.matchMedia('(display-mode: standalone)').matches
 
@@ -256,6 +261,7 @@ function AppShell() {
   const theme            = useTheme()
   const isMobile         = useMediaQuery(theme.breakpoints.down('sm'))
   const showClientDetail = (auth.role === 'coach' || auth.role === 'admin') && coachClientMode
+  const { isOnline: isOnlineClient, isLead } = useClientTier()
 
   // Scroll to top whenever coach/admin opens a client
   useEffect(() => {
@@ -313,7 +319,13 @@ function AppShell() {
                     {t('backBtn')}
                   </Button>
                 )}
-                {view === 'dashboard' && <Dashboard />}
+                {view === 'dashboard' && (
+                  auth.role === 'client' && isOnlineClient
+                    ? <OnlineHome />
+                    : auth.role === 'client' && isLead
+                      ? <LeadHome />
+                      : <Dashboard />
+                )}
                 {view === 'progress'  && (auth.role !== 'client' || hasModule(auth.modules, 'nutrition_tracking') || hasModule(auth.modules, 'weight_tracking')) && <Progress />}
                 {view === 'food'      && (auth.role !== 'client' || hasModule(auth.modules, 'nutrition_tracking')) && <FoodTracker />}
                 {view === 'weight'    && (auth.role !== 'client' || hasModule(auth.modules, 'weight_tracking'))    && <WeightTracker />}
@@ -331,6 +343,7 @@ function AppShell() {
                 {view === 'recipes'      && (auth.role !== 'client' || hasModule(auth.modules, 'program_access') || hasModule(auth.modules, 'training_plan_access')) && <Recipes />}
                 {view === 'coach_chat'   && auth.role === 'client' && hasModule(auth.modules, 'synrg_method') && <CoachChat />}
                 {view === 'coach_chat_admin' && auth.role === 'coach' && <AdminMessagesTab />}
+                {view === 'profile'   && auth.role !== 'client' && <Profile />}
                 {view === 'admin'     && admin && <Admin />}
               </>
             )}
@@ -341,6 +354,8 @@ function AppShell() {
       {isMobile && <MobileNav />}
 
       <ConfirmDeleteModal />
+
+      {auth.role === 'client' && isOnlineClient && <WelcomeTour />}
 
       {auth.role === 'client' && <BadgeUnlockWatcher />}
 

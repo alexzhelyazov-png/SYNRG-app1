@@ -64,6 +64,8 @@ export const T = {
     navNotifications:   'Известия',
     navCoach:           'Треньор',
     navMessages:        'Съобщения',
+    navProfile:         'Моят профил',
+    profileTabTracker:  'Табло',
     navLogout:          'Изход',
     navHide:            'Скрий',
     navExpand:          'Разшири',
@@ -426,6 +428,10 @@ export const T = {
     remainingSessionsLbl: 'Оставащи сесии',
     workoutsThisWeekLbl: 'Тренировки тази седмица',
     noWorkoutsWeekLbl:  'Няма тренировки тази седмица',
+    focusThisWeekLbl:   'ФОКУС ТАЗИ СЕДМИЦА',
+    tapForExplanationLbl: 'натисни за обяснение',
+    continueWithHabitsFromWeeksLbl: 'Продължи с навиците от седмици {from}–{to}',
+    weekShortLbl:       'СЕДМИЦА',
     analyticsTab:       'Аналитикс',
     coachesTab:         'Треньори',
     priceLbl:           'Такса (€)',
@@ -777,7 +783,7 @@ export const T = {
     valueEn:            'Стойност (EN)',
 
     // ── Programs ────────────────────────────────────────
-    navPrograms:        'Програми',
+    navPrograms:        'Ресурси',
     programsOverline:   'Онлайн обучение',
     programsTitle:      'Моите програми',
     lessonsCount:       'урока',
@@ -863,6 +869,57 @@ export const T = {
     lockedProgramsDesc:    'Тренировъчни и хранителни режими',
     lockedStudio:          'Студио тренировки',
     lockedStudioDesc:      'Персонални тренировки на живо',
+
+    // ── Welcome tour (online client onboarding) ────────
+    tour_welcome_eyebrow:      'ДОБРЕ ДОШЪЛ В SYNRG МЕТОД',
+    tour_welcome_title:        'Здравей!',
+    tour_welcome_body:         'Започваш 8-седмично пътуване. Малки стъпки всеки ден, за да постигнеш резултатите, които искаш, без да се насилваш. Нека те разведем накратко из приложението.',
+
+    tour_navDashboard_eyebrow: 'РАЗДЕЛ · ДНЕС',
+    tour_navDashboard_title:   'Твоят ден',
+    tour_navDashboard_body:    'Тук започваш всеки ден — виждаш целите за седмицата, задачите за деня и тренировките ти. Нека ти покажа какво има вътре.',
+
+    tour_focus_eyebrow:        'ДНЕС · ФОКУС ТАЗИ СЕДМИЦА',
+    tour_focus_title:          'Седмични цели',
+    tour_focus_body:           'Това са нещата, които ще ти изградят навици, за да останеш във форма — без постоянно да почваш диети и режими.',
+
+    tour_dailies_eyebrow:      'ДНЕС · ЗАДАЧИ ЗА ДНЕС',
+    tour_dailies_title:        'Ежедневни навици',
+    tour_dailies_body:         'Тук записваш трите ежедневни навика — тегло, храна и крачки. Малките записи всеки ден стават голяма промяна за 8 седмици.',
+
+    tour_workout_eyebrow:      'ДНЕС · ТРЕНИРОВКИ',
+    tour_workout_title:        'Движение за седмицата',
+    tour_workout_body:         'Тренировките за седмицата с точни упражнения, рундове и време. Отвори тренировка, за да видиш изпълнението стъпка по стъпка.',
+
+    tour_chat_eyebrow:         'ДНЕС · ТРЕНЬОР',
+    tour_chat_title:           'Имаш въпрос? Пиши!',
+    tour_chat_body:            'Твоят ментор е на един клик разстояние. При блокаж, съмнение или просто за дооформяне на плана — пиши по всяко време.',
+
+    tour_navProgress_eyebrow:  'РАЗДЕЛ · ПРОГРЕС',
+    tour_navProgress_title:    'Отключвай значки за постоянство, трупай точки и се състезавай с останалите',
+    tour_navProgress_body:     'Тук следиш напредъка си във времето — значки за постоянство и класация спрямо общността.',
+
+    tour_badges_eyebrow:       'ПРОГРЕС · ЗНАЧКИ',
+    tour_badges_title:         'Твоят напредък',
+    tour_badges_body:          'Събираш значки за всяка постоянност — записано тегло, храна, крачки, тренировки. Те визуализират напредъка ти седмица по седмица.',
+
+    tour_ranking_eyebrow:      'ПРОГРЕС · КЛАСАЦИЯ',
+    tour_ranking_title:        'Не си сам',
+    tour_ranking_body:         'Виж как се справят другите клиенти в общността. Малка приятелска конкуренция за повече мотивация.',
+
+    tour_navResources_eyebrow: 'РАЗДЕЛ · РЕСУРСИ',
+    tour_navResources_title:   'Помощ в ежедневието',
+    tour_navResources_body:    'Рецепти и полезни ресурси — винаги под ръка, когато ти трябват идеи или насоки.',
+
+    tour_recipes_eyebrow:      'РЕСУРСИ · РЕЦЕПТИ',
+    tour_recipes_title:        'Вдъхновение за менюто',
+    tour_recipes_body:         'Предефинирани ястия с грамажи, макроси и стъпки. Избирай лесно от тук, когато търсиш идея за ядене.',
+
+    tour_skip:                 'Пропусни',
+    tour_back:                 'Назад',
+    tour_next:                 'Напред →',
+    tour_start:                'Започни',
+    tour_close:                'Затвори',
   },
 
   en: {
@@ -930,6 +987,8 @@ export const T = {
     navNotifications:   'Notifications',
     navCoach:           'Coach',
     navMessages:        'Messages',
+    navProfile:         'My profile',
+    profileTabTracker:  'Dashboard',
     navLogout:          'Logout',
     navHide:            'Hide',
     navExpand:          'Expand',
@@ -1292,6 +1351,10 @@ export const T = {
     remainingSessionsLbl: 'Remaining Sessions',
     workoutsThisWeekLbl: 'Workouts This Week',
     noWorkoutsWeekLbl:  'No workouts this week',
+    focusThisWeekLbl:   'THIS WEEK\'S FOCUS',
+    tapForExplanationLbl: 'tap for explanation',
+    continueWithHabitsFromWeeksLbl: 'Continue with habits from weeks {from}–{to}',
+    weekShortLbl:       'WEEK',
     upcomingSessionsLbl: 'Upcoming Sessions',
     analyticsTab:       'Analytics',
     coachesTab:         'Coaches',
@@ -1643,7 +1706,7 @@ export const T = {
     valueEn:            'Value (EN)',
 
     // ── Programs ────────────────────────────────────────
-    navPrograms:        'Programs',
+    navPrograms:        'Resources',
     programsOverline:   'Online training',
     programsTitle:      'My Programs',
     lessonsCount:       'lessons',
@@ -1729,5 +1792,56 @@ export const T = {
     lockedProgramsDesc:    'Training & nutrition plans',
     lockedStudio:          'Studio training',
     lockedStudioDesc:      'Personal training sessions',
+
+    // ── Welcome tour (online client onboarding) ────────
+    tour_welcome_eyebrow:      'WELCOME TO THE SYNRG METHOD',
+    tour_welcome_title:        'Hi there!',
+    tour_welcome_body:         'You are starting an 8-week journey. Small daily steps to reach the results you want without forcing yourself. Let us give you a quick tour of the app.',
+
+    tour_navDashboard_eyebrow: 'SECTION · TODAY',
+    tour_navDashboard_title:   'Your day',
+    tour_navDashboard_body:    'This is where you start every day — you can see your weekly goals, daily tasks and workouts. Let us show you what is inside.',
+
+    tour_focus_eyebrow:        'TODAY · FOCUS THIS WEEK',
+    tour_focus_title:          'Weekly goals',
+    tour_focus_body:           'These are the things that will build your habits so you stay in shape — without constantly starting new diets or restrictive regimens.',
+
+    tour_dailies_eyebrow:      'TODAY · DAILY TASKS',
+    tour_dailies_title:        'Daily habits',
+    tour_dailies_body:         'This is where you log the three daily habits — weight, food and steps. Small entries every day become big change over 8 weeks.',
+
+    tour_workout_eyebrow:      'TODAY · WORKOUTS',
+    tour_workout_title:        'Movement for the week',
+    tour_workout_body:         'The workouts for the week with exact exercises, rounds and time. Open a workout to see the execution step by step.',
+
+    tour_chat_eyebrow:         'TODAY · COACH',
+    tour_chat_title:           'Got a question? Write!',
+    tour_chat_body:            'Your mentor is one click away. Whenever you are stuck, have a doubt or just want to fine-tune the plan — write any time.',
+
+    tour_navProgress_eyebrow:  'SECTION · PROGRESS',
+    tour_navProgress_title:    'Unlock badges for consistency, earn points and compete with the others',
+    tour_navProgress_body:     'This is where you follow your progress over time — consistency badges and ranking within the community.',
+
+    tour_badges_eyebrow:       'PROGRESS · BADGES',
+    tour_badges_title:         'Your progress',
+    tour_badges_body:          'You collect badges for every streak — weight logged, food, steps, workouts. They visualize your progress week by week.',
+
+    tour_ranking_eyebrow:      'PROGRESS · RANKING',
+    tour_ranking_title:        'You are not alone',
+    tour_ranking_body:         'See how other clients in the community are doing. A bit of friendly competition for extra motivation.',
+
+    tour_navResources_eyebrow: 'SECTION · RESOURCES',
+    tour_navResources_title:   'Help for everyday life',
+    tour_navResources_body:    'Recipes and useful resources — always on hand whenever you need ideas or guidance.',
+
+    tour_recipes_eyebrow:      'RESOURCES · RECIPES',
+    tour_recipes_title:        'Inspiration for your menu',
+    tour_recipes_body:         'Pre-defined meals with portion sizes, macros and steps. Pick easily from here whenever you need a meal idea.',
+
+    tour_skip:                 'Skip',
+    tour_back:                 'Back',
+    tour_next:                 'Next →',
+    tour_start:                'Start',
+    tour_close:                'Close',
   },
 }

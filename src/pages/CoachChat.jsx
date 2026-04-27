@@ -58,18 +58,19 @@ export default function CoachChat() {
   }
 
   // ─── No coach assigned yet ──────────────────────────────────
+  // This is a safety net only — online clients get a coach auto-assigned
+  // by the stripe-webhook at purchase time. If we land here, something's
+  // off (purchase not yet processed, manual test insert, etc.).
   if (!assignedCoach) {
     return (
       <Box sx={{ p: 3, textAlign: 'center' }}>
-        <IconButton onClick={() => setView('dashboard')} sx={{ position: 'absolute', left: 8, top: 8, color: C.muted }}>
-          <ArrowBackIcon />
-        </IconButton>
-        <Box sx={{ mt: 8 }}>
-          <Typography sx={{ fontSize: 18, fontWeight: 700, color: C.text, mb: 1 }}>
-            Твоят треньор предстои да ти бъде назначен
+        <Box sx={{ mt: 6 }}>
+          <CircularProgress size={28} sx={{ color: C.purple, mb: 2 }} />
+          <Typography sx={{ fontSize: 16, fontWeight: 700, color: C.text, mb: 0.5 }}>
+            Назначаваме ти ментор
           </Typography>
-          <Typography sx={{ fontSize: 14, color: C.muted }}>
-            До 24 часа ще получиш съобщение от личния си ментор с план за стартиране.
+          <Typography sx={{ fontSize: 13, color: C.muted }}>
+            Обнови страницата след няколко секунди.
           </Typography>
         </Box>
       </Box>
@@ -105,9 +106,6 @@ export default function CoachChat() {
         borderBottom: `1px solid ${C.border}`,
         background: C.surface,
       }}>
-        <IconButton onClick={() => setView('dashboard')} size="small" sx={{ color: C.muted }}>
-          <ArrowBackIcon />
-        </IconButton>
         <Box sx={{
           width: 40, height: 40, borderRadius: '50%',
           background: C.purpleSoft, border: `1px solid rgba(200,197,255,0.2)`,
@@ -142,7 +140,7 @@ export default function CoachChat() {
         )}
         {coachMsgsLoaded && thread.length === 0 && (
           <Typography sx={{ fontSize: 13, color: C.muted, textAlign: 'center', mt: 4 }}>
-            Все още няма съобщения. Напиши нещо на {assignedCoach.name}.
+            Свържи се с твоя ментор {assignedCoach.name} в случай че имаш въпроси или казус.
           </Typography>
         )}
         {thread.map(m => {

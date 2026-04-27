@@ -494,7 +494,9 @@ export default function Recipes() {
   return (
     <Box sx={{ animation: `fadeInUp 0.22s ${EASE.decelerate} both` }}>
 
-      {/* Header */}
+      {/* Header — wraps title + category chips so the tour spotlight
+          clearly shows this is the Recipes page (with its filter bar). */}
+      <Box data-tour="recipes">
       <Box sx={{ mb: 2.5 }}>
         <Typography variant="h2" sx={{ mb: 0.5 }}>Не знаеш какво да хапнеш?</Typography>
         <Typography sx={{ fontSize: '13px', color: C.muted }}>
@@ -529,6 +531,9 @@ export default function Recipes() {
           )
         })}
       </Box>
+
+      </Box>
+      {/* /tour-wrapper ends after header + filter chips */}
 
       {/* Count */}
       <Typography sx={{ fontSize: '11px', color: C.muted, mb: 1.5, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>

@@ -14,9 +14,10 @@ import { useApp }             from '../context/AppContext'
 import { isAdmin }            from '../lib/bookingUtils'
 import { hasModule }          from '../lib/modules'
 import { C, EASE }            from '../theme'
+import useClientTier          from '../hooks/useClientTier'
 
 // Build role-specific nav item list (module-aware for clients)
-function getNavItems(auth, admin) {
+function getNavItems(auth, admin, isOnlineClient = false, isLead = false) {
   // Coach/admin nav — unchanged
   if (auth.role !== 'client') {
     const items = [
@@ -41,8 +42,12 @@ function getNavItems(auth, admin) {
   // Programs: always visible — locked with indicator if no program_access
   items.push({ view: 'programs', Icon: PlayCircleOutlineIcon, labelKey: 'navPrograms', isLocked: !hasProgramAccess })
 
-  // Schedule: always visible — locked with indicator if no booking_access
-  items.push({ view: 'schedule', Icon: CalendarMonthIcon, labelKey: 'navBookSlot', isLocked: !hasBookingAccess })
+  // Schedule (Тренировки / Резервации): only for studio clients.
+  // Online clients don't use the physical studio schedule.
+  // Leads (freemium) haven't bought anything yet — no studio booking for them either.
+  if (!isOnlineClient && !isLead) {
+    items.push({ view: 'schedule', Icon: CalendarMonthIcon, labelKey: 'navBookSlot', isLocked: !hasBookingAccess })
+  }
   return items
 }
 
@@ -129,7 +134,8 @@ export default function MobileNav() {
   } = useApp()
 
   const admin = isAdmin(auth)
-  const navItems = getNavItems(auth, admin)
+  const { isOnline: isOnlineClient, isLead } = useClientTier()
+  const navItems = getNavItems(auth, admin, isOnlineClient, isLead)
 
   return (
     <>

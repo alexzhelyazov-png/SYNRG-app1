@@ -12,7 +12,7 @@ import { C, EASE } from '../theme'
 
 // ── Questions ──────────────────────────────────────────────────
 // ── Target calculators from questionnaire ──────────────────────
-function calcTargets(weight, height, goal) {
+export function calcTargets(weight, height, goal) {
   const w = Number(weight) || 0
   const h = Number(height) || 0
 
@@ -205,7 +205,9 @@ function saveState(key, val) {
 }
 
 // ── Quiz Screen ────────────────────────────────────────────────
-function QuizScreen({ onDone, isBg }) {
+// Exported so OnlineHome can render the quiz inline as part of the
+// post-payment onboarding flow (consent → quiz → program start → tour).
+export function QuizScreen({ onDone, isBg }) {
   const [answers, setAnswers] = useState({})
 
   const allAnswered = QUESTIONS.every(q => {

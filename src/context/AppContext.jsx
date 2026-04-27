@@ -751,6 +751,19 @@ export function AppProvider({ children }) {
   const kcalPct  = Math.min((foodTotals.kcal    / (client.calorieTarget || 1)) * 100, 100)
   const protPct  = Math.min((foodTotals.protein / (client.proteinTarget || 1)) * 100, 100)
 
+  // ── Derive carbs / fat targets from kcal + protein ─────────────
+  // Standard split: fat ≈ 27% of total kcal (9 kcal/g),
+  // carbs = remaining kcal after protein and fat (4 kcal/g).
+  const fatTarget   = Math.round(((client.calorieTarget || 0) * 0.27) / 9)
+  const carbsTarget = Math.max(
+    0,
+    Math.round(
+      ((client.calorieTarget || 0) - (client.proteinTarget || 0) * 4 - fatTarget * 9) / 4
+    )
+  )
+  const carbsPct = Math.min((foodTotals.carbs / (carbsTarget || 1)) * 100, 100)
+  const fatPct   = Math.min((foodTotals.fat   / (fatTarget   || 1)) * 100, 100)
+
   // ── Notifications: unread count (resets when viewing notifications page) ──
   const [lastNotifSeen, setLastNotifSeen] = useState(() => {
     return localStorage.getItem('synrg_last_notif_seen') || ''
@@ -1559,7 +1572,8 @@ export function AppProvider({ children }) {
     sortedWeightLogs, weightChartData,
     latestWeight, latestAvg, weeklyRate,
     sortedStepsLogs,
-    ranking, kcalPct, protPct, visibleClients,
+    ranking, kcalPct, protPct, carbsPct, fatPct,
+    carbsTarget, fatTarget, visibleClients,
     // Actions
     loadAll,
     handleLogin,
