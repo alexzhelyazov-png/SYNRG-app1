@@ -2,14 +2,15 @@
  * Supabase Edge Function: auth-login
  *
  * Verifies client password server-side using bcrypt (via Postgres crypt()).
- * Replaces client-side password comparison which exposed plaintext passwords
- * to anyone with the anon key.
- *
- * Returns full client data (excluding password_hash) on success.
+ * Adds:
+ *  - Cloudflare Turnstile verification (bot protection)
+ *  - Rate limiting per IP (10 fails/5 min → 1h block)
+ *  - Account lockout per username (5 fails/5 min → 15 min block)
  */
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+const TURNSTILE_SECRET = Deno.env.get("TURNSTILE_SECRET_KEY") || "";
 
 const ALLOWED_ORIGINS = [
   "https://synrg-beyondfitness.com",
@@ -35,6 +36,88 @@ function sbHeaders() {
   };
 }
 
+function getIp(req: Request): string {
+  return (
+    req.headers.get("cf-connecting-ip") ||
+    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    req.headers.get("x-real-ip") ||
+    "unknown"
+  );
+}
+
+async function verifyTurnstile(token: string | null, ip: string): Promise<boolean> {
+  // Soft-fail if not configured (early dev / migration)
+  if (!TURNSTILE_SECRET) return true;
+  if (!token) return false;
+  try {
+    const formData = new FormData();
+    formData.append("secret", TURNSTILE_SECRET);
+    formData.append("response", token);
+    formData.append("remoteip", ip);
+    const res = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
+      method: "POST",
+      body: formData,
+    });
+    const data = await res.json();
+    return data.success === true;
+  } catch (e) {
+    console.error("Turnstile verify error:", e);
+    return false;
+  }
+}
+
+// Returns true if request should be blocked
+async function isRateLimited(ip: string, name: string): Promise<{ blocked: boolean; reason?: string }> {
+  try {
+    const cutoff5min = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+    const cutoff1h = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+
+    // Per-IP: 10 failed attempts in last 5 min → blocked for 1h
+    const ipRes = await fetch(
+      `${SUPABASE_URL}/rest/v1/auth_attempts?select=created_at&ip=eq.${encodeURIComponent(ip)}&action=eq.login&success=eq.false&created_at=gte.${cutoff1h}&order=created_at.desc&limit=20`,
+      { headers: sbHeaders() }
+    );
+    if (ipRes.ok) {
+      const ipFails = await ipRes.json() as Array<{ created_at: string }>;
+      const recent5min = ipFails.filter(a => a.created_at >= cutoff5min);
+      if (recent5min.length >= 10) {
+        return { blocked: true, reason: "Too many attempts from your IP. Try again later." };
+      }
+      // If 10+ fails in last 1h → still blocked
+      if (ipFails.length >= 10) {
+        return { blocked: true, reason: "Too many failed attempts. Try again in 1 hour." };
+      }
+    }
+
+    // Per-username: 5 failed attempts in last 5 min → 15 min lockout
+    const userRes = await fetch(
+      `${SUPABASE_URL}/rest/v1/auth_attempts?select=created_at&name=eq.${encodeURIComponent(name)}&action=eq.login&success=eq.false&created_at=gte.${cutoff5min}&limit=10`,
+      { headers: sbHeaders() }
+    );
+    if (userRes.ok) {
+      const userFails = await userRes.json() as Array<unknown>;
+      if (userFails.length >= 5) {
+        return { blocked: true, reason: "Account temporarily locked due to too many failed attempts. Try again in 15 minutes." };
+      }
+    }
+  } catch (e) {
+    console.warn("Rate limit check failed (allowing through):", e);
+  }
+  return { blocked: false };
+}
+
+async function logAttempt(ip: string, name: string, action: string, success: boolean) {
+  try {
+    await fetch(`${SUPABASE_URL}/rest/v1/auth_attempts`, {
+      method: "POST",
+      headers: { ...sbHeaders(), Prefer: "return=minimal" },
+      body: JSON.stringify({ ip, name, action, success }),
+    });
+  } catch (e) {
+    console.warn("Failed to log attempt:", e);
+  }
+}
+
 Deno.serve(async (req: Request) => {
   const origin = req.headers.get("origin");
   const cors = corsHeaders(origin);
@@ -46,8 +129,15 @@ Deno.serve(async (req: Request) => {
     return new Response("Method not allowed", { status: 405, headers: cors });
   }
 
+  const ip = getIp(req);
+  let name = "";
+
   try {
-    const { name, password } = await req.json();
+    const body = await req.json();
+    name = body.name || "";
+    const password = body.password || "";
+    const turnstile_token = body.turnstile_token || null;
+
     if (!name || !password) {
       return new Response(
         JSON.stringify({ error: "name and password required" }),
@@ -55,7 +145,26 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Verify password via Postgres RPC (uses crypt() for bcrypt comparison)
+    // 1. Rate limit check
+    const rateLimit = await isRateLimited(ip, name);
+    if (rateLimit.blocked) {
+      return new Response(
+        JSON.stringify({ error: "rate_limited", message: rateLimit.reason }),
+        { status: 429, headers: { ...cors, "Content-Type": "application/json" } }
+      );
+    }
+
+    // 2. Turnstile verification
+    const turnstileOk = await verifyTurnstile(turnstile_token, ip);
+    if (!turnstileOk) {
+      await logAttempt(ip, name, "login", false);
+      return new Response(
+        JSON.stringify({ error: "bot_check_failed", message: "Bot check failed. Please try again." }),
+        { status: 403, headers: { ...cors, "Content-Type": "application/json" } }
+      );
+    }
+
+    // 3. Verify password via Postgres RPC (uses crypt() for bcrypt comparison)
     const verifyRes = await fetch(`${SUPABASE_URL}/rest/v1/rpc/verify_client_password`, {
       method: "POST",
       headers: sbHeaders(),
@@ -65,6 +174,7 @@ Deno.serve(async (req: Request) => {
     const row = Array.isArray(verifyData) ? verifyData[0] : verifyData;
 
     if (!row || !row.valid) {
+      await logAttempt(ip, name, "login", false);
       return new Response(
         JSON.stringify({ error: "Invalid credentials" }),
         { status: 401, headers: { ...cors, "Content-Type": "application/json" } }
@@ -91,12 +201,14 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    await logAttempt(ip, name, "login", true);
     return new Response(
       JSON.stringify({ ok: true, client }),
       { status: 200, headers: { ...cors, "Content-Type": "application/json" } }
     );
   } catch (err) {
     console.error("auth-login error:", err);
+    if (name) await logAttempt(ip, name, "login", false);
     return new Response(
       JSON.stringify({ error: err.message }),
       { status: 500, headers: { ...cors, "Content-Type": "application/json" } }

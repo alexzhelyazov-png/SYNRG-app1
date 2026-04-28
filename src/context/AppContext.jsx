@@ -497,7 +497,7 @@ export function AppProvider({ children }) {
   // ── Auth ──────────────────────────────────────────────────────
   // Server-side bcrypt verification via auth-login Edge Function.
   // Replaces client-side password comparison (which exposed plaintext via anon key).
-  async function handleLogin(name, pass) {
+  async function handleLogin(name, pass, turnstileToken = null) {
     const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL
     const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_KEY
     let result
@@ -505,7 +505,7 @@ export function AppProvider({ children }) {
       const res = await fetch(`${SUPABASE_URL}/functions/v1/auth-login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${SUPABASE_KEY}` },
-        body: JSON.stringify({ name: name.trim(), password: pass }),
+        body: JSON.stringify({ name: name.trim(), password: pass, turnstile_token: turnstileToken }),
       })
       result = await res.json()
       if (!res.ok || !result.ok) return t('errLogin')
@@ -534,7 +534,7 @@ export function AppProvider({ children }) {
     return null
   }
 
-  async function handleRegisterClient(name, pass, email = null) {
+  async function handleRegisterClient(name, pass, email = null, turnstileToken = null) {
     const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL
     const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_KEY
     const FREE_MODULES = ['nutrition_tracking', 'weight_tracking', 'steps_tracking']
@@ -544,7 +544,7 @@ export function AppProvider({ children }) {
       const res = await fetch(`${SUPABASE_URL}/functions/v1/auth-register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${SUPABASE_KEY}` },
-        body: JSON.stringify({ name: name.trim(), password: pass, email }),
+        body: JSON.stringify({ name: name.trim(), password: pass, email, turnstile_token: turnstileToken }),
       })
       result = await res.json()
       if (res.status === 409) return t('errClientExists')

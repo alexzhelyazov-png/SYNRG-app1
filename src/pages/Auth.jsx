@@ -9,6 +9,7 @@ import { DB, isUsingSupabase } from '../lib/db'
 import { C, EASE } from '../theme'
 import SynrgLogomark from '../layout/SynrgLogomark'
 import PrivacyPolicyDialog from '../components/PrivacyPolicyDialog'
+import { getTurnstileToken } from '../components/TurnstileWidget'
 
 const isStandalone = window.navigator.standalone || window.matchMedia('(display-mode: standalone)').matches
 const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent)
@@ -71,12 +72,15 @@ export default function Auth() {
       }
       if (!consentGdpr) { setError(t('errConsentRequired')); return }
       setLoading(true)
-      const err = await handleRegisterClient(name.trim(), pass, trimmedEmail || null)
+      // Bot guard: get invisible Cloudflare Turnstile token
+      const turnstileToken = await getTurnstileToken('register')
+      const err = await handleRegisterClient(name.trim(), pass, trimmedEmail || null, turnstileToken)
       setLoading(false)
       if (err) setError(err)
     } else {
       setLoading(true)
-      const err = await handleLogin(name.trim(), pass)
+      const turnstileToken = await getTurnstileToken('login')
+      const err = await handleLogin(name.trim(), pass, turnstileToken)
       setLoading(false)
       if (err) setError(err)
     }
