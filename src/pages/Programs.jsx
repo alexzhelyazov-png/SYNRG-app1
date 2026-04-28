@@ -23,6 +23,7 @@ import { useApp }          from '../context/AppContext'
 import { useBooking }      from '../context/BookingContext'
 import NoPlanBanner        from '../components/NoPlanBanner'
 import CheckoutConsentDialog from '../components/CheckoutConsentDialog'
+import ProgramReviews        from '../components/ProgramReviews'
 import { DB }              from '../lib/db'
 import Recipes             from './Recipes'
 import { parseVideoUrl, getVideoThumbnail } from '../lib/videoUtils'
@@ -488,6 +489,14 @@ function ProgramDetail({ program, modules, lessons, progress, onBack, onLesson, 
           </Paper>
         )
       })}
+
+      {/* ── Program Reviews (verified buyers can submit; everyone can read) ── */}
+      <Box sx={{ mt: 4, mb: 2 }}>
+        <Typography sx={{ fontSize: '13px', color: C.muted, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', mb: 1 }}>
+          Ревюта от клиенти
+        </Typography>
+        <ProgramReviews programId={program.id} />
+      </Box>
     </Box>
   )
 }

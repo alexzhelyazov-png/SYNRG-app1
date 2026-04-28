@@ -14,19 +14,35 @@ export default function SubscriptionsTab({ t, lang }) {
   const [loading, setLoading] = useState(true)
   const [programPurchases, setProgramPurchases] = useState([])
   const [invoices, setInvoices] = useState([])
+  const [pendingReviews, setPendingReviews] = useState([])
 
   const reload = useCallback(() => {
     Promise.all([
       DB.selectAll('client_plans'),
       DB.selectAll('program_purchases').catch(() => []),
       DB.selectAll('invoices', '&order=invoice_number.desc&limit=200').catch(() => []),
-    ]).then(([plans, purchases, invs]) => {
+      DB.selectAll('program_reviews', '&status=eq.pending&order=created_at.desc&limit=50').catch(() => []),
+    ]).then(([plans, purchases, invs, reviews]) => {
       setAllPlans(plans.sort((a, b) => (b.created_at || '').localeCompare(a.created_at || '')))
       setProgramPurchases(purchases.sort((a, b) => (b.purchased_at || b.created_at || '').localeCompare(a.purchased_at || a.created_at || '')))
       setInvoices(invs)
+      setPendingReviews(reviews || [])
       setLoading(false)
     })
   }, [])
+
+  const moderateReview = async (id, newStatus) => {
+    try {
+      await DB.update('program_reviews', id, {
+        status: newStatus,
+        reviewed_at: new Date().toISOString(),
+      })
+      showSnackbar(newStatus === 'approved' ? 'Ревюто е одобрено' : 'Ревюто е отхвърлено', 'success')
+      reload()
+    } catch {
+      showSnackbar('Грешка при модерация', 'error')
+    }
+  }
 
   // CSV export of all invoices for accountant
   const exportInvoicesCSV = () => {
@@ -167,6 +183,58 @@ export default function SubscriptionsTab({ t, lang }) {
 
   return (
     <Box>
+      {/* Pending reviews — moderation queue */}
+      {pendingReviews.length > 0 && (
+        <Box sx={{
+          mb: 2, p: 2, borderRadius: '12px',
+          background: 'rgba(170,169,205,0.08)', border: '1px solid rgba(170,169,205,0.3)',
+        }}>
+          <Typography sx={{ fontSize: '13px', fontWeight: 700, color: '#aaa9cd', mb: 1 }}>
+            Ревюта за модерация ({pendingReviews.length})
+          </Typography>
+          {pendingReviews.map(r => (
+            <Box key={r.id} sx={{ mb: 1.5, p: 1.5, borderRadius: '10px', background: 'rgba(0,0,0,0.2)', border: `1px solid ${C.border}` }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                <Typography sx={{ fontSize: '14px', color: '#FFC107' }}>
+                  {'★'.repeat(r.rating)}{'☆'.repeat(5 - r.rating)}
+                </Typography>
+                <Typography sx={{ fontSize: '12px', fontWeight: 700, color: C.text }}>
+                  {r.client_name || 'Клиент'}
+                </Typography>
+                <Typography sx={{ fontSize: '11px', color: C.muted, ml: 'auto' }}>
+                  {formatDate(r.created_at)}
+                </Typography>
+              </Box>
+              {r.text && (
+                <Typography sx={{ fontSize: '12px', color: C.text, lineHeight: 1.5, mb: 1 }}>
+                  "{r.text}"
+                </Typography>
+              )}
+              <Box sx={{ display: 'flex', gap: 0.5 }}>
+                <button
+                  onClick={() => moderateReview(r.id, 'approved')}
+                  style={{
+                    background: 'rgba(196,233,191,0.2)', border: '1px solid rgba(196,233,191,0.5)',
+                    color: '#c4e9bf', padding: '4px 12px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer',
+                  }}
+                >
+                  Одобри
+                </button>
+                <button
+                  onClick={() => moderateReview(r.id, 'rejected')}
+                  style={{
+                    background: 'rgba(248,113,113,0.15)', border: '1px solid rgba(248,113,113,0.4)',
+                    color: '#F87171', padding: '4px 12px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer',
+                  }}
+                >
+                  Отхвърли
+                </button>
+              </Box>
+            </Box>
+          ))}
+        </Box>
+      )}
+
       {/* Invoices section — admin tools (CSV export, NAP report) */}
       <Box sx={{
         mb: 2, p: 2, borderRadius: '12px',
