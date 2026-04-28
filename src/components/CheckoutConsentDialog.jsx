@@ -156,7 +156,7 @@ export default function CheckoutConsentDialog({ open, onClose, onConfirm, progra
             label={
               <Typography sx={{ fontSize: '12.5px', color: C.text, lineHeight: 1.5 }}>
                 Декларирам, че <strong>нямам медицински противопоказания</strong> за
-                участие във фитнес и хранителна програма и при необходимост съм
+                участие във фитнес и хранителен план и при необходимост съм
                 консултирал/а лекар. Разбирам, че SYNRG не предоставя медицински
                 услуги.
               </Typography>

@@ -1444,7 +1444,7 @@ export function AppProvider({ children }) {
           coachId: pickedCoachId,
           senderRole: 'coach',
           senderName: pickedCoachName,
-          text: `Здравей, ${prevClient.name || 'клиент'}! Аз съм ${pickedCoachName}, твоят ментор в SYNRG Метод. Добре дошъл/дошла! Имаш 2 check-in сесии на месец — пиши ми тук когато имаш въпроси или се нуждаеш от корекция на програмата.`,
+          text: `Здравей, ${prevClient.name || 'клиент'}! Аз съм ${pickedCoachName}, твоят ментор в SYNRG Метод. Добре дошъл/дошла! Имаш 2 check-in сесии на месец — пиши ми тук, когато имаш въпроси или се нуждаеш от корекция по плана.`,
         })
       } catch (e) { console.warn('Auto-assign coach failed:', e) }
     }

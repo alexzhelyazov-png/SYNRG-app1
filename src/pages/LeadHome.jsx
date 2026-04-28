@@ -8,7 +8,7 @@
 //      as shortcuts (so they stay in the app, keep logging, stay engaged).
 //   2. Continuously remind them what SYNRG Метод is and what they're
 //      missing — precise, strong, specific result promises that show
-//      SYNRG's unique combo (ментор + програма + trackers + рецепти +
+//      SYNRG's unique combo (ментор + път + trackers + рецепти +
 //      общност — all in one place).
 //   3. Provide a single clear CTA to start SYNRG Метод — opens checkout
 //      consent dialog (3 mandatory checkboxes per BG/EU law) → Stripe.
@@ -39,7 +39,7 @@ function formatPrice(cents, currency = 'BGN') {
 
 // ── Result promises — concrete, specific, differentiating ─────────
 const RESULTS_BG = [
-  'Изграждане на устойчив режим за 8 седмици',
+  'Изграждане на устойчив ритъм за 8 седмици',
   'Навици, които остават за цял живот',
   'Личен ментор — не бот, реален човек',
   'Сила и стойка, които усещаш всеки ден',
@@ -53,7 +53,7 @@ const RESULTS_EN = [
 
 // ── What you get — the unique combo, all in one place ────────────
 const FEATURES_BG = [
-  { Icon: CalendarMonthIcon, title: '8-седмична програма',    sub: 'Структурирана тренировъчна седмица по седмица' },
+  { Icon: CalendarMonthIcon, title: '8 седмици с ментор',     sub: 'Структуриран път, седмица по седмица' },
   { Icon: PersonPinIcon,     title: 'Личен ментор',            sub: '2 check-in сесии на месец, реален треньор' },
   { Icon: FitnessCenterIcon, title: 'Видео на всяко упражнение', sub: 'Перфектна форма, бавно и чисто' },
   { Icon: RestaurantIcon,    title: 'Храна + тегло + стъпки',  sub: 'Всичко в един tracker, без external апове' },
@@ -61,7 +61,7 @@ const FEATURES_BG = [
   { Icon: GroupsIcon,        title: 'Общност и класация',      sub: 'Стена, значки, мотивация всеки ден' },
 ]
 const FEATURES_EN = [
-  { Icon: CalendarMonthIcon, title: '8-week program',          sub: 'Structured week by week' },
+  { Icon: CalendarMonthIcon, title: '8 weeks with a mentor',   sub: 'A structured path, week by week' },
   { Icon: PersonPinIcon,     title: 'Personal mentor',          sub: '2 monthly check-ins, real coach' },
   { Icon: FitnessCenterIcon, title: 'Video on every exercise', sub: 'Perfect form, slow and clean' },
   { Icon: RestaurantIcon,    title: 'Food + weight + steps',   sub: 'All in one tracker, no extra apps' },
@@ -125,11 +125,11 @@ export default function LeadHome() {
     }
   }
 
-  const heroTitle      = lang === 'en' ? '8 weeks to transform your body and routine' : '8 седмици да променим тялото и режима ти'
+  const heroTitle      = lang === 'en' ? '8 weeks to transform your body and rhythm' : '8 седмици да променим тялото и ритъма ти'
   const heroOverline   = 'SYNRG МЕТОД'
   const heroSub        = lang === 'en'
-    ? 'The only platform in Bulgaria that combines a mentor, a structured program, trackers, recipes and a community — all in one place.'
-    : 'Единствената платформа в България с ментор, структурирана програма, трекери, рецепти и общност — всичко на едно място.'
+    ? 'The only platform in Bulgaria that brings together a mentor, a clear path, trackers, recipes and a community — all in one place.'
+    : 'Единствената платформа в България с ментор, ясен път, трекери, рецепти и общност — всичко на едно място.'
   const ctaLabel       = lang === 'en' ? 'Start SYNRG Method'  : 'Започни SYNRG Метод'
   // Dynamic price label — falls back to 397 лв if program hasn't loaded yet
   const priceFromDb    = program ? formatPrice(program.price_cents, program.currency) : '397 лв'

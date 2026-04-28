@@ -150,8 +150,8 @@ function ProgramsList({ programs, progress, lessons, purchases, onSelect, onBuy,
                   display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
                 }}>
                   {lang === 'en'
-                    ? '5-week habit-building program — included with SYNRG ONLINE'
-                    : '5-седмична програма за здравословни навици — включена в SYNRG ONLINE'}
+                    ? '5 weeks of habit-building — included with SYNRG ONLINE'
+                    : '5 седмици за здравословни навици — включени в SYNRG ONLINE'}
                 </Typography>
                 {hasSynrg ? (
                   <Button fullWidth variant="contained" size="small"
@@ -1070,7 +1070,7 @@ export default function Programs() {
   }
 
   // ── Main view with sub-tabs (Ресурси / Рецепти) ────────────
-  // "Моите програми" removed — SYNRG Метод is now the whole app.
+  // "My products" tab removed — SYNRG Метод is now the whole app.
   // The Programs page is now a reference library: educational resources + recipes.
   return (
     <Box>

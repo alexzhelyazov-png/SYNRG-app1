@@ -146,7 +146,7 @@ export default function ProgramReviews({ programId }) {
           ) : showForm || !myReview ? (
             <Box>
               <Typography sx={{ fontSize: '13px', fontWeight: 700, color: C.text, mb: 1 }}>
-                Сподели опита си с програмата
+                Сподели опита си със SYNRG Метод
               </Typography>
               <StarRow value={rating} onChange={setRating} size={28} />
               <TextField

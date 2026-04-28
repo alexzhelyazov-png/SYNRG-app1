@@ -82,7 +82,7 @@ export default function PrivacyPolicyDialog({ open, onClose }) {
               'Проследяване на вашия хранителен прием, тегло и тренировки',
               'Комуникация с вашия треньор',
               'Изпращане на напомняния по имейл (само ако сте предоставили имейл)',
-              'Обработка на плащания (само при покупка на програма)',
+              'Обработка на плащания (само при покупка на SYNRG Метод)',
             ].map(item => (
               <Typography key={item} component="li" sx={{ fontSize: '13px', color: C.muted, lineHeight: 1.65, mb: 0.5 }}>
                 {item}
@@ -110,7 +110,7 @@ export default function PrivacyPolicyDialog({ open, onClose }) {
             {[
               'Supabase Inc. (Supabase.com) — хостинг на базата данни, сървъри в ЕС',
               'Brevo SAS (Brevo.com) — изпращане на имейли, при предоставен имейл',
-              'Stripe Inc. (Stripe.com) — обработка на плащания, при покупка на програма',
+              'Stripe Inc. (Stripe.com) — обработка на плащания, при покупка на SYNRG Метод',
             ].map(item => (
               <Typography key={item} component="li" sx={{ fontSize: '13px', color: C.muted, lineHeight: 1.65, mb: 0.5 }}>
                 {item}

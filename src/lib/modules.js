@@ -17,7 +17,7 @@ export const MODULE_DEFS = {
   weight_tracking:      { labelBg: 'Тракер за тегло',       labelEn: 'Weight Tracking',      group: 'tracking' },
   nutrition_tracking:   { labelBg: 'Хранителен тракер',     labelEn: 'Nutrition Tracking',   group: 'tracking' },
   training_plan_access: { labelBg: 'Тренировъчен план',     labelEn: 'Training Plan Access', group: 'studio' },
-  program_access:       { labelBg: 'Онлайн програма',       labelEn: 'Online Program',       group: 'digital' },
+  program_access:       { labelBg: 'Онлайн с ментор',       labelEn: 'Online with Mentor',   group: 'digital' },
   planner_access:       { labelBg: 'Дигитален планер',      labelEn: 'Digital Planner',      group: 'digital' },
   synrg_method:         { labelBg: 'SYNRG метод',           labelEn: 'SYNRG Method',         group: 'method'  },
 }

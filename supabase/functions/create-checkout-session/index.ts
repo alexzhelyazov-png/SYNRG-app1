@@ -7,6 +7,7 @@ const ALLOWED_ORIGINS = [
   "https://aleksandarzhelyazov.github.io",
   "http://localhost:5173",
   "http://localhost:3000",
+  "http://localhost:3030",
 ];
 
 function corsHeaders(origin: string | null) {
