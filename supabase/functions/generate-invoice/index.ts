@@ -38,6 +38,7 @@ const BGN_PER_EUR = 1.95583;
 
 const ALLOWED_ORIGINS = [
   "https://synrg-beyondfitness.com",
+  "https://www.synrg-beyondfitness.com",
   "https://aleksandarzhelyazov.github.io",
   "http://localhost:5173",
 ];

@@ -10,6 +10,7 @@
 
 const ALLOWED_ORIGINS = [
   "https://synrg-beyondfitness.com",
+  "https://www.synrg-beyondfitness.com",
   "https://aleksandarzhelyazov.github.io",
   "http://localhost:5173",
   "http://localhost:3000",

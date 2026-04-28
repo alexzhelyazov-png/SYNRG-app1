@@ -13,6 +13,7 @@ const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 const ALLOWED_ORIGINS = [
   "https://synrg-beyondfitness.com",
+  "https://www.synrg-beyondfitness.com",
   "https://aleksandarzhelyazov.github.io",
   "http://localhost:5173",
   "http://localhost:3000",
