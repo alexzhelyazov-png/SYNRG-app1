@@ -95,14 +95,10 @@ export default function LeadHome() {
     return () => { alive = false }
   }, [])
 
-  // ── Checkout flow: open consent → on confirm → Stripe ───────────
+  // ── CTA: navigate to Programs page where user sees full details + reviews + buy button ───
+  // (Don't open Stripe consent dialog directly — too aggressive; let user see what they buy first)
   const openConsent = () => {
-    if (!program?.stripe_price_id) {
-      // Program not loaded yet, or Stripe price missing → fallback to programs view
-      setView('programs')
-      return
-    }
-    setConsentOpen(true)
+    setView('programs')
   }
 
   const proceedToStripe = async () => {
@@ -255,7 +251,9 @@ export default function LeadHome() {
         </Stack>
       </Box>
 
-      {/* ── Results block (concrete promises) ───────────── */}
+      {/* Sales sections (results + features) hidden on free home — moved to /app/programs detail */}
+      {false && (
+      <>
       <Box sx={{
         background: C.card,
         border: `1px solid ${C.border}`,
@@ -341,6 +339,9 @@ export default function LeadHome() {
           ))}
         </Box>
       </Box>
+
+      </>
+      )}
 
       {/* ── Freemium trackers — keep them using the app ─── */}
       <Box>
