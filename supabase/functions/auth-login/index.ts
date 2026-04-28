@@ -45,10 +45,16 @@ function getIp(req: Request): string {
   );
 }
 
-async function verifyTurnstile(token: string | null, ip: string): Promise<boolean> {
-  // Soft-fail if not configured (early dev / migration)
+async function verifyTurnstile(token: string | null, ip: string, origin: string | null): Promise<boolean> {
+  // SOFT-MODE: log Turnstile status but don't block login.
+  // This prevents lockouts while widget config is being verified.
+  // To re-enable hard enforcement: change `return true` after the warn to `return false`.
   if (!TURNSTILE_SECRET) return true;
-  if (!token) return false;
+  if (origin && (origin.startsWith("http://localhost") || origin.startsWith("http://127.0.0.1"))) return true;
+  if (!token) {
+    console.warn("[turnstile] no token supplied — allowing in soft mode");
+    return true;
+  }
   try {
     const formData = new FormData();
     formData.append("secret", TURNSTILE_SECRET);
@@ -59,10 +65,12 @@ async function verifyTurnstile(token: string | null, ip: string): Promise<boolea
       body: formData,
     });
     const data = await res.json();
-    return data.success === true;
+    if (!data.success) console.warn("[turnstile] failed verify:", data["error-codes"]);
+    // Soft mode: allow through even on failure (just log)
+    return true;
   } catch (e) {
-    console.error("Turnstile verify error:", e);
-    return false;
+    console.warn("[turnstile] verify exception (allowing through):", e);
+    return true;
   }
 }
 

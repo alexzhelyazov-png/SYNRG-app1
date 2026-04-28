@@ -46,8 +46,12 @@ function getIp(req: Request): string {
 }
 
 async function verifyTurnstile(token: string | null, ip: string): Promise<boolean> {
+  // SOFT-MODE: log but don't block registration.
   if (!TURNSTILE_SECRET) return true;
-  if (!token) return false;
+  if (!token) {
+    console.warn("[turnstile] no token supplied — allowing in soft mode");
+    return true;
+  }
   try {
     const formData = new FormData();
     formData.append("secret", TURNSTILE_SECRET);
@@ -58,10 +62,11 @@ async function verifyTurnstile(token: string | null, ip: string): Promise<boolea
       body: formData,
     });
     const data = await res.json();
-    return data.success === true;
+    if (!data.success) console.warn("[turnstile] failed verify:", data["error-codes"]);
+    return true;
   } catch (e) {
-    console.error("Turnstile verify error:", e);
-    return false;
+    console.warn("[turnstile] verify exception (allowing through):", e);
+    return true;
   }
 }
 

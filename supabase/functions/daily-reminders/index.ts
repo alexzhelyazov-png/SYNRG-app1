@@ -51,7 +51,14 @@ Deno.serve(async (req) => {
       "Content-Type": "application/json",
     };
 
-    const results = { expiry_reminders: 0, training_reminders: 0 };
+    const results = {
+      expiry_reminders: 0,
+      training_reminders: 0,
+      program_warned_7d: 0,
+      program_warned_1d: 0,
+      program_expired: 0,
+    };
+    const FREE_MODULES = ["nutrition_tracking", "weight_tracking", "steps_tracking"];
 
     // ── 1. Plan expiry reminders (expiring in 3 days) ──────────
     const in3days = isoDate(3);
@@ -135,6 +142,139 @@ Deno.serve(async (req) => {
         );
         results.training_reminders++;
       }
+    }
+
+    // ── 3. Program purchase expiry — 7 day warning ────────────
+    const in7days = isoDate(7);
+    const warn7Res = await fetch(
+      `${supabaseUrl}/rest/v1/program_purchases?select=id,client_id,valid_until&status=eq.active&valid_until=eq.${in7days}&expiry_warned_7d=eq.false`,
+      { headers: sbHeaders }
+    );
+    const warn7 = await warn7Res.json();
+    for (const purch of warn7 || []) {
+      const cRes = await fetch(`${supabaseUrl}/rest/v1/clients?select=name,email&id=eq.${purch.client_id}&limit=1`, { headers: sbHeaders });
+      const client = (await cRes.json())?.[0];
+      if (client?.email) {
+        await sendEmail(brevoKey, { email: client.email, name: client.name },
+          "Програмата ти приключва след 7 дни",
+          `<div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px;background:#1a1a1a;color:#e0e0e0;border-radius:16px">
+            <h2 style="color:#c4e9bf;margin:0 0 16px">${client.name || "клиент"},</h2>
+            <p style="font-size:16px;line-height:1.6">Остават 7 дни до края на твоята 8-седмична програма SYNRG Метод!</p>
+            <p style="font-size:14px;color:#bbb;line-height:1.6">Това е момента да:</p>
+            <ul style="font-size:14px;color:#bbb;line-height:1.7">
+              <li>Премериш напредъка си (тегло, снимки)</li>
+              <li>Запишеш final check-in с твоя ментор</li>
+              <li>Завършиш всички уроци които си пропуснал</li>
+            </ul>
+            <p style="font-size:13px;color:#999">След 7 дни преминаваш на freemium режим — задържаш достъп до hranene/тегло/стъпки трекерите, но не и до програмата и тренера.</p>
+            <hr style="border:none;border-top:1px solid #333;margin:24px 0">
+            <p style="font-size:12px;color:#666">SYNRG Beyond Fitness</p>
+          </div>`
+        );
+      }
+      await fetch(`${supabaseUrl}/rest/v1/program_purchases?id=eq.${purch.id}`, {
+        method: "PATCH",
+        headers: { ...sbHeaders, Prefer: "return=minimal" },
+        body: JSON.stringify({ expiry_warned_7d: true }),
+      });
+      results.program_warned_7d++;
+    }
+
+    // ── 4. Program purchase expiry — 1 day warning ────────────
+    const in1day = isoDate(1);
+    const warn1Res = await fetch(
+      `${supabaseUrl}/rest/v1/program_purchases?select=id,client_id,valid_until&status=eq.active&valid_until=eq.${in1day}&expiry_warned_1d=eq.false`,
+      { headers: sbHeaders }
+    );
+    const warn1 = await warn1Res.json();
+    for (const purch of warn1 || []) {
+      const cRes = await fetch(`${supabaseUrl}/rest/v1/clients?select=name,email&id=eq.${purch.client_id}&limit=1`, { headers: sbHeaders });
+      const client = (await cRes.json())?.[0];
+      if (client?.email) {
+        await sendEmail(brevoKey, { email: client.email, name: client.name },
+          "Утре приключва програмата ти",
+          `<div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px;background:#1a1a1a;color:#e0e0e0;border-radius:16px">
+            <h2 style="color:#FB923C;margin:0 0 16px">${client.name || "клиент"},</h2>
+            <p style="font-size:16px;line-height:1.6">Утре е последният ти ден от 8-седмичната програма SYNRG Метод!</p>
+            <p style="font-size:14px;color:#bbb;line-height:1.6">Това е завършен цикъл — поздравления! От утре:</p>
+            <ul style="font-size:14px;color:#bbb;line-height:1.7">
+              <li>Запазваш достъп до hranene, тегло и стъпки трекерите</li>
+              <li>Свалят се: програмата, тренера, тренировъчните планове</li>
+            </ul>
+            <p style="font-size:14px;color:#c4e9bf">Искаш ли да започнем нова програма заедно? Свържи се с нас!</p>
+            <hr style="border:none;border-top:1px solid #333;margin:24px 0">
+            <p style="font-size:12px;color:#666">SYNRG Beyond Fitness</p>
+          </div>`
+        );
+      }
+      await fetch(`${supabaseUrl}/rest/v1/program_purchases?id=eq.${purch.id}`, {
+        method: "PATCH",
+        headers: { ...sbHeaders, Prefer: "return=minimal" },
+        body: JSON.stringify({ expiry_warned_1d: true }),
+      });
+      results.program_warned_1d++;
+    }
+
+    // ── 5. Program purchase expiry — auto-revoke modules ───────
+    // Find purchases past valid_until that are still active
+    const today = isoDate(0);
+    const expiredRes = await fetch(
+      `${supabaseUrl}/rest/v1/program_purchases?select=id,client_id,valid_until&status=eq.active&valid_until=lt.${today}`,
+      { headers: sbHeaders }
+    );
+    const expired = await expiredRes.json();
+    for (const purch of expired || []) {
+      // Mark as expired
+      await fetch(`${supabaseUrl}/rest/v1/program_purchases?id=eq.${purch.id}`, {
+        method: "PATCH",
+        headers: { ...sbHeaders, Prefer: "return=minimal" },
+        body: JSON.stringify({ status: "expired", expired_at: new Date().toISOString() }),
+      });
+
+      // Revoke modules → FREE_MODULES (only if no OTHER active program purchase)
+      const otherActive = await fetch(
+        `${supabaseUrl}/rest/v1/program_purchases?select=id&client_id=eq.${purch.client_id}&status=eq.active&id=neq.${purch.id}&limit=1`,
+        { headers: sbHeaders }
+      );
+      const others = await otherActive.json();
+      if (!others || others.length === 0) {
+        // Also check for active studio plan — don't revoke if studio client
+        const studioPlanRes = await fetch(
+          `${supabaseUrl}/rest/v1/client_plans?select=id&client_id=eq.${purch.client_id}&status=eq.active&limit=1`,
+          { headers: sbHeaders }
+        );
+        const studioPlan = await studioPlanRes.json();
+        if (!studioPlan || studioPlan.length === 0) {
+          await fetch(`${supabaseUrl}/rest/v1/clients?id=eq.${purch.client_id}`, {
+            method: "PATCH",
+            headers: { ...sbHeaders, Prefer: "return=minimal" },
+            body: JSON.stringify({ modules: FREE_MODULES, account_type: "free" }),
+          });
+        }
+      }
+
+      // Send "program completed" email
+      const cRes = await fetch(`${supabaseUrl}/rest/v1/clients?select=name,email&id=eq.${purch.client_id}&limit=1`, { headers: sbHeaders });
+      const client = (await cRes.json())?.[0];
+      if (client?.email) {
+        await sendEmail(brevoKey, { email: client.email, name: client.name },
+          "Завърши SYNRG Метод — поздравления!",
+          `<div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px;background:#1a1a1a;color:#e0e0e0;border-radius:16px">
+            <h2 style="color:#c4e9bf;margin:0 0 16px">${client.name || "клиент"},</h2>
+            <p style="font-size:16px;line-height:1.6">Завърши успешно 8-седмичната програма SYNRG Метод. Поздравления!</p>
+            <p style="font-size:14px;color:#bbb;line-height:1.6">Какво следва?</p>
+            <ul style="font-size:14px;color:#bbb;line-height:1.7">
+              <li>Запазваш достъп до freemium трекери (hranene, тегло, стъпки)</li>
+              <li>Можеш да продължиш да си записваш тренировки и да следиш прогрес</li>
+              <li>Готов ли си за следващото ниво? Запиши се за студио тренировки или нова онлайн програма</li>
+            </ul>
+            <p style="font-size:14px;color:#c4e9bf">Благодарим ти за доверието. Очакваме те за следващата стъпка!</p>
+            <hr style="border:none;border-top:1px solid #333;margin:24px 0">
+            <p style="font-size:12px;color:#666">SYNRG Beyond Fitness · Синерджи 93 ООД</p>
+          </div>`
+        );
+      }
+      results.program_expired++;
     }
 
     return new Response(JSON.stringify({ success: true, ...results }), {

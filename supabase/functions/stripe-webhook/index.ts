@@ -58,13 +58,25 @@ async function sbPatch(table: string, idOrFilter: string, patch: Record<string, 
   }
 }
 
+// Modules granted to online clients on program purchase.
+// CRITICAL: synrg_method MUST be included or purchasers can't access what they paid for.
+// Excludes booking_access and studio_access (those are for in-person studio clients).
 const REMOTE_MODULES = [
+  "synrg_method",
   "program_access",
   "weight_tracking",
   "nutrition_tracking",
   "training_plan_access",
   "planner_access",
 ];
+
+// Free modules (after program ends or refund) — baseline freemium access.
+const FREE_MODULES = ["nutrition_tracking", "weight_tracking", "steps_tracking"];
+
+// Program duration: 8 weeks. Auto-revoke modules after this period.
+const PROGRAM_DURATION_WEEKS = 8;
+
+const ADMIN_ALERT_EMAILS = ["aleksandarzhelyazov@gmail.com"];
 
 async function sendPurchaseEmail(clientEmail: string, clientName: string, amountTotal: number | null, currency: string, retries = 3): Promise<boolean> {
   const amountDisplay = amountTotal
@@ -173,6 +185,42 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
 
   console.log(`Processing purchase: client=${client_id}, program=${program_id}`);
 
+  // ── Race condition guard: re-check Early Bird cap inside webhook (atomic with insert) ──
+  // The frontend create-checkout-session does a TOCTOU check, but two concurrent purchases
+  // can both pass it. We re-verify here before granting access.
+  try {
+    const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY")!, { apiVersion: "2023-10-16" });
+    const lineItems = await stripe.checkout.sessions.listLineItems(session.id, { limit: 5 });
+    const priceId = lineItems.data[0]?.price?.id;
+    if (priceId) {
+      const price = await stripe.prices.retrieve(priceId);
+      if (price.metadata?.campaign === "early_bird_first_100") {
+        const activeRes = await fetch(
+          `${SUPABASE_URL}/rest/v1/program_purchases?select=id&program_id=eq.${program_id}&status=eq.active`,
+          { headers: { ...sbHeaders(), Prefer: "count=exact" } }
+        );
+        const range = activeRes.headers.get("content-range");
+        const total = range ? parseInt(range.split("/")[1], 10) : 0;
+        if (total >= 100) {
+          console.warn(`Early Bird cap exceeded — purchase ${session.id} would be #${total + 1}. Refunding.`);
+          // Auto-refund via Stripe (so customer isn't charged for unavailable spot)
+          if (session.payment_intent) {
+            await stripe.refunds.create({ payment_intent: session.payment_intent as string, reason: "duplicate" });
+          }
+          // Notify admin
+          await sendAdminAlert(`Early Bird cap race condition triggered — refunded ${session.id}`, `Customer attempted purchase but cap was full. Auto-refunded.`);
+          return;
+        }
+      }
+    }
+  } catch (e) {
+    console.warn("Cap re-check failed (allowing through):", e);
+  }
+
+  // Calculate program expiry (8 weeks from now)
+  const validUntil = new Date(Date.now() + PROGRAM_DURATION_WEEKS * 7 * 24 * 60 * 60 * 1000)
+    .toISOString().slice(0, 10);
+
   // 1. Record purchase (UNIQUE constraint on stripe_session_id will reject duplicates)
   const inserted = await sbInsert("program_purchases", {
     client_id,
@@ -181,6 +229,7 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     amount_cents: session.amount_total || 0,
     currency: (session.currency || "eur").toUpperCase(),
     status: "active",
+    valid_until: validUntil,
   });
   if (!inserted) {
     console.error(`Failed to insert purchase for session ${session.id}`);
@@ -230,9 +279,40 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
   console.log(`Purchase recorded for client ${client_id}, program ${program_id}`);
 }
 
+// Generic email sender (uses mailerlite-sync function which talks to Brevo)
+async function sendEmail(to: string, name: string, subject: string, html: string): Promise<boolean> {
+  try {
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/mailerlite-sync`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${Deno.env.get("SUPABASE_ANON_KEY") || ""}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        action: "send_email",
+        email: to,
+        name,
+        fields: {},
+        subject,
+        html,
+      }),
+    });
+    return res.ok;
+  } catch (e) {
+    console.warn("sendEmail failed:", e);
+    return false;
+  }
+}
+
+async function sendAdminAlert(subject: string, body: string) {
+  const html = `<div style="font-family:sans-serif;padding:20px;max-width:560px"><h2 style="color:#d33">[SYNRG ADMIN] ${subject}</h2><p>${body}</p><p style="font-size:11px;color:#999">Auto-generated from Stripe webhook.</p></div>`;
+  for (const email of ADMIN_ALERT_EMAILS) {
+    await sendEmail(email, "Admin", `[SYNRG] ${subject}`, html);
+  }
+}
+
 async function handleRefund(charge: Stripe.Charge) {
   const sessionId = charge.metadata?.checkout_session_id || (charge.payment_intent as string);
-  // Find purchase by either session_id or by matching payment intent in our records
   const purchases = await sbQuery(
     "program_purchases",
     `?select=id,client_id,program_id&or=(stripe_session_id.eq.${sessionId},stripe_session_id.eq.${charge.payment_intent})`
@@ -244,20 +324,37 @@ async function handleRefund(charge: Stripe.Charge) {
   }
 
   await sbPatch("program_purchases", purchase.id, { status: "refunded", refunded_at: new Date().toISOString() });
-  console.log(`Marked purchase ${purchase.id} as refunded`);
 
-  // Revoke modules — reset to FREE_MODULES
-  const FREE_MODULES = ["nutrition_tracking", "weight_tracking", "steps_tracking"];
+  // Revoke modules → FREE_MODULES
   await sbPatch("clients", purchase.client_id, {
     modules: FREE_MODULES,
     account_type: "free",
   });
-  console.log(`Revoked modules for client ${purchase.client_id}`);
+
+  // Get client info for email
+  const clientRows = await sbQuery("clients", `?select=email,name&id=eq.${purchase.client_id}`);
+  const client = (clientRows as Array<{ email: string; name: string }>)?.[0];
+
+  if (client?.email) {
+    const refundAmount = charge.amount_refunded ? (charge.amount_refunded / 100).toFixed(0) + " " + (charge.currency?.toUpperCase() || "EUR") : "";
+    const html = `<div style="font-family:sans-serif;padding:24px;background:#1a1a1a;color:#e0e0e0;border-radius:16px;max-width:520px">`
+      + `<h2 style="color:#c4e9bf;margin:0 0 16px">Възстановяване на сума</h2>`
+      + `<p>Здравей, <strong>${client.name || "клиент"}</strong>!</p>`
+      + `<p>Потвърждаваме, че сумата ${refundAmount ? `от <strong>${refundAmount}</strong> ` : ""}за програмата SYNRG Метод беше възстановена.</p>`
+      + `<p>Парите ще се появят в банковата ти сметка в рамките на 5-10 работни дни (зависи от банката).</p>`
+      + `<p>Достъпът ти до програмата е прекратен. Безплатните модули (хранене, тегло, стъпки) остават активни.</p>`
+      + `<p>Ако имаш въпроси — отговори на този имейл.</p>`
+      + `<hr style="border:none;border-top:1px solid #333;margin:20px 0">`
+      + `<p style="font-size:12px;color:#666">SYNRG Beyond Fitness · Синерджи 93 ООД</p></div>`;
+    await sendEmail(client.email, client.name || "клиент", "Възстановяване на сума — SYNRG", html);
+  }
+
+  await sendAdminAlert(`Refund processed`, `Purchase ${purchase.id} for client ${purchase.client_id} refunded. Modules revoked.`);
+  console.log(`Refunded purchase ${purchase.id}, revoked modules for client ${purchase.client_id}`);
 }
 
 async function handleDispute(dispute: Stripe.Dispute) {
   const charge = dispute.charge as string;
-  // Look up via charge — webhook ordering means we may have the original session
   const purchases = await sbQuery(
     "program_purchases",
     `?select=id,client_id&stripe_session_id=eq.${charge}`
@@ -265,13 +362,31 @@ async function handleDispute(dispute: Stripe.Dispute) {
   const purchase = (purchases as Array<{ id: string; client_id: string }>)?.[0];
   if (!purchase) {
     console.warn(`Dispute: no purchase found for charge ${charge}`);
+    await sendAdminAlert(`Dispute opened — no purchase found`, `Charge: ${charge}, Dispute: ${dispute.id}, Reason: ${dispute.reason}. Investigate manually.`);
     return;
   }
+
   await sbPatch("program_purchases", purchase.id, {
     status: "disputed",
     disputed_at: new Date().toISOString(),
   });
-  console.error(`DISPUTE OPENED: purchase ${purchase.id}, client ${purchase.client_id} — admin attention needed`);
+
+  // CRITICAL: Revoke modules during dispute (prevents fraudster from keeping access)
+  await sbPatch("clients", purchase.client_id, {
+    modules: FREE_MODULES,
+    account_type: "free",
+  });
+
+  // Email admin urgently
+  const clientRows = await sbQuery("clients", `?select=email,name&id=eq.${purchase.client_id}`);
+  const client = (clientRows as Array<{ email: string; name: string }>)?.[0];
+  await sendAdminAlert(
+    `URGENT: Chargeback dispute opened`,
+    `Purchase ${purchase.id} for client ${purchase.client_id} (${client?.name || "?"} / ${client?.email || "no email"}) is disputed. ` +
+    `Reason: ${dispute.reason}. Stripe dispute ID: ${dispute.id}. ` +
+    `Modules have been auto-revoked. You have ~7 days to respond to Stripe dispute or you lose by default.`
+  );
+  console.error(`DISPUTE: purchase ${purchase.id}, client ${purchase.client_id} — modules revoked, admin alerted`);
 }
 
 Deno.serve(async (req: Request) => {

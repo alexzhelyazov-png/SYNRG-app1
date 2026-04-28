@@ -1106,8 +1106,10 @@ function DashboardClient({ isCoachView = false }) {
   const { slots, myBookings, myPlan, bookingBusy, loadSlots, loadMyBookings, loadMyPlan, cancelBookingForSlot } = useBooking()
 
   const [tab, setTab] = useState(0)
-  const [showDeleteAccount, setShowDeleteAccount] = useState(false)
-  const [deletingAccount,   setDeletingAccount]   = useState(false)
+  const [showDeleteAccount,      setShowDeleteAccount]      = useState(false)
+  const [deletingAccount,        setDeletingAccount]        = useState(false)
+  const [deleteConfirmPassword,  setDeleteConfirmPassword]  = useState('')
+  const [deleteError,            setDeleteError]            = useState('')
 
   // Load booking data for client (not in coach-viewing-own-tracker mode)
   useEffect(() => {
@@ -1623,7 +1625,7 @@ function DashboardClient({ isCoachView = false }) {
         </Box>
       )}
 
-      {/* Delete account confirmation dialog */}
+      {/* Delete account confirmation dialog — GDPR Art. 17 (Right to be Forgotten) */}
       <Dialog
         open={showDeleteAccount}
         onClose={() => !deletingAccount && setShowDeleteAccount(false)}
@@ -1635,13 +1637,31 @@ function DashboardClient({ isCoachView = false }) {
           {t('deleteAccountTitle')}
         </DialogTitle>
         <DialogContent>
-          <Typography sx={{ fontSize: '14px', color: C.muted, lineHeight: 1.6 }}>
+          <Typography sx={{ fontSize: '14px', color: C.muted, lineHeight: 1.6, mb: 2 }}>
             {t('deleteAccountConfirm')}
           </Typography>
+          <Typography sx={{ fontSize: '12px', color: C.muted, mb: 1 }}>
+            Въведи паролата си за потвърждение:
+          </Typography>
+          <TextField
+            type="password"
+            fullWidth
+            size="small"
+            value={deleteConfirmPassword || ''}
+            onChange={e => setDeleteConfirmPassword(e.target.value)}
+            placeholder="Парола"
+            disabled={deletingAccount}
+            autoComplete="current-password"
+          />
+          {deleteError && (
+            <Typography sx={{ fontSize: '12px', color: '#F87171', mt: 1 }}>
+              {deleteError}
+            </Typography>
+          )}
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 3, pt: 0, gap: 1 }}>
           <Button
-            onClick={() => setShowDeleteAccount(false)}
+            onClick={() => { setShowDeleteAccount(false); setDeleteConfirmPassword(''); setDeleteError('') }}
             variant="outlined"
             fullWidth
             disabled={deletingAccount}
@@ -1650,14 +1670,34 @@ function DashboardClient({ isCoachView = false }) {
           </Button>
           <Button
             onClick={async () => {
+              if (!deleteConfirmPassword) { setDeleteError('Въведи паролата си'); return }
               setDeletingAccount(true)
-              await deleteClient(auth.id)
-              logout()
+              setDeleteError('')
+              try {
+                const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL
+                const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
+                const res = await fetch(`${SUPABASE_URL}/functions/v1/gdpr-delete-account`, {
+                  method: 'POST',
+                  headers: { 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ client_id: auth.id, password: deleteConfirmPassword }),
+                })
+                const data = await res.json()
+                if (!res.ok || !data.ok) {
+                  setDeleteError(data.error === 'Invalid password' ? 'Грешна парола' : 'Грешка при изтриване — опитай пак')
+                  setDeletingAccount(false)
+                  return
+                }
+                // Success — log out
+                logout()
+              } catch {
+                setDeleteError('Мрежова грешка — опитай пак')
+                setDeletingAccount(false)
+              }
             }}
             variant="contained"
             color="error"
             fullWidth
-            disabled={deletingAccount}
+            disabled={deletingAccount || !deleteConfirmPassword}
             sx={{ fontWeight: 800 }}
           >
             {deletingAccount ? t('saving') : t('deleteAccountBtn')}

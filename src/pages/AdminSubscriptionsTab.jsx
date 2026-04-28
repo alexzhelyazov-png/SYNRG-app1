@@ -12,15 +12,37 @@ export default function SubscriptionsTab({ t, lang }) {
   const { realClients, showSnackbar, updateClientModules } = useApp()
   const [allPlans, setAllPlans] = useState([])
   const [loading, setLoading] = useState(true)
+  const [programPurchases, setProgramPurchases] = useState([])
 
   const reload = useCallback(() => {
-    DB.selectAll('client_plans').then(plans => {
+    Promise.all([
+      DB.selectAll('client_plans'),
+      DB.selectAll('program_purchases').catch(() => []),
+    ]).then(([plans, purchases]) => {
       setAllPlans(plans.sort((a, b) => (b.created_at || '').localeCompare(a.created_at || '')))
+      setProgramPurchases(purchases.sort((a, b) => (b.purchased_at || b.created_at || '').localeCompare(a.purchased_at || a.created_at || '')))
       setLoading(false)
     })
   }, [])
 
   useEffect(() => { reload() }, [reload])
+
+  // Purchases needing admin attention
+  const flaggedPurchases = programPurchases.filter(p =>
+    p.status === 'needs_coach' || p.status === 'disputed' || p.status === 'refunded'
+  )
+  const flagLabel = (s) => ({
+    needs_coach: 'Без тренер',
+    disputed: 'Chargeback',
+    refunded: 'Възстановена',
+    expired: 'Изтекла',
+  })[s] || s
+  const flagColor = (s) => ({
+    needs_coach: '#FB923C',
+    disputed: '#F87171',
+    refunded: '#999',
+    expired: '#666',
+  })[s] || C.muted
 
   const getName = (clientId) => {
     const c = realClients.find(c => c.id === clientId)
@@ -82,6 +104,40 @@ export default function SubscriptionsTab({ t, lang }) {
 
   return (
     <Box>
+      {/* Program purchases needing attention */}
+      {flaggedPurchases.length > 0 && (
+        <Box sx={{
+          mb: 2, p: 2, borderRadius: '12px',
+          background: 'rgba(251,146,60,0.08)', border: '1px solid rgba(251,146,60,0.3)',
+        }}>
+          <Typography sx={{ fontSize: '13px', fontWeight: 700, color: '#FB923C', mb: 1 }}>
+            Покупки изискващи внимание ({flaggedPurchases.length})
+          </Typography>
+          {flaggedPurchases.map(p => (
+            <Box key={p.id} sx={{ mb: 1, display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+              <Box sx={{
+                px: 1, py: 0.25, borderRadius: '8px',
+                background: `${flagColor(p.status)}22`,
+                border: `1px solid ${flagColor(p.status)}55`,
+              }}>
+                <Typography sx={{ fontSize: '10px', fontWeight: 800, color: flagColor(p.status), letterSpacing: 0.5, textTransform: 'uppercase' }}>
+                  {flagLabel(p.status)}
+                </Typography>
+              </Box>
+              <Typography sx={{ fontSize: '13px', fontWeight: 700, color: C.text }}>
+                {getName(p.client_id)}
+              </Typography>
+              <Typography sx={{ fontSize: '11px', color: C.muted }}>
+                {(p.amount_cents / 100).toFixed(0)} {p.currency || 'EUR'} · {formatDate(p.purchased_at || p.created_at)}
+                {p.status === 'needs_coach' && ' · Auto-assign не успя'}
+                {p.status === 'disputed' && ` · Stripe alert ${formatDate(p.disputed_at)}`}
+                {p.status === 'refunded' && ` · Refunded ${formatDate(p.refunded_at)}`}
+              </Typography>
+            </Box>
+          ))}
+        </Box>
+      )}
+
       {/* Duplicate warnings */}
       {duplicateClientIds.length > 0 && (
         <Box sx={{
