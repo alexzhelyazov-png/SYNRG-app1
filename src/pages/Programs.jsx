@@ -812,7 +812,7 @@ function StepView({ step, allSteps, progress, onBack, onToggle, onNavigate, t, l
 // MAIN PROGRAMS PAGE
 // ══════════════════════════════════════════════════════════════
 export default function Programs() {
-  const { auth, t, lang, showSnackbar, setView } = useApp()
+  const { auth, t, lang, showSnackbar, setView, pendingProgramOpen, setPendingProgramOpen } = useApp()
   const { myPlan, loadMyPlan } = useBooking()
 
   // Load the current client's plan only if it hasn't been loaded for this client yet.
@@ -890,6 +890,17 @@ export default function Programs() {
     return () => { cancelled = true }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [auth.id])
+
+  // Deep-link: when LeadHome's "Започни SYNRG Метод" button sets pendingProgramOpen,
+  // auto-open that program's detail page (shows ProgramDetail before the tabs render).
+  useEffect(() => {
+    if (!pendingProgramOpen || !programs || programs.length === 0) return
+    const target = programs.find(p => p.id === pendingProgramOpen)
+    if (target) {
+      setSelectedProgram(target)
+    }
+    setPendingProgramOpen(null)
+  }, [pendingProgramOpen, programs, setPendingProgramOpen])
 
   // Resources access: coach, OR purchased any program, OR studio/program module with an active plan
   const hasResourceAccess = auth.role === 'coach'

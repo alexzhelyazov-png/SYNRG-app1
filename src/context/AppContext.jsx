@@ -71,6 +71,7 @@ export function AppProvider({ children }) {
   const [confirmDelete,  setConfirmDelete]  = useState(null)
   const [coachClientMode, setCoachClientMode] = useState(false) // true after coach explicitly clicks a client
   const [pendingProgressTab, setPendingProgressTab] = useState(null) // deep-link to a Progress sub-tab
+  const [pendingProgramOpen, setPendingProgramOpen] = useState(null) // deep-link: program slug to auto-open in Programs view
 
   // ── Snackbar ─────────────────────────────────────────────────
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' })
@@ -1595,6 +1596,7 @@ export function AppProvider({ children }) {
     viewingCoach, setViewingCoach,
     coachClientMode, setCoachClientMode,
     pendingProgressTab, setPendingProgressTab,
+    pendingProgramOpen, setPendingProgramOpen,
     isReadOnly,
     isTrackerReadOnly,
     // Snackbar

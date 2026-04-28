@@ -70,7 +70,7 @@ const FEATURES_EN = [
 ]
 
 export default function LeadHome() {
-  const { auth, setView, lang, t, showSnackbar } = useApp()
+  const { auth, setView, lang, t, showSnackbar, setPendingProgramOpen } = useApp()
   const modules = auth?.modules || []
   const results  = lang === 'en' ? RESULTS_EN  : RESULTS_BG
   const features = lang === 'en' ? FEATURES_EN : FEATURES_BG
@@ -95,10 +95,10 @@ export default function LeadHome() {
     return () => { alive = false }
   }, [])
 
-  // ── CTA: navigate to Programs page where user sees full details + reviews + buy button ───
-  // (Don't open Stripe consent dialog directly — too aggressive; let user see what they buy first)
+  // ── CTA: redirect to marketing site's SYNRG Метод landing page (full sales LP).
+  // The LP has detailed description, "за кого е", "как работи", reviews, FAQ, buy button.
   const openConsent = () => {
-    setView('programs')
+    window.location.href = '../synrg-method.html'
   }
 
   const proceedToStripe = async () => {
