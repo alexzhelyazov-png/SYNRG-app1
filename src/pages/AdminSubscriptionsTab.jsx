@@ -13,17 +13,80 @@ export default function SubscriptionsTab({ t, lang }) {
   const [allPlans, setAllPlans] = useState([])
   const [loading, setLoading] = useState(true)
   const [programPurchases, setProgramPurchases] = useState([])
+  const [invoices, setInvoices] = useState([])
 
   const reload = useCallback(() => {
     Promise.all([
       DB.selectAll('client_plans'),
       DB.selectAll('program_purchases').catch(() => []),
-    ]).then(([plans, purchases]) => {
+      DB.selectAll('invoices', '&order=invoice_number.desc&limit=200').catch(() => []),
+    ]).then(([plans, purchases, invs]) => {
       setAllPlans(plans.sort((a, b) => (b.created_at || '').localeCompare(a.created_at || '')))
       setProgramPurchases(purchases.sort((a, b) => (b.purchased_at || b.created_at || '').localeCompare(a.purchased_at || a.created_at || '')))
+      setInvoices(invs)
       setLoading(false)
     })
   }, [])
+
+  // CSV export of all invoices for accountant
+  const exportInvoicesCSV = () => {
+    if (!invoices.length) return
+    const lines = ['\uFEFF' + ['Номер', 'Дата', 'Купувач', 'Email', 'Описание', 'Валута', 'Нето', 'ДДС%', 'ДДС', 'Бруто', 'Статус']
+      .map(s => `"${s}"`).join(',')]
+    for (const inv of invoices) {
+      const d = inv.issued_at?.slice(0, 10) || ''
+      const net = ((inv.amount_cents - (inv.vat_amount_cents || 0)) / 100).toFixed(2)
+      const vat = ((inv.vat_amount_cents || 0) / 100).toFixed(2)
+      const gross = (inv.amount_cents / 100).toFixed(2)
+      const row = [
+        String(inv.invoice_number).padStart(10, '0'),
+        d,
+        inv.buyer_name || '',
+        inv.buyer_email || '',
+        inv.description || '',
+        inv.currency || 'EUR',
+        net, inv.vat_rate || 0, vat, gross,
+        inv.status || 'issued',
+      ].map(s => `"${String(s).replace(/"/g, '""')}"`).join(',')
+      lines.push(row)
+    }
+    const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url; a.download = `synrg-invoices-${new Date().toISOString().slice(0, 10)}.csv`; a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  const triggerNapReport = async () => {
+    if (!confirm('Изпрати месечния НАП отчет за миналия месец на счетоводителя?')) return
+    const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL
+    const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
+    try {
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/monthly-nap-report`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      })
+      const data = await res.json()
+      if (data.success) showSnackbar(`НАП отчет: ${data.invoices} фактури · изпратен на счетоводителя`, 'success')
+      else showSnackbar('Грешка при генериране на НАП отчет', 'error')
+    } catch { showSnackbar('Мрежова грешка', 'error') }
+  }
+
+  const openInvoice = async (invoiceId) => {
+    const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL
+    const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
+    try {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/invoices?select=html_content&id=eq.${invoiceId}&limit=1`, {
+        headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
+      })
+      const data = await res.json()
+      const html = data?.[0]?.html_content
+      if (!html) return
+      const win = window.open('', '_blank')
+      win.document.write(html); win.document.close()
+    } catch (e) { console.error(e) }
+  }
 
   useEffect(() => { reload() }, [reload])
 
@@ -104,6 +167,74 @@ export default function SubscriptionsTab({ t, lang }) {
 
   return (
     <Box>
+      {/* Invoices section — admin tools (CSV export, NAP report) */}
+      <Box sx={{
+        mb: 2, p: 2, borderRadius: '12px',
+        background: 'rgba(196,233,191,0.06)', border: '1px solid rgba(196,233,191,0.2)',
+      }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
+          <Typography sx={{ fontSize: '13px', fontWeight: 700, color: C.text }}>
+            Фактури ({invoices.length})
+          </Typography>
+          <Box sx={{ display: 'flex', gap: 0.75 }}>
+            <button
+              onClick={exportInvoicesCSV}
+              disabled={!invoices.length}
+              style={{
+                background: 'rgba(196,233,191,0.15)', border: '1px solid rgba(196,233,191,0.4)',
+                color: '#c4e9bf', padding: '5px 10px', borderRadius: 8, fontSize: 11, fontWeight: 700,
+                cursor: invoices.length ? 'pointer' : 'not-allowed', opacity: invoices.length ? 1 : 0.4,
+              }}
+            >
+              CSV
+            </button>
+            <button
+              onClick={triggerNapReport}
+              style={{
+                background: 'rgba(170,169,205,0.15)', border: '1px solid rgba(170,169,205,0.4)',
+                color: '#aaa9cd', padding: '5px 10px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer',
+              }}
+            >
+              НАП отчет
+            </button>
+          </Box>
+        </Box>
+        {invoices.length === 0 ? (
+          <Typography sx={{ fontSize: '11px', color: C.muted }}>Няма издадени фактури.</Typography>
+        ) : (
+          <Box sx={{ display: 'grid', gap: 0.5, maxHeight: 280, overflow: 'auto' }}>
+            {invoices.slice(0, 20).map(inv => (
+              <Box key={inv.id} sx={{
+                display: 'flex', alignItems: 'center', gap: 1, py: 0.5, px: 1,
+                borderBottom: `1px solid ${C.border}`, fontSize: '11px',
+              }}>
+                <Typography sx={{ fontSize: '11px', color: C.muted, fontFamily: 'monospace', minWidth: 90 }}>
+                  №{String(inv.invoice_number).padStart(10, '0')}
+                </Typography>
+                <Typography sx={{ fontSize: '11px', color: C.text, flex: 1 }} noWrap>
+                  {inv.buyer_name || 'Физическо лице'}
+                </Typography>
+                <Typography sx={{ fontSize: '11px', color: C.muted }}>
+                  {(inv.amount_cents / 100).toFixed(2)} {inv.currency}
+                </Typography>
+                <Typography sx={{ fontSize: '11px', color: C.muted, minWidth: 70 }}>
+                  {inv.issued_at?.slice(0, 10)}
+                </Typography>
+                <button
+                  onClick={() => openInvoice(inv.id)}
+                  style={{
+                    background: 'transparent', border: '1px solid ' + C.border,
+                    color: C.purple, padding: '2px 8px', borderRadius: 6, fontSize: 10, fontWeight: 700, cursor: 'pointer',
+                  }}
+                >
+                  Виж
+                </button>
+              </Box>
+            ))}
+          </Box>
+        )}
+      </Box>
+
       {/* Program purchases needing attention */}
       {flaggedPurchases.length > 0 && (
         <Box sx={{

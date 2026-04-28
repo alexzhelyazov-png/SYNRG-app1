@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import ClientWorkout from './ClientWorkout'
 import { Box, Typography, TextField, Button, Chip, Paper, Switch, Collapse, Tabs, Tab, IconButton, Tooltip, Dialog, DialogTitle, DialogContent, DialogActions } from '@mui/material'
+import MyInvoicesSection from '../components/MyInvoicesSection'
 import ArrowBackIcon from '@mui/icons-material/ArrowBack'
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline'
 import EditIcon from '@mui/icons-material/Edit'
@@ -1602,6 +1603,13 @@ function DashboardClient({ isCoachView = false }) {
             </Paper>
 
           </Box>
+        </Box>
+      )}
+
+      {/* ── My Invoices (clients only) ── */}
+      {!isCoachView && (
+        <Box sx={{ mt: 4 }}>
+          <MyInvoicesSection />
         </Box>
       )}
 

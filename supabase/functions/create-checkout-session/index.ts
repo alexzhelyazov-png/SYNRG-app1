@@ -121,6 +121,16 @@ Deno.serve(async (req) => {
       cancel_url,
       locale: locale === "en" ? "en" : "bg",
       metadata: metadata || {},
+      // Capture billing address (required for BG invoice/фактура)
+      billing_address_collection: "required",
+      // Allow promo codes at checkout (admin-managed in Stripe Dashboard)
+      allow_promotion_codes: true,
+      // Auto-collect tax IDs for B2B (companies can enter ЕИК / VAT for reverse charge)
+      tax_id_collection: { enabled: true },
+      // Use customer email if known
+      customer_email: metadata?.customer_email,
+      // Phone collection (optional but useful for support)
+      phone_number_collection: { enabled: true },
     });
 
     return new Response(

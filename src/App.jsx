@@ -16,6 +16,7 @@ import {
 } from './lib/gamification'
 
 import SiteHeader     from './layout/SiteHeader'
+import CookieBanner   from './components/CookieBanner'
 import Sidebar        from './layout/Sidebar'
 import MobileHeader   from './layout/MobileHeader'
 import MobileNav      from './layout/MobileNav'
@@ -390,6 +391,7 @@ function AppContent() {
       <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
         <AppShell />
       </Box>
+      <CookieBanner />
     </Box>
   )
 }

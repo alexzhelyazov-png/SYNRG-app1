@@ -78,17 +78,21 @@ const PROGRAM_DURATION_WEEKS = 8;
 
 const ADMIN_ALERT_EMAILS = ["aleksandarzhelyazov@gmail.com"];
 
-async function sendPurchaseEmail(clientEmail: string, clientName: string, amountTotal: number | null, currency: string, retries = 3): Promise<boolean> {
+async function sendPurchaseEmail(clientEmail: string, clientName: string, amountTotal: number | null, currency: string, invoiceNumber: number | null = null, retries = 3): Promise<boolean> {
   const amountDisplay = amountTotal
-    ? (amountTotal / 100).toFixed(0) + " " + currency.toUpperCase()
+    ? (amountTotal / 100).toFixed(2) + " " + currency.toUpperCase()
+    : "";
+  const invoiceLine = invoiceNumber
+    ? `<p style="font-size:13px;color:#bbb">Издадена е фактура № ${String(invoiceNumber).padStart(10, "0")}. Можеш да я изтеглиш от секция <strong>Моите фактури</strong> в приложението.</p>`
     : "";
   const html = `<div style="font-family:sans-serif;padding:24px;background:#1a1a1a;color:#e0e0e0;border-radius:16px;max-width:520px">`
     + `<h2 style="color:#c4e9bf;margin:0 0 16px">Успешна покупка!</h2>`
     + `<p>Здравей, <strong>${clientName}</strong>!</p>`
-    + `<p>Плащането ти е потвърдено${amountDisplay ? " (" + amountDisplay + ")" : ""}.</p>`
-    + `<p>Достъпът до програмата е активиран. Отвори приложението и ще намериш съдържанието в секция <strong>Програми</strong>.</p>`
+    + `<p>Плащането ти е потвърдено${amountDisplay ? " (<strong>" + amountDisplay + "</strong>)" : ""}.</p>`
+    + `<p>Достъпът до програмата SYNRG Метод е активиран за <strong>8 седмици</strong>. Отвори приложението и ще намериш съдържанието в секция <strong>Програми</strong>.</p>`
+    + invoiceLine
     + `<hr style="border:none;border-top:1px solid #333;margin:20px 0">`
-    + `<p style="font-size:12px;color:#666">SYNRG Beyond Fitness</p></div>`;
+    + `<p style="font-size:12px;color:#666">SYNRG Beyond Fitness · Синерджи 93 ООД · ЕИК 207343690</p></div>`;
 
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
@@ -265,18 +269,62 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     }
   }
 
-  // 4. Send confirmation email with retry
-  const clientEmail = clientRow.email as string;
-  const clientName = (clientRow.name as string) || "клиент";
+  // 4. Generate BG-compliant invoice — pulls billing address + tax IDs from Stripe session
+  const clientEmail = (session.customer_details?.email as string) || (clientRow.email as string);
+  const clientName = (session.customer_details?.name as string) || (clientRow.name as string) || "клиент";
+
+  const billing = session.customer_details?.address;
+  const buyerAddress = billing
+    ? [billing.line1, billing.line2, billing.postal_code, billing.city, billing.country].filter(Boolean).join(", ")
+    : null;
+  const taxIds = (session.customer_details?.tax_ids || []) as Array<{ type: string; value: string }>;
+  const buyerEik = taxIds.find((t) => t.type === "bg_uic")?.value || null;
+  const buyerVat = taxIds.find((t) => t.type === "eu_vat")?.value || null;
+
+  let invoiceNumber: number | null = null;
+  try {
+    const invRes = await fetch(`${SUPABASE_URL}/functions/v1/generate-invoice`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${Deno.env.get("SUPABASE_ANON_KEY") || ""}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        client_id,
+        program_purchase_id: inserted?.id,
+        buyer_name: clientName,
+        buyer_email: clientEmail,
+        buyer_address: buyerAddress,
+        buyer_eik: buyerEik,
+        buyer_vat_number: buyerVat,
+        description: "SYNRG Метод — 8-седмична онлайн програма за устойчиви здравни навици",
+        amount_cents: session.amount_total || 0,
+        currency: (session.currency || "eur").toUpperCase(),
+        stripe_session_id: session.id,
+        stripe_payment_intent: session.payment_intent,
+      }),
+    });
+    if (invRes.ok) {
+      const invData = await invRes.json();
+      invoiceNumber = invData.invoice?.invoice_number || null;
+      console.log(`Invoice ${invoiceNumber} issued for client ${client_id}`);
+    } else {
+      console.error("Invoice generation failed:", await invRes.text());
+      await sendAdminAlert("Invoice generation failed", `Purchase ${inserted?.id} succeeded but invoice could not be generated. Manual issue required for session ${session.id}.`);
+    }
+  } catch (e) {
+    console.error("Invoice generation threw:", e);
+  }
+
+  // 5. Send confirmation email with retry (includes invoice number)
   if (clientEmail) {
-    const sent = await sendPurchaseEmail(clientEmail, clientName, session.amount_total, session.currency || "eur");
+    const sent = await sendPurchaseEmail(clientEmail, clientName, session.amount_total, session.currency || "eur", invoiceNumber);
     if (!sent) {
       console.error(`EMAIL FAILED for client ${client_id} after retries`);
-      // Don't fail the webhook — email failure shouldn't trigger Stripe retry
     }
   }
 
-  console.log(`Purchase recorded for client ${client_id}, program ${program_id}`);
+  console.log(`Purchase recorded for client ${client_id}, program ${program_id}, invoice ${invoiceNumber}`);
 }
 
 // Generic email sender (uses mailerlite-sync function which talks to Brevo)
