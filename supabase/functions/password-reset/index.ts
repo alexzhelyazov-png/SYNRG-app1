@@ -134,13 +134,21 @@ Deno.serve(async (req) => {
 
       const reset = resets[0];
 
-      // Update password
+      // Hash new password via Postgres crypt() RPC
+      const hashRes = await fetch(`${supabaseUrl}/rest/v1/rpc/hash_password`, {
+        method: "POST",
+        headers: sbHeaders,
+        body: JSON.stringify({ p_password: new_password }),
+      });
+      const passwordHash = await hashRes.json();
+
+      // Update password (set hash, clear plaintext)
       await fetch(
         `${supabaseUrl}/rest/v1/clients?id=eq.${reset.client_id}`,
         {
           method: "PATCH",
           headers: { ...sbHeaders, Prefer: "return=minimal" },
-          body: JSON.stringify({ password: new_password }),
+          body: JSON.stringify({ password_hash: passwordHash, password: null }),
         }
       );
 

@@ -13,12 +13,17 @@ const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL
 const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_KEY
 
 // Send photo to AI Edge Function for food recognition
-async function recognizeFood(base64) {
+// Returns: { ...result } on success, { quotaExceeded: true, message } on 429, null on other failures
+async function recognizeFood(base64, clientId) {
   const res = await fetch(`${SUPABASE_URL}/functions/v1/food-recognize`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${SUPABASE_KEY}` },
-    body: JSON.stringify({ image: base64 }),
+    body: JSON.stringify({ image: base64, client_id: clientId }),
   })
+  if (res.status === 429) {
+    const data = await res.json().catch(() => ({}))
+    return { quotaExceeded: true, message: data.message || 'Дневният лимит е достигнат.' }
+  }
   if (!res.ok) return null
   const data = await res.json()
   if (data.error) return null
@@ -183,9 +188,14 @@ export default function FoodModal() {
     try {
       // Resize image to save bandwidth (max 800px)
       const base64 = await resizeAndEncode(file, 800)
-      const result = await recognizeFood(base64)
+      const result = await recognizeFood(base64, client?.id)
       if (!result) {
         setAiError(t('aiRecognizeError'))
+        setAiLoading(false)
+        return
+      }
+      if (result.quotaExceeded) {
+        setAiError(result.message)
         setAiLoading(false)
         return
       }

@@ -22,6 +22,7 @@ const CartSvg = () => (
 import { useApp }          from '../context/AppContext'
 import { useBooking }      from '../context/BookingContext'
 import NoPlanBanner        from '../components/NoPlanBanner'
+import CheckoutConsentDialog from '../components/CheckoutConsentDialog'
 import { DB }              from '../lib/db'
 import Recipes             from './Recipes'
 import { parseVideoUrl, getVideoThumbnail } from '../lib/videoUtils'
@@ -828,6 +829,7 @@ export default function Programs() {
   const [resourceProgress, setResourceProgress] = useState([])
   const [loading, setLoading]     = useState(true)
   const [buyLoading, setBuyLoading] = useState(null)
+  const [consentProgram, setConsentProgram] = useState(null) // program awaiting consent
 
   // Navigation state
   const [selectedProgram, setSelectedProgram] = useState(null)
@@ -835,17 +837,50 @@ export default function Programs() {
   const [selectedResource, setSelectedResource] = useState(null)
   const [selectedStep, setSelectedStep] = useState(null)
 
-  // Check for purchase success URL param
+  // Check for purchase success URL param — verifies actual purchase in DB
+  // (with poll-retry to handle webhook delay) before showing success message
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
-    if (params.get('purchase') === 'success') {
-      showSnackbar(t('purchaseSuccess'))
+    if (params.get('purchase') !== 'success') return
+    const pid = params.get('program_id')
+
+    const cleanUrl = () => {
       const url = new URL(window.location.href)
       url.searchParams.delete('purchase')
       url.searchParams.delete('program_id')
       window.history.replaceState({}, '', url.pathname + url.hash)
     }
-  }, [])
+
+    if (!auth.id || !pid) { cleanUrl(); return }
+
+    let cancelled = false
+    const poll = async () => {
+      // Poll for up to ~20s (webhook delay tolerance)
+      for (let i = 0; i < 10; i++) {
+        if (cancelled) return
+        try {
+          const purch = await DB.getClientPurchases(auth.id)
+          const found = (purch || []).some(p => p.program_id === pid && p.status === 'active')
+          if (found) {
+            showSnackbar(t('purchaseSuccess'))
+            cleanUrl()
+            // Refresh data so program appears unlocked immediately
+            loadData()
+            return
+          }
+        } catch { /* keep polling */ }
+        await new Promise(r => setTimeout(r, 2000))
+      }
+      // Webhook never arrived — DON'T show success, alert the client
+      if (!cancelled) {
+        showSnackbar(t('purchaseError') || 'Плащането се обработва. Опитай да презаредиш страницата след минута.')
+        cleanUrl()
+      }
+    }
+    poll()
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [auth.id])
 
   // Resources access: coach, OR purchased any program, OR studio/program module with an active plan
   const hasResourceAccess = auth.role === 'coach'
@@ -938,8 +973,16 @@ export default function Programs() {
     }
   }, [auth, resourceProgress, resourceSteps])
 
-  const handleBuy = useCallback(async (prog) => {
+  // Step 1 — open consent dialog (3 mandatory checkboxes per BG/EU law)
+  const handleBuy = useCallback((prog) => {
     if (!prog.stripe_price_id) { showSnackbar(t('purchaseError')); return }
+    setConsentProgram(prog)
+  }, [showSnackbar, t])
+
+  // Step 2 — after consent confirmed, proceed to Stripe checkout
+  const proceedToStripe = useCallback(async () => {
+    const prog = consentProgram
+    if (!prog) return
     setBuyLoading(prog.id)
     try {
       const baseUrl = window.location.origin + window.location.pathname
@@ -949,10 +992,13 @@ export default function Programs() {
         `${baseUrl}#/programs`, lang,
       )
       if (result?.url) window.location.href = result.url
-      else showSnackbar(t('purchaseError'))
-    } catch { showSnackbar(t('purchaseError')) }
-    finally { setBuyLoading(null) }
-  }, [auth.id, lang, showSnackbar, t])
+      else { showSnackbar(t('purchaseError')); setBuyLoading(null); setConsentProgram(null) }
+    } catch {
+      showSnackbar(t('purchaseError'))
+      setBuyLoading(null)
+      setConsentProgram(null)
+    }
+  }, [consentProgram, auth.id, lang, showSnackbar, t])
 
   if (loading) {
     return (
@@ -1032,6 +1078,16 @@ export default function Programs() {
           t={t} lang={lang} />
       )}
       {tab === 'recipes' && <Recipes />}
+
+      {/* ── Checkout consent gate (3 mandatory checkboxes per BG/EU law) ── */}
+      <CheckoutConsentDialog
+        open={!!consentProgram}
+        onClose={() => setConsentProgram(null)}
+        onConfirm={proceedToStripe}
+        programName={consentProgram ? (lang === 'en' && consentProgram.name_en ? consentProgram.name_en : consentProgram.name_bg) : ''}
+        price={consentProgram ? formatPrice(consentProgram.price_cents, consentProgram.currency, t) : ''}
+        loading={!!buyLoading}
+      />
     </Box>
   )
 }

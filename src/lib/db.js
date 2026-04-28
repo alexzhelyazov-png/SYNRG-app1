@@ -47,12 +47,23 @@ async function sbFetchSafe(url, options) {
 // returns 200 OK with [] — while Range past end returns 416 which would throw
 // and abort the entire syncFresh, breaking XP updates.
 const PAGE_SIZE = 1000
+
+// Tables with column-level access restrictions — anon cannot SELECT *.
+// For these we explicitly list the safe columns to avoid permission errors.
+const SAFE_SELECTS = {
+  clients: 'id,name,calorie_target,protein_target,created_at,is_coach,modules,email,dismissed_badges,synrg_started_at,synrg_quiz,account_type,xp_monthly,xp_total,xp_level,assigned_coach_id',
+}
+function selectColumns(table) {
+  return SAFE_SELECTS[table] || '*'
+}
+
 async function sbFetchPaginated(table, extra = '') {
+  const sel = selectColumns(table)
   // Respect caller's explicit limit — if it's <= PAGE_SIZE just do a single request
   const limitMatch = extra.match(/(?:^|&)limit=(\d+)/)
   const explicitLimit = limitMatch ? parseInt(limitMatch[1], 10) : Infinity
   if (explicitLimit <= PAGE_SIZE) {
-    return (await sbFetch(sbUrl(table, '?select=*' + extra), { headers: sbHeaders(), cache: 'no-store' })) || []
+    return (await sbFetch(sbUrl(table, `?select=${sel}` + extra), { headers: sbHeaders(), cache: 'no-store' })) || []
   }
   // Strip caller's limit — we'll control it per-page via limit/offset
   const extraNoLimit = extra.replace(/(?:^|&)limit=\d+/g, '')
@@ -64,7 +75,7 @@ async function sbFetchPaginated(table, extra = '') {
     const remaining = hardCap - offset
     const pageSize = Math.min(PAGE_SIZE, remaining)
     const page = await sbFetch(
-      sbUrl(table, `?select=*${extraNoLimit}&limit=${pageSize}&offset=${offset}`),
+      sbUrl(table, `?select=${sel}${extraNoLimit}&limit=${pageSize}&offset=${offset}`),
       { headers: sbHeaders(), cache: 'no-store' }
     ) || []
     all.push(...page)

@@ -41,13 +41,15 @@ export default function PrivacyPolicyDialog({ open, onClose }) {
 
       <DialogContent sx={{ pt: 0.5 }}>
         <Typography sx={{ fontSize: '11px', color: C.muted, mb: 2.5 }}>
-          Последна актуализация: Април 2025 г.
+          Последна актуализация: Април 2026 г.
         </Typography>
 
         <SECTION title="1. Администратор на данните">
           <P>
-            Администратор на личните ви данни е <strong style={{ color: C.text }}>SYNRG Beyond Fitness</strong>,
-            достъпен на адрес <strong style={{ color: C.text }}>synrg-beyondfitness.com</strong> и на имейл{' '}
+            Администратор на личните ви данни е{' '}
+            <strong style={{ color: C.text }}>Синерджи 93 ООД</strong>,
+            ЕИК <strong style={{ color: C.text }}>207343690</strong>,
+            достъпно на адрес <strong style={{ color: C.text }}>synrg-beyondfitness.com</strong> и на имейл{' '}
             <strong style={{ color: C.text }}>info@synrg-beyondfitness.com</strong>.
           </P>
         </SECTION>

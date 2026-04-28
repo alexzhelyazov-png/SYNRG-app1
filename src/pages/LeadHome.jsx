@@ -10,12 +10,11 @@
 //      missing — precise, strong, specific result promises that show
 //      SYNRG's unique combo (ментор + програма + trackers + рецепти +
 //      общност — all in one place).
-//   3. Provide a single clear CTA to start SYNRG Метод (routes into the
-//      Programs / Ресурси tab where the purchase flow lives).
-//
-// No studio / online specific content is shown.
+//   3. Provide a single clear CTA to start SYNRG Метод — opens checkout
+//      consent dialog (3 mandatory checkboxes per BG/EU law) → Stripe.
 
-import { Box, Typography, Button, Stack, Chip } from '@mui/material'
+import { useState, useEffect } from 'react'
+import { Box, Typography, Button, Stack, Chip, CircularProgress } from '@mui/material'
 import RestaurantIcon   from '@mui/icons-material/Restaurant'
 import MonitorWeightIcon from '@mui/icons-material/MonitorWeight'
 import DirectionsRunIcon from '@mui/icons-material/DirectionsRun'
@@ -29,17 +28,25 @@ import CalendarMonthIcon from '@mui/icons-material/CalendarMonth'
 import { useApp } from '../context/AppContext'
 import { C } from '../theme'
 import { hasModule } from '../lib/modules'
+import { DB } from '../lib/db'
+import CheckoutConsentDialog from '../components/CheckoutConsentDialog'
+
+// Format price helper — keeps in sync with Programs.jsx
+function formatPrice(cents, currency = 'BGN') {
+  const amount = (cents / 100).toFixed(2).replace(/\.00$/, '')
+  return currency === 'EUR' ? `${amount} EUR` : `${amount} лв`
+}
 
 // ── Result promises — concrete, specific, differentiating ─────────
 const RESULTS_BG = [
-  'Свали до 8 кг устойчиво за 8 седмици',
-  'Изгради режим, който остава за цял живот',
+  'Изграждане на устойчив режим за 8 седмици',
+  'Навици, които остават за цял живот',
   'Личен ментор — не бот, реален човек',
   'Сила и стойка, които усещаш всеки ден',
 ]
 const RESULTS_EN = [
-  'Lose up to 8 kg sustainably in 8 weeks',
-  'Build a routine that stays for life',
+  'Build a sustainable routine in 8 weeks',
+  'Habits that stay for life',
   'A real human mentor — not a bot',
   'Strength and posture you feel daily',
 ]
@@ -63,10 +70,64 @@ const FEATURES_EN = [
 ]
 
 export default function LeadHome() {
-  const { auth, setView, lang, t } = useApp()
+  const { auth, setView, lang, t, showSnackbar } = useApp()
   const modules = auth?.modules || []
   const results  = lang === 'en' ? RESULTS_EN  : RESULTS_BG
   const features = lang === 'en' ? FEATURES_EN : FEATURES_BG
+
+  // ── Load SYNRG Метод program from DB (first active program) ─────
+  const [program, setProgram]     = useState(null)
+  const [consentOpen, setConsentOpen] = useState(false)
+  const [buyLoading, setBuyLoading]   = useState(false)
+
+  useEffect(() => {
+    let alive = true
+    ;(async () => {
+      try {
+        const progs = await DB.getPrograms('active')
+        if (!alive) return
+        // Pick the first active program (SYNRG Метод). If multiple, lowest display_order.
+        if (progs && progs.length > 0) setProgram(progs[0])
+      } catch {
+        // silent fail — fallback to default price label below
+      }
+    })()
+    return () => { alive = false }
+  }, [])
+
+  // ── Checkout flow: open consent → on confirm → Stripe ───────────
+  const openConsent = () => {
+    if (!program?.stripe_price_id) {
+      // Program not loaded yet, or Stripe price missing → fallback to programs view
+      setView('programs')
+      return
+    }
+    setConsentOpen(true)
+  }
+
+  const proceedToStripe = async () => {
+    if (!program?.stripe_price_id) return
+    setBuyLoading(true)
+    try {
+      const baseUrl = window.location.origin + window.location.pathname
+      const result = await DB.createCheckoutSession(
+        program.id, auth.id, program.stripe_price_id,
+        `${baseUrl}?purchase=success&program_id=${program.id}#/programs`,
+        `${baseUrl}#/`, lang,
+      )
+      if (result?.url) {
+        window.location.href = result.url
+      } else {
+        if (showSnackbar) showSnackbar(t('purchaseError') || 'Грешка при плащане')
+        setBuyLoading(false)
+        setConsentOpen(false)
+      }
+    } catch {
+      if (showSnackbar) showSnackbar(t('purchaseError') || 'Грешка при плащане')
+      setBuyLoading(false)
+      setConsentOpen(false)
+    }
+  }
 
   const heroTitle      = lang === 'en' ? '8 weeks to transform your body and routine' : '8 седмици да променим тялото и режима ти'
   const heroOverline   = 'SYNRG МЕТОД'
@@ -74,17 +135,20 @@ export default function LeadHome() {
     ? 'The only platform in Bulgaria that combines a mentor, a structured program, trackers, recipes and a community — all in one place.'
     : 'Единствената платформа в България с ментор, структурирана програма, трекери, рецепти и общност — всичко на едно място.'
   const ctaLabel       = lang === 'en' ? 'Start SYNRG Method'  : 'Започни SYNRG Метод'
-  const priceLabel     = lang === 'en' ? '199 BGN · one-time · 8 weeks' : '199 лв · еднократно · 8 седмици'
+  // Dynamic price label — falls back to 397 лв if program hasn't loaded yet
+  const priceFromDb    = program ? formatPrice(program.price_cents, program.currency) : '397 лв'
+  const priceLabel     = lang === 'en'
+    ? `${priceFromDb} · one-time · 8 weeks`
+    : `${priceFromDb} · еднократно · 8 седмици`
   const trackersTitle  = lang === 'en' ? 'Your free trackers' : 'Безплатните ти трекери'
   const whatYouGetLabel= lang === 'en' ? "What you get with SYNRG Method" : 'Какво получаваш със SYNRG Метод'
   const resultsTitle   = lang === 'en' ? 'What you can expect' : 'Какво можеш да очакваш'
+  const programName    = program ? (lang === 'en' && program.name_en ? program.name_en : program.name_bg) : 'SYNRG Метод'
 
   const firstName = (auth?.name || '').split(' ')[0]
   const greeting  = lang === 'en'
     ? (firstName ? `Hey, ${firstName}.` : 'Hey.')
     : (firstName ? `Здравей, ${firstName}.` : 'Здравей.')
-
-  const goToPrograms = () => setView('programs')
 
   const trackers = [
     { key: 'food',   Icon: RestaurantIcon,    label: t('navFood')   || 'Храна',   view: 'food',   module: 'nutrition_tracking' },
@@ -158,9 +222,12 @@ export default function LeadHome() {
 
         <Stack direction="row" spacing={1.5} alignItems="center" flexWrap="wrap" useFlexGap>
           <Button
-            onClick={goToPrograms}
+            onClick={openConsent}
+            disabled={buyLoading}
             variant="contained"
-            endIcon={<ArrowForwardIcon />}
+            endIcon={buyLoading
+              ? <CircularProgress size={16} sx={{ color: '#0A0A14' }} />
+              : <ArrowForwardIcon />}
             sx={{
               background: C.purple,
               color: '#0A0A14',
@@ -332,9 +399,12 @@ export default function LeadHome() {
 
       {/* ── Final CTA (sticky feel) ─────────────────────── */}
       <Button
-        onClick={goToPrograms}
+        onClick={openConsent}
+        disabled={buyLoading}
         variant="outlined"
-        endIcon={<ArrowForwardIcon />}
+        endIcon={buyLoading
+          ? <CircularProgress size={16} sx={{ color: C.purple }} />
+          : <ArrowForwardIcon />}
         sx={{
           alignSelf: 'stretch',
           borderColor: C.purpleA20,
@@ -364,9 +434,34 @@ export default function LeadHome() {
         mt: 0.5,
       }}>
         {lang === 'en'
-          ? 'SYNRG is an educational method for healthy habits. It is not a medical service and does not replace consultation with a physician.'
-          : 'SYNRG е образователен метод за здравословни навици. Не е медицинска услуга и не замества консултация с лекар.'}
+          ? 'SYNRG is an educational method for healthy habits. It is not a medical service and does not replace consultation with a physician. Individual results may vary.'
+          : 'SYNRG е образователен метод за здравословни навици. Не е медицинска услуга и не замества консултация с лекар. Индивидуалните резултати може да варират.'}
       </Typography>
+
+      {/* ── Company info (mandatory per ЗЕТ Чл. 4) ─────── */}
+      <Typography sx={{
+        fontSize: '10px',
+        color: C.muted,
+        opacity: 0.45,
+        textAlign: 'center',
+        lineHeight: 1.55,
+        px: 2,
+        mt: 0.5,
+      }}>
+        {lang === 'en'
+          ? 'Sinerji 93 Ltd. · UIC 207343690 · info@synrg-beyondfitness.com · Supervisory authority: Consumer Protection Commission, kzp.bg, 0700 111 22'
+          : 'Синерджи 93 ООД · ЕИК 207343690 · info@synrg-beyondfitness.com · Надзорен орган: Комисия за защита на потребителите, kzp.bg, 0700 111 22'}
+      </Typography>
+
+      {/* ── Checkout consent gate (Чл. 57 т. 12 ЗЗП + Terms + Health) ── */}
+      <CheckoutConsentDialog
+        open={consentOpen}
+        onClose={() => { if (!buyLoading) setConsentOpen(false) }}
+        onConfirm={proceedToStripe}
+        programName={programName}
+        price={priceFromDb}
+        loading={buyLoading}
+      />
     </Box>
   )
 }

@@ -163,7 +163,8 @@ export function AppProvider({ children }) {
         DB.getAllPastBookings().catch(() => []),
       ])
 
-      setCoaches(rawCoaches.map(c => ({ name: c.name, password: c.password, id: c.id })))
+      // Note: password fields no longer loaded into client state — auth handled via auth-login Edge Function
+      setCoaches(rawCoaches.map(c => ({ name: c.name, id: c.id })))
       if (rawCoaches.length) setSelCoach(sc => sc || rawCoaches[0].name)
 
       // Check localStorage for any meals that were pending when the app was killed
@@ -198,7 +199,6 @@ export function AppProvider({ children }) {
         return {
         id:             c.id,
         name:           c.name,
-        password:       c.password,
         email:          c.email || null,
         created_at:     c.created_at || null,
         is_coach:       c.is_coach || false,
@@ -495,40 +495,68 @@ export function AppProvider({ children }) {
   }, [auth.isLoggedIn, auth.role])
 
   // ── Auth ──────────────────────────────────────────────────────
+  // Server-side bcrypt verification via auth-login Edge Function.
+  // Replaces client-side password comparison (which exposed plaintext via anon key).
   async function handleLogin(name, pass) {
-    // Try coaches first
-    const coach = coaches.find(c => c.name.toLowerCase() === name.toLowerCase() && c.password === pass)
-    if (coach) {
-      const a = { isLoggedIn: true, role: 'coach', name: coach.name, id: coach.id }
+    const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL
+    const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_KEY
+    let result
+    try {
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/auth-login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${SUPABASE_KEY}` },
+        body: JSON.stringify({ name: name.trim(), password: pass }),
+      })
+      result = await res.json()
+      if (!res.ok || !result.ok) return t('errLogin')
+    } catch {
+      return t('errLogin')
+    }
+
+    const c = result.client
+    if (c.is_coach) {
+      const a = { isLoggedIn: true, role: 'coach', name: c.name, id: c.id }
       setAuth(a)
       localStorage.setItem('synrg_auth', JSON.stringify(a))
-      setSelCoach(coach.name)
+      setSelCoach(c.name)
       setViewingCoach(null)
       return null
     }
-    // Try clients (only non-coach profiles)
-    const c = clients.find(c => !c.is_coach && c.name.toLowerCase() === name.toLowerCase() && c.password === pass)
-    if (c) {
-      const i = clients.findIndex(x => x.name === c.name)
-      setSelIdx(i)
-      localStorage.setItem('synrg_selidx', String(i))
-      const a = { isLoggedIn: true, role: 'client', name: c.name, id: c.id, modules: c.modules || [] }
-      setAuth(a)
-      localStorage.setItem('synrg_auth', JSON.stringify(a))
-      return null
+    // Client login
+    const idx = clients.findIndex(x => x.id === c.id)
+    if (idx >= 0) {
+      setSelIdx(idx)
+      localStorage.setItem('synrg_selidx', String(idx))
     }
-    return t('errLogin')
+    const a = { isLoggedIn: true, role: 'client', name: c.name, id: c.id, modules: c.modules || [] }
+    setAuth(a)
+    localStorage.setItem('synrg_auth', JSON.stringify(a))
+    return null
   }
 
   async function handleRegisterClient(name, pass, email = null) {
-    const exists = clients.find(c => !c.is_coach && c.name.toLowerCase() === name.toLowerCase())
-    if (exists) return t('errClientExists')
+    const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL
+    const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_KEY
     const FREE_MODULES = ['nutrition_tracking', 'weight_tracking', 'steps_tracking']
-    const row = { name, password: pass, calorie_target: 2000, protein_target: 140, is_coach: false, modules: FREE_MODULES }
-    if (email) row.email = email
-    const data = await DB.insert('clients', row)
+
+    let result
+    try {
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/auth-register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${SUPABASE_KEY}` },
+        body: JSON.stringify({ name: name.trim(), password: pass, email }),
+      })
+      result = await res.json()
+      if (res.status === 409) return t('errClientExists')
+      if (!res.ok || !result.ok) return result.error || t('errLogin')
+    } catch {
+      return t('errLogin')
+    }
+
+    const data = result.client
     const newClient = {
-      id: data.id, name, password: pass, is_coach: false,
+      id: data.id, name, is_coach: false,
+      email: email || null,
       calorieTarget: 2000, proteinTarget: 140, modules: FREE_MODULES,
       meals: [], workouts: [], weightLogs: [], tasks: [], reactions: [],
       reminderSettings: { protein: true, weight: true, foodLog: true, coach: true },

@@ -8,25 +8,82 @@
  * - Total calories and protein for the estimated portion
  */
 
-const CORS_HEADERS = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-};
+const ALLOWED_ORIGINS = [
+  "https://synrg-beyondfitness.com",
+  "https://aleksandarzhelyazov.github.io",
+  "http://localhost:5173",
+  "http://localhost:3000",
+];
+function corsHeaders(origin: string | null) {
+  const allowed = origin && ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
+  return {
+    "Access-Control-Allow-Origin": allowed,
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Vary": "Origin",
+  };
+}
+
+// Daily quota per client. Prevents bot abuse / accidental spam = cost overrun.
+const DAILY_QUOTA = 30;
+
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
+async function checkAndIncrementQuota(clientId: string): Promise<{ allowed: boolean; count: number }> {
+  const today = new Date().toISOString().slice(0, 10);
+  // Atomic upsert + increment via PostgREST
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/incr_food_quota`, {
+    method: "POST",
+    headers: {
+      apikey: SUPABASE_SERVICE_KEY,
+      Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ p_client_id: clientId, p_date: today }),
+  });
+  if (!res.ok) {
+    console.warn("Quota check failed (allowing through):", await res.text());
+    return { allowed: true, count: 0 };
+  }
+  const newCount = await res.json();
+  return { allowed: newCount <= DAILY_QUOTA, count: newCount };
+}
 
 Deno.serve(async (req: Request) => {
+  const origin = req.headers.get("origin");
+  const cors = corsHeaders(origin);
+  const CORS_HEADERS = cors;
+
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: CORS_HEADERS });
   }
 
   try {
-    const { image } = await req.json();
+    const { image, client_id } = await req.json();
     if (!image) {
       return new Response(
         JSON.stringify({ error: "No image provided" }),
         { status: 400, headers: { ...CORS_HEADERS, "Content-Type": "application/json" } }
       );
+    }
+
+    // Quota enforcement (graceful — allow if no client_id for backward compat, log it)
+    if (client_id) {
+      const quota = await checkAndIncrementQuota(client_id);
+      if (!quota.allowed) {
+        return new Response(
+          JSON.stringify({
+            error: "quota_exceeded",
+            message: `Дневният лимит за разпознаване на храна (${DAILY_QUOTA}) е достигнат. Опитай отново утре.`,
+            count: quota.count,
+            limit: DAILY_QUOTA,
+          }),
+          { status: 429, headers: { ...CORS_HEADERS, "Content-Type": "application/json" } }
+        );
+      }
+    } else {
+      console.warn("food-recognize called without client_id");
     }
 
     const apiKey = Deno.env.get("GEMINI_API_KEY");
