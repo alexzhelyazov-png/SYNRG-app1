@@ -1547,9 +1547,36 @@ export function AppProvider({ children }) {
     const cl = client
     if (!cl?.id) return
     const key = monthKey ? `${badgeId}:${monthKey}` : badgeId
-    const updated = [...(cl.dismissedBadges || []), key]
-    await DB.update('clients', cl.id, { dismissed_badges: updated })
-    setClients(prev => prev.map(c => c.id === cl.id ? { ...c, dismissedBadges: updated } : c))
+    // Read FRESH dismissedBadges via functional setClients to avoid closure races
+    // (e.g., when called multiple times in a tight loop, each call would otherwise
+    //  overwrite the previous one with stale state)
+    let updated
+    setClients(prev => prev.map(c => {
+      if (c.id !== cl.id) return c
+      updated = [...new Set([...(c.dismissedBadges || []), key])]
+      return { ...c, dismissedBadges: updated }
+    }))
+    if (updated) {
+      try { await DB.update('clients', cl.id, { dismissed_badges: updated }) }
+      catch (e) { console.warn('dismissBadge persist failed:', e) }
+    }
+  }
+
+  // Bulk-dismiss multiple badges in ONE DB call (used for PR celebrations
+  // where 0,5,10 kg milestones all unlock at once).
+  async function dismissBadgesBulk(keys) {
+    const cl = client
+    if (!cl?.id || !keys || keys.length === 0) return
+    let merged
+    setClients(prev => prev.map(c => {
+      if (c.id !== cl.id) return c
+      merged = [...new Set([...(c.dismissedBadges || []), ...keys])]
+      return { ...c, dismissedBadges: merged }
+    }))
+    if (merged) {
+      try { await DB.update('clients', cl.id, { dismissed_badges: merged }) }
+      catch (e) { console.warn('dismissBadgesBulk persist failed:', e) }
+    }
   }
 
   const value = {
@@ -1623,6 +1650,7 @@ export function AppProvider({ children }) {
     updateReminderSettings,
     updateClientModules,
     dismissBadge,
+    dismissBadgesBulk,
     synrgHabits, setSynrgHabits,
     // Coach chat
     coachMessages, coachMsgsLoaded, unreadCoachMsgCount,

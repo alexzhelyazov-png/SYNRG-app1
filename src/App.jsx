@@ -122,7 +122,7 @@ function PageTransition({ children, viewKey }) {
 
 // ── Global badge + level-up watcher ──────────────────────────────
 function BadgeUnlockWatcher() {
-  const { client, t, lang, dismissBadge } = useApp()
+  const { client, t, lang, dismissBadge, dismissBadgesBulk } = useApp()
   const [unlockedBadge, setUnlockedBadge] = useState(null)
   const [levelUpInfo, setLevelUpInfo]     = useState(null)
   const prevEarnedRef  = useRef(null)
@@ -180,13 +180,14 @@ function BadgeUnlockWatcher() {
 
   useEffect(() => {
     if (!prCelebration) return
-    const timer = setTimeout(async () => {
-      // Dismiss ALL milestones up to and including the shown one (prevent cascade)
-      for (const m of (prCelebration.allMilestones || [{ v: prCelebration.value }])) {
-        await dismissBadge(prCelebration.exercise.id, String(m.v))
-      }
-      setPrCelebration(null)
-    }, 4000)
+    // Dismiss ALL milestones IMMEDIATELY when celebration shows.
+    // This prevents the banner from re-appearing if user closes the app
+    // before the auto-dismiss timer fires (PWA timers pause when backgrounded).
+    const keys = (prCelebration.allMilestones || [{ v: prCelebration.value }])
+      .map(m => `${prCelebration.exercise.id}:${m.v}`)
+    dismissBadgesBulk(keys).catch(e => console.warn('PR dismiss failed:', e))
+    // Hide visually after 4s
+    const timer = setTimeout(() => setPrCelebration(null), 4000)
     return () => clearTimeout(timer)
   }, [prCelebration])
 
@@ -220,7 +221,7 @@ function BadgeUnlockWatcher() {
         }} />
       )}
       {prCelebration && (
-        <Box onClick={async () => { await dismissBadge(prCelebration.exercise.id, String(prCelebration.value)); setPrCelebration(null) }}
+        <Box onClick={() => setPrCelebration(null)}
           sx={{
             position: 'fixed', inset: 0, zIndex: 1500,
             display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
