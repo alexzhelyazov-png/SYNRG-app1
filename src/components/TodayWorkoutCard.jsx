@@ -156,11 +156,22 @@ function buildSteps(workout) {
   const steps = []
   for (let r = 0; r < rounds; r++) {
     exercises.forEach((ex, exIdx) => {
-      steps.push({ kind: 'work', round: r + 1, exIdx, ex, sec: work_sec })
+      // Side 1 (or the only side for non-unilateral exercises)
+      steps.push({
+        kind: 'work', round: r + 1, exIdx, ex, sec: work_sec,
+        side: ex.pair_with ? 'left' : null,
+      })
+      // If unilateral, run the mirror side immediately — no rest between
+      if (ex.pair_with) {
+        steps.push({
+          kind: 'work', round: r + 1, exIdx, ex: ex.pair_with, sec: work_sec,
+          side: 'right',
+        })
+      }
       const isLastEx = exIdx === exercises.length - 1
       if (!isLastEx) {
-        const next = exercises[exIdx + 1]
-        steps.push({ kind: 'rest', round: r + 1, exIdx, ex: next, sec: rest_sec })
+        const nextEx = exercises[exIdx + 1]
+        steps.push({ kind: 'rest', round: r + 1, exIdx, ex: nextEx, sec: rest_sec })
       }
     })
     if (r < rounds - 1) {
@@ -253,7 +264,8 @@ function WorkoutPlayer({ workout, onClose }) {
   const isWork = step.kind === 'work'
   const isRoundRest = step.kind === 'round-rest'
   const colorAccent = isWork ? C.primary : C.logan
-  const stateLabel = isWork ? 'WORK' : isRoundRest ? 'ПОЧИВКА МЕЖДУ РУНДИ' : 'REST'
+  const sideLabel = step.side === 'left' ? ' · ЛЯВА СТРАНА' : step.side === 'right' ? ' · ДЯСНА СТРАНА' : ''
+  const stateLabel = isWork ? `WORK${sideLabel}` : isRoundRest ? 'ПОЧИВКА МЕЖДУ РУНДИ' : 'REST'
   const ex = step.ex
   const stepProgress = step.sec > 0 ? ((step.sec - secLeft) / step.sec) * 100 : 0
 
@@ -407,13 +419,14 @@ function PrepScreen({ workout, onStart, onClose }) {
                   fontSize: 11, fontWeight: 700, color: C.primary, letterSpacing: 1, textTransform: 'uppercase',
                 }}>
                   {String(i + 1).padStart(2, '0')} · {ex.category || 'full'}
+                  {ex.pair_with ? ' · 2 страни' : ''}
                 </Typography>
                 <Typography sx={{
                   fontSize: 15, fontWeight: 700, fontStyle: 'italic',
                   fontFamily: "'MontBlanc', sans-serif", color: C.text, lineHeight: 1.2,
                   overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                 }}>
-                  {ex.name_bg}
+                  {ex.pair_with ? ex.name_bg.replace(/\s*\((ляв|десен)\)\s*$/i, '').trim() : ex.name_bg}
                 </Typography>
               </Box>
             </Box>

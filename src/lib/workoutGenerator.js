@@ -28,6 +28,18 @@ function bucketFor(ex) {
   return 'full'
 }
 
+// Unilateral pair detection — slugs end in "-l" or "-r" for the two sides.
+const SIDE_RE = /-(l|r)$/i
+function pairKey(ex) {
+  return (ex.slug || '').replace(SIDE_RE, '')
+}
+function mirrorSlug(ex) {
+  if (!SIDE_RE.test(ex.slug || '')) return null
+  return ex.slug.endsWith('-l')
+    ? ex.slug.replace(/-l$/, '-r')
+    : ex.slug.replace(/-r$/, '-l')
+}
+
 function seededShuffle(arr, seed) {
   const out = arr.slice()
   let h = 2166136261 >>> 0
@@ -89,6 +101,9 @@ export function generateDailyWorkout({ library, clientId, dayIndex, difficulty =
   const seed = `${clientId || 'anon'}|${dayIndex}|circuit|v2`
 
   const buckets = buildBuckets(library, cap)
+  // Index for fast mirror lookup
+  const bySlug = new Map(library.map(ex => [ex.slug, ex]))
+
   // For each slot in the round, prepare a shuffled queue from the
   // matching bucket. Slots fall back to "full" when the chosen bucket
   // is empty (e.g. early on with very small libraries).
@@ -97,31 +112,49 @@ export function generateDailyWorkout({ library, clientId, dayIndex, difficulty =
     return seededShuffle(pool, `${seed}|slot${slotIdx}|${bucket}`)
   })
 
-  // Pick one exercise per slot (no within-round repeats; queue them so
-  // future rounds can pick a different sibling if the pool is large).
-  const taken = new Set()
+  // Pick one exercise per slot. Dedup by pairKey() so we never end up
+  // with both sides of the same unilateral exercise as separate slots.
+  const takenIds = new Set()
+  const takenPairs = new Set()
   const picks = slotPools.map((pool, slotIdx) => {
-    const candidate = pool.find(ex => !taken.has(ex.id))
+    const candidate = pool.find(ex => !takenIds.has(ex.id) && !takenPairs.has(pairKey(ex)))
     const chosen = candidate || pool[slotIdx % pool.length] || null
-    if (chosen) taken.add(chosen.id)
+    if (chosen) {
+      takenIds.add(chosen.id)
+      takenPairs.add(pairKey(chosen))
+    }
     return chosen
   }).filter(Boolean)
 
-  // If for some reason the library is too small, top-up by sampling at
-  // random until we have EXERCISES_PER_R unique exercises.
+  // Top-up if library was too small for the bucket selection above.
   if (picks.length < EXERCISES_PER_R) {
-    const remainder = seededShuffle(library.filter(ex => !taken.has(ex.id) && (ex.difficulty || 1) <= cap), seed + '|fill')
+    const remainder = seededShuffle(
+      library.filter(ex => !takenIds.has(ex.id) && !takenPairs.has(pairKey(ex)) && (ex.difficulty || 1) <= cap),
+      seed + '|fill'
+    )
     for (const ex of remainder) {
       if (picks.length >= EXERCISES_PER_R) break
-      picks.push(ex); taken.add(ex.id)
+      picks.push(ex); takenIds.add(ex.id); takenPairs.add(pairKey(ex))
     }
   }
 
-  const exercises = picks.map(ex => withProgression(ex, dayIndex))
+  // Enrich: for unilateral exercises (-l/-r slug suffix), attach the
+  // mirror side so the player can run both sides back-to-back without
+  // a rest between sides.
+  const exercises = picks.map(ex => {
+    const out = withProgression(ex, dayIndex)
+    const mSlug = mirrorSlug(ex)
+    if (mSlug && bySlug.has(mSlug)) {
+      out.pair_with = withProgression(bySlug.get(mSlug), dayIndex)
+    }
+    return out
+  })
 
-  // Total work time:  rounds × ((work + rest) per ex × N - rest after last) + roundRest × (rounds-1)
-  const perRoundSec   = (WORK_SEC + REST_SEC) * exercises.length - REST_SEC
-  const totalSec      = perRoundSec * ROUND_COUNT + ROUND_REST_SEC * (ROUND_COUNT - 1)
+  // Total work time. Unilateral exercises run BOTH sides per slot
+  // (no rest between sides), so they cost 2 × WORK_SEC instead of 1.
+  const slotWorkSecs = exercises.map(ex => ex.pair_with ? 2 * WORK_SEC : WORK_SEC)
+  const perRoundSec  = slotWorkSecs.reduce((a,b) => a + b, 0) + REST_SEC * (exercises.length - 1)
+  const totalSec     = perRoundSec * ROUND_COUNT + ROUND_REST_SEC * (ROUND_COUNT - 1)
 
   const sections = [{
     type: 'main',
