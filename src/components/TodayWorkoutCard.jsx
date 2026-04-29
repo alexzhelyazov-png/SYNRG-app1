@@ -116,7 +116,7 @@ export default function TodayWorkoutCard({ clientId, programStartedAt, difficult
           fontSize: 22, fontWeight: 700, fontStyle: 'italic', color: C.text,
           fontFamily: "'MontBlanc', sans-serif", lineHeight: 1.1, mb: 0.75,
         }}>
-          Кръгова · {workout.focus}
+          Тренировка {workout.workoutNumber} от {workout.curriculumSize || 20}
         </Typography>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1.5, color: C.muted, flexWrap: 'wrap' }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
@@ -152,22 +152,32 @@ export default function TodayWorkoutCard({ clientId, programStartedAt, difficult
 // Build a flat sequence of steps so the runtime is simple.
 function buildSteps(workout) {
   const main = workout.sections[0]
-  const { exercises, rounds, work_sec, rest_sec, round_rest_sec } = main
+  const { exercises, rounds, rest_sec, round_rest_sec } = main
   const steps = []
   for (let r = 0; r < rounds; r++) {
     exercises.forEach((ex, exIdx) => {
-      // Side 1 (or the only side for non-unilateral exercises)
+      const sec = ex.prescribed || 30
+      const hasTwoSides = !!(ex.pair_with || ex.both_sides)
+
+      // First side (or the only side for non-unilateral exercises)
       steps.push({
-        kind: 'work', round: r + 1, exIdx, ex, sec: work_sec,
-        side: ex.pair_with ? 'left' : null,
+        kind: 'work', round: r + 1, exIdx, ex, sec,
+        side: hasTwoSides ? 'left' : null,
       })
-      // If unilateral, run the mirror side immediately — no rest between
+
+      // Second side: mirrored exercise (pair_with) or same video again (both_sides)
       if (ex.pair_with) {
         steps.push({
-          kind: 'work', round: r + 1, exIdx, ex: ex.pair_with, sec: work_sec,
+          kind: 'work', round: r + 1, exIdx, ex: ex.pair_with, sec,
+          side: 'right',
+        })
+      } else if (ex.both_sides) {
+        steps.push({
+          kind: 'work', round: r + 1, exIdx, ex, sec,
           side: 'right',
         })
       }
+
       const isLastEx = exIdx === exercises.length - 1
       if (!isLastEx) {
         const nextEx = exercises[exIdx + 1]
@@ -391,10 +401,10 @@ function PrepScreen({ workout, onStart, onClose }) {
           fontSize: 28, fontWeight: 800, fontStyle: 'italic',
           fontFamily: "'MontBlanc', sans-serif", color: C.text, lineHeight: 1.05, mb: 1,
         }}>
-          Кръгова тренировка
+          Тренировка {workout.workoutNumber} от {workout.curriculumSize || 20}
         </Typography>
         <Typography sx={{ fontSize: 13, color: C.muted, mb: 2.5 }}>
-          {main.rounds} рунда × {main.exercises.length} упражнения · {workout.totalMinutes} мин общо · {WORKOUT_TIMING.WORK_SEC} сек работа / {WORKOUT_TIMING.REST_SEC} сек почивка
+          {main.rounds} рунда × {main.exercises.length} упражнения · {workout.totalMinutes} мин общо · {WORKOUT_TIMING.REST_SEC} сек смяна / {WORKOUT_TIMING.ROUND_REST_SEC} сек почивка между рундите
         </Typography>
 
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.25, mb: 3 }}>
@@ -418,15 +428,17 @@ function PrepScreen({ workout, onStart, onClose }) {
                 <Typography sx={{
                   fontSize: 11, fontWeight: 700, color: C.primary, letterSpacing: 1, textTransform: 'uppercase',
                 }}>
-                  {String(i + 1).padStart(2, '0')} · {ex.category || 'full'}
-                  {ex.pair_with ? ' · 2 страни' : ''}
+                  {String(i + 1).padStart(2, '0')} · {ex.prescribed} сек
+                  {(ex.pair_with || ex.both_sides) ? ' / страна' : ''}
                 </Typography>
                 <Typography sx={{
                   fontSize: 15, fontWeight: 700, fontStyle: 'italic',
                   fontFamily: "'MontBlanc', sans-serif", color: C.text, lineHeight: 1.2,
                   overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                 }}>
-                  {ex.pair_with ? ex.name_bg.replace(/\s*\((ляв|десен)\)\s*$/i, '').trim() : ex.name_bg}
+                  {(ex.pair_with || ex.both_sides)
+                    ? ex.name_bg.replace(/\s*\((ляв|десен)\)\s*$/i, '').trim()
+                    : ex.name_bg}
                 </Typography>
               </Box>
             </Box>

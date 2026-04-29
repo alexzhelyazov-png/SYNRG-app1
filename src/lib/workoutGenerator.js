@@ -1,177 +1,103 @@
 // ── Workout Generator ─────────────────────────────────────────────
-// Single-section circuit workout assembler.
+// Picks today's workout from a fixed Level 1 curriculum (20 workouts,
+// rotating by day index).  Level 2 / Level 3 curricula will plug into
+// the same shape later via the difficulty parameter.
 //
-// Design (per founder spec):
-//   • 25-30 min total work time, no warmup, no separate finisher
-//   • Circular format — N rounds × 5 exercises
-//   • Each exercise hits a different body region so a full round trains
-//     the whole body. Rotation per round picks the same slot from each
-//     "bucket" so you don't redo the same muscle group back-to-back.
-//   • Rounds: 4 (≈ 25 min with 40s work / 15s rest / 60s round-rest)
-//   • Difficulty 1-3 from quiz; tier widens by +1 every 14 days.
-//   • Deterministic per (clientId, day) so reloads stay consistent.
+// Each workout is 3 rounds, ~25-30 minutes total. Per-exercise duration
+// comes from the curriculum entry (varies between 25-40 sec). Rest
+// between exercises is 12 s; rest between rounds is 45 s.
 
-const ROUND_COUNT     = 4
-const EXERCISES_PER_R = 5
-const WORK_SEC        = 40   // boomerang loop drives the rep target
-const REST_SEC        = 15   // between exercises within a round
-const ROUND_REST_SEC  = 60   // between full rounds
-
-// ── Body buckets (so each round trains the whole body) ──────────────
-// Order matters → slot 0 of every round comes from BUCKET_ORDER[0], etc.
-const BUCKET_ORDER = ['lower', 'upper', 'core', 'cardio', 'full']
-
-// Map exercise.category → bucket (with fallback so nothing is dropped).
-function bucketFor(ex) {
-  const c = (ex.category || '').toLowerCase()
-  if (c === 'lower' || c === 'upper' || c === 'core' || c === 'cardio' || c === 'full') return c
-  return 'full'
-}
+import { LEVEL_1_CURRICULUM, LEVEL_1_CONFIG } from './levelOneCurriculum'
 
 // Unilateral pair detection — slugs end in "-l" or "-r" for the two sides.
 const SIDE_RE = /-(l|r)$/i
-function pairKey(ex) {
-  return (ex.slug || '').replace(SIDE_RE, '')
-}
-function mirrorSlug(ex) {
-  if (!SIDE_RE.test(ex.slug || '')) return null
-  return ex.slug.endsWith('-l')
-    ? ex.slug.replace(/-l$/, '-r')
-    : ex.slug.replace(/-r$/, '-l')
-}
-
-function seededShuffle(arr, seed) {
-  const out = arr.slice()
-  let h = 2166136261 >>> 0
-  for (let i = 0; i < seed.length; i++) {
-    h ^= seed.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0
-  }
-  function rng() {
-    h = Math.imul(h ^ (h >>> 15), 2246822507) >>> 0
-    h = Math.imul(h ^ (h >>> 13), 3266489909) >>> 0
-    return ((h ^= h >>> 16) >>> 0) / 4294967296
-  }
-  for (let i = out.length - 1; i > 0; i--) {
-    const j = Math.floor(rng() * (i + 1))
-    ;[out[i], out[j]] = [out[j], out[i]]
-  }
-  return out
-}
-
-function progressionMultiplier(dayIndex) {
-  // +10 % every 7 days, capped at +30 %
-  const weeks = Math.min(3, Math.floor(dayIndex / 7))
-  return 1 + 0.1 * weeks
-}
-
-function withProgression(exercise, dayIndex) {
-  const mult = progressionMultiplier(dayIndex)
-  if (exercise.default_reps) {
-    return { ...exercise, prescribed: Math.round(exercise.default_reps * mult), prescribedType: 'reps' }
-  }
-  if (exercise.default_sec) {
-    return { ...exercise, prescribed: Math.round(exercise.default_sec * mult), prescribedType: 'sec' }
-  }
-  // Default to a 40-second AMRAP if the library row didn't specify either
-  return { ...exercise, prescribed: WORK_SEC, prescribedType: 'sec' }
-}
-
-// Group exercises into body buckets honouring the difficulty cap.
-function buildBuckets(library, cap) {
-  const buckets = { lower: [], upper: [], core: [], cardio: [], full: [] }
-  for (const ex of library) {
-    if ((ex.difficulty || 1) > cap) continue
-    buckets[bucketFor(ex)].push(ex)
-  }
-  return buckets
+function mirrorSlug(slug) {
+  if (!SIDE_RE.test(slug || '')) return null
+  return slug.endsWith('-l')
+    ? slug.replace(/-l$/, '-r')
+    : slug.replace(/-r$/, '-l')
 }
 
 /**
- * Build today's workout — single circuit, 25-30 min, whole body.
+ * Build today's workout from the Level 1 curriculum.
  * @param {object} args
- * @param {Array}  args.library  - rows from exercise_library
- * @param {string} args.clientId - used as deterministic seed
- * @param {number} args.dayIndex - 0-based day since program start
- * @param {number} args.difficulty - 1..3 (defaults to 1)
+ * @param {Array}  args.library    rows from exercise_library
+ * @param {number} args.dayIndex   0-based day since program start
+ * @param {number} [args.difficulty]  reserved for level 2/3 (defaults 1)
  */
-export function generateDailyWorkout({ library, clientId, dayIndex, difficulty = 1 }) {
+export function generateDailyWorkout({ library, dayIndex, difficulty = 1 }) {
   if (!Array.isArray(library) || library.length === 0) return null
 
-  const cap = Math.min(3, difficulty + Math.floor(dayIndex / 14))
-  const seed = `${clientId || 'anon'}|${dayIndex}|circuit|v2`
+  // Until we have level 2/3 curricula, every difficulty rotates Level 1
+  const curriculum = LEVEL_1_CURRICULUM
+  const cfg = LEVEL_1_CONFIG
+  const idx = ((dayIndex % curriculum.length) + curriculum.length) % curriculum.length
+  const template = curriculum[idx]
+  const workoutNumber = idx + 1
 
-  const buckets = buildBuckets(library, cap)
-  // Index for fast mirror lookup
   const bySlug = new Map(library.map(ex => [ex.slug, ex]))
 
-  // For each slot in the round, prepare a shuffled queue from the
-  // matching bucket. Slots fall back to "full" when the chosen bucket
-  // is empty (e.g. early on with very small libraries).
-  const slotPools = BUCKET_ORDER.slice(0, EXERCISES_PER_R).map((bucket, slotIdx) => {
-    const pool = buckets[bucket]?.length ? buckets[bucket] : buckets.full
-    return seededShuffle(pool, `${seed}|slot${slotIdx}|${bucket}`)
-  })
+  // Resolve each curriculum entry to a real library row.  Skip entries
+  // whose slug isn't in the library (so an admin can iterate without
+  // crashing the runtime).
+  const exercises = template.map(item => {
+    const ex = bySlug.get(item.slug)
+    if (!ex) return null
 
-  // Pick one exercise per slot. Dedup by pairKey() so we never end up
-  // with both sides of the same unilateral exercise as separate slots.
-  const takenIds = new Set()
-  const takenPairs = new Set()
-  const picks = slotPools.map((pool, slotIdx) => {
-    const candidate = pool.find(ex => !takenIds.has(ex.id) && !takenPairs.has(pairKey(ex)))
-    const chosen = candidate || pool[slotIdx % pool.length] || null
-    if (chosen) {
-      takenIds.add(chosen.id)
-      takenPairs.add(pairKey(chosen))
+    const out = {
+      ...ex,
+      prescribed: item.sec,
+      prescribedType: 'sec',
     }
-    return chosen
-  }).filter(Boolean)
 
-  // Top-up if library was too small for the bucket selection above.
-  if (picks.length < EXERCISES_PER_R) {
-    const remainder = seededShuffle(
-      library.filter(ex => !takenIds.has(ex.id) && !takenPairs.has(pairKey(ex)) && (ex.difficulty || 1) <= cap),
-      seed + '|fill'
-    )
-    for (const ex of remainder) {
-      if (picks.length >= EXERCISES_PER_R) break
-      picks.push(ex); takenIds.add(ex.id); takenPairs.add(pairKey(ex))
-    }
-  }
-
-  // Enrich: for unilateral exercises (-l/-r slug suffix), attach the
-  // mirror side so the player can run both sides back-to-back without
-  // a rest between sides.
-  const exercises = picks.map(ex => {
-    const out = withProgression(ex, dayIndex)
-    const mSlug = mirrorSlug(ex)
-    if (mSlug && bySlug.has(mSlug)) {
-      out.pair_with = withProgression(bySlug.get(mSlug), dayIndex)
+    if (item.perSide) {
+      // Same exercise, two sides (single video, user switches sides
+      // between work intervals).
+      out.both_sides = true
+    } else {
+      // Mirror via -l/-r slug (e.g. lunge-l → lunge-r). Both sides run
+      // back-to-back with the same prescribed duration.
+      const mSlug = mirrorSlug(ex.slug)
+      if (mSlug && bySlug.has(mSlug)) {
+        out.pair_with = {
+          ...bySlug.get(mSlug),
+          prescribed: item.sec,
+          prescribedType: 'sec',
+        }
+      }
     }
     return out
-  })
+  }).filter(Boolean)
 
-  // Total work time. Unilateral exercises run BOTH sides per slot
-  // (no rest between sides), so they cost 2 × WORK_SEC instead of 1.
-  const slotWorkSecs = exercises.map(ex => ex.pair_with ? 2 * WORK_SEC : WORK_SEC)
-  const perRoundSec  = slotWorkSecs.reduce((a,b) => a + b, 0) + REST_SEC * (exercises.length - 1)
-  const totalSec     = perRoundSec * ROUND_COUNT + ROUND_REST_SEC * (ROUND_COUNT - 1)
+  if (exercises.length === 0) return null
 
-  const sections = [{
-    type: 'main',
-    title_bg: 'Кръгова тренировка',
-    rounds: ROUND_COUNT,
-    time_cap_sec: totalSec,
-    work_sec: WORK_SEC,
-    rest_sec: REST_SEC,
-    round_rest_sec: ROUND_REST_SEC,
-    exercises,
-  }]
+  // Total time. Unilateral entries (pair_with OR both_sides) cost 2 ×
+  // prescribed seconds; everything else costs 1 ×.
+  const slotWorkSecs = exercises.map(ex =>
+    (ex.pair_with || ex.both_sides) ? 2 * ex.prescribed : ex.prescribed
+  )
+  const perRoundSec = slotWorkSecs.reduce((a, b) => a + b, 0)
+                    + cfg.rest_between_exercises_sec * (exercises.length - 1)
+  const totalSec = perRoundSec * cfg.rounds
+                 + cfg.rest_between_rounds_sec * (cfg.rounds - 1)
 
   return {
     focus: 'Цяло тяло',
     dayIndex,
+    workoutNumber,
+    curriculumSize: curriculum.length,
+    difficulty,
     totalMinutes: Math.round(totalSec / 60),
-    sections,
+    sections: [{
+      type: 'main',
+      title_bg: `Тренировка ${workoutNumber}`,
+      rounds: cfg.rounds,
+      time_cap_sec: totalSec,
+      work_sec: 0, // varies per exercise — read step.sec at runtime
+      rest_sec: cfg.rest_between_exercises_sec,
+      round_rest_sec: cfg.rest_between_rounds_sec,
+      exercises,
+    }],
     rest: false,
   }
 }
@@ -187,9 +113,7 @@ export function formatPrescription(ex) {
 }
 
 export const WORKOUT_TIMING = {
-  WORK_SEC,
-  REST_SEC,
-  ROUND_REST_SEC,
-  ROUND_COUNT,
-  EXERCISES_PER_R,
+  ROUND_COUNT:     LEVEL_1_CONFIG.rounds,
+  REST_SEC:        LEVEL_1_CONFIG.rest_between_exercises_sec,
+  ROUND_REST_SEC:  LEVEL_1_CONFIG.rest_between_rounds_sec,
 }
