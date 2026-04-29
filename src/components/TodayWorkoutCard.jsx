@@ -44,7 +44,7 @@ function fmtMSS(sec) {
   return `${m}:${r.toString().padStart(2, '0')}`
 }
 
-export default function TodayWorkoutCard({ clientId, programStartedAt, difficulty = 1 }) {
+export default function TodayWorkoutCard({ clientId, programStartedAt, difficulty = 1, flat = false }) {
   const [library, setLibrary] = useState(null)
   const [open, setOpen] = useState(false)
   const dayIndex = useMemo(() => daysSince(programStartedAt), [programStartedAt])
@@ -95,17 +95,27 @@ export default function TodayWorkoutCard({ clientId, programStartedAt, difficult
   const main = workout.sections[0]
   const totalExercises = main.exercises.length
 
+  const bannerSx = flat
+    ? {
+        p: 1.25, mb: 0,
+        display: 'flex', alignItems: 'center', gap: 1.5,
+        cursor: 'pointer',
+        background: 'transparent', border: 'none', boxShadow: 'none',
+        '&:hover': { background: 'rgba(196,233,191,0.04)' },
+      }
+    : {
+        ...cardSx,
+        p: 1.25,
+        display: 'flex', alignItems: 'center', gap: 1.5,
+        cursor: 'pointer',
+        transition: 'border-color 200ms ease, transform 200ms ease',
+        '&:hover': { borderColor: C.primary, transform: 'translateY(-1px)' },
+      }
+
   return (
     <>
       <Paper
-        sx={{
-          ...cardSx,
-          p: 1.25,
-          display: 'flex', alignItems: 'center', gap: 1.5,
-          cursor: 'pointer',
-          transition: 'border-color 200ms ease, transform 200ms ease',
-          '&:hover': { borderColor: C.primary, transform: 'translateY(-1px)' },
-        }}
+        sx={bannerSx}
         elevation={0}
         onClick={() => setOpen(true)}
       >

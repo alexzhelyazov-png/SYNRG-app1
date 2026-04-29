@@ -489,21 +489,32 @@ export default function OnlineHome() {
 
       {selected && (
         <>
-          {/* ── ДНЕС — unified daily block (workout + logs + habits) ── */}
+          {/* ── ДНЕС — single visual block: workout + logs + habits ── */}
           <Box data-tour="today" sx={{ mb: 3 }}>
             <Typography sx={{ fontSize: 11, letterSpacing: 1.5, fontWeight: 700, color: C.text, mb: 1.25 }}>
               ДНЕС
             </Typography>
+            <Paper
+              elevation={0}
+              sx={{
+                p: 1, borderRadius: 2.5,
+                border: `1px solid ${C.loganBorder}`,
+                background: `linear-gradient(135deg, rgba(196,233,191,0.04) 0%, rgba(255,255,255,0.02) 100%)`,
+                display: 'flex', flexDirection: 'column',
+              }}
+            >
+              {/* Тренировка днес — flat (no own border, parent owns the frame) */}
+              <TodayWorkoutCard
+                clientId={auth?.id}
+                programStartedAt={state?.started_at}
+                difficulty={1}
+                flat
+              />
 
-            {/* Тренировка днес — compact banner */}
-            <TodayWorkoutCard
-              clientId={auth?.id}
-              programStartedAt={state?.started_at}
-              difficulty={1}
-            />
+              <Box sx={{ height: 1, background: C.border, my: 0.5 }} />
 
-            {/* Daily logs (weight / food / steps) with weekly streak */}
-            <Box data-tour="dailies">
+              {/* Daily logs (weight / food / steps) with weekly streak */}
+              <Box data-tour="dailies" sx={{ p: 0.5 }}>
             <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 1 }}>
               {[
                 { view: 'weight', label: 'тегло',  done: didWeightToday, streak: weeklyStreaks.weight },
@@ -557,41 +568,40 @@ export default function OnlineHome() {
           {/* Behavioural weekly habits (water, no-sugar drinks, etc.) — only those
               without a daily-tracker counterpart so we don't duplicate the log buttons. */}
           {behaviouralHabits.length > 0 && (
-            <Box sx={{ mt: 1.25, display: 'flex', flexDirection: 'column', gap: 0.25 }}>
-              <Typography sx={{
-                fontSize: 10, letterSpacing: 1.4, fontWeight: 700, color: C.logan, mb: 0.25,
-              }}>
-                ОЩЕ ЗА ДНЕС
-              </Typography>
-              {behaviouralHabits.map(task => (
-                <Box
-                  key={task.id}
-                  onClick={() => setTaskDialog(task)}
-                  sx={{
-                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                    gap: 1, py: 0.65, px: 1, mx: -1, borderRadius: 1.5,
-                    cursor: 'pointer', transition: 'background 120ms ease',
-                    '&:hover': { background: 'rgba(170,169,205,0.08)' },
-                  }}
-                >
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 0 }}>
-                    <Box sx={{
-                      flexShrink: 0, width: 5, height: 5, borderRadius: '50%', background: C.logan,
-                    }} />
-                    <Typography sx={{
-                      fontSize: 13, fontWeight: 600, color: C.text, lineHeight: 1.35,
-                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                    }}>
-                      {formatTaskTitle(task.title_bg, weightForTasks)}
-                    </Typography>
+            <>
+              <Box sx={{ height: 1, background: C.border, my: 0.5 }} />
+              <Box sx={{ p: 0.5, display: 'flex', flexDirection: 'column', gap: 0.25 }}>
+                {behaviouralHabits.map(task => (
+                  <Box
+                    key={task.id}
+                    onClick={() => setTaskDialog(task)}
+                    sx={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                      gap: 1, py: 0.75, px: 1, borderRadius: 1.5,
+                      cursor: 'pointer', transition: 'background 120ms ease',
+                      '&:hover': { background: 'rgba(170,169,205,0.08)' },
+                    }}
+                  >
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 0 }}>
+                      <Box sx={{
+                        flexShrink: 0, width: 5, height: 5, borderRadius: '50%', background: C.logan,
+                      }} />
+                      <Typography sx={{
+                        fontSize: 13, fontWeight: 600, color: C.text, lineHeight: 1.35,
+                        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                      }}>
+                        {formatTaskTitle(task.title_bg, weightForTasks)}
+                      </Typography>
+                    </Box>
+                    {task.description && (
+                      <InfoOutlinedIcon sx={{ fontSize: 14, color: C.muted, flexShrink: 0 }} />
+                    )}
                   </Box>
-                  {task.description && (
-                    <InfoOutlinedIcon sx={{ fontSize: 14, color: C.muted, flexShrink: 0 }} />
-                  )}
-                </Box>
-              ))}
-            </Box>
+                ))}
+              </Box>
+            </>
           )}
+            </Paper>
           </Box>{/* /ДНЕС unified block */}
 
           {/* Carry-over habits from earlier weeks (separate, collapsible) */}
