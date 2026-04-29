@@ -690,12 +690,12 @@ export default function OnlineHome() {
             </Box>
           </Box>
 
-          {/* ── Workouts for this week ── */}
-          <Box data-tour="workout" sx={{ mb: 3 }}>
-            <Typography sx={{ fontSize: 11, letterSpacing: 1.5, fontWeight: 700, color: C.muted, mb: 1.25 }}>
-              ТРЕНИРОВКИ
-            </Typography>
-            {selected.workouts?.length > 0 ? (
+          {/* ── Legacy week-based workouts (only when admin has seeded program_workouts) ── */}
+          {selected.workouts?.length > 0 && (
+            <Box data-tour="workout" sx={{ mb: 3 }}>
+              <Typography sx={{ fontSize: 11, letterSpacing: 1.5, fontWeight: 700, color: C.muted, mb: 1.25 }}>
+                ТРЕНИРОВКИ ОТ ПРОГРАМАТА
+              </Typography>
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.25 }}>
                 {selected.workouts.map(w => {
                   const done = doneWorkoutIds.has(w.id)
@@ -743,32 +743,8 @@ export default function OnlineHome() {
                   )
                 })}
               </Box>
-            ) : (
-              // Empty state
-              <Paper
-                elevation={0}
-                sx={{
-                  p: 2.5,
-                  borderRadius: 2.5,
-                  border: `1px dashed ${C.border}`,
-                  background: 'transparent',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 1.5,
-                }}
-              >
-                <FitnessCenterIcon sx={{ color: C.muted, fontSize: 28 }} />
-                <Box>
-                  <Typography sx={{ fontWeight: 700, color: C.text, fontSize: 14 }}>
-                    Тази седмица без фиксирани тренировки
-                  </Typography>
-                  <Typography sx={{ fontSize: 12, color: C.muted, mt: 0.25 }}>
-                    Фокусът е върху хранене и движение. Движи се според възможностите си.
-                  </Typography>
-                </Box>
-              </Paper>
-            )}
-          </Box>
+            </Box>
+          )}
 
           {/* ── Coach chat CTA ── */}
           <Paper
