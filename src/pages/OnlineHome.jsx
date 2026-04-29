@@ -491,18 +491,9 @@ export default function OnlineHome() {
         <>
           {/* ── ДНЕС — unified daily block (workout + logs + habits) ── */}
           <Box data-tour="today" sx={{ mb: 3 }}>
-            <Box sx={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', mb: 1.25 }}>
-              <Typography sx={{ fontSize: 11, letterSpacing: 1.5, fontWeight: 700, color: C.text }}>
-                ДНЕС
-              </Typography>
-              <Typography sx={{
-                fontSize: 11,
-                fontWeight: 700,
-                color: dailiesDoneCount === 3 ? C.primary : C.muted,
-              }}>
-                {dailiesDoneCount}/3
-              </Typography>
-            </Box>
+            <Typography sx={{ fontSize: 11, letterSpacing: 1.5, fontWeight: 700, color: C.text, mb: 1.25 }}>
+              ДНЕС
+            </Typography>
 
             {/* Тренировка днес — compact banner */}
             <TodayWorkoutCard
@@ -515,9 +506,9 @@ export default function OnlineHome() {
             <Box data-tour="dailies">
             <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 1 }}>
               {[
-                { view: 'weight', label: 'запиши тегло',  done: didWeightToday, streak: weeklyStreaks.weight },
-                { view: 'food',   label: 'запиши храна',  done: didFoodToday,   streak: weeklyStreaks.food },
-                { view: 'steps',  label: 'запиши стъпки', done: didStepsToday,  streak: weeklyStreaks.steps },
+                { view: 'weight', label: 'тегло',  done: didWeightToday, streak: weeklyStreaks.weight },
+                { view: 'food',   label: 'храна',  done: didFoodToday,   streak: weeklyStreaks.food },
+                { view: 'steps',  label: 'стъпки', done: didStepsToday,  streak: weeklyStreaks.steps },
               ].map(item => {
                 const isPriority = !item.done && item.view === firstUndoneView && selectedWeek === currentWeek
                 return (
@@ -570,7 +561,7 @@ export default function OnlineHome() {
               <Typography sx={{
                 fontSize: 10, letterSpacing: 1.4, fontWeight: 700, color: C.logan, mb: 0.25,
               }}>
-                {t('focusThisWeekLbl')}
+                ОЩЕ ЗА ДНЕС
               </Typography>
               {behaviouralHabits.map(task => (
                 <Box
