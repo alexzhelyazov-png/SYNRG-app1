@@ -20,6 +20,11 @@ import PlayArrowIcon from '@mui/icons-material/PlayArrow'
 import CloseIcon from '@mui/icons-material/Close'
 import FitnessCenterIcon from '@mui/icons-material/FitnessCenter'
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined'
+import MonitorWeightOutlinedIcon from '@mui/icons-material/MonitorWeightOutlined'
+import RestaurantOutlinedIcon from '@mui/icons-material/RestaurantOutlined'
+import DirectionsRunOutlinedIcon from '@mui/icons-material/DirectionsRunOutlined'
+import LocalDrinkOutlinedIcon from '@mui/icons-material/LocalDrinkOutlined'
+import ChevronRightIcon from '@mui/icons-material/ChevronRight'
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
 import ExpandLessIcon from '@mui/icons-material/ExpandLess'
 import { Collapse } from '@mui/material'
@@ -88,6 +93,47 @@ function applyTaskVars(text, weightKg) {
 }
 // Back-compat alias used in render code.
 function formatTaskTitle(title, weightKg) { return applyTaskVars(title, weightKg) }
+
+// ── Shared row template used inside the unified ДНЕС block ──────────
+// Every action in the day card uses the same shape — left circle icon,
+// title in italic, optional right slot — so the eye reads them as
+// siblings. The accent prop swaps the icon-circle colour to signal
+// what kind of action the row represents:
+//   • 'mint'  trackable daily action (workout, log, etc.)
+//   • 'done'  same as mint but with the check icon (already complete)
+//   • 'logan' informational / educational behavioural habit
+function DailyTaskRow({ Icon, label, rightSlot, accent = 'mint', onClick }) {
+  const isLogan = accent === 'logan'
+  return (
+    <Box
+      onClick={onClick}
+      sx={{
+        display: 'flex', alignItems: 'center', gap: 1.25,
+        px: 1, py: 0.75, borderRadius: 1.5,
+        cursor: 'pointer', transition: 'background 120ms ease',
+        '&:hover': { background: isLogan ? 'rgba(170,169,205,0.08)' : 'rgba(196,233,191,0.06)' },
+      }}
+    >
+      <Box sx={{
+        width: 32, height: 32, borderRadius: '50%',
+        background: isLogan ? 'rgba(170,169,205,0.14)' : 'rgba(196,233,191,0.10)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        flexShrink: 0,
+      }}>
+        <Icon sx={{ fontSize: 17, color: isLogan ? '#AAA9CD' : '#C4E9BF' }} />
+      </Box>
+      <Typography sx={{
+        flex: 1, minWidth: 0,
+        fontSize: 14, fontWeight: 700, fontStyle: 'italic',
+        fontFamily: "'MontBlanc', sans-serif", color: '#f0eded', lineHeight: 1.2,
+        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+      }}>
+        {label}
+      </Typography>
+      {rightSlot}
+    </Box>
+  )
+}
 
 export default function OnlineHome() {
   const { auth, setView, t, client, updateClient } = useApp()
@@ -513,94 +559,55 @@ export default function OnlineHome() {
 
               <Box sx={{ height: 1, background: C.border, my: 0.5 }} />
 
-              {/* Daily logs (weight / food / steps) with weekly streak */}
-              <Box data-tour="dailies" sx={{ p: 0.5 }}>
-            <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 1 }}>
-              {[
-                { view: 'weight', label: 'тегло',  done: didWeightToday, streak: weeklyStreaks.weight },
-                { view: 'food',   label: 'храна',  done: didFoodToday,   streak: weeklyStreaks.food },
-                { view: 'steps',  label: 'стъпки', done: didStepsToday,  streak: weeklyStreaks.steps },
-              ].map(item => {
-                const isPriority = !item.done && item.view === firstUndoneView && selectedWeek === currentWeek
-                return (
-                  <Button
+              {/* Daily logs (weight / food / steps) — same row template as the
+                  workout banner above; mint accent signals they're trackable
+                  daily actions. Streak count on the right shows weekly progress. */}
+              <Box data-tour="dailies" sx={{ display: 'flex', flexDirection: 'column' }}>
+                {[
+                  { view: 'weight', label: 'тегло',  Icon: MonitorWeightOutlinedIcon, done: didWeightToday, streak: weeklyStreaks.weight },
+                  { view: 'food',   label: 'храна',  Icon: RestaurantOutlinedIcon,    done: didFoodToday,   streak: weeklyStreaks.food   },
+                  { view: 'steps',  label: 'стъпки', Icon: DirectionsRunOutlinedIcon, done: didStepsToday,  streak: weeklyStreaks.steps  },
+                ].map(item => (
+                  <DailyTaskRow
                     key={item.view}
-                    variant="outlined"
-                    onClick={() => setView(item.view)}
-                    sx={{
-                      py: 1.5,
-                      borderRadius: 2,
-                      color: item.done ? C.primary : C.text,
-                      borderColor: item.done ? C.primaryA20 : isPriority ? C.logan : C.border,
-                      background: item.done
-                        ? C.primaryContainer
-                        : isPriority
-                          ? C.loganDeep
-                          : 'transparent',
-                      boxShadow: isPriority ? `0 0 0 3px ${C.loganDim}` : 'none',
-                      fontSize: 12,
-                      fontWeight: 700,
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: 0.25,
-                      textTransform: 'none',
-                      '&:hover': { borderColor: item.done ? C.primary : C.logan },
-                    }}
-                  >
-                    {item.done
-                      ? <CheckCircleIcon sx={{ fontSize: 20, color: C.primary }} />
-                      : <RadioButtonUncheckedIcon sx={{ fontSize: 20, color: isPriority ? C.logan : C.muted }} />}
-                    {item.label}
-                    <Typography component="span" sx={{
-                      fontSize: 10,
-                      fontWeight: 600,
-                      color: item.streak >= 5 ? C.primary : C.muted,
-                      mt: 0.25,
-                    }}>
-                      {item.streak}/7 дни
-                    </Typography>
-                  </Button>
-                )
-              })}
-            </Box>
-          </Box>
-
-          {/* Behavioural weekly habits (water, no-sugar drinks, etc.) — only those
-              without a daily-tracker counterpart so we don't duplicate the log buttons. */}
-          {behaviouralHabits.length > 0 && (
-            <>
-              <Box sx={{ height: 1, background: C.border, my: 0.5 }} />
-              <Box sx={{ p: 0.5, display: 'flex', flexDirection: 'column', gap: 0.25 }}>
-                {behaviouralHabits.map(task => (
-                  <Box
-                    key={task.id}
-                    onClick={() => setTaskDialog(task)}
-                    sx={{
-                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                      gap: 1, py: 0.75, px: 1, borderRadius: 1.5,
-                      cursor: 'pointer', transition: 'background 120ms ease',
-                      '&:hover': { background: 'rgba(170,169,205,0.08)' },
-                    }}
-                  >
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 0 }}>
-                      <Box sx={{
-                        flexShrink: 0, width: 5, height: 5, borderRadius: '50%', background: C.logan,
-                      }} />
+                    Icon={item.Icon}
+                    label={item.label}
+                    rightSlot={
                       <Typography sx={{
-                        fontSize: 13, fontWeight: 600, color: C.text, lineHeight: 1.35,
-                        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                        fontSize: 11, fontWeight: 700,
+                        color: item.streak >= 5 ? C.primary : C.muted,
                       }}>
-                        {formatTaskTitle(task.title_bg, weightForTasks)}
+                        {item.streak}/7 дни
                       </Typography>
-                    </Box>
-                    {task.description && (
-                      <InfoOutlinedIcon sx={{ fontSize: 14, color: C.muted, flexShrink: 0 }} />
-                    )}
-                  </Box>
+                    }
+                    accent={item.done ? 'done' : 'mint'}
+                    onClick={() => setView(item.view)}
+                  />
                 ))}
               </Box>
-            </>
-          )}
+
+              {/* Behavioural weekly habits (water, no-sugar drinks, etc.) — same
+                  row template, with the logan accent signalling they're
+                  informational/educational rather than trackable. */}
+              {behaviouralHabits.length > 0 && (
+                <>
+                  <Box sx={{ height: 1, background: C.border, my: 0.25 }} />
+                  <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+                    {behaviouralHabits.map(task => (
+                      <DailyTaskRow
+                        key={task.id}
+                        Icon={LocalDrinkOutlinedIcon}
+                        label={formatTaskTitle(task.title_bg, weightForTasks)}
+                        rightSlot={task.description
+                          ? <InfoOutlinedIcon sx={{ fontSize: 16, color: C.muted }} />
+                          : null}
+                        accent="logan"
+                        onClick={() => setTaskDialog(task)}
+                      />
+                    ))}
+                  </Box>
+                </>
+              )}
             </Paper>
           </Box>{/* /ДНЕС unified block */}
 
