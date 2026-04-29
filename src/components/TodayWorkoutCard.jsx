@@ -98,40 +98,52 @@ export default function TodayWorkoutCard({ clientId, programStartedAt, difficult
   return (
     <>
       <Paper
-        sx={{ ...cardSx, cursor: 'pointer', transition: 'border-color 200ms ease, transform 200ms ease',
-              '&:hover': { borderColor: C.primary, transform: 'translateY(-1px)' } }}
+        sx={{
+          ...cardSx,
+          p: 1.25,
+          display: 'flex', alignItems: 'center', gap: 1.5,
+          cursor: 'pointer',
+          transition: 'border-color 200ms ease, transform 200ms ease',
+          '&:hover': { borderColor: C.primary, transform: 'translateY(-1px)' },
+        }}
         elevation={0}
         onClick={() => setOpen(true)}
       >
-        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}>
-            <FitnessCenterIcon sx={{ fontSize: 18, color: C.primary }} />
-            <Typography sx={overlineSx}>Тренировка днес</Typography>
-          </Box>
-          <Typography sx={{ fontSize: 11, color: C.muted, letterSpacing: 0.6, fontWeight: 700 }}>
-            ДЕН {workout.dayIndex + 1}
-          </Typography>
-        </Box>
-        <Typography sx={{
-          fontSize: 22, fontWeight: 700, fontStyle: 'italic', color: C.text,
-          fontFamily: "'MontBlanc', sans-serif", lineHeight: 1.1, mb: 0.75,
+        <Box sx={{
+          width: 38, height: 38, borderRadius: '50%',
+          background: C.primaryContainer,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          flexShrink: 0,
         }}>
-          Тренировка {workout.workoutNumber} от {workout.curriculumSize || 20}
-        </Typography>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1.5, color: C.muted, flexWrap: 'wrap' }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-            <AccessTimeIcon sx={{ fontSize: 14 }} />
-            <Typography sx={{ fontSize: 12, fontWeight: 700 }}>{workout.totalMinutes} мин</Typography>
-          </Box>
-          <Typography sx={{ fontSize: 12, fontWeight: 700 }}>· {main.rounds} рунда</Typography>
-          <Typography sx={{ fontSize: 12, fontWeight: 700 }}>· {totalExercises} упражнения</Typography>
+          <FitnessCenterIcon sx={{ fontSize: 18, color: C.primary }} />
         </Box>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, color: C.primary }}>
-          <PlayArrowIcon sx={{ fontSize: 26 }} />
-          <Typography sx={{ fontSize: 14, fontWeight: 700, fontStyle: 'italic' }}>
-            Започни тренировката →
+        <Box sx={{ flex: 1, minWidth: 0 }}>
+          <Typography sx={{
+            fontSize: 14, fontWeight: 700, fontStyle: 'italic',
+            fontFamily: "'MontBlanc', sans-serif", color: C.text, lineHeight: 1.2,
+          }}>
+            Тренировка днес
+          </Typography>
+          <Typography sx={{ fontSize: 11, color: C.muted, fontWeight: 700, mt: 0.25 }}>
+            {workout.totalMinutes} мин · {main.rounds} рунда · {totalExercises} упражнения
           </Typography>
         </Box>
+        <Button
+          variant="contained"
+          size="small"
+          startIcon={<PlayArrowIcon sx={{ fontSize: 18 }} />}
+          onClick={(e) => { e.stopPropagation(); setOpen(true) }}
+          sx={{
+            borderRadius: 100, px: 2, py: 0.5, minWidth: 0,
+            fontWeight: 700, fontSize: 12, fontStyle: 'italic',
+            fontFamily: "'MontBlanc', sans-serif",
+            background: C.primary, color: '#0d1510',
+            boxShadow: 'none',
+            '&:hover': { background: '#d4f0cf', boxShadow: 'none' },
+          }}
+        >
+          Започни
+        </Button>
       </Paper>
 
       <Dialog
