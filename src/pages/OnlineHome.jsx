@@ -35,6 +35,7 @@ import {
 import { DB } from '../lib/db'
 import { QuizScreen, calcTargets } from './SynrgMethod'
 import ExpertTeam from '../components/ExpertTeam'
+import TodayWorkoutCard from '../components/TodayWorkoutCard'
 
 const TOTAL_WEEKS = 8
 const TOTAL_DAYS  = TOTAL_WEEKS * 7
@@ -617,6 +618,13 @@ export default function OnlineHome() {
               )}
             </Paper>
           )}
+
+          {/* ── Тренировка днес (auto-assembled from exercise_library) ── */}
+          <TodayWorkoutCard
+            clientId={auth?.id}
+            programStartedAt={state?.started_at}
+            difficulty={1}
+          />
 
           {/* ── Задачи за днес ── */}
           <Box data-tour="dailies" sx={{ mb: 3 }}>
