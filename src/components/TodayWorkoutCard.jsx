@@ -27,6 +27,9 @@ import {
   focusLabelBg,
   WORKOUT_TIMING,
 } from '../lib/workoutGenerator'
+import { recordWorkoutCompletion, countWorkoutsThisWeek } from '../lib/dailyTracking'
+
+const WEEKLY_WORKOUT_TARGET = 5
 
 function daysSince(startDateStr) {
   if (!startDateStr) return 0
@@ -47,6 +50,7 @@ function fmtMSS(sec) {
 export default function TodayWorkoutCard({ clientId, programStartedAt, difficulty = 1, flat = false }) {
   const [library, setLibrary] = useState(null)
   const [open, setOpen] = useState(false)
+  const [weekCount, setWeekCount] = useState(0)
   const dayIndex = useMemo(() => daysSince(programStartedAt), [programStartedAt])
 
   useEffect(() => {
@@ -56,6 +60,26 @@ export default function TodayWorkoutCard({ clientId, programStartedAt, difficult
     }).catch(() => { if (!cancel) setLibrary([]) })
     return () => { cancel = true }
   }, [])
+
+  // Load this week's workout count so we can render "X/5"
+  useEffect(() => {
+    if (!clientId) return
+    let cancel = false
+    countWorkoutsThisWeek(clientId).then(n => { if (!cancel) setWeekCount(n) })
+    return () => { cancel = true }
+  }, [clientId, open])
+
+  const recordCompletion = async () => {
+    if (!clientId || !workout) return
+    await recordWorkoutCompletion({
+      clientId,
+      dayIndex,
+      workoutNumber: workout.workoutNumber || 1,
+      durationSec: workout.totalMinutes ? workout.totalMinutes * 60 : null,
+    })
+    const n = await countWorkoutsThisWeek(clientId)
+    setWeekCount(n)
+  }
 
   const workout = useMemo(() => {
     if (!library || library.length === 0) return null
@@ -135,7 +159,7 @@ export default function TodayWorkoutCard({ clientId, programStartedAt, difficult
             Тренировка днес
           </Typography>
           <Typography sx={{ fontSize: 11, color: C.muted, fontWeight: 700, mt: 0.25 }}>
-            {workout.totalMinutes} мин · {main.rounds} рунда · {totalExercises} упражнения
+            {workout.totalMinutes} мин · {weekCount}/{WEEKLY_WORKOUT_TARGET} тази седмица
           </Typography>
         </Box>
         <Button
@@ -163,7 +187,11 @@ export default function TodayWorkoutCard({ clientId, programStartedAt, difficult
         slotProps={{ paper: { sx: { background: C.bg, color: C.text } } }}
       >
         <DialogContent sx={{ p: 0, height: '100vh', overflow: 'hidden' }}>
-          <WorkoutPlayer workout={workout} onClose={() => setOpen(false)} />
+          <WorkoutPlayer
+            workout={workout}
+            onClose={() => setOpen(false)}
+            onCompleted={recordCompletion}
+          />
         </DialogContent>
       </Dialog>
     </>
@@ -213,13 +241,23 @@ function buildSteps(workout) {
   return steps
 }
 
-function WorkoutPlayer({ workout, onClose }) {
+function WorkoutPlayer({ workout, onClose, onCompleted }) {
   const steps = useMemo(() => buildSteps(workout), [workout])
   const [phase, setPhase] = useState('prep')   // 'prep' | 'running' | 'done'
   const [stepIdx, setStepIdx] = useState(0)
   const [secLeft, setSecLeft] = useState(steps[0]?.sec || 0)
   const [paused, setPaused] = useState(false)
   const tickRef = useRef(null)
+  const completedFiredRef = useRef(false)
+
+  // Persist completion exactly once when we transition into the done phase
+  useEffect(() => {
+    if (phase === 'done' && !completedFiredRef.current) {
+      completedFiredRef.current = true
+      try { onCompleted && onCompleted() } catch {}
+    }
+    if (phase !== 'done') completedFiredRef.current = false
+  }, [phase, onCompleted])
 
   // Reset when steps change
   useEffect(() => {

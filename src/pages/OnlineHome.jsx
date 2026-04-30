@@ -41,6 +41,7 @@ import { DB } from '../lib/db'
 import { QuizScreen, calcTargets } from './SynrgMethod'
 import ExpertTeam from '../components/ExpertTeam'
 import TodayWorkoutCard from '../components/TodayWorkoutCard'
+import { loadHabitCompletionsThisWeek, toggleHabitForToday } from '../lib/dailyTracking'
 
 const TOTAL_WEEKS = 8
 const TOTAL_DAYS  = TOTAL_WEEKS * 7
@@ -157,6 +158,34 @@ export default function OnlineHome() {
   const [consentChecked, setConsentChecked] = useState(false)
   const [consentAccepted, setConsentAccepted] = useState(false)
   const [quizSaving, setQuizSaving] = useState(false)
+  // taskId → { count: number this week, doneToday: bool }
+  const [habitCompletions, setHabitCompletions] = useState({})
+
+  // Load this week's habit completion counts so we can render X/7 + toggle.
+  useEffect(() => {
+    if (!auth?.id) return
+    let cancelled = false
+    loadHabitCompletionsThisWeek(auth.id).then(map => {
+      if (!cancelled) setHabitCompletions(map || {})
+    })
+    return () => { cancelled = true }
+  }, [auth?.id])
+
+  const handleToggleHabit = async (task) => {
+    if (!auth?.id || !task?.id) return
+    const prev = habitCompletions[task.id] || { count: 0, doneToday: false }
+    // Optimistic update
+    const nextSlot = prev.doneToday
+      ? { count: Math.max(0, prev.count - 1), doneToday: false }
+      : { count: prev.count + 1, doneToday: true }
+    setHabitCompletions(s => ({ ...s, [task.id]: nextSlot }))
+    try {
+      await toggleHabitForToday({ clientId: auth.id, taskId: task.id, currentlyDone: prev.doneToday })
+    } catch {
+      // Revert on failure
+      setHabitCompletions(s => ({ ...s, [task.id]: prev }))
+    }
+  }
 
   // Load catalog + per-client state
   useEffect(() => {
@@ -593,18 +622,39 @@ export default function OnlineHome() {
                 <>
                   <Box sx={{ height: 1, background: C.border, my: 0.25 }} />
                   <Box sx={{ display: 'flex', flexDirection: 'column' }}>
-                    {behaviouralHabits.map(task => (
-                      <DailyTaskRow
-                        key={task.id}
-                        Icon={LocalDrinkOutlinedIcon}
-                        label={formatTaskTitle(task.title_bg, weightForTasks)}
-                        rightSlot={task.description
-                          ? <InfoOutlinedIcon sx={{ fontSize: 16, color: C.muted }} />
-                          : null}
-                        accent="logan"
-                        onClick={() => setTaskDialog(task)}
-                      />
-                    ))}
+                    {behaviouralHabits.map(task => {
+                      const slot = habitCompletions[task.id] || { count: 0, doneToday: false }
+                      const accent = slot.doneToday ? 'done' : 'logan'
+                      const RowIcon = slot.doneToday ? CheckCircleIcon : LocalDrinkOutlinedIcon
+                      return (
+                        <DailyTaskRow
+                          key={task.id}
+                          Icon={RowIcon}
+                          label={formatTaskTitle(task.title_bg, weightForTasks)}
+                          rightSlot={
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+                              <Typography sx={{
+                                fontSize: 11, fontWeight: 700,
+                                color: slot.count >= 5 ? C.primary : C.muted,
+                              }}>
+                                {slot.count}/7 дни
+                              </Typography>
+                              {task.description && (
+                                <IconButton
+                                  size="small"
+                                  onClick={(e) => { e.stopPropagation(); setTaskDialog(task) }}
+                                  sx={{ p: 0.25, color: C.muted }}
+                                >
+                                  <InfoOutlinedIcon sx={{ fontSize: 16 }} />
+                                </IconButton>
+                              )}
+                            </Box>
+                          }
+                          accent={accent}
+                          onClick={() => handleToggleHabit(task)}
+                        />
+                      )
+                    })}
                   </Box>
                 </>
               )}
