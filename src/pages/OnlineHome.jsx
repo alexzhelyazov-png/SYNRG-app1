@@ -939,21 +939,48 @@ export default function OnlineHome() {
             Информацията е образователна и не замества медицинска консултация.
           </Typography>
         </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2 }}>
+        <DialogActions sx={{ px: 3, pb: 2, gap: 1, justifyContent: 'space-between', flexWrap: 'wrap' }}>
+          {/* Toggle done/undone — only shown for behavioural habits that
+              have a completion record (i.e. live tasks from the DB, not
+              synthetic info objects from the daily-log rows). */}
+          {taskDialog?.id && (() => {
+            const slot = habitCompletions[taskDialog.id] || { count: 0, doneToday: false }
+            return (
+              <Button
+                onClick={() => { handleToggleHabit(taskDialog); setTaskDialog(null) }}
+                variant={slot.doneToday ? 'outlined' : 'contained'}
+                sx={{
+                  borderRadius: 99,
+                  background: slot.doneToday ? 'transparent' : C.primary,
+                  borderColor: slot.doneToday ? C.primaryA20 : 'transparent',
+                  color: slot.doneToday ? C.primary : '#0A2E0F',
+                  fontWeight: 700,
+                  textTransform: 'none',
+                  px: 3,
+                  '&:hover': {
+                    background: slot.doneToday ? 'rgba(196,233,191,0.08)' : C.primaryHover,
+                    borderColor: slot.doneToday ? C.primary : 'transparent',
+                  },
+                }}
+              >
+                {slot.doneToday ? 'Отбележи като неизпълнено' : 'Изпълнено за днес'}
+              </Button>
+            )
+          })()}
           <Button
             onClick={() => setTaskDialog(null)}
-            variant="contained"
+            variant={taskDialog?.id ? 'text' : 'contained'}
             sx={{
               borderRadius: 99,
-              background: C.primary,
-              color: '#0A2E0F',
+              background: taskDialog?.id ? 'transparent' : C.primary,
+              color: taskDialog?.id ? C.muted : '#0A2E0F',
               fontWeight: 700,
               textTransform: 'none',
               px: 3,
-              '&:hover': { background: C.primaryHover },
+              '&:hover': { background: taskDialog?.id ? 'rgba(255,255,255,0.04)' : C.primaryHover },
             }}
           >
-            Разбрах
+            Затвори
           </Button>
         </DialogActions>
       </Dialog>
