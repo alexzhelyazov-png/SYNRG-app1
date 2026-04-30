@@ -590,24 +590,55 @@ export default function OnlineHome() {
 
               {/* Daily logs (weight / food / steps) — same row template as the
                   workout banner above; mint accent signals they're trackable
-                  daily actions. Streak count on the right shows weekly progress. */}
+                  daily actions. Streak count + info icon on the right match the
+                  habit rows below so all five rows share one layout. */}
               <Box data-tour="dailies" sx={{ display: 'flex', flexDirection: 'column' }}>
                 {[
-                  { view: 'weight', label: 'тегло',  Icon: MonitorWeightOutlinedIcon, done: didWeightToday, streak: weeklyStreaks.weight },
-                  { view: 'food',   label: 'храна',  Icon: RestaurantOutlinedIcon,    done: didFoodToday,   streak: weeklyStreaks.food   },
-                  { view: 'steps',  label: 'стъпки', Icon: DirectionsRunOutlinedIcon, done: didStepsToday,  streak: weeklyStreaks.steps  },
+                  {
+                    view: 'weight', label: 'тегло', Icon: MonitorWeightOutlinedIcon,
+                    done: didWeightToday, streak: weeklyStreaks.weight,
+                    info: {
+                      title_bg: 'Защо да се теглим всеки ден',
+                      description: 'Теглото варира от ден в ден заради водна задръжка, фази на цикъла, осоленост на храната, стрес. Една стойност не казва нищо. Това, което казва, е тенденцията. Тегли се всяка сутрин при едни и същи условия (преди закуска, след тоалетна, голи) и наблюдавай средната за 4-5 поредни дни. Така се вижда реалната посока — без да се плашиш от ежедневните колебания.',
+                    },
+                  },
+                  {
+                    view: 'food', label: 'храна', Icon: RestaurantOutlinedIcon,
+                    done: didFoodToday, streak: weeklyStreaks.food,
+                    info: {
+                      title_bg: 'Защо да записваме храната',
+                      description: 'Броенето на калории работи... но не дългосрочно — никой не го прави цял живот. Целта на 1-2 седмици записване не е „диета", а знание: откъде идват най-много калории в деня ти, колко реално приемаш, как изглеждат 150 г месо, една порция ориз, една шепа ядки. Това знание е основата, върху която после стои интуицията — и взимането на правилни решения става лесно, без да броиш всеки залък.',
+                    },
+                  },
+                  {
+                    view: 'steps', label: 'стъпки', Icon: DirectionsRunOutlinedIcon,
+                    done: didStepsToday, streak: weeklyStreaks.steps,
+                    info: {
+                      title_bg: 'Защо да броим стъпките',
+                      description: 'Не е нужно да скочиш от 5 000 на 15 000 стъпки — това е насилие, което няма да издържиш. Започни с 2 000–3 000 повече, отколкото правиш сега. Това са около 90 000 допълнителни стъпки на месец — почти 1 кг изгорени мазнини за месец, без да тренираш повече. Бавно увеличение, устойчив навик. Това е разликата между „диета" и реален живот.',
+                    },
+                  },
                 ].map(item => (
                   <DailyTaskRow
                     key={item.view}
                     Icon={item.Icon}
                     label={item.label}
                     rightSlot={
-                      <Typography sx={{
-                        fontSize: 11, fontWeight: 700,
-                        color: item.streak >= 5 ? C.primary : C.muted,
-                      }}>
-                        {item.streak}/7 дни
-                      </Typography>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+                        <Typography sx={{
+                          fontSize: 11, fontWeight: 700,
+                          color: item.streak >= 5 ? C.primary : C.muted,
+                        }}>
+                          {item.streak}/7 дни
+                        </Typography>
+                        <IconButton
+                          size="small"
+                          onClick={(e) => { e.stopPropagation(); setTaskDialog(item.info) }}
+                          sx={{ p: 0.25, color: C.muted }}
+                        >
+                          <InfoOutlinedIcon sx={{ fontSize: 16 }} />
+                        </IconButton>
+                      </Box>
                     }
                     accent={item.done ? 'done' : 'mint'}
                     onClick={() => setView(item.view)}
