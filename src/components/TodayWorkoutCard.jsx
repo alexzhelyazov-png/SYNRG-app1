@@ -121,11 +121,11 @@ export default function TodayWorkoutCard({ clientId, programStartedAt, difficult
 
   const bannerSx = flat
     ? {
-        p: 1.25, mb: 0,
-        display: 'flex', alignItems: 'center', gap: 1.5,
+        px: 1, py: 0.75, mb: 0,
+        display: 'flex', alignItems: 'center', gap: 1.25,
         cursor: 'pointer',
-        background: 'transparent', border: 'none', boxShadow: 'none',
-        '&:hover': { background: 'rgba(196,233,191,0.04)' },
+        background: 'transparent', border: 'none', boxShadow: 'none', borderRadius: 1.5,
+        '&:hover': { background: 'rgba(196,233,191,0.06)' },
       }
     : {
         ...cardSx,
@@ -144,40 +144,44 @@ export default function TodayWorkoutCard({ clientId, programStartedAt, difficult
         onClick={() => setOpen(true)}
       >
         <Box sx={{
-          width: 38, height: 38, borderRadius: '50%',
-          background: C.primaryContainer,
+          width: 32, height: 32, borderRadius: '50%',
+          background: 'rgba(196,233,191,0.10)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           flexShrink: 0,
         }}>
-          <FitnessCenterIcon sx={{ fontSize: 18, color: C.primary }} />
+          <FitnessCenterIcon sx={{ fontSize: 17, color: C.primary }} />
         </Box>
-        <Box sx={{ flex: 1, minWidth: 0 }}>
+        <Typography sx={{
+          flex: 1, minWidth: 0,
+          fontSize: 14, fontWeight: 700, fontStyle: 'italic',
+          fontFamily: "'MontBlanc', sans-serif", color: C.text, lineHeight: 1.2,
+          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+        }}>
+          Тренировка
+        </Typography>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, flexShrink: 0 }}>
           <Typography sx={{
-            fontSize: 14, fontWeight: 700, fontStyle: 'italic',
-            fontFamily: "'MontBlanc', sans-serif", color: C.text, lineHeight: 1.2,
+            fontSize: 11, fontWeight: 700,
+            color: weekCount >= WEEKLY_WORKOUT_TARGET ? C.primary : C.muted,
           }}>
-            Тренировка днес
+            {weekCount}/{WEEKLY_WORKOUT_TARGET}
           </Typography>
-          <Typography sx={{ fontSize: 11, color: C.muted, fontWeight: 700, mt: 0.25 }}>
-            {workout.totalMinutes} мин · {weekCount}/{WEEKLY_WORKOUT_TARGET} тази седмица
-          </Typography>
+          <Button
+            variant="contained"
+            size="small"
+            onClick={(e) => { e.stopPropagation(); setOpen(true) }}
+            sx={{
+              borderRadius: 100, px: 1.5, py: 0.25, minWidth: 0,
+              fontWeight: 700, fontSize: 11, fontStyle: 'italic',
+              fontFamily: "'MontBlanc', sans-serif",
+              background: C.primary, color: '#0d1510',
+              boxShadow: 'none',
+              '&:hover': { background: '#d4f0cf', boxShadow: 'none' },
+            }}
+          >
+            Започни
+          </Button>
         </Box>
-        <Button
-          variant="contained"
-          size="small"
-          startIcon={<PlayArrowIcon sx={{ fontSize: 18 }} />}
-          onClick={(e) => { e.stopPropagation(); setOpen(true) }}
-          sx={{
-            borderRadius: 100, px: 2, py: 0.5, minWidth: 0,
-            fontWeight: 700, fontSize: 12, fontStyle: 'italic',
-            fontFamily: "'MontBlanc', sans-serif",
-            background: C.primary, color: '#0d1510',
-            boxShadow: 'none',
-            '&:hover': { background: '#d4f0cf', boxShadow: 'none' },
-          }}
-        >
-          Започни
-        </Button>
       </Paper>
 
       <Dialog

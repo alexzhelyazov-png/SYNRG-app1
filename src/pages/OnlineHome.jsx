@@ -595,7 +595,7 @@ export default function OnlineHome() {
               <Box data-tour="dailies" sx={{ display: 'flex', flexDirection: 'column' }}>
                 {[
                   {
-                    view: 'weight', label: 'тегло', Icon: MonitorWeightOutlinedIcon,
+                    view: 'weight', label: 'Запиши тегло', Icon: MonitorWeightOutlinedIcon,
                     done: didWeightToday, streak: weeklyStreaks.weight,
                     info: {
                       title_bg: 'Защо да се теглим всеки ден',
@@ -603,7 +603,7 @@ export default function OnlineHome() {
                     },
                   },
                   {
-                    view: 'food', label: 'храна', Icon: RestaurantOutlinedIcon,
+                    view: 'food', label: 'Запиши храната си', Icon: RestaurantOutlinedIcon,
                     done: didFoodToday, streak: weeklyStreaks.food,
                     info: {
                       title_bg: 'Защо да записваме храната',
@@ -611,7 +611,7 @@ export default function OnlineHome() {
                     },
                   },
                   {
-                    view: 'steps', label: 'стъпки', Icon: DirectionsRunOutlinedIcon,
+                    view: 'steps', label: 'Запиши стъпките си', Icon: DirectionsRunOutlinedIcon,
                     done: didStepsToday, streak: weeklyStreaks.steps,
                     info: {
                       title_bg: 'Защо да броим стъпките',
