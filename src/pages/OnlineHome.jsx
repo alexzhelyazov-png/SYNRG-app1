@@ -103,8 +103,9 @@ function formatTaskTitle(title, weightKg) { return applyTaskVars(title, weightKg
 //   • 'mint'  trackable daily action (workout, log, etc.)
 //   • 'done'  same as mint but with the check icon (already complete)
 //   • 'logan' informational / educational behavioural habit
-function DailyTaskRow({ Icon, label, rightSlot, accent = 'mint', onClick }) {
+function DailyTaskRow({ Icon, label, rightSlot, accent = 'mint', onClick, onIconClick }) {
   const isLogan = accent === 'logan'
+  const iconInteractive = typeof onIconClick === 'function'
   return (
     <Box
       onClick={onClick}
@@ -115,12 +116,20 @@ function DailyTaskRow({ Icon, label, rightSlot, accent = 'mint', onClick }) {
         '&:hover': { background: isLogan ? 'rgba(170,169,205,0.08)' : 'rgba(196,233,191,0.06)' },
       }}
     >
-      <Box sx={{
-        width: 32, height: 32, borderRadius: '50%',
-        background: isLogan ? 'rgba(170,169,205,0.14)' : 'rgba(196,233,191,0.10)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        flexShrink: 0,
-      }}>
+      <Box
+        onClick={iconInteractive ? (e) => { e.stopPropagation(); onIconClick(e) } : undefined}
+        sx={{
+          width: 32, height: 32, borderRadius: '50%',
+          background: isLogan ? 'rgba(170,169,205,0.14)' : 'rgba(196,233,191,0.10)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          flexShrink: 0,
+          cursor: iconInteractive ? 'pointer' : 'inherit',
+          transition: 'background 120ms ease, transform 120ms ease',
+          '&:hover': iconInteractive
+            ? { background: isLogan ? 'rgba(170,169,205,0.22)' : 'rgba(196,233,191,0.18)', transform: 'scale(1.05)' }
+            : undefined,
+        }}
+      >
         <Icon sx={{ fontSize: 17, color: isLogan ? '#AAA9CD' : '#C4E9BF' }} />
       </Box>
       <Typography sx={{
@@ -663,26 +672,16 @@ export default function OnlineHome() {
                           Icon={RowIcon}
                           label={formatTaskTitle(task.title_bg, weightForTasks)}
                           rightSlot={
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
-                              <Typography sx={{
-                                fontSize: 11, fontWeight: 700,
-                                color: slot.count >= 5 ? C.primary : C.muted,
-                              }}>
-                                {slot.count}/7 дни
-                              </Typography>
-                              {task.description && (
-                                <IconButton
-                                  size="small"
-                                  onClick={(e) => { e.stopPropagation(); setTaskDialog(task) }}
-                                  sx={{ p: 0.25, color: C.muted }}
-                                >
-                                  <InfoOutlinedIcon sx={{ fontSize: 16 }} />
-                                </IconButton>
-                              )}
-                            </Box>
+                            <Typography sx={{
+                              fontSize: 11, fontWeight: 700,
+                              color: slot.count >= 5 ? C.primary : C.muted,
+                            }}>
+                              {slot.count}/7 дни
+                            </Typography>
                           }
                           accent={accent}
-                          onClick={() => handleToggleHabit(task)}
+                          onClick={() => setTaskDialog(task)}
+                          onIconClick={() => handleToggleHabit(task)}
                         />
                       )
                     })}
