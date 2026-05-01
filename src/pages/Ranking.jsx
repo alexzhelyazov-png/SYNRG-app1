@@ -1,10 +1,16 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Box, Typography, Paper, Dialog, IconButton, Chip } from '@mui/material'
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline'
 import { useApp } from '../context/AppContext'
 import { C, EASE } from '../theme'
+import { DB } from '../lib/db'
 import CommunityFeed from './CommunityFeed'
 import { ALLTIME_BADGES, MONTHLY_BADGES, TIER_COLORS, getLevelName } from '../lib/gamification'
+
+// Bulgarian month names — used for the "Победител за <месец>" banner
+// rendered above the leaderboard. Index aligns with month_key parsing
+// (split('-')[1] is 1-based month → subtract 1).
+const BG_MONTHS = ['Януари','Февруари','Март','Април','Май','Юни','Юли','Август','Септември','Октомври','Ноември','Декември']
 import MonitorWeightIcon        from '@mui/icons-material/MonitorWeight'
 import RestaurantIcon           from '@mui/icons-material/Restaurant'
 import DirectionsWalkIcon       from '@mui/icons-material/DirectionsWalk'
@@ -44,6 +50,17 @@ export default function Ranking() {
   const isMobile = window.innerWidth < 640
   const [viewProfile, setViewProfile] = useState(null)
   const [tab, setTab] = useState('ranking') // 'ranking' | 'feed'
+  // Previous month's winner banner — populated by the `monthly-winners`
+  // edge function on day 1 of each month. Read the most-recent row so
+  // the banner stays visible all month, not just on day 1.
+  const [prevWinner, setPrevWinner] = useState(null)
+  useEffect(() => {
+    let alive = true
+    DB.selectAll('monthly_winners', '&order=month_key.desc&limit=1')
+      .then(rows => { if (alive && Array.isArray(rows) && rows.length) setPrevWinner(rows[0]) })
+      .catch(() => {})
+    return () => { alive = false }
+  }, [])
 
   function switchTab(key) {
     setTab(key)
@@ -82,6 +99,35 @@ export default function Ranking() {
         <Typography sx={{ color: C.muted, fontSize: '14px' }}>
           {t('rankingDesc')}
         </Typography>
+
+        {/* Previous-month winner banner. Renders only when the
+            monthly-winners edge function has snapshotted the prior
+            month — keeps the leaderboard reset less jarring on day 1
+            and gives the founder a public record to point clients to. */}
+        {prevWinner && (() => {
+          const [yr, mo] = (prevWinner.month_key || '').split('-')
+          const monthLabel = BG_MONTHS[Number(mo) - 1]
+          if (!monthLabel) return null
+          return (
+            <Box sx={{
+              mt: 1.5,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 1,
+              px: 1.5, py: 0.75,
+              borderRadius: '999px',
+              border: '1px solid rgba(212,175,55,0.35)',
+              background: 'rgba(212,175,55,0.08)',
+            }}>
+              <EmojiEventsIcon sx={{ fontSize: 16, color: '#D4AF37' }} />
+              <Typography sx={{ fontSize: 13, color: C.text }}>
+                Победител за <strong style={{ color: '#D4AF37' }}>{monthLabel}</strong>:&nbsp;
+                <strong>{prevWinner.winner_name}</strong>
+                <span style={{ color: C.muted, marginLeft: 6 }}>· {prevWinner.winner_xp} XP</span>
+              </Typography>
+            </Box>
+          )
+        })()}
       </Box>
 
       {/* ── Podium (top 3) ────────────────────────────── */}

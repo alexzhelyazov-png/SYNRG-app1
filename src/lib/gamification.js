@@ -85,10 +85,12 @@ export const MONTHLY_BADGES = [
   { id: 'm_workouts_silver', monthly: true, xp: 20, tier: 'silver', series: 'm_workouts', muiIcon: 'FitnessCenter', condType: 'monthly_count', condField: 'workoutCount', condValue: 12 },
   { id: 'm_workouts_gold',   monthly: true, xp: 35, tier: 'gold',   series: 'm_workouts', muiIcon: 'FitnessCenter', condType: 'monthly_count', condField: 'workoutCount', condValue: 16 },
 
-  // ── m_meals series ──
-  { id: 'm_meals_bronze', monthly: true, xp: 10, tier: 'bronze', series: 'm_meals', muiIcon: 'Restaurant', condType: 'monthly_count', condField: 'mealCount', condValue: 20 },
-  { id: 'm_meals_silver', monthly: true, xp: 20, tier: 'silver', series: 'm_meals', muiIcon: 'Restaurant', condType: 'monthly_count', condField: 'mealCount', condValue: 40 },
-  { id: 'm_meals_gold',   monthly: true, xp: 35, tier: 'gold',   series: 'm_meals', muiIcon: 'Restaurant', condType: 'monthly_count', condField: 'mealCount', condValue: 60 },
+  // ── m_meals series — REMOVED (per founder, 2026-05-01) ──
+  // Meal-count badges caused too many edge cases: rapid-fire entries
+  // counted multiple times, sync conflicts on mobile, and clients
+  // gaming the count by logging snacks. Removed entirely from the
+  // monthly system. The meal log itself stays — only the badges go.
+
 
   // ── m_weights series ──
   { id: 'm_weights_bronze', monthly: true, xp: 10, tier: 'bronze', series: 'm_weights', muiIcon: 'MonitorWeight', condType: 'monthly_count', condField: 'weightCount', condValue: 7  },
