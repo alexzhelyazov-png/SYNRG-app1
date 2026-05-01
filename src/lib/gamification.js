@@ -241,9 +241,21 @@ function collectMonthlyStats(client, monthKey) {
   const calTargetDays  = targetDaysCount(meals, client.calorieTarget || 99999, 'kcal')
   const protTargetDays = targetDaysCount(meals, client.proteinTarget || 99999, 'protein')
 
-  // Monthly weight loss: difference between first and last weight in the month
+  // Monthly weight loss — averaged, NOT single readings.
+  // A single weigh-in can swing 1–2 kg from water alone (cycle phase,
+  // salt, sleep). Comparing one start day to one end day rewarded that
+  // noise and let clients "earn" the badge from a temporary dip.
+  // We now average the first 4 and last 4 entries (or as many as we
+  // have if fewer; minimum 2 per side, so at least 4 weigh-ins total
+  // are required to qualify for the badge at all).
   const sortedW = [...weights].sort((a, b) => a.date.localeCompare(b.date))
-  const monthWeightLoss = sortedW.length >= 2 ? sortedW[0].weight - sortedW[sortedW.length - 1].weight : 0
+  const avgWeights = arr => arr.length === 0
+    ? 0
+    : arr.reduce((s, w) => s + Number(w.weight || 0), 0) / arr.length
+  const winSize = Math.min(4, Math.floor(sortedW.length / 2))
+  const monthWeightLoss = winSize >= 2
+    ? avgWeights(sortedW.slice(0, winSize)) - avgWeights(sortedW.slice(-winSize))
+    : 0
 
   return {
     workoutCount: workoutDateSet.size, // unique training days: tracker + bookings

@@ -160,9 +160,15 @@ function collectMonthlyStats(client: {
   const calTargetDays  = targetDaysCount(meals, client.calorieTarget || 99999, 'kcal');
   const protTargetDays = targetDaysCount(meals, client.proteinTarget || 99999, 'protein');
 
+  // Averaged weight loss — see gamification.js for the rationale.
+  // 4-day rolling window each end, min 2-per-side (so ≥4 logs needed).
   const sortedW = [...weights].sort((a, b) => a.date.localeCompare(b.date));
-  const monthWeightLoss = sortedW.length >= 2
-    ? Number(sortedW[0].weight || 0) - Number(sortedW[sortedW.length - 1].weight || 0)
+  const avgW = (arr: Weight[]) => arr.length === 0
+    ? 0
+    : arr.reduce((s, w) => s + Number(w.weight || 0), 0) / arr.length;
+  const winSize = Math.min(4, Math.floor(sortedW.length / 2));
+  const monthWeightLoss = winSize >= 2
+    ? avgW(sortedW.slice(0, winSize)) - avgW(sortedW.slice(-winSize))
     : 0;
 
   return {
