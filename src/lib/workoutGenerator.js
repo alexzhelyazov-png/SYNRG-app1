@@ -20,6 +20,28 @@ function mirrorSlug(slug) {
     ? slug.replace(/-l$/, '-r')
     : slug.replace(/-r$/, '-l')
 }
+// Strip side suffix so `lunge-l` and `lunge-r` count as the same movement
+// when checking adjacent-day overlap.
+function baseSlug(s) {
+  return String(s || '').replace(SIDE_RE, '')
+}
+
+// Look up the RAW first-exercise slug of a given day's curriculum entry
+// without doing any library resolution or rotation. Used by the
+// anti-repeat guard inside generateDailyWorkout to peek at yesterday's
+// lead movement. Mirrors the curriculum-selection logic in
+// generateDailyWorkout so the two stay in sync.
+function templateLeadSlug(dayIndex, quiz) {
+  if (dayIndex < 0) return null
+  const weekIdx = Math.floor(dayIndex / 7)
+  const lvl     = determineLevelStart(quiz)
+  let curr
+  if (lvl === 2)            curr = LEVEL_2_CURRICULUM
+  else if (weekIdx === 0)   curr = LEVEL_1_CURRICULUM
+  else                      curr = LEVEL_2_CURRICULUM
+  const idx = ((dayIndex % curr.length) + curr.length) % curr.length
+  return curr[idx]?.[0]?.slug || null
+}
 
 /**
  * Build today's workout from the Level 1 curriculum.
@@ -109,6 +131,23 @@ export function generateDailyWorkout({ library, dayIndex, difficulty = 1, quiz =
   }).filter(Boolean)
 
   if (exercises.length === 0) return null
+
+  // ── Anti-repeat guard ────────────────────────────────────────────
+  // The hand-authored curricula tend to alternate between the same 2
+  // lead exercises (L1: bodyweight-squat / sumo-squat; L2: thruster /
+  // swing). If the user happens to skip a day or the curriculum is
+  // edited, two consecutive sessions can land on the same first
+  // movement — which feels stale. Compare today's first base-slug to
+  // yesterday's; if they match, rotate today's exercises by one until
+  // they differ. Bounded loop so a curriculum where every entry shares
+  // the same base-slug doesn't infinite-loop.
+  const yLead = templateLeadSlug(dayIndex - 1, quiz)
+  if (yLead && exercises.length > 1) {
+    let safety = exercises.length
+    while (safety-- > 0 && baseSlug(exercises[0]?.slug) === baseSlug(yLead)) {
+      exercises.push(exercises.shift())
+    }
+  }
 
   // Total time. Unilateral entries (pair_with OR both_sides) cost 2 ×
   // prescribed seconds; everything else costs 1 ×.
