@@ -42,7 +42,15 @@ export const todayLocalDate = () => localDateString()
 export const monStartLocalDate = () => startOfWeekString()
 
 // ── Workout completions ──────────────────────────────────────────
-export async function recordWorkoutCompletion({ clientId, dayIndex, workoutNumber, durationSec }) {
+// Convert today's YYYY-MM-DD (Sofia tz) to the legacy DD.MM.YYYY format
+// used by the `workouts` table + gamification engine.
+function todayDotDate() {
+  const iso = todayLocalDate()       // YYYY-MM-DD
+  const [y, m, d] = iso.split('-')
+  return `${d}.${m}.${y}`
+}
+
+export async function recordWorkoutCompletion({ clientId, dayIndex, workoutNumber, durationSec, workout }) {
   if (!clientId || !SB_URL) return null
   const body = {
     client_id: clientId,
@@ -64,8 +72,55 @@ export async function recordWorkoutCompletion({ clientId, dayIndex, workoutNumbe
         body: JSON.stringify(body),
       }
     )
+
+    // ── Also write a row to legacy `workouts` so the gamification
+    // engine (which reads client.workouts) counts this completion
+    // toward badges, levels, monthly XP and streaks.
+    // We dedupe on (client_id, date) — one workout row per training day.
+    if (workout && workout.sections?.[0]?.exercises) {
+      const dotDate = todayDotDate()
+      const items = workout.sections[0].exercises.map(ex => ({
+        exercise: ex.name_bg || ex.name_en || ex.slug || '',
+        scheme:   `${workout.sections[0].rounds || 3}x${ex.prescribed || 30}sec`,
+        weight:   '',
+      }))
+      // Only insert if no workout row for today exists yet (avoid duplicates
+      // when the user replays the same workout). Cheap PATCH on conflict not
+      // available since `workouts` has no unique constraint — use a guard fetch.
+      const existing = await fetch(
+        `${SB_URL}/rest/v1/workouts?client_id=eq.${clientId}&date=eq.${dotDate}&select=id&limit=1`,
+        { headers: sbHeaders() }
+      ).then(r => r.ok ? r.json() : []).catch(() => [])
+      if (!Array.isArray(existing) || existing.length === 0) {
+        await fetch(`${SB_URL}/rest/v1/workouts`, {
+          method: 'POST',
+          headers: sbHeaders({ 'Content-Type': 'application/json', Prefer: 'return=minimal' }),
+          body: JSON.stringify({
+            client_id: clientId,
+            date:      dotDate,
+            coach:     'SYNRG',
+            category:  'Цяло тяло',
+            items,
+          }),
+        }).catch(() => {})
+      }
+    }
+
     return res.ok ? res.json() : null
   } catch { return null }
+}
+
+// Returns the completion row for today (or null if not done yet).
+// Used by the dashboard banner to show "Готова" + checkmark instead of
+// the "Започни" CTA after the user completes today's workout.
+export async function loadTodayWorkoutCompletion(clientId) {
+  if (!clientId) return null
+  const today = todayLocalDate()
+  const rows = await DB.selectAll(
+    'client_daily_workout_completions',
+    `&client_id=eq.${clientId}&for_date=eq.${today}&limit=1`
+  )
+  return Array.isArray(rows) && rows.length > 0 ? rows[0] : null
 }
 
 export async function countWorkoutsThisWeek(clientId) {

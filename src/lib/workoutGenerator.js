@@ -7,7 +7,10 @@
 // comes from the curriculum entry (varies between 25-40 sec). Rest
 // between exercises is 12 s; rest between rounds is 45 s.
 
-import { LEVEL_1_CURRICULUM, LEVEL_1_CONFIG } from './levelOneCurriculum'
+import {
+  LEVEL_1_CURRICULUM, LEVEL_1_CONFIG,
+  LEVEL_2_CURRICULUM, LEVEL_2_CONFIG,
+} from './levelOneCurriculum'
 
 // Unilateral pair detection — slugs end in "-l" or "-r" for the two sides.
 const SIDE_RE = /-(l|r)$/i
@@ -25,15 +28,51 @@ function mirrorSlug(slug) {
  * @param {number} args.dayIndex   0-based day since program start
  * @param {number} [args.difficulty]  reserved for level 2/3 (defaults 1)
  */
-export function generateDailyWorkout({ library, dayIndex, difficulty = 1 }) {
+// Map a quiz answers object (clients.synrg_quiz) to the starting fitness
+// level.  Rules:
+//   • last_trained === 'gt_3y'                              → L1 forced
+//   • activity >= 7  AND  last_trained !== 'gt_3y'          → L2 starter
+//   • everything else (incl. missing quiz)                  → L1 starter
+export function determineLevelStart(quiz) {
+  if (!quiz) return 1
+  const lt = String(quiz.last_trained || '').toLowerCase()
+  if (lt === 'gt_3y') return 1
+  const activity = Number(quiz.activity) || 0
+  if (activity >= 7 && lt && lt !== 'gt_3y') return 2
+  return 1
+}
+
+export function generateDailyWorkout({ library, dayIndex, difficulty = 1, quiz = null }) {
   if (!Array.isArray(library) || library.length === 0) return null
 
-  // Until we have level 2/3 curricula, every difficulty rotates Level 1
-  const curriculum = LEVEL_1_CURRICULUM
-  const cfg = LEVEL_1_CONFIG
+  const weekIndex   = Math.floor((dayIndex || 0) / 7)
+  const levelStart  = determineLevelStart(quiz)
+
+  // Progression rules:
+  //   • L1 starter, week 1   → L1 curriculum, 3 rounds
+  //   • L1 starter, week 2+  → L2 curriculum, 4 rounds (default L2 cfg)
+  //   • L2 starter, week 1   → L2 curriculum, 5 rounds
+  //   • L2 starter, week 2+  → L2 curriculum, 6 rounds
+  let curriculum, cfg, numberOffset
+  if (levelStart === 2) {
+    curriculum   = LEVEL_2_CURRICULUM
+    numberOffset = LEVEL_1_CURRICULUM.length
+    cfg = weekIndex === 0
+      ? { ...LEVEL_2_CONFIG, rounds: 5 }
+      : { ...LEVEL_2_CONFIG, rounds: 6 }
+  } else if (weekIndex === 0) {
+    curriculum   = LEVEL_1_CURRICULUM
+    cfg          = LEVEL_1_CONFIG
+    numberOffset = 0
+  } else {
+    curriculum   = LEVEL_2_CURRICULUM
+    cfg          = LEVEL_2_CONFIG
+    numberOffset = LEVEL_1_CURRICULUM.length
+  }
+
   const idx = ((dayIndex % curriculum.length) + curriculum.length) % curriculum.length
   const template = curriculum[idx]
-  const workoutNumber = idx + 1
+  const workoutNumber = idx + 1 + numberOffset
 
   const bySlug = new Map(library.map(ex => [ex.slug, ex]))
 
@@ -85,7 +124,7 @@ export function generateDailyWorkout({ library, dayIndex, difficulty = 1 }) {
     focus: 'Цяло тяло',
     dayIndex,
     workoutNumber,
-    curriculumSize: curriculum.length,
+    curriculumSize: LEVEL_1_CURRICULUM.length + LEVEL_2_CURRICULUM.length,
     difficulty,
     totalMinutes: Math.round(totalSec / 60),
     sections: [{

@@ -12,10 +12,18 @@ import { Box, Typography, Paper, Avatar, Skeleton } from '@mui/material'
 import VerifiedIcon from '@mui/icons-material/Verified'
 import { DB } from '../lib/db'
 import { C } from '../theme'
+import { useApp } from '../context/AppContext'
 
 export default function ExpertTeam() {
+  const { t, lang } = useApp()
   const [experts, setExperts] = useState(null)
   const [loading, setLoading] = useState(true)
+  // Helper: pick the right column based on the active language.
+  const pick = (exp, base) => {
+    if (!exp) return undefined
+    if (lang !== 'en') return exp[base]
+    return exp[`${base}_en`] || exp[base]
+  }
 
   useEffect(() => {
     let alive = true
@@ -57,11 +65,11 @@ export default function ExpertTeam() {
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
         <VerifiedIcon sx={{ fontSize: 16, color: C.logan }} />
         <Typography sx={{ fontSize: 11, letterSpacing: 1.5, fontWeight: 700, color: C.logan }}>
-          ЕКИПЪТ ЗАД МЕТОДА
+          {t('expertTitle')}
         </Typography>
       </Box>
       <Typography sx={{ fontSize: 12, color: C.muted, mb: 1.75, lineHeight: 1.45 }}>
-        Всяка препоръка идва от лекари и треньори, които работят с теб.
+        {t('expertIntro')}
       </Typography>
 
       <Box
@@ -98,7 +106,7 @@ export default function ExpertTeam() {
                 border: `2px solid ${C.loganBorder}`,
               }}
             >
-              {(exp.name || '?').charAt(0)}
+              {(pick(exp, 'name') || '?').charAt(0)}
             </Avatar>
             <Typography sx={{
               fontSize: 13,
@@ -107,9 +115,9 @@ export default function ExpertTeam() {
               lineHeight: 1.2,
               fontStyle: 'italic',
             }}>
-              {exp.name}
+              {pick(exp, 'name')}
             </Typography>
-            {exp.credentials && (
+            {pick(exp, 'credentials') && (
               <Typography sx={{
                 fontSize: 10,
                 color: C.logan,
@@ -118,7 +126,7 @@ export default function ExpertTeam() {
                 mt: 0.25,
                 textTransform: 'uppercase',
               }}>
-                {exp.credentials}
+                {pick(exp, 'credentials')}
               </Typography>
             )}
             {exp.role && (

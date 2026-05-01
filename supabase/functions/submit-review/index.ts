@@ -150,9 +150,13 @@ Deno.serve(async (req: Request) => {
     }
 
     // ── Path 2: PUBLIC submission (no account required) ───────────────
+    // Turnstile was retired (the widget kept showing "Unable to connect");
+    // we now rely on three lighter spam filters:
+    //   • client-side honeypot field (caught before submit)
+    //   • client-side time-on-form check (caught before submit)
+    //   • mandatory admin moderation before any review goes public
     const name = (body.name || "").toString().trim().slice(0, 50);
     const category = (body.category || "general").toString().trim().toLowerCase();
-    const turnstileToken = (body.turnstile_token || "").toString();
 
     if (!name || name.length < 2) {
       return new Response(
@@ -160,25 +164,10 @@ Deno.serve(async (req: Request) => {
         { status: 400, headers: { ...cors, "Content-Type": "application/json" } }
       );
     }
-    if (!cleanText || cleanText.length < 10) {
+    if (!cleanText) {
       return new Response(
-        JSON.stringify({ error: "Моля, напиши кратък отзив (мин. 10 знака)." }),
+        JSON.stringify({ error: "Моля, напиши отзив." }),
         { status: 400, headers: { ...cors, "Content-Type": "application/json" } }
-      );
-    }
-    if (!turnstileToken) {
-      return new Response(
-        JSON.stringify({ error: "Липсва Turnstile верификация." }),
-        { status: 400, headers: { ...cors, "Content-Type": "application/json" } }
-      );
-    }
-
-    const ip = req.headers.get("cf-connecting-ip") || req.headers.get("x-forwarded-for");
-    const captchaOk = await verifyTurnstile(turnstileToken, ip);
-    if (!captchaOk) {
-      return new Response(
-        JSON.stringify({ error: "Turnstile верификацията не премина. Моля, опитай отново." }),
-        { status: 403, headers: { ...cors, "Content-Type": "application/json" } }
       );
     }
 

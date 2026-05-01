@@ -32,14 +32,26 @@ export default function SubscriptionsTab({ t, lang }) {
   }, [])
 
   const moderateReview = async (id, newStatus) => {
+    // RLS only allows the service role to UPDATE program_reviews, so the
+    // direct DB.update from the admin browser fails silently.  We proxy
+    // through the moderate-review Edge Function which uses the service
+    // key + a shared admin secret for authorization.
     try {
-      await DB.update('program_reviews', id, {
-        status: newStatus,
-        reviewed_at: new Date().toISOString(),
+      const SB_URL = import.meta.env.VITE_SUPABASE_URL
+      const ADMIN_SECRET = '43513671f56530f3a1c9f2affd33d041a112c3e850f9de78'
+      const res = await fetch(`${SB_URL}/functions/v1/moderate-review`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, status: newStatus, admin_secret: ADMIN_SECRET }),
       })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok || !data.ok) {
+        throw new Error(data.error || `HTTP ${res.status}`)
+      }
       showSnackbar(newStatus === 'approved' ? 'Ревюто е одобрено' : 'Ревюто е отхвърлено', 'success')
       reload()
-    } catch {
+    } catch (err) {
+      console.error('moderateReview failed:', err)
       showSnackbar('Грешка при модерация', 'error')
     }
   }

@@ -146,7 +146,19 @@ function DailyTaskRow({ Icon, label, rightSlot, accent = 'mint', onClick, onIcon
 }
 
 export default function OnlineHome() {
-  const { auth, setView, t, client, updateClient } = useApp()
+  const { auth, setView, t, lang, client, updateClient } = useApp()
+  // Helper: prefer the EN column when active language is English, fall
+  // back to the BG (legacy) column for content that hasn't been translated yet.
+  // Strips a trailing "_bg" so callers can pass the legacy field name and we
+  // automatically look up the matching "_en" pair.
+  const pickLang = (row, base) => {
+    if (!row) return undefined
+    if (lang !== 'en') return row[base]
+    const enKey = base.endsWith('_bg')
+      ? base.replace(/_bg$/, '_en')
+      : `${base}_en`
+    return row[enKey] || row[base]
+  }
   const [loading,       setLoading]        = useState(true)
   const [weeks,         setWeeks]          = useState([])
   const [state,         setState]          = useState(null)
@@ -288,7 +300,7 @@ export default function OnlineHome() {
       .sort((a, b) => a.week_number - b.week_number)
       .map(w => ({
         weekNumber: w.week_number,
-        title:      w.title_bg || `Седмица ${w.week_number}`,
+        title:      pickLang(w, 'title_bg') || `${t('weekLabel')} ${w.week_number}`,
         tasks:      (w.tasks || []).filter(t => !isWorkoutTask(t) && !isCarryOverTask(t)),
       }))
       .filter(g => g.tasks.length > 0)
@@ -487,7 +499,7 @@ export default function OnlineHome() {
         }}
       >
         <Typography sx={{ fontSize: 12, color: C.logan, letterSpacing: 1.5, fontWeight: 700 }}>
-          SYNRG МЕТОД · ДЕН {dayNumber} ОТ {TOTAL_DAYS}
+          {t('heroEyebrow')(dayNumber, TOTAL_DAYS)}
         </Typography>
         <Typography
           sx={{
@@ -499,11 +511,11 @@ export default function OnlineHome() {
             lineHeight: 1.15,
           }}
         >
-          {weeks.find(w => w.week_number === currentWeek)?.title_bg || `Седмица ${currentWeek}`}
+          {pickLang(weeks.find(w => w.week_number === currentWeek), 'title_bg') || `${t('weekLabel')} ${currentWeek}`}
         </Typography>
-        {weeks.find(w => w.week_number === currentWeek)?.subtitle_bg && (
+        {pickLang(weeks.find(w => w.week_number === currentWeek), 'subtitle_bg') && (
           <Typography sx={{ mt: 0.5, color: C.muted, fontSize: 15 }}>
-            {weeks.find(w => w.week_number === currentWeek).subtitle_bg}
+            {pickLang(weeks.find(w => w.week_number === currentWeek), 'subtitle_bg')}
           </Typography>
         )}
         <Box sx={{ mt: 2 }}>
@@ -521,7 +533,7 @@ export default function OnlineHome() {
             }}
           />
           <Typography sx={{ mt: 0.75, fontSize: 12, color: C.muted }}>
-            Седмица {currentWeek} от {TOTAL_WEEKS}
+            {t('weekOfTotal')(currentWeek, TOTAL_WEEKS)}
           </Typography>
         </Box>
       </Paper>
@@ -543,7 +555,7 @@ export default function OnlineHome() {
           return (
             <Chip
               key={n}
-              label={locked ? `${n}` : `Седмица ${n}`}
+              label={locked ? `${n}` : `${t('weekLabel')} ${n}`}
               icon={locked ? <LockIcon sx={{ fontSize: 14 }} /> : undefined}
               onClick={() => !locked && setSelectedWeek(n)}
               sx={{
@@ -567,7 +579,7 @@ export default function OnlineHome() {
 
       {!selected && (
         <Typography sx={{ color: C.muted, textAlign: 'center', py: 4 }}>
-          Тази седмица все още няма съдържание.
+          {t('weekEmpty')}
         </Typography>
       )}
 
@@ -576,7 +588,7 @@ export default function OnlineHome() {
           {/* ── ДНЕС — single visual block: workout + logs + habits ── */}
           <Box data-tour="today" sx={{ mb: 3 }}>
             <Typography sx={{ fontSize: 11, letterSpacing: 1.5, fontWeight: 700, color: C.text, mb: 1.25 }}>
-              ДНЕС
+              {t('todayLabel')}
             </Typography>
             <Paper
               elevation={0}
@@ -592,6 +604,7 @@ export default function OnlineHome() {
                 clientId={auth?.id}
                 programStartedAt={state?.started_at}
                 difficulty={1}
+                quiz={client?.synrg_quiz}
                 flat
               />
 
@@ -604,27 +617,27 @@ export default function OnlineHome() {
               <Box data-tour="dailies" sx={{ display: 'flex', flexDirection: 'column' }}>
                 {[
                   {
-                    view: 'weight', label: 'Запиши тегло', Icon: MonitorWeightOutlinedIcon,
+                    view: 'weight', label: t('logWeight'), Icon: MonitorWeightOutlinedIcon,
                     done: didWeightToday, streak: weeklyStreaks.weight,
                     info: {
-                      title_bg: 'Защо да се теглим всеки ден',
-                      description: 'Теглото варира от ден в ден заради водна задръжка, фази на цикъла, осоленост на храната, стрес. Една стойност не казва нищо. Това, което казва, е тенденцията. Тегли се всяка сутрин при едни и същи условия (преди закуска, след тоалетна, голи) и наблюдавай средната за 4-5 поредни дни. Така се вижда реалната посока — без да се плашиш от ежедневните колебания.',
+                      title_bg: t('weightInfoTitle'),
+                      description: t('weightInfoBody'),
                     },
                   },
                   {
-                    view: 'food', label: 'Запиши храната си', Icon: RestaurantOutlinedIcon,
+                    view: 'food', label: t('logFood'), Icon: RestaurantOutlinedIcon,
                     done: didFoodToday, streak: weeklyStreaks.food,
                     info: {
-                      title_bg: 'Защо да записваме храната',
-                      description: 'Броенето на калории работи... но не дългосрочно — никой не го прави цял живот. Целта на 1-2 седмици записване не е „диета", а знание: откъде идват най-много калории в деня ти, колко реално приемаш, как изглеждат 150 г месо, една порция ориз, една шепа ядки. Това знание е основата, върху която после стои интуицията — и взимането на правилни решения става лесно, без да броиш всеки залък.',
+                      title_bg: t('foodInfoTitle'),
+                      description: t('foodInfoBody'),
                     },
                   },
                   {
-                    view: 'steps', label: 'Запиши стъпките си', Icon: DirectionsRunOutlinedIcon,
+                    view: 'steps', label: t('logSteps'), Icon: DirectionsRunOutlinedIcon,
                     done: didStepsToday, streak: weeklyStreaks.steps,
                     info: {
-                      title_bg: 'Защо да броим стъпките',
-                      description: 'Не е нужно да скочиш от 5 000 на 15 000 стъпки — това е насилие, което няма да издържиш. Започни с 2 000–3 000 повече, отколкото правиш сега. Това са около 90 000 допълнителни стъпки на месец — почти 1 кг изгорени мазнини за месец, без да тренираш повече. Бавно увеличение, устойчив навик. Това е разликата между „диета" и реален живот.',
+                      title_bg: t('stepsInfoTitle'),
+                      description: t('stepsInfoBody'),
                     },
                   },
                 ].map(item => (
@@ -638,7 +651,7 @@ export default function OnlineHome() {
                           fontSize: 11, fontWeight: 700,
                           color: item.streak >= 5 ? C.primary : C.muted,
                         }}>
-                          {item.streak}/7 дни
+                          {item.streak}/7 {t('daysShort')}
                         </Typography>
                         <IconButton
                           size="small"
@@ -670,13 +683,13 @@ export default function OnlineHome() {
                         <DailyTaskRow
                           key={task.id}
                           Icon={RowIcon}
-                          label={formatTaskTitle(task.title_bg, weightForTasks)}
+                          label={formatTaskTitle(pickLang(task, 'title_bg'), weightForTasks)}
                           rightSlot={
                             <Typography sx={{
                               fontSize: 11, fontWeight: 700,
                               color: slot.count >= 5 ? C.primary : C.muted,
                             }}>
-                              {slot.count}/7 дни
+                              {slot.count}/7 {t('daysShort')}
                             </Typography>
                           }
                           accent={accent}
@@ -745,7 +758,7 @@ export default function OnlineHome() {
                             fontSize: 12.5, color: C.text, lineHeight: 1.35,
                             overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                           }}>
-                            {formatTaskTitle(t2.title_bg, weightForTasks)}
+                            {formatTaskTitle(pickLang(t2, 'title_bg'), weightForTasks)}
                           </Typography>
                         </Box>
                       ))}
@@ -796,9 +809,9 @@ export default function OnlineHome() {
                           {w.title_bg}
                         </Typography>
                         <Typography sx={{ fontSize: 12, color: C.muted, mt: 0.25 }}>
-                          {w.workout_type === 'warmup'   ? 'ЗАГРЯВКА' :
-                           w.workout_type === 'cooldown' ? 'ОХЛАЖДАНЕ' :
-                           w.workout_type === 'mobility' ? 'МОБИЛНОСТ' : 'ОСНОВНА'}
+                          {w.workout_type === 'warmup'   ? t('workoutTypeWarmup') :
+                           w.workout_type === 'cooldown' ? t('workoutTypeCooldown') :
+                           w.workout_type === 'mobility' ? t('workoutTypeMobility') : t('workoutTypeMain')}
                           {w.time_cap_sec ? ` · ${Math.round(w.time_cap_sec/60)} мин` : ''}
                           {w.rounds && w.rounds > 1 ? ` · ${w.rounds} рунда` : ''}
                           {w.exercises?.length ? ` · ${w.exercises.length} упражнения` : ''}
@@ -831,14 +844,14 @@ export default function OnlineHome() {
           >
             <Box>
               <Typography sx={{ fontWeight: 700, color: C.text, fontSize: 15 }}>
-                Имаш въпрос?
+                {t('coachQTitle')}
               </Typography>
               <Typography sx={{ fontSize: 12, color: C.muted, mt: 0.25 }}>
-                Пиши на твоя ментор →
+                {t('coachQSub')}
               </Typography>
             </Box>
             <Button variant="contained" sx={{ borderRadius: 99, background: C.primary, color: '#0A2E0F', fontWeight: 700 }}>
-              Чат
+              {t('coachQBtn')}
             </Button>
           </Paper>
         </>
@@ -871,7 +884,7 @@ export default function OnlineHome() {
           color: C.text,
           pr: 6,
         }}>
-          {applyTaskVars(taskDialog?.title_bg, weightForTasks)}
+          {applyTaskVars(pickLang(taskDialog, 'title_bg'), weightForTasks)}
           <IconButton
             onClick={() => setTaskDialog(null)}
             size="small"
@@ -882,8 +895,8 @@ export default function OnlineHome() {
         </DialogTitle>
         <DialogContent>
           <Typography sx={{ fontSize: 14, color: C.text, lineHeight: 1.55, whiteSpace: 'pre-wrap' }}>
-            {applyTaskVars(taskDialog?.description, weightForTasks)
-              || 'Няма допълнително обяснение за тази задача.'}
+            {applyTaskVars(pickLang(taskDialog, 'description'), weightForTasks)
+              || t('taskNoExtra')}
           </Typography>
 
           {taskDialog?.rationale_bg && (
@@ -896,10 +909,10 @@ export default function OnlineHome() {
                 textTransform: 'uppercase',
                 mb: 0.75,
               }}>
-                Защо това работи
+                {t('whyThisWorks')}
               </Typography>
               <Typography sx={{ fontSize: 13, color: C.muted, lineHeight: 1.55, fontStyle: 'italic' }}>
-                {applyTaskVars(taskDialog.rationale_bg, weightForTasks)}
+                {applyTaskVars(pickLang(taskDialog, 'rationale_bg'), weightForTasks)}
               </Typography>
             </Box>
           )}
@@ -915,7 +928,7 @@ export default function OnlineHome() {
                 mb: 0.5,
                 opacity: 0.8,
               }}>
-                Източник
+                {t('sourceLabel')}
               </Typography>
               <Typography sx={{
                 fontSize: 11,
@@ -936,7 +949,7 @@ export default function OnlineHome() {
             opacity: 0.55,
             lineHeight: 1.4,
           }}>
-            Информацията е образователна и не замества медицинска консултация.
+            {t('eduDisclaimer')}
           </Typography>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2, gap: 1, justifyContent: 'space-between', flexWrap: 'wrap' }}>
@@ -963,7 +976,7 @@ export default function OnlineHome() {
                   },
                 }}
               >
-                {slot.doneToday ? 'Отбележи като неизпълнено' : 'Изпълнено за днес'}
+                {slot.doneToday ? t('markUndone') : t('markDone')}
               </Button>
             )
           })()}
@@ -980,7 +993,7 @@ export default function OnlineHome() {
               '&:hover': { background: taskDialog?.id ? 'rgba(255,255,255,0.04)' : C.primaryHover },
             }}
           >
-            Затвори
+            {t('closeBtn')}
           </Button>
         </DialogActions>
       </Dialog>

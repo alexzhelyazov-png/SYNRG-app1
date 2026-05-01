@@ -20,14 +20,16 @@ import SkipPreviousIcon     from '@mui/icons-material/SkipPrevious'
 import AccessTimeIcon       from '@mui/icons-material/AccessTime'
 import CheckCircleIcon      from '@mui/icons-material/CheckCircle'
 import ReplayIcon           from '@mui/icons-material/Replay'
+import StopIcon             from '@mui/icons-material/Stop'
 import { C } from '../theme'
 import { DB } from '../lib/db'
+import { useApp } from '../context/AppContext'
 import {
   generateDailyWorkout,
   focusLabelBg,
   WORKOUT_TIMING,
 } from '../lib/workoutGenerator'
-import { recordWorkoutCompletion, countWorkoutsThisWeek } from '../lib/dailyTracking'
+import { recordWorkoutCompletion, countWorkoutsThisWeek, loadTodayWorkoutCompletion } from '../lib/dailyTracking'
 
 const WEEKLY_WORKOUT_TARGET = 5
 
@@ -40,6 +42,135 @@ function daysSince(startDateStr) {
   return Math.max(0, Math.floor((today - start) / (1000 * 60 * 60 * 24)))
 }
 
+// ── LoopingClip ─────────────────────────────────────────────────
+// Source MOVs have a black frame at both ends:
+//   • ~0.1 s of black at the very start
+//   • ~0.7-1.0 s of black at the end
+// We skip past both:
+//   • on `loadedmetadata` we jump to HEAD_SKIP so the very first frame
+//     painted is the live action, not the leading black frame
+//   • a tight rAF poll seeks back to HEAD_SKIP whenever we cross the
+//     `duration - TRIM_SEC` threshold — restarts the loop cleanly with
+//     no trailing black flash
+function LoopingClip({ src, poster, style, ...rest }) {
+  const ref = useRef(null)
+  const rafRef = useRef(0)
+  const [ready, setReady] = useState(false)
+  const TRIM_SEC = 1.2
+  const HEAD_SKIP = 0.15
+
+  useEffect(() => {
+    setReady(false)
+    const v = ref.current
+    if (!v) return
+
+    // Reveal the <video> as soon as we have a real frame to show.
+    // Listen on EVERY event that signals "frames are flowing" so we
+    // never get stuck on a black wrapper if one of them doesn't fire
+    // (iOS Safari PWA, low-end Android, slow networks).
+    const reveal = () => setReady(true)
+    const events = ['playing', 'canplay', 'canplaythrough', 'seeked', 'timeupdate']
+    events.forEach(e => v.addEventListener(e, reveal))
+
+    const onMeta = () => {
+      try { v.currentTime = HEAD_SKIP } catch {}
+      // Some browsers (notably iOS PWA) suspend autoplay when the video
+      // is mounted off-screen; explicitly call play() so it doesn't sit
+      // on a black first frame waiting for user gesture.
+      v.play?.().catch(() => {})
+    }
+    v.addEventListener('loadedmetadata', onMeta)
+    if (v.readyState >= 1) onMeta()
+
+    // Hard fallback: if no event has fired in 1.5 s just reveal the
+    // element regardless — better to show a partial black frame for a
+    // moment than to leave the user staring at a permanently dark box.
+    const fallbackTimer = setTimeout(() => setReady(true), 1500)
+
+    const tick = () => {
+      if (v.duration && !v.paused) {
+        if (v.currentTime >= v.duration - TRIM_SEC) {
+          try { v.currentTime = HEAD_SKIP } catch {}
+        }
+      }
+      rafRef.current = requestAnimationFrame(tick)
+    }
+    rafRef.current = requestAnimationFrame(tick)
+    return () => {
+      cancelAnimationFrame(rafRef.current)
+      clearTimeout(fallbackTimer)
+      events.forEach(e => v.removeEventListener(e, reveal))
+      v.removeEventListener('loadedmetadata', onMeta)
+    }
+  }, [src])
+
+  // Solid-black wrapper while the video is still decoding/seeking past
+  // its leading black frame.  We deliberately do NOT use the poster as
+  // a background: Bunny generates the poster at an arbitrary moment of
+  // the clip, so the still image and the first played frame (at
+  // HEAD_SKIP) show the person in slightly different positions — that
+  // visible "jump" reads as a glitch.  A short black wrapper followed
+  // by an opacity fade-in is cleaner.
+  return (
+    <div
+      style={{
+        position: 'relative',
+        width:  style?.width  || '100%',
+        height: style?.height || '100%',
+        backgroundColor: '#0a0a0a',
+      }}
+    >
+      <video
+        ref={ref}
+        src={src}
+        muted autoPlay loop playsInline preload="auto"
+        style={{ ...style, opacity: ready ? 1 : 0, transition: 'opacity 140ms ease' }}
+        {...rest}
+      />
+    </div>
+  )
+}
+
+// ── Sound cues ────────────────────────────────────────────────────
+// Synthesized via Web Audio API so the app stays self-contained
+// (no audio files to bundle, no CORS, no preload).
+//   • beep(880, 0.10)  — countdown blip (3, 2, 1)
+//   • beep(440, 0.45)  — "go" tone fired when a new WORK step starts
+let _audioCtx = null
+function getAudioCtx() {
+  if (typeof window === 'undefined') return null
+  if (_audioCtx) return _audioCtx
+  const Ctx = window.AudioContext || window.webkitAudioContext
+  if (!Ctx) return null
+  _audioCtx = new Ctx()
+  return _audioCtx
+}
+function beep(freq, duration, vol = 0.25, type = 'sine', startOffset = 0) {
+  const ctx = getAudioCtx()
+  if (!ctx) return
+  // iOS Safari starts the context suspended; resume on every play attempt.
+  if (ctx.state === 'suspended') { try { ctx.resume() } catch {} }
+  const osc = ctx.createOscillator()
+  const gain = ctx.createGain()
+  osc.type = type
+  osc.frequency.value = freq
+  // Quick attack + decay envelope so beeps don't click.
+  const t0 = ctx.currentTime + startOffset
+  gain.gain.setValueAtTime(0, t0)
+  gain.gain.linearRampToValueAtTime(vol, t0 + 0.012)
+  gain.gain.exponentialRampToValueAtTime(0.0001, t0 + duration)
+  osc.connect(gain).connect(ctx.destination)
+  osc.start(t0)
+  osc.stop(t0 + duration + 0.05)
+}
+
+// Single, slightly extended tone fired when a new WORK step starts.
+// Triangle wave gives a fuller body than a pure sine without sounding
+// shrill on phone speakers.
+function playGoTone() {
+  beep(660, 0.55, 0.30, 'triangle')   // E5, ~0.55s
+}
+
 function fmtMSS(sec) {
   const s = Math.max(0, Math.round(sec))
   const m = Math.floor(s / 60)
@@ -47,10 +178,12 @@ function fmtMSS(sec) {
   return `${m}:${r.toString().padStart(2, '0')}`
 }
 
-export default function TodayWorkoutCard({ clientId, programStartedAt, difficulty = 1, flat = false }) {
+export default function TodayWorkoutCard({ clientId, programStartedAt, difficulty = 1, flat = false, quiz = null }) {
+  const { t } = useApp()
   const [library, setLibrary] = useState(null)
   const [open, setOpen] = useState(false)
   const [weekCount, setWeekCount] = useState(0)
+  const [doneToday, setDoneToday] = useState(false)
   const dayIndex = useMemo(() => daysSince(programStartedAt), [programStartedAt])
 
   useEffect(() => {
@@ -61,11 +194,14 @@ export default function TodayWorkoutCard({ clientId, programStartedAt, difficult
     return () => { cancel = true }
   }, [])
 
-  // Load this week's workout count so we can render "X/5"
+  // Load this week's workout count + whether today is done.
+  // Re-runs when the player closes so the banner updates immediately
+  // after the user finishes (or marks "Завърши") today's workout.
   useEffect(() => {
     if (!clientId) return
     let cancel = false
     countWorkoutsThisWeek(clientId).then(n => { if (!cancel) setWeekCount(n) })
+    loadTodayWorkoutCompletion(clientId).then(row => { if (!cancel) setDoneToday(!!row) })
     return () => { cancel = true }
   }, [clientId, open])
 
@@ -83,8 +219,8 @@ export default function TodayWorkoutCard({ clientId, programStartedAt, difficult
 
   const workout = useMemo(() => {
     if (!library || library.length === 0) return null
-    return generateDailyWorkout({ library, clientId, dayIndex, difficulty })
-  }, [library, clientId, dayIndex, difficulty])
+    return generateDailyWorkout({ library, clientId, dayIndex, difficulty, quiz })
+  }, [library, clientId, dayIndex, difficulty, quiz])
 
   if (!library) {
     return (
@@ -92,7 +228,7 @@ export default function TodayWorkoutCard({ clientId, programStartedAt, difficult
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
           <CircularProgress size={18} sx={{ color: C.primary }} />
           <Typography sx={{ fontSize: 13, color: C.muted }}>
-            Зареждам тренировката...
+            {t('workoutLoading')}
           </Typography>
         </Box>
       </Paper>
@@ -104,13 +240,13 @@ export default function TodayWorkoutCard({ clientId, programStartedAt, difficult
       <Paper sx={cardSx} elevation={0}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 0.75 }}>
           <FitnessCenterIcon sx={{ fontSize: 18, color: C.primary }} />
-          <Typography sx={overlineSx}>Тренировка днес</Typography>
+          <Typography sx={overlineSx}>{t('workoutToday')}</Typography>
         </Box>
         <Typography sx={{ fontSize: 18, fontWeight: 700, fontStyle: 'italic', color: C.text, fontFamily: "'MontBlanc', sans-serif" }}>
-          Скоро
+          {t('workoutComingSoon')}
         </Typography>
         <Typography sx={{ fontSize: 13, color: C.muted, mt: 0.5 }}>
-          Подреждаме библиотеката с упражнения. Върни се скоро.
+          {t('workoutComingSoonBody')}
         </Typography>
       </Paper>
     )
@@ -145,20 +281,34 @@ export default function TodayWorkoutCard({ clientId, programStartedAt, difficult
       >
         <Box sx={{
           width: 32, height: 32, borderRadius: '50%',
-          background: 'rgba(196,233,191,0.10)',
+          background: doneToday ? C.primary : 'rgba(196,233,191,0.10)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           flexShrink: 0,
         }}>
-          <FitnessCenterIcon sx={{ fontSize: 17, color: C.primary }} />
+          {doneToday
+            ? <CheckCircleIcon sx={{ fontSize: 19, color: '#0d1510' }} />
+            : <FitnessCenterIcon sx={{ fontSize: 17, color: C.primary }} />
+          }
         </Box>
-        <Typography sx={{
-          flex: 1, minWidth: 0,
-          fontSize: 14, fontWeight: 700, fontStyle: 'italic',
-          fontFamily: "'MontBlanc', sans-serif", color: C.text, lineHeight: 1.2,
-          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-        }}>
-          Тренировка
-        </Typography>
+        <Box sx={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 0.1 }}>
+          <Typography sx={{
+            fontSize: 14, fontWeight: 700, fontStyle: 'italic',
+            fontFamily: "'MontBlanc', sans-serif",
+            color: doneToday ? C.muted : C.text, lineHeight: 1.2,
+            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+            textDecoration: doneToday ? 'line-through' : 'none',
+          }}>
+            {doneToday ? t('workoutDoneBanner') : t('workoutTitle')}
+          </Typography>
+          {workout?.totalMinutes ? (
+            <Typography sx={{
+              fontSize: 11, fontWeight: 600,
+              color: C.muted, lineHeight: 1,
+            }}>
+              ~{workout.totalMinutes} мин
+            </Typography>
+          ) : null}
+        </Box>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, flexShrink: 0 }}>
           <Typography sx={{
             fontSize: 11, fontWeight: 700,
@@ -167,19 +317,25 @@ export default function TodayWorkoutCard({ clientId, programStartedAt, difficult
             {weekCount}/{WEEKLY_WORKOUT_TARGET}
           </Typography>
           <Button
-            variant="contained"
+            variant={doneToday ? 'outlined' : 'contained'}
             size="small"
             onClick={(e) => { e.stopPropagation(); setOpen(true) }}
             sx={{
               borderRadius: 100, px: 1.5, py: 0.25, minWidth: 0,
               fontWeight: 700, fontSize: 11, fontStyle: 'italic',
               fontFamily: "'MontBlanc', sans-serif",
-              background: C.primary, color: '#0d1510',
+              background: doneToday ? 'transparent' : C.primary,
+              color: doneToday ? C.primary : '#0d1510',
+              borderColor: doneToday ? C.primaryA20 : 'transparent',
               boxShadow: 'none',
-              '&:hover': { background: '#d4f0cf', boxShadow: 'none' },
+              '&:hover': {
+                background: doneToday ? 'rgba(196,233,191,0.08)' : '#d4f0cf',
+                borderColor: doneToday ? C.primary : 'transparent',
+                boxShadow: 'none',
+              },
             }}
           >
-            Започни
+            {doneToday ? t('workoutReplay') : t('workoutStart')}
           </Button>
         </Box>
       </Paper>
@@ -246,6 +402,7 @@ function buildSteps(workout) {
 }
 
 function WorkoutPlayer({ workout, onClose, onCompleted }) {
+  const { t } = useApp()
   const steps = useMemo(() => buildSteps(workout), [workout])
   const [phase, setPhase] = useState('prep')   // 'prep' | 'running' | 'done'
   const [stepIdx, setStepIdx] = useState(0)
@@ -291,11 +448,21 @@ function WorkoutPlayer({ workout, onClose, onCompleted }) {
     return () => clearInterval(tickRef.current)
   }, [phase, paused, steps.length])
 
-  // When stepIdx advances, prime the new countdown
+  // When stepIdx advances, prime the new countdown.  We also fire a
+  // "go" tone whenever we enter a WORK step so the user can keep their
+  // eyes on form instead of the screen.
   useEffect(() => {
     if (phase !== 'running') return
     setSecLeft(steps[stepIdx]?.sec || 0)
+    const s = steps[stepIdx]
+    if (s?.kind === 'work') playGoTone()
   }, [stepIdx, phase, steps])
+
+  // Countdown beeps on the last 3 seconds of every step.
+  useEffect(() => {
+    if (phase !== 'running' || paused) return
+    if (secLeft > 0 && secLeft <= 3) beep(880, 0.10)
+  }, [secLeft, phase, paused])
 
   function start() {
     setPhase('running')
@@ -338,104 +505,178 @@ function WorkoutPlayer({ workout, onClose, onCompleted }) {
   const isWork = step.kind === 'work'
   const isRoundRest = step.kind === 'round-rest'
   const colorAccent = isWork ? C.primary : C.logan
-  const sideLabel = step.side === 'left' ? ' · ЛЯВА СТРАНА' : step.side === 'right' ? ' · ДЯСНА СТРАНА' : ''
-  const stateLabel = isWork ? `WORK${sideLabel}` : isRoundRest ? 'ПОЧИВКА МЕЖДУ РУНДИ' : 'REST'
+  const sideLabel = step.side === 'left' ? t('workoutSideLeft') : step.side === 'right' ? t('workoutSideRight') : ''
+  const stateLabel = isWork ? `WORK${sideLabel}` : isRoundRest ? t('workoutBetweenRounds') : 'REST'
   const ex = step.ex
   const stepProgress = step.sec > 0 ? ((step.sec - secLeft) / step.sec) * 100 : 0
 
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh', background: C.bg, color: C.text }}>
-      {/* Top bar */}
+    <Box sx={{
+      display: 'flex', flexDirection: 'column',
+      height: '100dvh', maxHeight: '100dvh', overflow: 'hidden',
+      background: C.bg, color: C.text,
+      paddingTop: 'env(safe-area-inset-top)',
+      paddingBottom: 'env(safe-area-inset-bottom)',
+      paddingLeft: 'env(safe-area-inset-left)',
+      paddingRight: 'env(safe-area-inset-right)',
+    }}>
+      {/* Top bar — compact */}
       <Box sx={{
+        flexShrink: 0,
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        px: 2, py: 1.25, borderBottom: `1px solid ${C.border}`,
+        px: 1.5, py: 0.75, borderBottom: `1px solid ${C.border}`,
       }}>
-        <Typography sx={{ fontSize: 12, fontWeight: 700, letterSpacing: 1.2, color: C.muted }}>
-          РУНД {step.round} / {totalRounds}
+        <Typography sx={{ fontSize: 11, fontWeight: 700, letterSpacing: 1.2, color: C.muted }}>
+          {t('workoutRound')} {step.round}/{totalRounds}
         </Typography>
         {!isRoundRest && (
-          <Typography sx={{ fontSize: 12, fontWeight: 700, letterSpacing: 1.2, color: C.muted }}>
-            {(step.exIdx ?? 0) + 1} / {exPerRound}
+          <Typography sx={{ fontSize: 11, fontWeight: 700, letterSpacing: 1.2, color: C.muted }}>
+            {(step.exIdx ?? 0) + 1}/{exPerRound}
           </Typography>
         )}
-        <IconButton size="small" onClick={onClose} sx={{ color: C.text }}>
-          <CloseIcon />
-        </IconButton>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+          <Button
+            onClick={() => setPhase('done')}
+            size="small"
+            startIcon={<StopIcon sx={{ fontSize: 16 }} />}
+            sx={{
+              minWidth: 0, px: 1.25, py: 0.25,
+              color: C.text, textTransform: 'none',
+              fontSize: 12, fontWeight: 700, fontStyle: 'italic',
+              fontFamily: "'MontBlanc', sans-serif",
+              border: `1px solid ${C.border}`, borderRadius: 99,
+            }}
+          >
+            {t('workoutFinish')}
+          </Button>
+          <IconButton size="small" onClick={onClose} sx={{ color: C.text }}>
+            <CloseIcon sx={{ fontSize: 20 }} />
+          </IconButton>
+        </Box>
       </Box>
 
-      {/* Step progress */}
+      {/* Overall workout progress — solid mint bar fills as steps complete */}
       <LinearProgress
         variant="determinate"
-        value={stepProgress}
+        value={steps.length > 0 ? ((stepIdx + (step.sec > 0 ? (step.sec - secLeft) / step.sec : 0)) / steps.length) * 100 : 0}
         sx={{
+          flexShrink: 0,
           height: 3, background: 'rgba(255,255,255,0.06)',
-          '& .MuiLinearProgress-bar': { background: colorAccent },
+          '& .MuiLinearProgress-bar': {
+            background: C.primary,
+            transition: 'transform 250ms linear',
+          },
         }}
       />
 
-      {/* Body */}
-      <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', px: 3, gap: 2 }}>
+      {/* Per-step segmented bar — one dot per step. Done = solid mint,
+          current = mint, upcoming = dim. Lets the user see exactly
+          where they are in the workout at a glance. */}
+      <Box sx={{
+        flexShrink: 0,
+        display: 'flex', gap: 0.5,
+        px: 1, py: 0.75,
+      }}>
+        {steps.map((s, i) => {
+          const done = i < stepIdx
+          const current = i === stepIdx
+          const isWorkSeg = s.kind === 'work'
+          const bg = done
+            ? C.primary
+            : current
+              ? C.primary
+              : 'rgba(255,255,255,0.10)'
+          return (
+            <Box
+              key={i}
+              sx={{
+                flex: 1,
+                height: isWorkSeg ? 4 : 3,
+                borderRadius: 99,
+                background: bg,
+                opacity: current ? (paused ? 0.6 : 1) : 1,
+                transition: 'background 200ms ease',
+              }}
+            />
+          )
+        })}
+      </Box>
+
+      {/* Body — flex column, video uses available space */}
+      <Box sx={{
+        flex: 1, minHeight: 0,
+        display: 'flex', flexDirection: 'column', alignItems: 'center',
+        px: 2, py: 1, gap: 0.75,
+      }}>
         <Typography sx={{
-          fontSize: 13, fontWeight: 800, letterSpacing: 2, color: colorAccent, textTransform: 'uppercase',
+          fontSize: 'clamp(20px, 3.2vh, 28px)',
+          fontWeight: 800, letterSpacing: 2.5,
+          color: colorAccent, textTransform: 'uppercase',
         }}>
           {stateLabel}
         </Typography>
 
         <Typography sx={{
-          fontSize: 'clamp(64px, 22vw, 132px)', fontWeight: 800, fontStyle: 'italic',
-          fontFamily: "'MontBlanc', sans-serif", color: C.text, lineHeight: 1, my: 1,
+          fontSize: 'clamp(48px, 14vh, 96px)', fontWeight: 800, fontStyle: 'italic',
+          fontFamily: "'MontBlanc', sans-serif",
+          color: secLeft > 0 && secLeft <= 3 ? '#FF7A50' : C.text,
+          transition: 'color 120ms ease',
+          lineHeight: 1,
         }}>
           {fmtMSS(secLeft)}
         </Typography>
 
-        {/* Clip */}
+        {/* Clip — flex grows to fill remaining space */}
         {ex?.clip_url && (
           <Box sx={{
-            width: '100%', maxWidth: 360, aspectRatio: '4/5', borderRadius: 3, overflow: 'hidden',
+            flex: 1, minHeight: 0,
+            width: '100%', maxWidth: 360, aspectRatio: '4/5',
+            borderRadius: 3, overflow: 'hidden',
             border: `1px solid ${C.loganBorder}`, background: 'rgba(0,0,0,0.4)',
+            display: 'flex',
           }}>
-            <video
+            <LoopingClip
               key={ex.clip_url + step.kind + stepIdx}
               src={ex.clip_url}
               poster={ex.thumb_url || undefined}
-              muted autoPlay loop playsInline
               style={{ width: '100%', height: '100%', objectFit: 'cover' }}
             />
           </Box>
         )}
 
         <Typography sx={{
-          fontSize: 22, fontWeight: 700, fontStyle: 'italic',
+          fontSize: 'clamp(15px, 2.4vh, 20px)', fontWeight: 700, fontStyle: 'italic',
           fontFamily: "'MontBlanc', sans-serif", color: C.text, textAlign: 'center', lineHeight: 1.15,
         }}>
-          {isRoundRest ? 'Поеми въздух · следва нов рунд' : ex?.name_bg || '—'}
+          {isRoundRest ? t('workoutBreathe') : ex?.name_bg || '—'}
         </Typography>
 
         {!isWork && !isRoundRest && (
-          <Typography sx={{ fontSize: 12, fontWeight: 700, color: C.muted, letterSpacing: 1, textTransform: 'uppercase' }}>
-            Следва: {ex?.name_bg}
+          <Typography sx={{ fontSize: 11, fontWeight: 700, color: C.muted, letterSpacing: 1, textTransform: 'uppercase' }}>
+            {t('workoutNext')} {ex?.name_bg}
           </Typography>
         )}
       </Box>
 
-      {/* Controls */}
+      {/* Controls — compact */}
       <Box sx={{
+        flexShrink: 0,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        gap: 1.5, px: 2, py: 2, borderTop: `1px solid ${C.border}`,
+        gap: 1.25, px: 2, py: 1.25, borderTop: `1px solid ${C.border}`,
       }}>
-        <IconButton onClick={prev} sx={{ color: C.text, border: `1px solid ${C.border}` }} disabled={stepIdx === 0}>
+        <IconButton onClick={prev} sx={{ color: C.text, border: `1px solid ${C.border}`, width: 44, height: 44 }} disabled={stepIdx === 0}>
           <SkipPreviousIcon />
         </IconButton>
         <IconButton
           onClick={() => setPaused(p => !p)}
           sx={{
-            color: '#0d1510', background: C.primary, width: 64, height: 64,
+            color: '#0d1510', background: C.primary, width: 56, height: 56,
             '&:hover': { background: '#d4f0cf' },
           }}
         >
-          {paused ? <PlayArrowIcon sx={{ fontSize: 30 }} /> : <PauseIcon sx={{ fontSize: 30 }} />}
+          {paused ? <PlayArrowIcon sx={{ fontSize: 28 }} /> : <PauseIcon sx={{ fontSize: 28 }} />}
         </IconButton>
-        <IconButton onClick={next} sx={{ color: C.text, border: `1px solid ${C.border}` }}>
+        <IconButton onClick={next} sx={{ color: C.text, border: `1px solid ${C.border}`, width: 44, height: 44 }}>
           <SkipNextIcon />
         </IconButton>
       </Box>
@@ -445,15 +686,23 @@ function WorkoutPlayer({ workout, onClose, onCompleted }) {
 
 // ── Prep / Done screens ──────────────────────────────────────────
 function PrepScreen({ workout, onStart, onClose }) {
+  const { t } = useApp()
   const main = workout.sections[0]
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh', background: C.bg, color: C.text }}>
+    <Box sx={{
+      display: 'flex', flexDirection: 'column',
+      height: '100dvh', maxHeight: '100dvh',
+      background: C.bg, color: C.text,
+      paddingTop: 'env(safe-area-inset-top)',
+      paddingLeft: 'env(safe-area-inset-left)',
+      paddingRight: 'env(safe-area-inset-right)',
+    }}>
       <Box sx={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         px: 2, py: 1.25, borderBottom: `1px solid ${C.border}`,
       }}>
         <Typography sx={{ fontSize: 12, fontWeight: 700, letterSpacing: 1.2, color: C.muted }}>
-          ДЕН {workout.dayIndex + 1} · {workout.focus.toUpperCase()}
+          {t('workoutDay')} {workout.dayIndex + 1} · {workout.focus.toUpperCase()}
         </Typography>
         <IconButton size="small" onClick={onClose} sx={{ color: C.text }}>
           <CloseIcon />
@@ -465,10 +714,10 @@ function PrepScreen({ workout, onStart, onClose }) {
           fontSize: 28, fontWeight: 800, fontStyle: 'italic',
           fontFamily: "'MontBlanc', sans-serif", color: C.text, lineHeight: 1.05, mb: 1,
         }}>
-          Тренировка {workout.workoutNumber} от {workout.curriculumSize || 20}
+          {t('workoutTitle')} {workout.workoutNumber} {t('workoutOfTotal')} {workout.curriculumSize || 20}
         </Typography>
         <Typography sx={{ fontSize: 13, color: C.muted, mb: 2.5 }}>
-          {main.rounds} рунда × {main.exercises.length} упражнения · {workout.totalMinutes} мин общо · {WORKOUT_TIMING.REST_SEC} сек смяна / {WORKOUT_TIMING.ROUND_REST_SEC} сек почивка между рундите
+          {t('workoutSummary')(main.rounds, main.exercises.length, workout.totalMinutes, WORKOUT_TIMING.REST_SEC, WORKOUT_TIMING.ROUND_REST_SEC)}
         </Typography>
 
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.25, mb: 3 }}>
@@ -484,7 +733,7 @@ function PrepScreen({ workout, onStart, onClose }) {
                 background: 'rgba(0,0,0,0.4)', flexShrink: 0,
               }}>
                 {ex.clip_url ? (
-                  <video src={ex.clip_url} poster={ex.thumb_url} muted autoPlay loop playsInline
+                  <LoopingClip src={ex.clip_url} poster={ex.thumb_url}
                          style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                 ) : null}
               </Box>
@@ -492,8 +741,8 @@ function PrepScreen({ workout, onStart, onClose }) {
                 <Typography sx={{
                   fontSize: 11, fontWeight: 700, color: C.primary, letterSpacing: 1, textTransform: 'uppercase',
                 }}>
-                  {String(i + 1).padStart(2, '0')} · {ex.prescribed} сек
-                  {(ex.pair_with || ex.both_sides) ? ' / страна' : ''}
+                  {String(i + 1).padStart(2, '0')} · {ex.prescribed} {t('workoutSec')}
+                  {(ex.pair_with || ex.both_sides) ? t('workoutPerSide') : ''}
                 </Typography>
                 <Typography sx={{
                   fontSize: 15, fontWeight: 700, fontStyle: 'italic',
@@ -510,7 +759,13 @@ function PrepScreen({ workout, onStart, onClose }) {
         </Box>
       </Box>
 
-      <Box sx={{ p: 2.5, borderTop: `1px solid ${C.border}`, background: C.bg }}>
+      <Box sx={{
+        p: 2.5,
+        pb: 'calc(20px + env(safe-area-inset-bottom))',
+        borderTop: `1px solid ${C.border}`,
+        background: C.bg,
+        flexShrink: 0,
+      }}>
         <Button
           fullWidth variant="contained" startIcon={<PlayArrowIcon />}
           onClick={onStart}
@@ -521,7 +776,7 @@ function PrepScreen({ workout, onStart, onClose }) {
             '&:hover': { background: '#d4f0cf' },
           }}
         >
-          Започни сега
+          {t('workoutStartNow')}
         </Button>
       </Box>
     </Box>
@@ -529,27 +784,34 @@ function PrepScreen({ workout, onStart, onClose }) {
 }
 
 function DoneScreen({ workout, onRestart, onClose }) {
+  const { t } = useApp()
   return (
     <Box sx={{
-      display: 'flex', flexDirection: 'column', height: '100vh', background: C.bg, color: C.text,
+      display: 'flex', flexDirection: 'column',
+      height: '100dvh', maxHeight: '100dvh',
+      background: C.bg, color: C.text,
       alignItems: 'center', justifyContent: 'center', px: 3, gap: 2,
+      paddingTop: 'calc(16px + env(safe-area-inset-top))',
+      paddingBottom: 'calc(16px + env(safe-area-inset-bottom))',
+      paddingLeft: 'calc(24px + env(safe-area-inset-left))',
+      paddingRight: 'calc(24px + env(safe-area-inset-right))',
     }}>
       <CheckCircleIcon sx={{ fontSize: 96, color: C.primary }} />
       <Typography sx={{
         fontSize: 32, fontWeight: 800, fontStyle: 'italic',
         fontFamily: "'MontBlanc', sans-serif", color: C.text, textAlign: 'center', lineHeight: 1.1,
       }}>
-        Готово.
+        {t('workoutDone')}
       </Typography>
       <Typography sx={{ fontSize: 14, color: C.muted, textAlign: 'center', maxWidth: 320 }}>
-        Един рунд по-силен от вчера. Спокойно дишане, малко вода, разтягане.
+        {t('workoutDoneBody')}
       </Typography>
       <Box sx={{ display: 'flex', gap: 1.5, mt: 2 }}>
         <Button
           variant="outlined" startIcon={<ReplayIcon />} onClick={onRestart}
           sx={{ borderRadius: 100, color: C.text, borderColor: C.border, fontWeight: 700, fontStyle: 'italic', fontFamily: "'MontBlanc', sans-serif" }}
         >
-          Отначало
+          {t('workoutRestart')}
         </Button>
         <Button
           variant="contained" onClick={onClose}
@@ -559,7 +821,7 @@ function DoneScreen({ workout, onRestart, onClose }) {
             '&:hover': { background: '#d4f0cf' },
           }}
         >
-          Към dashboard
+          {t('workoutToDashboard')}
         </Button>
       </Box>
     </Box>

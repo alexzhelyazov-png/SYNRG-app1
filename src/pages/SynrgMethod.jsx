@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useRef } from 'react'
 import {
   Box, Typography, Paper, Button, TextField,
   IconButton, Divider,
@@ -128,6 +128,26 @@ const QUESTIONS = [
       { value: 'daily',     labelBg: 'Всеки ден',  labelEn: 'Daily'       },
     ],
   },
+  // ── Fitness self-assessment — drives the workout level (L1 vs L2)
+  {
+    id: 'activity',
+    type: 'number',
+    labelBg: 'Колко активен се чувстваш от 1 до 10?',
+    labelEn: 'How active do you feel from 1 to 10?',
+    suffix: '/10',
+  },
+  {
+    id: 'last_trained',
+    type: 'choice',
+    labelBg: 'Кога последно си тренирал/а редовно?',
+    labelEn: 'When did you last train regularly?',
+    options: [
+      { value: 'recent',   labelBg: 'Под 6 месеца', labelEn: 'Under 6 months' },
+      { value: 'lt_1y',    labelBg: '6м – 1 година', labelEn: '6m – 1 year'  },
+      { value: 'lt_3y',    labelBg: '1 – 3 години',  labelEn: '1 – 3 years'   },
+      { value: 'gt_3y',    labelBg: 'Над 3 години',  labelEn: 'Over 3 years'  },
+    ],
+  },
 ]
 
 // ── Show conditions (keyed by show_condition from DB) ──────────
@@ -209,14 +229,34 @@ function saveState(key, val) {
 // post-payment onboarding flow (consent → quiz → program start → tour).
 export function QuizScreen({ onDone, isBg }) {
   const [answers, setAnswers] = useState({})
+  const [highlight, setHighlight] = useState(null)
+  const refs = useRef({})
 
-  const allAnswered = QUESTIONS.every(q => {
+  const isAnswered = (q) => {
     if (q.type === 'number') return answers[q.id] && Number(answers[q.id]) > 0
-    return answers[q.id]
-  })
+    return !!answers[q.id]
+  }
+  const allAnswered = QUESTIONS.every(isAnswered)
+  const answeredCount = QUESTIONS.filter(isAnswered).length
 
   function set(id, val) {
     setAnswers(p => ({ ...p, [id]: val }))
+  }
+
+  function handleSubmit() {
+    if (allAnswered) {
+      onDone(answers)
+      return
+    }
+    // Scroll to first unanswered and flash it so the user sees what's missing.
+    const first = QUESTIONS.find(q => !isAnswered(q))
+    if (!first) return
+    const node = refs.current[first.id]
+    if (node?.scrollIntoView) {
+      node.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }
+    setHighlight(first.id)
+    setTimeout(() => setHighlight(null), 1600)
   }
 
   return (
@@ -229,8 +269,13 @@ export function QuizScreen({ onDone, isBg }) {
       <Paper sx={{ overflow: 'hidden' }}>
         {QUESTIONS.map((q, qi) => {
           const label = isBg ? q.labelBg : q.labelEn
+          const isHi = highlight === q.id
           return (
-            <Box key={q.id}>
+            <Box key={q.id} ref={el => { refs.current[q.id] = el }} sx={{
+              transition: 'background 0.3s ease',
+              background: isHi ? 'rgba(255, 90, 90, 0.10)' : 'transparent',
+              outline: isHi ? '1px solid rgba(255,90,90,0.55)' : 'none',
+            }}>
               <Box sx={{ px: 2, py: '14px' }}>
                 <Typography sx={{ fontWeight: 700, fontSize: '14px', mb: 1.5 }}>{label}</Typography>
 
@@ -281,11 +326,14 @@ export function QuizScreen({ onDone, isBg }) {
         <Box sx={{ p: 2 }}>
           <Button
             fullWidth variant="contained"
-            disabled={!allAnswered}
-            onClick={() => onDone(answers)}
+            onClick={handleSubmit}
             sx={{ py: 1.5, fontWeight: 700, fontSize: '14px' }}
           >
-            {isBg ? 'Виж плана си →' : 'See my plan →'}
+            {allAnswered
+              ? (isBg ? 'Виж плана си →' : 'See my plan →')
+              : (isBg
+                  ? `Виж плана си → (${answeredCount}/${QUESTIONS.length})`
+                  : `See my plan → (${answeredCount}/${QUESTIONS.length})`)}
           </Button>
         </Box>
       </Paper>

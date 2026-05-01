@@ -120,7 +120,7 @@ export default function CoachChat() {
             {assignedCoach.name}
           </Typography>
           <Typography sx={{ fontSize: 11, color: C.muted, letterSpacing: '0.04em' }}>
-            Твоят ментор
+            {t('yourMentor')}
           </Typography>
         </Box>
       </Box>
