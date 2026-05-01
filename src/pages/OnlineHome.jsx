@@ -586,12 +586,16 @@ export default function OnlineHome() {
       {selected && (
         <>
           {/* ── ДНЕС — single visual block: workout + logs + habits ── */}
-          <Box data-tour="today" sx={{ mb: 3 }}>
+          <Box sx={{ mb: 3 }}>
             <Typography sx={{ fontSize: 11, letterSpacing: 1.5, fontWeight: 700, color: C.text, mb: 1.25 }}>
               {t('todayLabel')}
             </Typography>
+            {/* `data-tour="today"` lives on the Paper itself so the
+                WelcomeTour spotlight ring frames just the white card
+                (workout + logs + habits) — not the eyebrow above it. */}
             <Paper
               elevation={0}
+              data-tour="today"
               sx={{
                 p: 1, borderRadius: 2.5,
                 border: `1px solid ${C.loganBorder}`,
@@ -599,14 +603,19 @@ export default function OnlineHome() {
                 display: 'flex', flexDirection: 'column',
               }}
             >
-              {/* Тренировка днес — flat (no own border, parent owns the frame) */}
-              <TodayWorkoutCard
-                clientId={auth?.id}
-                programStartedAt={state?.started_at}
-                difficulty={1}
-                quiz={client?.synrg_quiz}
-                flat
-              />
+              {/* Тренировка днес — flat (no own border, parent owns the frame).
+                  Wrapper carries the `today-workout` tour anchor so the welcome
+                  tour can spotlight just this row instead of the rarely-rendered
+                  legacy program_workouts block. */}
+              <Box data-tour="today-workout">
+                <TodayWorkoutCard
+                  clientId={auth?.id}
+                  programStartedAt={state?.started_at}
+                  difficulty={1}
+                  quiz={client?.synrg_quiz}
+                  flat
+                />
+              </Box>
 
               <Box sx={{ height: 1, background: C.border, my: 0.5 }} />
 

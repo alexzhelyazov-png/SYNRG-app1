@@ -70,12 +70,22 @@ function LockBadge() {
 }
 
 // ── Shared pill-style nav button ─────────────────────────────
-function NavAction({ value, Icon, label, isSelected, onClick, badge, isLocked, ...rest }) {
+// MUI v6 BottomNavigationAction strips custom data-* attributes on the way
+// through (BottomNavigation cloneElement only forwards a fixed prop set),
+// so we attach `data-tour` via a callback ref directly on the DOM root.
+// Without this hack the WelcomeTour can't locate the bottom-nav buttons
+// on mobile and falls back to a no-highlight centered tooltip.
+function NavAction({ value, Icon, label, isSelected, onClick, badge, isLocked, dataTour, ...rest }) {
   const iconColor = isSelected ? C.purple : isLocked ? 'rgba(196,209,205,0.3)' : C.muted
   const labelColor = isSelected ? C.purple : isLocked ? 'rgba(196,209,205,0.3)' : C.muted
 
+  const setRef = (node) => {
+    if (node && dataTour) node.setAttribute('data-tour', dataTour)
+  }
+
   return (
     <BottomNavigationAction
+      ref={setRef}
       value={value}
       label={label}
       onClick={onClick}
@@ -187,6 +197,8 @@ export default function MobileNav() {
                 isSelected={view === v && !viewingCoach}
                 badge={showBadge ? unreadFeedCount : 0}
                 isLocked={!!isLocked}
+                // Tour anchor — WelcomeTour highlights nav-dashboard / nav-progress / nav-programs
+                dataTour={`nav-${v}`}
               />
             )
           })}

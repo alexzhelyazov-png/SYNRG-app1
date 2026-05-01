@@ -24,21 +24,30 @@ import { C } from '../theme'
 // Copy for each step comes from translations (bg + en). The `i18n` field
 // is the prefix — we resolve `<prefix>_eyebrow`, `<prefix>_title`,
 // `<prefix>_body` at render time via t().
+// Trimmed per founder feedback:
+//   • Dropped `nav-dashboard` (Твоят ден) — the welcome already explains
+//     why we're here, no need for a redundant nav-callout step.
+//   • Dropped `dailies` (Ежедневни навици) and `workout` (Движение за
+//     седмицата) — the `focus` step now spotlights the WHOLE ДНЕС
+//     panel (`data-tour="today"`), so the user sees workout + dailies
+//     + habits in one highlighted block instead of three repetitive steps.
+//   • `focus` step now resolves to `[data-tour="today"]` (was orphan
+//     `[data-tour="focus"]` and always fell back to a centered card).
+//   • `nav-*` anchors live on BOTH Sidebar (desktop) and MobileNav
+//     (mobile) so the highlight ring works on phones too.
 const STEPS = [
-  { key: 'welcome',       view: 'dashboard', tab: null,       target: null,                         i18n: 'tour_welcome'       },
+  { key: 'welcome',       view: 'dashboard', tab: null,       target: null,                            i18n: 'tour_welcome'       },
   // ── Section 1: Today (dashboard) ──────────────────────────────
-  { key: 'nav-dashboard', view: 'dashboard', tab: null,       target: '[data-tour="nav-dashboard"]', i18n: 'tour_navDashboard' },
-  { key: 'focus',         view: 'dashboard', tab: null,       target: '[data-tour="focus"]',         i18n: 'tour_focus'         },
-  { key: 'dailies',       view: 'dashboard', tab: null,       target: '[data-tour="dailies"]',       i18n: 'tour_dailies'       },
-  { key: 'workout',       view: 'dashboard', tab: null,       target: '[data-tour="workout"]',       i18n: 'tour_workout'       },
-  { key: 'chat',          view: 'dashboard', tab: null,       target: '[data-tour="chat"]',          i18n: 'tour_chat'          },
+  { key: 'focus',         view: 'dashboard', tab: null,       target: '[data-tour="today"]',           i18n: 'tour_focus'         },
+  { key: 'chat',          view: 'dashboard', tab: null,       target: '[data-tour="chat"]',            i18n: 'tour_chat'          },
   // ── Section 2: Progress ───────────────────────────────────────
-  { key: 'nav-progress',  view: 'progress',  tab: 'progress', target: '[data-tour="nav-progress"]',  i18n: 'tour_navProgress'   },
-  { key: 'badges',        view: 'progress',  tab: 'progress', target: '[data-tour="tab-badges"]',    i18n: 'tour_badges'        },
-  { key: 'ranking',       view: 'progress',  tab: 'ranking',  target: '[data-tour="tab-ranking"]',   i18n: 'tour_ranking'       },
+  // `nav-progress` step removed — the badges step that follows already
+  // explains the section, so the section-intro callout was redundant.
+  { key: 'badges',        view: 'progress',  tab: 'progress', target: '[data-tour="tab-badges"]',      i18n: 'tour_badges'        },
+  { key: 'ranking',       view: 'progress',  tab: 'ranking',  target: '[data-tour="tab-ranking"]',     i18n: 'tour_ranking'       },
   // ── Section 3: Resources ──────────────────────────────────────
-  { key: 'nav-resources', view: 'programs',  tab: null,       target: '[data-tour="nav-programs"]',  i18n: 'tour_navResources'  },
-  { key: 'recipes',       view: 'recipes',   tab: null,       target: '[data-tour="recipes"]',       i18n: 'tour_recipes'       },
+  { key: 'nav-resources', view: 'programs',  tab: null,       target: '[data-tour="nav-programs"]',    i18n: 'tour_navResources'  },
+  { key: 'recipes',       view: 'recipes',   tab: null,       target: '[data-tour="recipes"]',         i18n: 'tour_recipes'       },
 ]
 
 const TOTAL = STEPS.length
@@ -98,7 +107,11 @@ export default function WelcomeTour() {
 
     let cancelled = false
     let retries = 0
-    const maxRetries = 30 // ~3s total
+    // 12 retries × 100 ms = 1.2 s total. Used to be 30 (3 s) but on
+    // mobile a missing target made every step feel hung for 3 + s
+    // before falling back to the centered tooltip. 1.2 s is enough for
+    // route transitions to settle.
+    const maxRetries = 12
     const tick = () => {
       if (cancelled) return
       const el = document.querySelector(current.target)
@@ -217,34 +230,54 @@ export default function WelcomeTour() {
         pointerEvents: 'none',
       }}
     >
-      {/* Light dim only when no target (welcome step) so the centered tooltip reads cleanly */}
+      {/* Welcome (no target) — full dim, centered tooltip reads cleanly */}
       {!hasTarget && (
         <Box
           sx={{
             position: 'absolute',
             inset: 0,
-            bgcolor: 'rgba(0,0,0,0.55)',
+            bgcolor: 'rgba(0,0,0,0.72)',
             pointerEvents: 'auto',
           }}
         />
       )}
 
-      {/* Subtle highlight on the target — no dim overlay, just a glowing ring */}
+      {/* Spotlight cutout — a transparent rect over the target, with a
+          huge `box-shadow` spread that dims everything ELSE on screen.
+          This is the standard "spotlight" trick: one element, no SVG masks,
+          works across all browsers. The mint-green ring on top makes the
+          target pop without competing with the body content. */}
       {hasTarget && (
-        <Box
-          sx={{
-            position: 'absolute',
-            top: rect.top - PADDING,
-            left: rect.left - PADDING,
-            width: rect.width + PADDING * 2,
-            height: rect.height + PADDING * 2,
-            borderRadius: 999,
-            border: `3px solid #F09664`,
-            boxShadow: `0 0 0 4px rgba(240,150,100,0.28), 0 0 28px rgba(240,150,100,0.65)`,
-            pointerEvents: 'none',
-            transition: 'all 180ms ease',
-          }}
-        />
+        <>
+          <Box
+            sx={{
+              position: 'absolute',
+              top: rect.top - PADDING,
+              left: rect.left - PADDING,
+              width: rect.width + PADDING * 2,
+              height: rect.height + PADDING * 2,
+              borderRadius: 3,
+              boxShadow: '0 0 0 9999px rgba(0,0,0,0.72)',
+              pointerEvents: 'auto', // block clicks on the dim area
+              transition: 'all 180ms ease',
+            }}
+          />
+          <Box
+            sx={{
+              position: 'absolute',
+              top: rect.top - PADDING,
+              left: rect.left - PADDING,
+              width: rect.width + PADDING * 2,
+              height: rect.height + PADDING * 2,
+              borderRadius: 3,
+              border: '2px solid #D65A6F',
+              boxShadow:
+                '0 0 0 1px rgba(0,0,0,0.5), 0 0 24px rgba(214,90,111,0.55)',
+              pointerEvents: 'none',
+              transition: 'all 180ms ease',
+            }}
+          />
+        </>
       )}
 
       {/* Tooltip card */}
@@ -265,9 +298,12 @@ export default function WelcomeTour() {
             position: 'relative',
             p: 2.5,
             borderRadius: 3,
-            background: '#15151f',
-            border: `1px solid ${C.loganBorder || 'rgba(170,169,205,0.35)'}`,
-            boxShadow: '0 24px 64px rgba(0,0,0,0.85), 0 0 0 1px rgba(0,0,0,0.4)',
+            // Near-black bg + coral border + soft coral glow = strong
+            // contrast that doesn't blend into the dark dashboard.
+            background: '#0B0F0D',
+            border: '2px solid #D65A6F',
+            boxShadow:
+              '0 24px 64px rgba(0,0,0,0.9), 0 0 0 1px rgba(0,0,0,0.45), 0 0 32px rgba(214,90,111,0.22)',
           }}
         >
           <IconButton
