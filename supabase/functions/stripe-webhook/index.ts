@@ -173,11 +173,82 @@ async function assignCoach(clientId: string, clientName: string): Promise<{ ok: 
   }
 }
 
+// Find existing client by email (case-insensitive) or create a new one (anonymous purchase).
+// Returns { clientId, isNew, name } so the caller knows whether to send onboarding info.
+async function findOrCreateClientByEmail(email: string, name: string): Promise<{ clientId: string; isNew: boolean; name: string } | null> {
+  if (!email) return null;
+  const normalized = email.trim().toLowerCase();
+  // Look up existing
+  const found = await sbQuery(
+    "clients",
+    `?select=id,name,email&email=ilike.${encodeURIComponent(normalized)}&is_coach=eq.false&limit=1`
+  );
+  const existing = (found as Array<{ id: string; name: string; email: string }>)?.[0];
+  if (existing) return { clientId: existing.id, isNew: false, name: existing.name || name };
+
+  // Create new — random password (user sets via password_resets flow)
+  const randomPassword = crypto.randomUUID() + crypto.randomUUID();
+  const passwordHashHex = await (async () => {
+    const data = new TextEncoder().encode(randomPassword);
+    const buf = await crypto.subtle.digest("SHA-256", data);
+    return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, "0")).join("");
+  })();
+  const inserted = await sbInsert("clients", {
+    email: normalized,
+    name: name || normalized.split("@")[0],
+    password_hash: passwordHashHex,
+    modules: FREE_MODULES, // upgraded to REMOTE_MODULES later in handleCheckoutCompleted
+    account_type: "online",
+    is_coach: false,
+  });
+  if (!inserted?.id) {
+    console.error("Failed to create client for", normalized);
+    return null;
+  }
+  return { clientId: inserted.id as string, isNew: true, name: name || normalized.split("@")[0] };
+}
+
+// Generate a 6-digit one-time code in password_resets so the new client can set a password.
+async function issueOnboardingCode(clientId: string, email: string): Promise<string | null> {
+  try {
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(); // 24h
+    // Wipe any prior code for this email
+    await fetch(`${SUPABASE_URL}/rest/v1/password_resets?email=eq.${encodeURIComponent(email)}`, {
+      method: "DELETE", headers: sbHeaders(),
+    });
+    await sbInsert("password_resets", { email, code, client_id: clientId, expires_at: expiresAt });
+    return code;
+  } catch (e) {
+    console.error("issueOnboardingCode failed:", e);
+    return null;
+  }
+}
+
 async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
-  const { client_id, program_id } = session.metadata || {};
-  if (!client_id || !program_id) {
-    console.warn("Webhook: missing metadata", session.metadata);
+  let { client_id, program_id } = session.metadata || {};
+  if (!program_id) {
+    console.warn("Webhook: missing program_id metadata", session.metadata);
     return;
+  }
+  // Anonymous purchase fallback: derive client from Stripe customer email.
+  let onboardingNeeded = false;
+  if (!client_id) {
+    const email = session.customer_details?.email;
+    const name = session.customer_details?.name || "";
+    if (!email) {
+      console.warn("Webhook: no client_id and no customer_email — cannot fulfill purchase");
+      await sendAdminAlert("Purchase without client_id and email", `Stripe session ${session.id} completed but cannot be linked to any client. Manual action required.`);
+      return;
+    }
+    const result = await findOrCreateClientByEmail(email, name);
+    if (!result) {
+      await sendAdminAlert("Failed to resolve client from email", `Stripe session ${session.id}, email ${email}. Manual action required.`);
+      return;
+    }
+    client_id = result.clientId;
+    onboardingNeeded = result.isNew;
+    console.log(`Anonymous purchase resolved: client_id=${client_id}, isNew=${onboardingNeeded}`);
   }
 
   // Idempotency check — short-circuit if already processed
@@ -321,6 +392,28 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     const sent = await sendPurchaseEmail(clientEmail, clientName, session.amount_total, session.currency || "eur", invoiceNumber);
     if (!sent) {
       console.error(`EMAIL FAILED for client ${client_id} after retries`);
+    }
+  }
+
+  // 6. Onboarding: if account was just created, issue password-reset code + email setup link
+  if (onboardingNeeded && clientEmail) {
+    const code = await issueOnboardingCode(client_id, clientEmail);
+    if (code) {
+      const html = `<div style="font-family:sans-serif;padding:24px;background:#1a1a1a;color:#e0e0e0;border-radius:16px;max-width:520px">`
+        + `<h2 style="color:#c4e9bf;margin:0 0 16px">Влез в твоя SYNRG акаунт</h2>`
+        + `<p>Здравей, <strong>${clientName}</strong>!</p>`
+        + `<p>Създадохме ти акаунт за SYNRG Beyond Fitness. За да зададеш парола и да влезеш, използвай този код:</p>`
+        + `<div style="font-size:28px;letter-spacing:8px;font-weight:700;color:#c4e9bf;text-align:center;padding:16px;background:#0d1510;border-radius:12px;margin:16px 0">${code}</div>`
+        + `<p>Стъпки:</p>`
+        + `<ol><li>Отвори приложението: <a href="https://app.synrg-beyondfitness.com" style="color:#c4e9bf">app.synrg-beyondfitness.com</a></li>`
+        + `<li>Натисни <strong>"Забравена парола"</strong></li>`
+        + `<li>Въведи имейл и кода по-горе</li>`
+        + `<li>Задай нова парола → влез</li></ol>`
+        + `<p style="font-size:13px;color:#bbb">Кодът е валиден 24 часа.</p>`
+        + `<hr style="border:none;border-top:1px solid #333;margin:20px 0">`
+        + `<p style="font-size:12px;color:#666">SYNRG Beyond Fitness · Синерджи 93 ООД</p></div>`;
+      await sendEmail(clientEmail, clientName, "Достъп до твоя SYNRG акаунт", html);
+      console.log(`Onboarding email sent to ${clientEmail}`);
     }
   }
 
