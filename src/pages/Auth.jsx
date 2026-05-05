@@ -45,6 +45,21 @@ export default function Auth() {
     return () => window.removeEventListener('beforeinstallprompt', handler)
   }, [])
 
+  // Onboarding deep-link from purchase email: ?reset=email&code=123456
+  // Drops user directly into "set new password" view with email + code pre-filled.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const resetEm = params.get('reset')
+    const code    = params.get('code')
+    if (resetEm && code) {
+      setMode('forgot_code')
+      setResetEmail(resetEm)
+      setResetCode(code)
+      // Clean URL so the code isn't preserved in browser history
+      try { window.history.replaceState({}, '', window.location.pathname) } catch {}
+    }
+  }, [])
+
   function switchMode(m) {
     setMode(m)
     setError('')

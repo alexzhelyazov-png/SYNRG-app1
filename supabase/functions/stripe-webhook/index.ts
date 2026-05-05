@@ -486,16 +486,18 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
   if (onboardingNeeded && clientEmail) {
     const code = await issueOnboardingCode(client_id, clientEmail);
     if (code) {
+      // Direct deep-link: app reads ?reset=&code= and drops user straight into
+      // "set new password" view. Backup 6-digit code shown for copy/paste fallback.
+      const setupUrl = `https://synrg-beyondfitness.com/app/?reset=${encodeURIComponent(clientEmail)}&code=${code}`;
       const html = `<div style="font-family:sans-serif;padding:24px;background:#1a1a1a;color:#e0e0e0;border-radius:16px;max-width:520px">`
         + `<h2 style="color:#c4e9bf;margin:0 0 16px">Влез в твоя SYNRG акаунт</h2>`
         + `<p>Здравей, <strong>${clientName}</strong>!</p>`
-        + `<p>Създадохме ти акаунт за SYNRG Beyond Fitness. За да зададеш парола и да влезеш, използвай този код:</p>`
-        + `<div style="font-size:28px;letter-spacing:8px;font-weight:700;color:#c4e9bf;text-align:center;padding:16px;background:#0d1510;border-radius:12px;margin:16px 0">${code}</div>`
-        + `<p>Стъпки:</p>`
-        + `<ol><li>Отвори приложението: <a href="https://app.synrg-beyondfitness.com" style="color:#c4e9bf">app.synrg-beyondfitness.com</a></li>`
-        + `<li>Натисни <strong>"Забравена парола"</strong></li>`
-        + `<li>Въведи имейл и кода по-горе</li>`
-        + `<li>Задай нова парола → влез</li></ol>`
+        + `<p>Създадохме ти акаунт за SYNRG Beyond Fitness. За да зададеш парола и да влезеш, кликни бутона по-долу:</p>`
+        + `<p style="text-align:center;margin:24px 0">`
+        +   `<a href="${setupUrl}" style="display:inline-block;background:#c4e9bf;color:#0d1510;padding:14px 32px;border-radius:12px;font-weight:700;text-decoration:none;font-size:16px">Задай парола и влез</a>`
+        + `</p>`
+        + `<p style="font-size:13px;color:#bbb;margin-top:24px">Ако бутонът не работи, отвори <a href="https://synrg-beyondfitness.com/app/" style="color:#c4e9bf">приложението</a>, натисни „Забравена парола", въведи имейла си и този код:</p>`
+        + `<div style="font-size:24px;letter-spacing:6px;font-weight:700;color:#c4e9bf;text-align:center;padding:14px;background:#0d1510;border-radius:12px;margin:12px 0">${code}</div>`
         + `<p style="font-size:13px;color:#bbb">Кодът е валиден 24 часа.</p>`
         + `<hr style="border:none;border-top:1px solid #333;margin:20px 0">`
         + `<p style="font-size:12px;color:#666">SYNRG Beyond Fitness · Синерджи 93 ООД</p></div>`;
