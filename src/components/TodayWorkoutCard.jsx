@@ -294,8 +294,15 @@ export default function TodayWorkoutCard({ clientId, programStartedAt, difficult
           <Typography sx={{
             fontSize: 14, fontWeight: 700, fontStyle: 'italic',
             fontFamily: "'MontBlanc', sans-serif",
-            color: doneToday ? C.muted : C.text, lineHeight: 1.2,
-            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+            color: doneToday ? C.muted : C.text, lineHeight: 1.25,
+            // Wrap onto a second line so the banner is fully readable
+            // ("Тренировка · Готова" no longer gets ellipsised).
+            whiteSpace: 'normal',
+            wordBreak: 'break-word',
+            display: '-webkit-box',
+            WebkitBoxOrient: 'vertical',
+            WebkitLineClamp: 2,
+            overflow: 'hidden',
             textDecoration: doneToday ? 'line-through' : 'none',
           }}>
             {doneToday ? t('workoutDoneBanner') : t('workoutTitle')}

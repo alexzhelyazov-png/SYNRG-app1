@@ -135,8 +135,17 @@ function DailyTaskRow({ Icon, label, rightSlot, accent = 'mint', onClick, onIcon
       <Typography sx={{
         flex: 1, minWidth: 0,
         fontSize: 14, fontWeight: 700, fontStyle: 'italic',
-        fontFamily: "'MontBlanc', sans-serif", color: '#f0eded', lineHeight: 1.2,
-        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+        fontFamily: "'MontBlanc', sans-serif", color: '#f0eded', lineHeight: 1.25,
+        // Allow the label to wrap onto a second line so longer task titles
+        // ("Смени напитките с калории...") are readable at a glance instead
+        // of being truncated with an ellipsis. Up to 2 lines, then clamp.
+        whiteSpace: 'normal',
+        wordBreak: 'break-word',
+        overflowWrap: 'anywhere',
+        display: '-webkit-box',
+        WebkitBoxOrient: 'vertical',
+        WebkitLineClamp: 2,
+        overflow: 'hidden',
       }}>
         {label}
       </Typography>

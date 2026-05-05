@@ -78,6 +78,90 @@ const PROGRAM_DURATION_WEEKS = 8;
 
 const ADMIN_ALERT_EMAILS = ["aleksandarzhelyazov@gmail.com"];
 
+// Meta Conversions API config — server-side Purchase event for ad attribution
+// (browser Meta Pixel can be blocked by ad-blockers / Safari ITP / iOS 14.5+)
+const META_PIXEL_ID = "963430839623782";
+const META_CAPI_ENDPOINT = `https://graph.facebook.com/v18.0/${META_PIXEL_ID}/events`;
+
+async function sha256Hex(value: string): Promise<string> {
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value.trim().toLowerCase()));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, "0")).join("");
+}
+
+// Send Meta CAPI Purchase event. Fire-and-forget; failures only logged (don't block fulfillment).
+// event_id matches browser-side pixel for deduplication (`purchase_${session.id}`).
+async function sendMetaCAPIPurchase(session: Stripe.Checkout.Session, clientEmail: string | null, clientName: string | null) {
+  const accessToken = Deno.env.get("META_CAPI_ACCESS_TOKEN");
+  if (!accessToken) {
+    console.warn("META_CAPI_ACCESS_TOKEN not set — skipping CAPI Purchase");
+    return;
+  }
+  try {
+    const userData: Record<string, unknown> = {};
+    if (clientEmail) userData.em = [await sha256Hex(clientEmail)];
+    if (clientName) {
+      const parts = clientName.trim().split(/\s+/);
+      if (parts[0]) userData.fn = [await sha256Hex(parts[0])];
+      if (parts[1]) userData.ln = [await sha256Hex(parts.slice(1).join(" "))];
+    }
+    const phone = session.customer_details?.phone;
+    if (phone) userData.ph = [await sha256Hex(phone.replace(/\D/g, ""))];
+    const country = session.customer_details?.address?.country;
+    if (country) userData.country = [await sha256Hex(country)];
+    const city = session.customer_details?.address?.city;
+    if (city) userData.ct = [await sha256Hex(city)];
+    const zip = session.customer_details?.address?.postal_code;
+    if (zip) userData.zp = [await sha256Hex(zip)];
+
+    // fbc/fbp passed through Stripe metadata if browser captured them
+    const fbc = session.metadata?.fbc;
+    const fbp = session.metadata?.fbp;
+    if (fbc) userData.fbc = fbc;
+    if (fbp) userData.fbp = fbp;
+    const userAgent = session.metadata?.client_user_agent;
+    if (userAgent) userData.client_user_agent = userAgent;
+
+    const eventTime = Math.floor((session.created || Date.now() / 1000));
+    const value = (session.amount_total || 0) / 100;
+    const currency = (session.currency || "eur").toUpperCase();
+
+    const payload = {
+      data: [
+        {
+          event_name: "Purchase",
+          event_time: eventTime,
+          event_id: `purchase_${session.id}`,
+          action_source: "website",
+          event_source_url: "https://synrg-beyondfitness.com/remote.html",
+          user_data: userData,
+          custom_data: {
+            currency,
+            value,
+            content_ids: [session.metadata?.program_id || "synrg_method"],
+            content_type: "product",
+            content_name: "SYNRG Метод",
+          },
+        },
+      ],
+    };
+
+    const url = `${META_CAPI_ENDPOINT}?access_token=${encodeURIComponent(accessToken)}`;
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const body = await res.text();
+    if (!res.ok) {
+      console.error(`Meta CAPI Purchase failed (${res.status}):`, body);
+    } else {
+      console.log(`Meta CAPI Purchase sent: event_id=purchase_${session.id}, value=${value} ${currency}`);
+    }
+  } catch (e) {
+    console.error("Meta CAPI Purchase threw:", e);
+  }
+}
+
 async function sendPurchaseEmail(clientEmail: string, clientName: string, amountTotal: number | null, currency: string, invoiceNumber: number | null = null, retries = 3): Promise<boolean> {
   const amountDisplay = amountTotal
     ? (amountTotal / 100).toFixed(2) + " " + currency.toUpperCase()
@@ -394,6 +478,9 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
       console.error(`EMAIL FAILED for client ${client_id} after retries`);
     }
   }
+
+  // 5b. Meta Conversions API — server-side Purchase for ad attribution (fire-and-forget)
+  sendMetaCAPIPurchase(session, clientEmail || null, clientName || null);
 
   // 6. Onboarding: if account was just created, issue password-reset code + email setup link
   if (onboardingNeeded && clientEmail) {
