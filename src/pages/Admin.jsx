@@ -2311,16 +2311,33 @@ function OnlineClientsTab({ t }) {
   const now = new Date()
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
 
+  // Refund / dispute = the customer doesn't owe us anything anymore. Excluding
+  // those statuses gives "net" revenue numbers — refunded €98 should NOT show
+  // as €98 income.
+  const NET_STATUSES = new Set(['active', 'expired'])
+  const eur = (p) => Number(p.amount_cents || 0) / 100
+  const inThisMonth = (p) => p.purchased_at && new Date(p.purchased_at) >= monthStart
+  const refundedThisMonth = (p) => p.refunded_at && new Date(p.refunded_at) >= monthStart
+
   const stats = {
     total: real.length,
     active: real.filter(p => p.status === 'active').length,
     refunded: real.filter(p => p.status === 'refunded').length,
     disputed: real.filter(p => p.status === 'disputed').length,
-    thisMonth: real.filter(p => p.purchased_at && new Date(p.purchased_at) >= monthStart).length,
-    revenueAll: real.reduce((s, p) => s + (Number(p.amount_cents || 0) / 100), 0),
-    revenueActive: real.filter(p => p.status === 'active').reduce((s, p) => s + (Number(p.amount_cents || 0) / 100), 0),
-    revenueMonth: real.filter(p => p.purchased_at && new Date(p.purchased_at) >= monthStart).reduce((s, p) => s + (Number(p.amount_cents || 0) / 100), 0),
-    refundedAmount: real.filter(p => p.status === 'refunded').reduce((s, p) => s + (Number(p.amount_cents || 0) / 100), 0),
+    thisMonth: real.filter(inThisMonth).length,
+
+    // Net all-time = collected purchases minus what was refunded
+    revenueAll: real.filter(p => NET_STATUSES.has(p.status)).reduce((s, p) => s + eur(p), 0),
+
+    // Active = expected ongoing revenue (only active program subscriptions)
+    revenueActive: real.filter(p => p.status === 'active').reduce((s, p) => s + eur(p), 0),
+
+    // This month = net for the month: gross sales this month MINUS refunds this month
+    revenueMonth:
+      real.filter(p => inThisMonth(p) && p.status !== 'refunded' && p.status !== 'disputed').reduce((s, p) => s + eur(p), 0)
+      - real.filter(refundedThisMonth).reduce((s, p) => s + eur(p), 0),
+
+    refundedAmount: real.filter(p => p.status === 'refunded').reduce((s, p) => s + eur(p), 0),
   }
 
   const PROGRAM_WEEKS = 8
