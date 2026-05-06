@@ -1,13 +1,401 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   Box, Typography, TextField, IconButton, Paper, Button, Divider, Chip,
+  Collapse,
 } from '@mui/material'
 import SendIcon from '@mui/icons-material/Send'
 import ArrowBackIcon from '@mui/icons-material/ArrowBack'
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
 import { useApp } from '../context/AppContext'
 import { isAdmin, isFullAdmin } from '../lib/bookingUtils'
 import { DB } from '../lib/db'
 import { C } from '../theme'
+
+// Inline editable numeric field. Click value → input → Enter/blur saves.
+// Used for daily targets (calories, protein) which the coach often adjusts.
+function EditableNumber({ value, suffix, onSave }) {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  function start() {
+    setDraft(value === null || value === undefined ? '' : String(value))
+    setEditing(true)
+  }
+
+  async function commit() {
+    if (saving) return
+    const trimmed = draft.trim()
+    const num = trimmed === '' ? null : Number(trimmed)
+    if (trimmed !== '' && (!Number.isFinite(num) || num < 0)) {
+      setEditing(false)
+      return
+    }
+    if (num === (value ?? null)) {
+      setEditing(false)
+      return
+    }
+    setSaving(true)
+    try {
+      await onSave(num)
+    } finally {
+      setSaving(false)
+      setEditing(false)
+    }
+  }
+
+  if (editing) {
+    return (
+      <input
+        type="number"
+        value={draft}
+        autoFocus
+        disabled={saving}
+        onChange={e => setDraft(e.target.value)}
+        onBlur={commit}
+        onKeyDown={e => {
+          if (e.key === 'Enter')  commit()
+          if (e.key === 'Escape') setEditing(false)
+        }}
+        style={{
+          width: 70, padding: '2px 6px', fontSize: 12, fontWeight: 500,
+          background: C.card, color: C.text,
+          border: `1px solid ${C.primary || '#c4e9bf'}`, borderRadius: 6, outline: 'none',
+        }}
+      />
+    )
+  }
+  const display = value === null || value === undefined || value === '' ? '—' : `${value}${suffix ? ' ' + suffix : ''}`
+  return (
+    <span
+      onClick={start}
+      title="Кликни за промяна"
+      style={{
+        cursor: 'pointer', borderBottom: `1px dashed ${C.muted}`, paddingBottom: 1,
+      }}
+    >
+      {display}
+    </span>
+  )
+}
+
+// Compact client snapshot for the coach to read while replying. Loads quiz +
+// program state + recent activity on demand (only when expanded). Empty fields
+// show '—' so the coach can spot what hasn't been filled in.
+function ClientInfoPanel({ client }) {
+  const [open, setOpen] = useState(false)
+  const [data, setData] = useState(null)
+  const [targets, setTargets] = useState({
+    calorie: client?.calorieTarget || client?.calorie_target || null,
+    protein: client?.proteinTarget || client?.protein_target || null,
+  })
+  // Sync local targets when switching clients
+  useEffect(() => {
+    setTargets({
+      calorie: client?.calorieTarget || client?.calorie_target || null,
+      protein: client?.proteinTarget || client?.protein_target || null,
+    })
+  }, [client?.id])
+
+  async function saveTarget(field, value) {
+    if (!client?.id) return
+    const dbField = field === 'calorie' ? 'calorie_target' : 'protein_target'
+    await DB.update('clients', client.id, { [dbField]: value })
+    setTargets(prev => ({ ...prev, [field]: value }))
+  }
+  useEffect(() => {
+    if (!open || data || !client?.id) return
+    let cancelled = false
+    Promise.all([
+      DB.findWhere('client_program_state',         'client_id', client.id).catch(() => []),
+      DB.findWhere('program_purchases',            'client_id', client.id).catch(() => []),
+      DB.findWhere('meals',                        'client_id', client.id).catch(() => []),
+      DB.findWhere('weight_logs',                  'client_id', client.id).catch(() => []),
+      DB.findWhere('client_workout_completions',   'client_id', client.id).catch(() => []),
+      DB.findWhere('steps_logs',                   'client_id', client.id).catch(() => []),
+    ]).then(([states, purchases, meals, weights, workouts, steps]) => {
+      if (cancelled) return
+      const state    = (states    || [])[0] || null
+      const purchase = (purchases || []).filter(p => p.status === 'active')
+        .sort((a, b) => (b.purchased_at || '').localeCompare(a.purchased_at || ''))[0] || null
+
+      const sortDesc = (a, b, key = 'created_at') => (b[key] || '').localeCompare(a[key] || '')
+
+      // Meals: aggregate by day, then total stats
+      const allMeals = (meals || []).slice().sort((a, b) => sortDesc(a, b, 'created_at'))
+      const mealsByDay = new Map()
+      for (const m of allMeals) {
+        const day = (m.created_at || m.eaten_at || '').slice(0, 10)
+        if (!day) continue
+        const cur = mealsByDay.get(day) || { date: day, count: 0, kcal: 0 }
+        cur.count += 1
+        cur.kcal  += Number(m.kcal || 0)
+        mealsByDay.set(day, cur)
+      }
+      const byDay = Array.from(mealsByDay.values()).sort((a, b) => b.date.localeCompare(a.date))
+      const today = new Date()
+      const last7Cutoff = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 6).toISOString().slice(0, 10)
+      const daysLast7  = byDay.filter(d => d.date >= last7Cutoff).length
+      const avgKcal    = byDay.length ? byDay.reduce((s, d) => s + d.kcal, 0) / byDay.length : 0
+      const mealStats = {
+        distinctDays: byDay.length,
+        lastDay:      byDay[0]?.date || null,
+        avgKcal,
+        daysLast7,
+        byDay,
+      }
+
+      // Weights: history + delta
+      const allWeights = (weights || []).slice().sort((a, b) =>
+        (b.logged_at || b.created_at || '').localeCompare(a.logged_at || a.created_at || '')
+      )
+      let weightStats = null
+      if (allWeights.length) {
+        const current = Number(allWeights[0].weight)
+        const first   = Number(allWeights[allWeights.length - 1].weight)
+        weightStats = {
+          current,
+          first,
+          delta: current - first,
+          firstDate: allWeights[allWeights.length - 1].logged_at || allWeights[allWeights.length - 1].created_at,
+          lastDate:  allWeights[0].logged_at || allWeights[0].created_at,
+        }
+      }
+
+      // Workouts: completion stats
+      const allWorkouts = (workouts || []).slice().sort((a, b) => sortDesc(a, b, 'completed_at'))
+      const workoutsByDay = new Set(allWorkouts.map(w => (w.completed_at || w.created_at || '').slice(0, 10)).filter(Boolean))
+      const workoutsLast7 = Array.from(workoutsByDay).filter(d => d >= last7Cutoff).length
+      const workoutStats = {
+        total:        allWorkouts.length,
+        distinctDays: workoutsByDay.size,
+        lastDay:      allWorkouts[0]?.completed_at || allWorkouts[0]?.created_at || null,
+        last7:        workoutsLast7,
+      }
+
+      // Steps: daily logs aggregation
+      const allSteps = (steps || []).slice().sort((a, b) => (b.date || '').localeCompare(a.date || ''))
+      const stepsLast7 = allSteps.filter(s => (s.date || '') >= last7Cutoff)
+      const totalSteps = allSteps.reduce((s, x) => s + Number(x.steps || 0), 0)
+      const avgStepsLast7 = stepsLast7.length ? stepsLast7.reduce((s, x) => s + Number(x.steps || 0), 0) / stepsLast7.length : 0
+      const stepStats = {
+        days:    allSteps.length,
+        total:   totalSteps,
+        last:    allSteps[0] || null,
+        avgLast7: avgStepsLast7,
+        recent:  allSteps.slice(0, 5),
+      }
+
+      setData({ state, purchase, allMeals, mealStats, allWeights, weightStats, allWorkouts, workoutStats, allSteps, stepStats })
+    })
+    return () => { cancelled = true }
+  }, [open, client?.id])
+
+  // Quiz lives on the client row itself (synrg_quiz jsonb column).
+  const quiz = client?.synrgQuiz || client?.synrg_quiz || null
+
+  function fmt(v) { return v === null || v === undefined || v === '' ? '—' : String(v) }
+  function fmtDate(s) {
+    if (!s) return '—'
+    try { return new Date(s).toLocaleDateString('bg-BG') } catch { return String(s).slice(0, 10) }
+  }
+
+  // 8-week progress: derive current week from started_at if state.current_week missing.
+  let weekN = null
+  if (data?.state) {
+    const startedAt = data.state.started_at
+    const cur = Number(data.state.current_week) || 0
+    if (cur > 0) weekN = Math.min(8, cur)
+    else if (startedAt) {
+      const days = Math.floor((Date.now() - new Date(startedAt).getTime()) / (24 * 3600 * 1000))
+      weekN = Math.min(8, Math.max(1, Math.floor(days / 7) + 1))
+    }
+  }
+
+  const Row = ({ label, value }) => (
+    <Box sx={{ display: 'flex', gap: 1, py: 0.5 }}>
+      <Typography sx={{ fontSize: 11, color: C.muted, minWidth: 92, flexShrink: 0 }}>{label}</Typography>
+      <Typography sx={{ fontSize: 12, color: C.text, fontWeight: 500, wordBreak: 'break-word' }}>{value}</Typography>
+    </Box>
+  )
+
+  return (
+    <Box sx={{ borderBottom: `1px solid ${C.border}` }}>
+      <Box
+        onClick={() => setOpen(o => !o)}
+        sx={{
+          px: 2, py: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          cursor: 'pointer', userSelect: 'none',
+          '&:hover': { background: 'rgba(255,255,255,0.03)' },
+        }}
+      >
+        <Typography sx={{ fontSize: 11, fontWeight: 700, color: C.muted, letterSpacing: '0.06em' }}>
+          ПРОФИЛ НА КЛИЕНТА
+        </Typography>
+        <ExpandMoreIcon sx={{
+          fontSize: 18, color: C.muted,
+          transition: 'transform 0.2s', transform: open ? 'rotate(180deg)' : 'rotate(0deg)',
+        }} />
+      </Box>
+      <Collapse in={open}>
+        <Box sx={{ px: 2, pb: 2 }}>
+          {!data ? (
+            <Typography sx={{ fontSize: 12, color: C.muted, py: 1 }}>Зарежда...</Typography>
+          ) : (
+            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 1.5 }}>
+              {/* Program */}
+              <Paper sx={{ p: 1.25, borderRadius: 2, background: 'rgba(196,233,191,0.05)', border: '1px solid rgba(196,233,191,0.15)' }}>
+                <Typography sx={{ fontSize: 10, fontWeight: 700, color: '#c4e9bf', mb: 0.5, letterSpacing: '0.06em' }}>
+                  ПРОГРАМА
+                </Typography>
+                {data.purchase ? (
+                  <>
+                    <Row label="Седмица" value={weekN ? `${weekN} / 8` : '—'} />
+                    <Row label="Старт"   value={fmtDate(data.state?.started_at)} />
+                    <Row label="Валидна до" value={fmtDate(data.purchase.valid_until)} />
+                    <Row label="Платено"  value={`${(Number(data.purchase.amount_cents || 0) / 100).toFixed(0)} ${(data.purchase.currency || 'EUR').toUpperCase()}`} />
+                  </>
+                ) : (
+                  <Typography sx={{ fontSize: 12, color: C.muted }}>Без активна онлайн програма</Typography>
+                )}
+              </Paper>
+
+              {/* Targets — inline editable so the coach can adjust directly from chat */}
+              <Paper sx={{ p: 1.25, borderRadius: 2, background: 'rgba(165,180,252,0.05)', border: '1px solid rgba(165,180,252,0.15)' }}>
+                <Typography sx={{ fontSize: 10, fontWeight: 700, color: '#a5b4fc', mb: 0.5, letterSpacing: '0.06em' }}>
+                  ДНЕВНИ ЦЕЛИ
+                </Typography>
+                <Row label="Калории" value={
+                  <EditableNumber value={targets.calorie} onSave={v => saveTarget('calorie', v)} />
+                } />
+                <Row label="Протеин" value={
+                  <EditableNumber value={targets.protein} suffix="г" onSave={v => saveTarget('protein', v)} />
+                } />
+              </Paper>
+
+              {/* Quiz */}
+              <Paper sx={{ p: 1.25, borderRadius: 2, background: 'rgba(255,255,255,0.03)', border: `1px solid ${C.border}`, gridColumn: { xs: '1', sm: '1 / -1' } }}>
+                <Typography sx={{ fontSize: 10, fontWeight: 700, color: C.muted, mb: 0.5, letterSpacing: '0.06em' }}>
+                  ВЪПРОСНИК
+                </Typography>
+                {!quiz ? (
+                  <Typography sx={{ fontSize: 12, color: '#F87171', fontStyle: 'italic' }}>Не е попълнен</Typography>
+                ) : (
+                  <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr 1fr', sm: '1fr 1fr 1fr' }, gap: 0.5 }}>
+                    {Object.entries(quiz).map(([k, v]) => (
+                      <Row key={k} label={k} value={fmt(v)} />
+                    ))}
+                  </Box>
+                )}
+              </Paper>
+
+              {/* Meals — compliance stats + history */}
+              <Paper sx={{ p: 1.25, borderRadius: 2, background: 'rgba(255,255,255,0.03)', border: `1px solid ${C.border}` }}>
+                <Typography sx={{ fontSize: 10, fontWeight: 700, color: C.muted, mb: 0.5, letterSpacing: '0.06em' }}>
+                  ХРАНЕНЕ
+                </Typography>
+                {data.allMeals.length === 0 ? (
+                  <Typography sx={{ fontSize: 12, color: '#F87171', fontStyle: 'italic' }}>Не записва нищо</Typography>
+                ) : (
+                  <>
+                    <Row label="Общо записи" value={`${data.allMeals.length}`} />
+                    <Row label="Различни дни" value={`${data.mealStats.distinctDays}`} />
+                    <Row label="Последен ден" value={fmtDate(data.mealStats.lastDay)} />
+                    <Row label="Ср. ккал/ден" value={data.mealStats.avgKcal ? `${Math.round(data.mealStats.avgKcal)}` : '—'} />
+                    <Row label="Дни последните 7" value={`${data.mealStats.daysLast7} / 7`} />
+                    {data.mealStats.byDay.length > 0 && (
+                      <Box sx={{ mt: 1, pt: 1, borderTop: `1px solid ${C.border}` }}>
+                        <Typography sx={{ fontSize: 9, fontWeight: 700, color: C.muted, mb: 0.5 }}>ПОСЛЕДНИ ДНИ</Typography>
+                        {data.mealStats.byDay.slice(0, 5).map(d => (
+                          <Row key={d.date} label={fmtDate(d.date)} value={`${d.count} запис${d.count !== 1 ? 'а' : ''} · ${Math.round(d.kcal)} ккал`} />
+                        ))}
+                      </Box>
+                    )}
+                  </>
+                )}
+              </Paper>
+
+              {/* Workouts — completion stats */}
+              <Paper sx={{ p: 1.25, borderRadius: 2, background: 'rgba(255,255,255,0.03)', border: `1px solid ${C.border}` }}>
+                <Typography sx={{ fontSize: 10, fontWeight: 700, color: C.muted, mb: 0.5, letterSpacing: '0.06em' }}>
+                  ТРЕНИРОВКИ
+                </Typography>
+                {data.workoutStats.total === 0 ? (
+                  <Typography sx={{ fontSize: 12, color: '#F87171', fontStyle: 'italic' }}>Не тренира</Typography>
+                ) : (
+                  <>
+                    <Row label="Общо" value={`${data.workoutStats.total}`} />
+                    <Row label="Различни дни" value={`${data.workoutStats.distinctDays}`} />
+                    <Row label="Дни последните 7" value={`${data.workoutStats.last7} / 7`} />
+                    <Row label="Последна" value={fmtDate(data.workoutStats.lastDay)} />
+                  </>
+                )}
+              </Paper>
+
+              {/* Steps — daily activity */}
+              <Paper sx={{ p: 1.25, borderRadius: 2, background: 'rgba(255,255,255,0.03)', border: `1px solid ${C.border}` }}>
+                <Typography sx={{ fontSize: 10, fontWeight: 700, color: C.muted, mb: 0.5, letterSpacing: '0.06em' }}>
+                  СТЪПКИ
+                </Typography>
+                {data.stepStats.days === 0 ? (
+                  <Typography sx={{ fontSize: 12, color: '#F87171', fontStyle: 'italic' }}>Не записва стъпки</Typography>
+                ) : (
+                  <>
+                    <Row label="Дни записи" value={`${data.stepStats.days}`} />
+                    <Row label="Общо стъпки" value={data.stepStats.total.toLocaleString('bg-BG')} />
+                    <Row label="Ср. посл. 7 дни" value={data.stepStats.avgLast7 ? `${Math.round(data.stepStats.avgLast7).toLocaleString('bg-BG')}` : '—'} />
+                    <Row label="Последно" value={data.stepStats.last ? `${Number(data.stepStats.last.steps || 0).toLocaleString('bg-BG')} (${fmtDate(data.stepStats.last.date)})` : '—'} />
+                    {data.stepStats.recent.length > 1 && (
+                      <Box sx={{ mt: 1, pt: 1, borderTop: `1px solid ${C.border}` }}>
+                        <Typography sx={{ fontSize: 9, fontWeight: 700, color: C.muted, mb: 0.5 }}>ПОСЛЕДНИ ДНИ</Typography>
+                        {data.stepStats.recent.map(s => (
+                          <Row key={s.id || s.date} label={fmtDate(s.date)} value={Number(s.steps || 0).toLocaleString('bg-BG')} />
+                        ))}
+                      </Box>
+                    )}
+                  </>
+                )}
+              </Paper>
+
+              {/* Weight — progress stats + history */}
+              <Paper sx={{ p: 1.25, borderRadius: 2, background: 'rgba(255,255,255,0.03)', border: `1px solid ${C.border}` }}>
+                <Typography sx={{ fontSize: 10, fontWeight: 700, color: C.muted, mb: 0.5, letterSpacing: '0.06em' }}>
+                  ТЕГЛО
+                </Typography>
+                {data.allWeights.length === 0 ? (
+                  <Typography sx={{ fontSize: 12, color: '#F87171', fontStyle: 'italic' }}>Не се претегля</Typography>
+                ) : (
+                  <>
+                    <Row label="Общо записи" value={`${data.allWeights.length}`} />
+                    <Row label="Текущо" value={`${data.weightStats.current} кг`} />
+                    <Row label="Начално" value={`${data.weightStats.first} кг (${fmtDate(data.weightStats.firstDate)})`} />
+                    <Row label="Промяна" value={
+                      <span style={{
+                        color: data.weightStats.delta < 0 ? '#c4e9bf' : data.weightStats.delta > 0 ? '#FBBF24' : C.text,
+                        fontWeight: 700,
+                      }}>
+                        {data.weightStats.delta > 0 ? '+' : ''}{data.weightStats.delta.toFixed(1)} кг
+                      </span>
+                    } />
+                    <Row label="Последно" value={fmtDate(data.weightStats.lastDate)} />
+                    {data.allWeights.length > 1 && (
+                      <Box sx={{ mt: 1, pt: 1, borderTop: `1px solid ${C.border}` }}>
+                        <Typography sx={{ fontSize: 9, fontWeight: 700, color: C.muted, mb: 0.5 }}>ИСТОРИЯ</Typography>
+                        {data.allWeights.slice(0, 5).map(w => (
+                          <Row key={w.id || w.logged_at} label={fmtDate(w.logged_at || w.created_at)} value={`${w.weight} кг`} />
+                        ))}
+                      </Box>
+                    )}
+                  </>
+                )}
+              </Paper>
+            </Box>
+          )}
+        </Box>
+      </Collapse>
+    </Box>
+  )
+}
 
 // ── Admin Messages Tab ────────────────────────────────────────
 // For coach (shows only their assigned clients) and admin (shows all).
@@ -40,7 +428,14 @@ export default function AdminMessagesTab() {
     let cancelled = false
     DB.selectAll('program_purchases').then(rows => {
       if (cancelled) return
-      const ids = new Set((rows || []).map(r => r.client_id).filter(Boolean))
+      // Only ACTIVE purchases count as online — refunded/disputed/expired clients
+      // shouldn't surface in the online filter (they're back to free tier).
+      const ids = new Set(
+        (rows || [])
+          .filter(r => r.status === 'active')
+          .map(r => r.client_id)
+          .filter(Boolean)
+      )
       setOnlineClientIds(ids)
     }).catch(() => { /* silent — treat as no online clients */ })
     return () => { cancelled = true }
@@ -155,6 +550,10 @@ export default function AdminMessagesTab() {
             </Box>
           )}
         </Box>
+
+        {/* Collapsible client snapshot — quick context for the coach (quiz,
+            program week, targets, recent meals/weight) */}
+        <ClientInfoPanel client={selected} />
 
         {/* Messages */}
         <Box

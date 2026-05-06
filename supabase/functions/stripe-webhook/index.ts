@@ -173,7 +173,11 @@ async function sendPurchaseEmail(clientEmail: string, clientName: string, amount
     + `<h2 style="color:#c4e9bf;margin:0 0 16px">Успешна покупка!</h2>`
     + `<p>Здравей, <strong>${clientName}</strong>!</p>`
     + `<p>Плащането ти е потвърдено${amountDisplay ? " (<strong>" + amountDisplay + "</strong>)" : ""}.</p>`
-    + `<p>Достъпът до програмата SYNRG Метод е активиран за <strong>8 седмици</strong>. Отвори приложението и ще намериш съдържанието в секция <strong>Програми</strong>.</p>`
+    + `<p>Достъпът до програмата SYNRG Метод е активиран за <strong>8 седмици</strong>. Съдържанието е в секция <strong>Програми</strong>.</p>`
+    + `<p style="text-align:center;margin:24px 0">`
+    +   `<a href="https://synrg-beyondfitness.com/app/" style="display:inline-block;background:#c4e9bf;color:#0d1510;padding:14px 32px;border-radius:12px;font-weight:700;text-decoration:none;font-size:16px">Отвори приложението</a>`
+    + `</p>`
+    + `<p style="font-size:13px;color:#bbb;margin-top:24px"><strong>Първа покупка с този имейл?</strong> Ще получиш втори имейл с директен линк за задаване на парола. Кликни го и си готов.<br><br><strong>Вече имаш акаунт?</strong> Натисни „Забравена парола" в приложението с този имейл — ще получиш код за нов вход.</p>`
     + invoiceLine
     + `<hr style="border:none;border-top:1px solid #333;margin:20px 0">`
     + `<p style="font-size:12px;color:#666">SYNRG Beyond Fitness · Синерджи 93 ООД · ЕИК 207343690</p></div>`;
@@ -380,11 +384,14 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
   const validUntil = new Date(Date.now() + PROGRAM_DURATION_WEEKS * 7 * 24 * 60 * 60 * 1000)
     .toISOString().slice(0, 10);
 
-  // 1. Record purchase (UNIQUE constraint on stripe_session_id will reject duplicates)
+  // 1. Record purchase (UNIQUE constraint on stripe_session_id will reject duplicates).
+  // Storing payment_intent enables `charge.refunded` lookup later — that webhook only
+  // carries the payment_intent, not the original checkout session id.
   const inserted = await sbInsert("program_purchases", {
     client_id,
     program_id,
     stripe_session_id: session.id,
+    stripe_payment_intent: session.payment_intent || null,
     amount_cents: session.amount_total || 0,
     currency: (session.currency || "eur").toUpperCase(),
     status: "active",
@@ -542,10 +549,17 @@ async function sendAdminAlert(subject: string, body: string) {
 }
 
 async function handleRefund(charge: Stripe.Charge) {
-  const sessionId = charge.metadata?.checkout_session_id || (charge.payment_intent as string);
+  // Stripe's charge.refunded payload only carries payment_intent, never the original
+  // checkout.session.id. Match on stripe_payment_intent first, with stripe_session_id
+  // as a legacy fallback for purchases recorded before that column was added.
+  const pi = charge.payment_intent as string;
+  const fallbackSession = charge.metadata?.checkout_session_id || "";
+  const orFilter = fallbackSession
+    ? `or=(stripe_payment_intent.eq.${pi},stripe_session_id.eq.${fallbackSession})`
+    : `stripe_payment_intent=eq.${pi}`;
   const purchases = await sbQuery(
     "program_purchases",
-    `?select=id,client_id,program_id&or=(stripe_session_id.eq.${sessionId},stripe_session_id.eq.${charge.payment_intent})`
+    `?select=id,client_id,program_id&${orFilter}`
   );
   const purchase = (purchases as Array<{ id: string; client_id: string; program_id: string }>)?.[0];
   if (!purchase) {
@@ -585,9 +599,12 @@ async function handleRefund(charge: Stripe.Charge) {
 
 async function handleDispute(dispute: Stripe.Dispute) {
   const charge = dispute.charge as string;
+  const pi = dispute.payment_intent as string | null;
+  // Match by payment_intent (preferred) — earlier the code used dispute.charge to
+  // search stripe_session_id, which never matches because charge id ≠ session id.
   const purchases = await sbQuery(
     "program_purchases",
-    `?select=id,client_id&stripe_session_id=eq.${charge}`
+    pi ? `?select=id,client_id&stripe_payment_intent=eq.${pi}` : `?select=id,client_id&stripe_session_id=eq.${charge}`
   );
   const purchase = (purchases as Array<{ id: string; client_id: string }>)?.[0];
   if (!purchase) {
@@ -651,9 +668,11 @@ Deno.serve(async (req: Request) => {
 
     let event: Stripe.Event;
     try {
-      event = stripe.webhooks.constructEvent(body, sig, endpointSecret);
+      // Deno runtime requires the async variant — sync constructEvent uses Node-only crypto
+      // and silently fails signature verification on Supabase Edge Functions.
+      event = await stripe.webhooks.constructEventAsync(body, sig, endpointSecret);
     } catch (err) {
-      console.error("Signature verification failed:", err.message);
+      console.error("Signature verification failed:", err instanceof Error ? err.message : err);
       return new Response(JSON.stringify({ error: "Invalid signature" }), {
         status: 403,
         headers: { "Content-Type": "application/json" },

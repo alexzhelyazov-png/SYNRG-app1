@@ -230,6 +230,7 @@ function saveState(key, val) {
 export function QuizScreen({ onDone, isBg }) {
   const [answers, setAnswers] = useState({})
   const [highlight, setHighlight] = useState(null)
+  const [submitting, setSubmitting] = useState(false)
   const refs = useRef({})
 
   const isAnswered = (q) => {
@@ -243,9 +244,17 @@ export function QuizScreen({ onDone, isBg }) {
     setAnswers(p => ({ ...p, [id]: val }))
   }
 
-  function handleSubmit() {
+  async function handleSubmit() {
+    if (submitting) return
     if (allAnswered) {
-      onDone(answers)
+      setSubmitting(true)
+      try {
+        await onDone(answers)
+      } finally {
+        // Leave it disabled — parent unmounts QuizScreen after onDone resolves.
+        // Reset just in case parent re-renders us due to an error path.
+        setSubmitting(false)
+      }
       return
     }
     // Scroll to first unanswered and flash it so the user sees what's missing.
@@ -327,13 +336,16 @@ export function QuizScreen({ onDone, isBg }) {
           <Button
             fullWidth variant="contained"
             onClick={handleSubmit}
+            disabled={submitting}
             sx={{ py: 1.5, fontWeight: 700, fontSize: '14px' }}
           >
-            {allAnswered
-              ? (isBg ? 'Виж плана си →' : 'See my plan →')
-              : (isBg
-                  ? `Виж плана си → (${answeredCount}/${QUESTIONS.length})`
-                  : `See my plan → (${answeredCount}/${QUESTIONS.length})`)}
+            {submitting
+              ? (isBg ? 'Запазваме плана...' : 'Saving your plan...')
+              : allAnswered
+                ? (isBg ? 'Виж плана си →' : 'See my plan →')
+                : (isBg
+                    ? `Виж плана си → (${answeredCount}/${QUESTIONS.length})`
+                    : `See my plan → (${answeredCount}/${QUESTIONS.length})`)}
           </Button>
         </Box>
       </Paper>

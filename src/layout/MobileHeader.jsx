@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   AppBar, Toolbar, Box, Typography, IconButton, Button, Badge, Dialog,
   Drawer, List, ListItemButton, ListItemIcon, ListItemText, Divider,
@@ -16,6 +16,7 @@ import OndemandVideoIcon    from '@mui/icons-material/OndemandVideo'
 import AttachMoneyIcon      from '@mui/icons-material/AttachMoney'
 import { useApp } from '../context/AppContext'
 import { useBooking } from '../context/BookingContext'
+import { DB } from '../lib/db'
 import { hasModule } from '../lib/modules'
 import { creditsRemaining, daysUntilExpiry, fmtValidTo, isAdmin as isAdminUser } from '../lib/bookingUtils'
 import { C, EASE } from '../theme'
@@ -43,6 +44,23 @@ export default function MobileHeader() {
   const { myPlan } = useBooking()
   const [siteMenuOpen, setSiteMenuOpen] = useState(false)
   const [showProfile, setShowProfile] = useState(false)
+  // Online program purchase (Stripe). Loaded only when the profile dialog opens
+  // so we avoid unnecessary network roundtrips for users who never tap it.
+  const [onlineProgram, setOnlineProgram] = useState(null)
+  useEffect(() => {
+    if (!showProfile || !auth?.id || auth.role !== 'client') return
+    let cancelled = false
+    DB.findWhere('program_purchases', 'client_id', auth.id)
+      .then(rows => {
+        if (cancelled) return
+        const active = (rows || [])
+          .filter(p => p.status === 'active')
+          .sort((a, b) => (b.purchased_at || '').localeCompare(a.purchased_at || ''))[0]
+        setOnlineProgram(active || null)
+      })
+      .catch(() => { if (!cancelled) setOnlineProgram(null) })
+    return () => { cancelled = true }
+  }, [showProfile, auth?.id, auth?.role])
 
   const siteLinks = getSiteLinks(t)
 
@@ -298,6 +316,13 @@ export default function MobileHeader() {
                 value={fmtValidTo(myPlan)}
                 color={daysUntilExpiry(myPlan) <= 3 ? '#F87171' : daysUntilExpiry(myPlan) <= 7 ? '#FB923C' : C.text} />
             </>
+          ) : onlineProgram ? (
+            <>
+              <ProfileRow label={t('planLbl')} value="SYNRG Метод · Онлайн" color="#c4e9bf" />
+              {onlineProgram.valid_until && (
+                <ProfileRow label={t('validToLbl')} value={onlineProgram.valid_until} color={C.text} />
+              )}
+            </>
           ) : (
             <ProfileRow label={t('planLbl')} value={t('noPlanLbl')} color="#F87171" />
           )}
@@ -319,6 +344,51 @@ export default function MobileHeader() {
               </Box>
             </Box>
           )}
+
+          {/* Help & legal links — visible to every logged-in user. Refund / privacy /
+              terms must be reachable from inside the app per consumer-protection rules. */}
+          <Box sx={{ mt: 2.5, pt: 2, borderTop: `1px solid ${C.border}` }}>
+            <Typography sx={{ fontSize: '10px', fontWeight: 700, color: C.muted, mb: 1, letterSpacing: '0.08em' }}>
+              {lang === 'en' ? 'HELP & POLICIES' : 'ПОМОЩ И УСЛОВИЯ'}
+            </Typography>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75 }}>
+              {[
+                onlineProgram && {
+                  href: `${SITE_BASE}refund.html`,
+                  label: lang === 'en' ? 'Request refund' : 'Заяви възстановяване на сума',
+                  highlight: true,
+                },
+                {
+                  href: `${SITE_BASE}refund.html`,
+                  label: lang === 'en' ? 'Refund policy' : 'Политика за връщане',
+                  hideIf: !!onlineProgram, // already shown as "Request refund" above
+                },
+                { href: `${SITE_BASE}terms.html`,   label: lang === 'en' ? 'Terms of service' : 'Общи условия' },
+                { href: `${SITE_BASE}privacy.html`, label: lang === 'en' ? 'Privacy policy'   : 'Политика за поверителност' },
+                { href: 'mailto:info@synrg-beyondfitness.com', label: lang === 'en' ? 'Contact support' : 'Свържи се с нас' },
+              ]
+                .filter(item => item && !item.hideIf)
+                .map((item, i) => (
+                  <Box
+                    key={i}
+                    component="a"
+                    href={item.href}
+                    target={item.href.startsWith('mailto:') ? undefined : '_blank'}
+                    rel="noopener"
+                    sx={{
+                      fontSize: '13px',
+                      fontWeight: item.highlight ? 700 : 500,
+                      color: item.highlight ? '#c4e9bf' : C.text,
+                      textDecoration: 'none',
+                      py: 0.5,
+                      '&:hover': { color: '#c4e9bf' },
+                    }}
+                  >
+                    {item.label} →
+                  </Box>
+                ))}
+            </Box>
+          </Box>
 
           <Button fullWidth onClick={() => setShowProfile(false)}
             sx={{ mt: 2.5, color: C.muted, fontSize: '13px', fontWeight: 600 }}>

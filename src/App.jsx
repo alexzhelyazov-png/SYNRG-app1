@@ -357,7 +357,11 @@ function AppShell() {
 
       <ConfirmDeleteModal />
 
-      {auth.role === 'client' && isOnlineClient && <WelcomeTour />}
+      {/* Hold the tour until post-payment onboarding (consent + quiz) is done.
+          synrgQuiz is populated only after the quiz step submits, which is the
+          last gate before the dashboard. Otherwise the tour overlays the
+          ConsentScreen and the user can't see either. */}
+      {auth.role === 'client' && isOnlineClient && auth.synrgQuiz && <WelcomeTour />}
 
       {auth.role === 'client' && <BadgeUnlockWatcher />}
 

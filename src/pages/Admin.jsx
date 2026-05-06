@@ -2289,6 +2289,166 @@ function OrdersTab({ t }) {
   )
 }
 
+// ── Online Clients Tab ───────────────────────────────────────
+// Unified view of online program customers: revenue stats + per-client status,
+// week progress, coach, refund/dispute markers. Pulls from program_purchases
+// joined with clients in-memory (no need for an extra DB view).
+function OnlineClientsTab({ t }) {
+  const { realClients, coaches } = useApp()
+  const [purchases, setPurchases] = useState([])
+  const [loaded, setLoaded] = useState(false)
+
+  useEffect(() => {
+    DB.selectAll('program_purchases').then(rows => {
+      setPurchases(rows || [])
+      setLoaded(true)
+    }).catch(() => setLoaded(true))
+  }, [])
+
+  // Real (non-test) purchases: > 0 cents and Stripe session id (not test_manual_*)
+  const real = purchases.filter(p => Number(p.amount_cents || 0) > 0 && !(p.stripe_session_id || '').startsWith('test_'))
+
+  const now = new Date()
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
+
+  const stats = {
+    total: real.length,
+    active: real.filter(p => p.status === 'active').length,
+    refunded: real.filter(p => p.status === 'refunded').length,
+    disputed: real.filter(p => p.status === 'disputed').length,
+    thisMonth: real.filter(p => p.purchased_at && new Date(p.purchased_at) >= monthStart).length,
+    revenueAll: real.reduce((s, p) => s + (Number(p.amount_cents || 0) / 100), 0),
+    revenueActive: real.filter(p => p.status === 'active').reduce((s, p) => s + (Number(p.amount_cents || 0) / 100), 0),
+    revenueMonth: real.filter(p => p.purchased_at && new Date(p.purchased_at) >= monthStart).reduce((s, p) => s + (Number(p.amount_cents || 0) / 100), 0),
+    refundedAmount: real.filter(p => p.status === 'refunded').reduce((s, p) => s + (Number(p.amount_cents || 0) / 100), 0),
+  }
+
+  const PROGRAM_WEEKS = 8
+  function weekOf(purchasedAt) {
+    if (!purchasedAt) return null
+    const start = new Date(purchasedAt)
+    const days = Math.floor((now - start) / (24 * 3600 * 1000))
+    return Math.min(PROGRAM_WEEKS, Math.max(1, Math.floor(days / 7) + 1))
+  }
+
+  function statusChip(p) {
+    const map = {
+      active:    { bg: '#c4e9bf', label: 'Активна' },
+      refunded:  { bg: '#FBBF24', label: 'Възстановена' },
+      disputed:  { bg: '#F87171', label: 'Спорна' },
+      needs_coach: { bg: '#FBBF24', label: 'Без треньор' },
+      expired:   { bg: 'rgba(255,255,255,0.5)', label: 'Изтекла' },
+    }
+    const m = map[p.status] || { bg: 'rgba(255,255,255,0.5)', label: p.status || '?' }
+    return (
+      <Chip label={m.label} size="small" sx={{
+        height: '20px', fontSize: '10px', fontWeight: 700,
+        background: `${m.bg}22`, color: m.bg, border: `1px solid ${m.bg}44`,
+      }} />
+    )
+  }
+
+  // Sort: active first, newest first
+  const sorted = real.slice().sort((a, b) => {
+    if (a.status === 'active' && b.status !== 'active') return -1
+    if (b.status === 'active' && a.status !== 'active') return 1
+    return (b.purchased_at || '').localeCompare(a.purchased_at || '')
+  })
+
+  const StatCard = ({ label, value, suffix, color = '#c4e9bf' }) => (
+    <Paper sx={{
+      p: 1.75, borderRadius: '14px', border: `1px solid ${color}33`,
+      background: `${color}08`, flex: 1, minWidth: 130,
+    }}>
+      <Typography sx={{
+        fontSize: '10px', color: 'rgba(255,255,255,0.5)', fontWeight: 700,
+        textTransform: 'uppercase', letterSpacing: '0.6px', mb: 0.5,
+      }}>{label}</Typography>
+      <Typography sx={{
+        fontSize: '22px', fontWeight: 800, color, fontFamily: "'MontBlanc', sans-serif",
+      }}>
+        {value}
+        {suffix && <Typography component="span" sx={{ fontSize: '12px', fontWeight: 600, ml: 0.5 }}>{suffix}</Typography>}
+      </Typography>
+    </Paper>
+  )
+
+  return (
+    <Box>
+      {/* Stats */}
+      <Box sx={{ display: 'flex', gap: 1.25, mb: 1.25, flexWrap: 'wrap' }}>
+        <StatCard label="Активни сега" value={stats.active} />
+        <StatCard label="Този месец" value={stats.thisMonth} />
+        <StatCard label="Общо покупки" value={stats.total} color="#a5b4fc" />
+        {stats.refunded > 0 && <StatCard label="Възстановени" value={stats.refunded} color="#FBBF24" />}
+      </Box>
+      <Box sx={{ display: 'flex', gap: 1.25, mb: 2.5, flexWrap: 'wrap' }}>
+        <StatCard label="Активен приход" value={stats.revenueActive.toFixed(0)} suffix="€" />
+        <StatCard label="Този месец" value={stats.revenueMonth.toFixed(0)} suffix="€" />
+        <StatCard label="Общо приход" value={stats.revenueAll.toFixed(0)} suffix="€" color="#a5b4fc" />
+        {stats.refundedAmount > 0 && <StatCard label="Възстановена сума" value={stats.refundedAmount.toFixed(0)} suffix="€" color="#FBBF24" />}
+      </Box>
+
+      {/* Client list */}
+      {!loaded ? (
+        <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+          <CircularProgress size={24} sx={{ color: '#c4e9bf' }} />
+        </Box>
+      ) : sorted.length === 0 ? (
+        <Paper sx={{ p: 4, borderRadius: '14px', textAlign: 'center', border: '1px solid rgba(255,255,255,0.08)' }}>
+          <Typography sx={{ color: 'rgba(255,255,255,0.5)', fontSize: '14px' }}>
+            Все още няма online покупки. Първите ще се появят тук.
+          </Typography>
+        </Paper>
+      ) : (
+        <Paper sx={{ borderRadius: '14px', border: '1px solid rgba(255,255,255,0.08)', overflow: 'hidden' }}>
+          {sorted.map((p, idx) => {
+            const client = realClients.find(c => c.id === p.client_id)
+            const coach = coaches.find(c => c.id === p.assigned_coach_id || c.id === client?.assignedCoachId)
+            const week = p.status === 'active' ? weekOf(p.purchased_at) : null
+            const amount = (Number(p.amount_cents || 0) / 100).toFixed(0)
+            const date = (p.purchased_at || '').slice(0, 10)
+            return (
+              <Box key={p.id || idx} sx={{
+                px: 2, py: 1.5, borderBottom: '1px solid rgba(255,255,255,0.06)',
+                '&:last-child': { borderBottom: 'none' },
+                display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap',
+              }}>
+                <Box sx={{ flex: 1, minWidth: 140 }}>
+                  <Typography sx={{ fontWeight: 700, fontSize: '14px', color: '#e0e0e0' }}>
+                    {client?.name || '— изтрит клиент —'}
+                  </Typography>
+                  <Typography sx={{ fontSize: '11px', color: 'rgba(255,255,255,0.45)' }}>
+                    {client?.email || '—'}
+                  </Typography>
+                </Box>
+                {coach && (
+                  <Chip label={coach.name} size="small" sx={{
+                    height: '20px', fontSize: '10px', fontWeight: 700,
+                    background: 'rgba(165,180,252,0.15)', color: '#a5b4fc',
+                  }} />
+                )}
+                {week && (
+                  <Typography sx={{ fontSize: '11px', color: '#c4e9bf', fontWeight: 700, minWidth: 60 }}>
+                    седм. {week}/{PROGRAM_WEEKS}
+                  </Typography>
+                )}
+                <Typography sx={{ fontSize: '13px', fontWeight: 700, color: '#c4e9bf', minWidth: 50, textAlign: 'right' }}>
+                  {amount} €
+                </Typography>
+                <Typography sx={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', minWidth: 80 }}>
+                  {date}
+                </Typography>
+                {statusChip(p)}
+              </Box>
+            )
+          })}
+        </Paper>
+      )}
+    </Box>
+  )
+}
+
 // ── Admin SYNRG Method Tab ───────────────────────────────────
 const SHOW_CONDITIONS = [
   { value: 'always',   labelBg: 'Винаги',                  labelEn: 'Always' },
@@ -2608,6 +2768,7 @@ export default function Admin() {
   const SUB_TABS = {
     clients: [
       { key: 'clients',       label: t('clientsMgmt')     || 'Клиенти' },
+      { key: 'online',        label: 'Онлайн' },
       { key: 'messages',      label: 'Съобщения' },
       { key: 'coaches',       label: t('coachesTab')      || 'Треньори' },
       { key: 'subscriptions', label: t('subscriptionsTab')|| 'Абонаменти' },
@@ -2677,6 +2838,7 @@ export default function Admin() {
 
       {section === 'clients' && <>
         {clientSub === 'clients'       && <ClientsTab t={t} />}
+        {clientSub === 'online'        && <OnlineClientsTab t={t} />}
         {clientSub === 'messages'      && <AdminMessagesTab />}
         {clientSub === 'coaches'       && <CoachesTab t={t} />}
         {clientSub === 'subscriptions' && <SubscriptionsTab t={t} lang={lang} />}

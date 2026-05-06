@@ -63,7 +63,31 @@ async function upsertContact(
   return brevoFetch("/contacts", apiKey, "POST", contactData);
 }
 
-// Send a transactional email via Brevo
+// Strip HTML to a readable plain-text version. Helps Gmail/Outlook classify the
+// message as transactional (not promotional) and improves deliverability.
+function htmlToText(html: string): string {
+  return html
+    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "")
+    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/p>/gi, "\n\n")
+    .replace(/<\/h[1-6]>/gi, "\n\n")
+    .replace(/<\/li>/gi, "\n")
+    .replace(/<li[^>]*>/gi, "• ")
+    .replace(/<a[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi, "$2 ($1)")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+// Send a transactional email via Brevo. Includes plain-text alternative + transactional
+// headers so Gmail classifies it as Primary (not Promotions).
 async function sendTransactionalEmail(
   apiKey: string,
   to: { email: string; name?: string },
@@ -75,6 +99,13 @@ async function sendTransactionalEmail(
     to: [to],
     subject,
     htmlContent,
+    textContent: htmlToText(htmlContent),
+    // Transactional indicators — signal to Gmail/Outlook this is a service email,
+    // not a marketing message. Reduces likelihood of Promotions / spam routing.
+    headers: {
+      "X-Entity-Ref-ID": `synrg-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      "X-Mailer": "SYNRG Beyond Fitness",
+    },
   });
 }
 

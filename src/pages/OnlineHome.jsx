@@ -155,7 +155,7 @@ function DailyTaskRow({ Icon, label, rightSlot, accent = 'mint', onClick, onIcon
 }
 
 export default function OnlineHome() {
-  const { auth, setView, t, lang, client, updateClient } = useApp()
+  const { auth, setView, t, lang, client, updateClient, showSnackbar } = useApp()
   // Helper: prefer the EN column when active language is English, fall
   // back to the BG (legacy) column for content that hasn't been translated yet.
   // Strips a trailing "_bg" so callers can pass the legacy field name and we
@@ -455,9 +455,16 @@ export default function OnlineHome() {
             }
           } catch (e) {
             console.error('onboarding save failed', e)
-          } finally {
+            showSnackbar?.(
+              lang === 'en'
+                ? `Could not save your plan: ${e?.message || 'unknown error'}. Please try again.`
+                : `Не успяхме да запазим плана ти: ${e?.message || 'неизвестна грешка'}. Опитай пак.`,
+              'error'
+            )
             setQuizSaving(false)
+            return
           }
+          setQuizSaving(false)
         }}
       />
     )
@@ -483,6 +490,14 @@ export default function OnlineHome() {
               : computeCurrentWeek(effective.started_at, effective.paused, effective.current_week)
           )
         }
+      } catch (e) {
+        console.error('startClientProgram failed', e)
+        showSnackbar?.(
+          lang === 'en'
+            ? `Could not start your program: ${e?.message || 'unknown error'}. Please refresh and try again.`
+            : `Не успяхме да стартираме програмата: ${e?.message || 'неизвестна грешка'}. Презареди и опитай пак.`,
+          'error'
+        )
       } finally {
         setQuizSaving(false)
       }
