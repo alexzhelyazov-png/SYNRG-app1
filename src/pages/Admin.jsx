@@ -2332,9 +2332,11 @@ function OnlineClientsTab({ t }) {
     // Active = expected ongoing revenue (only active program subscriptions)
     revenueActive: real.filter(p => p.status === 'active').reduce((s, p) => s + eur(p), 0),
 
-    // This month = net for the month: gross sales this month MINUS refunds this month
+    // Net for the month = money received this month MINUS money refunded this
+    // month. Include the gross of every purchase made this month regardless of
+    // its current status — otherwise a same-month sale + refund double-subtracts.
     revenueMonth:
-      real.filter(p => inThisMonth(p) && p.status !== 'refunded' && p.status !== 'disputed').reduce((s, p) => s + eur(p), 0)
+      real.filter(inThisMonth).reduce((s, p) => s + eur(p), 0)
       - real.filter(refundedThisMonth).reduce((s, p) => s + eur(p), 0),
 
     refundedAmount: real.filter(p => p.status === 'refunded').reduce((s, p) => s + eur(p), 0),
