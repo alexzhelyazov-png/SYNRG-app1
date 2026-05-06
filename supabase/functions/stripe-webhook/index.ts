@@ -77,6 +77,9 @@ const FREE_MODULES = ["nutrition_tracking", "weight_tracking", "steps_tracking"]
 const PROGRAM_DURATION_WEEKS = 8;
 
 const ADMIN_ALERT_EMAILS = ["aleksandarzhelyazov@gmail.com"];
+// Where to send "🎉 New purchase" notifications. Separate from admin error alerts so
+// the team inbox gets sales feed without operational noise.
+const SALES_ALERT_EMAILS = ["info@synrg-beyondfitness.com", "aleksandarzhelyazov@gmail.com"];
 
 // Meta Conversions API config — server-side Purchase event for ad attribution
 // (browser Meta Pixel can be blocked by ad-blockers / Safari ITP / iOS 14.5+)
@@ -489,6 +492,27 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
   // 5b. Meta Conversions API — server-side Purchase for ad attribution (fire-and-forget)
   sendMetaCAPIPurchase(session, clientEmail || null, clientName || null);
 
+  // 5c. Sales alert to the team inbox — first signal of every conversion.
+  // Look up coach name (already assigned a few lines above) for the email body.
+  let coachName: string | null = null;
+  try {
+    const updatedClient = await sbQuery("clients", `?select=assigned_coach_id&id=eq.${client_id}`);
+    const coachId = (updatedClient as Array<{ assigned_coach_id: string }>)?.[0]?.assigned_coach_id;
+    if (coachId) {
+      const coach = await sbQuery("clients", `?select=name&id=eq.${coachId}`);
+      coachName = (coach as Array<{ name: string }>)?.[0]?.name || null;
+    }
+  } catch (e) { console.warn("Coach lookup for sales alert failed:", e); }
+  sendSalesAlert({
+    clientName,
+    clientEmail: clientEmail || "—",
+    amountCents: session.amount_total || 0,
+    currency: session.currency || "eur",
+    coachName,
+    invoiceNumber,
+    isNewClient: onboardingNeeded,
+  });
+
   // 6. Onboarding: if account was just created, issue password-reset code + email setup link
   if (onboardingNeeded && clientEmail) {
     const code = await issueOnboardingCode(client_id, clientEmail);
@@ -545,6 +569,42 @@ async function sendAdminAlert(subject: string, body: string) {
   const html = `<div style="font-family:sans-serif;padding:20px;max-width:560px"><h2 style="color:#d33">[SYNRG ADMIN] ${subject}</h2><p>${body}</p><p style="font-size:11px;color:#999">Auto-generated from Stripe webhook.</p></div>`;
   for (const email of ADMIN_ALERT_EMAILS) {
     await sendEmail(email, "Admin", `[SYNRG] ${subject}`, html);
+  }
+}
+
+// Notify the team inbox of every successful sale. Includes buyer details,
+// program, mentor, invoice, amount — enough to action immediately.
+async function sendSalesAlert(args: {
+  clientName: string;
+  clientEmail: string;
+  amountCents: number;
+  currency: string;
+  coachName: string | null;
+  invoiceNumber: number | null;
+  isNewClient: boolean;
+}) {
+  const amount = `${(args.amountCents / 100).toFixed(0)} ${args.currency.toUpperCase()}`;
+  const invoiceLine = args.invoiceNumber ? `Фактура: №${String(args.invoiceNumber).padStart(10, "0")}` : "Фактура: чакаме";
+  const html = `
+    <div style="font-family:sans-serif;padding:24px;background:#0d1510;color:#e0e0e0;border-radius:16px;max-width:520px">
+      <h2 style="color:#c4e9bf;margin:0 0 16px;font-size:22px">🎉 Нова покупка · ${amount}</h2>
+      <table style="width:100%;border-collapse:collapse;font-size:14px;line-height:1.7">
+        <tr><td style="color:#888;width:120px">Клиент</td><td><strong>${args.clientName}</strong></td></tr>
+        <tr><td style="color:#888">Email</td><td><a href="mailto:${args.clientEmail}" style="color:#c4e9bf">${args.clientEmail}</a></td></tr>
+        <tr><td style="color:#888">Програма</td><td>SYNRG Метод · 8 седмици</td></tr>
+        <tr><td style="color:#888">Ментор</td><td>${args.coachName || "<span style='color:#F87171'>не е назначен</span>"}</td></tr>
+        <tr><td style="color:#888">Тип акаунт</td><td>${args.isNewClient ? "Нов клиент (auto-created)" : "Съществуващ"}</td></tr>
+        <tr><td style="color:#888">${invoiceLine.split(":")[0]}</td><td>${invoiceLine.split(":").slice(1).join(":").trim()}</td></tr>
+      </table>
+      <hr style="border:none;border-top:1px solid #333;margin:20px 0">
+      <p style="font-size:12px;color:#666;margin:0">Виж в Admin → Клиенти → Онлайн</p>
+    </div>`;
+  for (const email of SALES_ALERT_EMAILS) {
+    try {
+      await sendEmail(email, "SYNRG Sales", `🎉 Нова покупка SYNRG Метод · ${amount} · ${args.clientName}`, html);
+    } catch (e) {
+      console.warn(`Sales alert to ${email} failed:`, e);
+    }
   }
 }
 
