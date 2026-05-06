@@ -323,8 +323,15 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     return;
   }
   // Anonymous purchase fallback: derive client from Stripe customer email.
+  // `onboardingNeeded` = a brand new client row was created for this purchase.
+  // `isAnonymousPurchase` = no client_id arrived from cart.js — the buyer wasn't
+  // logged in to the app at checkout. We send the magic deep-link in BOTH cases:
+  //  - new client: needs to set their first password
+  //  - returning client buying anonymously again: probably forgot password
   let onboardingNeeded = false;
+  let isAnonymousPurchase = false;
   if (!client_id) {
+    isAnonymousPurchase = true;
     const email = session.customer_details?.email;
     const name = session.customer_details?.name || "";
     if (!email) {
@@ -513,27 +520,55 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     isNewClient: onboardingNeeded,
   });
 
-  // 6. Onboarding: if account was just created, issue password-reset code + email setup link
-  if (onboardingNeeded && clientEmail) {
+  // 6. Reset / start the client_program_state so week 1 begins TODAY.
+  //    For new clients: row is inserted on first quiz submit (OnlineHome).
+  //    For returning clients (renewal after refund/expiry): we reset started_at
+  //    so they don't see stale "week 8" from a previous purchase.
+  try {
+    const existingState = await sbQuery("client_program_state", `?select=client_id,consent_accepted_at&client_id=eq.${client_id}`);
+    if (existingState && (existingState as Array<unknown>).length > 0) {
+      const nowIso = new Date().toISOString();
+      await sbPatch("client_program_state", `client_id=eq.${client_id}`, {
+        started_at:   nowIso,
+        current_week: 1,
+        paused:       false,
+        completed_at: null,
+        updated_at:   nowIso,
+      });
+      console.log(`Reset client_program_state for renewal: client=${client_id}`);
+    }
+  } catch (e) {
+    console.warn("client_program_state reset failed:", e);
+  }
+
+  // 7. Onboarding email — send for ANY anonymous purchase (new or returning).
+  //    A returning anonymous buyer probably forgot their password; the deep-link
+  //    is the smoothest path back in. Logged-in renewals (client_id metadata
+  //    came from cart.js) skip this — they already have a session.
+  if (isAnonymousPurchase && clientEmail) {
     const code = await issueOnboardingCode(client_id, clientEmail);
     if (code) {
-      // Direct deep-link: app reads ?reset=&code= and drops user straight into
-      // "set new password" view. Backup 6-digit code shown for copy/paste fallback.
       const setupUrl = `https://synrg-beyondfitness.com/app/?reset=${encodeURIComponent(clientEmail)}&code=${code}`;
+      const heading = onboardingNeeded ? "Влез в твоя SYNRG акаунт" : "Добре дошъл/дошла отново в SYNRG";
+      const intro = onboardingNeeded
+        ? `Създадохме ти акаунт за SYNRG Beyond Fitness. За да зададеш парола и да влезеш, кликни бутона по-долу:`
+        : `Програмата ти е активна отново. За да влезеш в акаунта си, кликни бутона по-долу — ще зададеш нова парола за по-голяма сигурност:`;
+      const ctaLabel = onboardingNeeded ? "Задай парола и влез" : "Влез в акаунта си";
+      const subjectLine = onboardingNeeded ? "Достъп до твоя SYNRG акаунт" : "Програмата ти е активна — влез отново";
       const html = `<div style="font-family:sans-serif;padding:24px;background:#1a1a1a;color:#e0e0e0;border-radius:16px;max-width:520px">`
-        + `<h2 style="color:#c4e9bf;margin:0 0 16px">Влез в твоя SYNRG акаунт</h2>`
+        + `<h2 style="color:#c4e9bf;margin:0 0 16px">${heading}</h2>`
         + `<p>Здравей, <strong>${clientName}</strong>!</p>`
-        + `<p>Създадохме ти акаунт за SYNRG Beyond Fitness. За да зададеш парола и да влезеш, кликни бутона по-долу:</p>`
+        + `<p>${intro}</p>`
         + `<p style="text-align:center;margin:24px 0">`
-        +   `<a href="${setupUrl}" style="display:inline-block;background:#c4e9bf;color:#0d1510;padding:14px 32px;border-radius:12px;font-weight:700;text-decoration:none;font-size:16px">Задай парола и влез</a>`
+        +   `<a href="${setupUrl}" style="display:inline-block;background:#c4e9bf;color:#0d1510;padding:14px 32px;border-radius:12px;font-weight:700;text-decoration:none;font-size:16px">${ctaLabel}</a>`
         + `</p>`
         + `<p style="font-size:13px;color:#bbb;margin-top:24px">Ако бутонът не работи, отвори <a href="https://synrg-beyondfitness.com/app/" style="color:#c4e9bf">приложението</a>, натисни „Забравена парола", въведи имейла си и този код:</p>`
         + `<div style="font-size:24px;letter-spacing:6px;font-weight:700;color:#c4e9bf;text-align:center;padding:14px;background:#0d1510;border-radius:12px;margin:12px 0">${code}</div>`
         + `<p style="font-size:13px;color:#bbb">Кодът е валиден 24 часа.</p>`
         + `<hr style="border:none;border-top:1px solid #333;margin:20px 0">`
         + `<p style="font-size:12px;color:#666">SYNRG Beyond Fitness · Синерджи 93 ООД</p></div>`;
-      await sendEmail(clientEmail, clientName, "Достъп до твоя SYNRG акаунт", html);
-      console.log(`Onboarding email sent to ${clientEmail}`);
+      await sendEmail(clientEmail, clientName, subjectLine, html);
+      console.log(`Onboarding email sent to ${clientEmail} (newClient=${onboardingNeeded})`);
     }
   }
 
