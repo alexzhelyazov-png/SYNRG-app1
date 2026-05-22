@@ -252,18 +252,30 @@ export function BookingProvider({ children }) {
   // ── Admin: activate plan for client ──────────────────────
   const activatePlan = useCallback(async (clientId, planType, validFrom, price = 0, startCredits = null, isPaid = false, validTo = null) => {
     try {
-      const creditsTotal = planType === '8' ? 8 : planType === '12' ? 12 : null
-      // If startCredits provided (migration), compute credits_used = total - remaining
-      const creditsUsed = (creditsTotal !== null && startCredits !== null)
-        ? Math.max(0, creditsTotal - Number(startCredits))
-        : 0
+      const baseTotal = planType === '8' ? 8 : planType === '12' ? 12 : null
       const from = validFrom || isoToday()
       let to = validTo
       if (!to) { const toDate = new Date(from + 'T00:00:00'); toDate.setDate(toDate.getDate() + 30); to = toDate.toISOString().slice(0, 10) }
       const existing = await DB.getClientActivePlan(clientId)
+      // Carry over unused credits from the previous active plan when renewing.
+      // Only applies when both old and new plan are credit-based (not unlimited)
+      // AND the admin did NOT manually specify a starting credits value
+      // (explicit startCredits = admin override, respect it as-is).
+      let carryover = 0
+      if (existing && baseTotal !== null && startCredits === null
+          && existing.plan_type !== 'unlimited' && existing.credits_total != null) {
+        carryover = Math.max(0, (existing.credits_total || 0) - (existing.credits_used || 0))
+      }
       if (existing) {
         await DB.update('client_plans', existing.id, { status: 'expired' })
       }
+      // Compute final credits_total / credits_used:
+      //   - If admin set startCredits explicitly: total stays at baseTotal, used = total - startCredits.
+      //   - Otherwise: total = baseTotal + carryover (so remaining = base + leftover).
+      const creditsTotal = baseTotal !== null ? baseTotal + carryover : null
+      const creditsUsed  = (baseTotal !== null && startCredits !== null)
+        ? Math.max(0, baseTotal - Number(startCredits))
+        : 0
       const result = await DB.insert('client_plans', {
         client_id:     clientId,
         plan_type:     planType,

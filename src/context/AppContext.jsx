@@ -241,6 +241,7 @@ export function AppProvider({ children }) {
           .filter(r => r.client_id === c.id)
           .sort((a, b) => (b.created_at || '').localeCompare(a.created_at || '')),
         modules: Array.isArray(c.modules) ? c.modules : (c.modules ? JSON.parse(c.modules) : []),
+        is_archived: !!c.is_archived,
         dismissedBadges: Array.isArray(c.dismissed_badges) ? c.dismissed_badges
           : (c.dismissed_badges ? JSON.parse(c.dismissed_badges) : []),
         reminderSettings: c.reminder_settings

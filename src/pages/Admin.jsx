@@ -13,6 +13,8 @@ import AccessTimeIcon        from '@mui/icons-material/AccessTime'
 import AddIcon               from '@mui/icons-material/Add'
 import EditIcon              from '@mui/icons-material/Edit'
 import DeleteOutlineIcon     from '@mui/icons-material/DeleteOutline'
+import Inventory2OutlinedIcon from '@mui/icons-material/Inventory2Outlined'
+import UnarchiveOutlinedIcon from '@mui/icons-material/UnarchiveOutlined'
 import PersonAddIcon         from '@mui/icons-material/PersonAdd'
 import PersonRemoveIcon      from '@mui/icons-material/PersonRemove'
 import CreditCardIcon        from '@mui/icons-material/CreditCard'
@@ -1913,6 +1915,10 @@ function DashboardTab({ t, lang, goTo }) {
   const [loaded,       setLoaded]       = useState(false)
   const [planDlg,      setPlanDlg]      = useState(null)
   const [broadcastDlg, setBroadcastDlg] = useState(null) // null | 'free' | { singleClient }
+  // Local overrides so the UI updates immediately after archive/unarchive
+  // without waiting for a full client reload. Keyed by client id.
+  const [archiveOverrides, setArchiveOverrides] = useState({}) // { [id]: true|false }
+  const [showArchived, setShowArchived] = useState(false)
 
   useEffect(() => {
     loadAllPlans().then(() => setLoaded(true))
@@ -1985,20 +1991,51 @@ function DashboardTab({ t, lang, goTo }) {
       !mods.includes('studio_access') && !mods.includes('program_access') && !mods.includes('booking_access') &&
       !getActivePlan(c.id)
   }
-  const newRegs    = realClients.filter(c => !(c.modules || []).length || isFreeReg(c))
+  // True if the client ever had a row in client_plans — used to distinguish
+  // a former studio client (whose modules were reset to FREE_MODULES on plan
+  // expiry) from a genuinely new registration that has never paid.
+  const hasAnyPlanHistory = c => allPlans.some(p => p.client_id === c.id)
+
+  const isArchived = c => (c.id in archiveOverrides) ? archiveOverrides[c.id] : !!c.is_archived
+  const active     = realClients.filter(c => !isArchived(c))
+  const archived   = realClients.filter(isArchived)
+
+  // New registrations: never had a plan and either no modules or only free
+  // tracking modules (the free.html landing flow). Former studio clients
+  // whose plan expired go to `pending` even though their modules look "free".
+  const newRegs    = active.filter(c =>
+    !hasAnyPlanHistory(c) && (!(c.modules || []).length || isFreeReg(c))
+  )
   const leads      = newRegs.filter(isFreeReg) // free registered users only (not empty-module ghosts)
-  const pending    = realClients.filter(c => !getActivePlan(c.id) && (c.modules || []).includes('studio_access'))
-  const expiring   = realClients.filter(c => {
+  // Pending activation: no active plan AND either still tagged with
+  // studio_access OR has any prior plan history (i.e. expired studio client).
+  const pending    = active.filter(c => {
+    if (getActivePlan(c.id)) return false
+    return (c.modules || []).includes('studio_access') || hasAnyPlanHistory(c)
+  })
+  const expiring   = active.filter(c => {
     const p = getActivePlan(c.id)
     if (!p) return false
     const d = daysUntilExpiry(p)
     return d !== null && d >= 0 && d <= 7
   })
-  const lowCred    = realClients.filter(c => {
+  const lowCred    = active.filter(c => {
     const p = getActivePlan(c.id)
     if (!p || p.plan_type === 'unlimited') return false
     return creditsRemaining(p) <= 2
   })
+
+  async function handleArchive(client, archive) {
+    try {
+      await DB.update('clients', client.id, { is_archived: archive })
+      setArchiveOverrides(prev => ({ ...prev, [client.id]: archive }))
+      showSnackbar(archive
+        ? (lang === 'en' ? 'Client archived' : 'Клиентът е архивиран')
+        : (lang === 'en' ? 'Client unarchived' : 'Клиентът е възстановен'))
+    } catch (e) {
+      showSnackbar(t('errGeneric') + ': ' + (e?.message || 'archive failed'))
+    }
+  }
 
   return (
     <Box>
@@ -2044,11 +2081,17 @@ function DashboardTab({ t, lang, goTo }) {
             {t('pendingActivation')} ({pending.length})
           </Typography>
           <Paper sx={{ borderRadius: '14px', border: `1px solid rgba(248,113,113,0.25)`, mb: 2, overflow: 'hidden' }}>
-            {pending.slice(0, 5).map(c => (
+            {pending.map(c => (
               <Box key={c.id} sx={{ px: 2, py: 1, display: 'flex', alignItems: 'center', gap: 1.5,
                 borderBottom: `1px solid ${C.border}`, '&:last-child': { borderBottom: 'none' } }}>
                 <Typography sx={{ fontWeight: 600, fontSize: '14px', color: C.text, flex: 1 }}>{c.name}</Typography>
                 <Typography sx={{ fontSize: '11px', color: '#F87171' }}>{t('noPlanShort')}</Typography>
+                <Tooltip title={lang === 'en' ? 'Archive' : 'Архивирай'} arrow>
+                  <IconButton size="small" onClick={() => handleArchive(c, true)}
+                    sx={{ color: C.muted, '&:hover': { color: '#FBBF24' } }}>
+                    <Inventory2OutlinedIcon sx={{ fontSize: 16 }} />
+                  </IconButton>
+                </Tooltip>
                 <Tooltip title={t('deleteClientBtn')} arrow>
                   <IconButton size="small" onClick={() => setConfirmDelete({ id: c.id, name: c.name })}
                     sx={{ color: C.muted, '&:hover': { color: '#F87171' } }}>
@@ -2058,6 +2101,43 @@ function DashboardTab({ t, lang, goTo }) {
               </Box>
             ))}
           </Paper>
+        </>
+      )}
+
+      {/* Archived list — collapsed by default, expandable */}
+      {archived.length > 0 && (
+        <>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1, cursor: 'pointer' }}
+            onClick={() => setShowArchived(v => !v)}>
+            <Typography sx={{ fontWeight: 700, fontSize: '14px', color: C.muted, flex: 1 }}>
+              {lang === 'en' ? 'Archived' : 'Архивирани'} ({archived.length})
+            </Typography>
+            <Typography sx={{ fontSize: '11px', color: C.muted }}>
+              {showArchived ? (lang === 'en' ? 'Hide' : 'Скрий') : (lang === 'en' ? 'Show' : 'Покажи')}
+            </Typography>
+          </Box>
+          {showArchived && (
+            <Paper sx={{ borderRadius: '14px', border: `1px solid ${C.border}`, mb: 2, overflow: 'hidden', opacity: 0.85 }}>
+              {archived.map(c => (
+                <Box key={c.id} sx={{ px: 2, py: 1, display: 'flex', alignItems: 'center', gap: 1.5,
+                  borderBottom: `1px solid ${C.border}`, '&:last-child': { borderBottom: 'none' } }}>
+                  <Typography sx={{ fontWeight: 600, fontSize: '14px', color: C.muted, flex: 1 }}>{c.name}</Typography>
+                  <Tooltip title={lang === 'en' ? 'Restore' : 'Възстанови'} arrow>
+                    <IconButton size="small" onClick={() => handleArchive(c, false)}
+                      sx={{ color: C.muted, '&:hover': { color: '#c4e9bf' } }}>
+                      <UnarchiveOutlinedIcon sx={{ fontSize: 16 }} />
+                    </IconButton>
+                  </Tooltip>
+                  <Tooltip title={t('deleteClientBtn')} arrow>
+                    <IconButton size="small" onClick={() => setConfirmDelete({ id: c.id, name: c.name })}
+                      sx={{ color: C.muted, '&:hover': { color: '#F87171' } }}>
+                      <DeleteOutlineIcon sx={{ fontSize: 16 }} />
+                    </IconButton>
+                  </Tooltip>
+                </Box>
+              ))}
+            </Paper>
+          )}
         </>
       )}
 
