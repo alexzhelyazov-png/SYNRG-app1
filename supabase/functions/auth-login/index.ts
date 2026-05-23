@@ -154,6 +154,25 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    // If the identifier looks like an email, resolve it to a name first.
+    if (name.includes("@")) {
+      const emailRes = await fetch(
+        `${SUPABASE_URL}/rest/v1/clients?select=name&email=ilike.${encodeURIComponent(name)}&is_coach=eq.false&limit=1`,
+        { headers: sbHeaders() }
+      );
+      if (emailRes.ok) {
+        const rows = await emailRes.json() as Array<{ name: string }>;
+        if (rows.length > 0) {
+          name = rows[0].name;
+        } else {
+          return new Response(
+            JSON.stringify({ error: "Invalid credentials" }),
+            { status: 401, headers: { ...cors, "Content-Type": "application/json" } }
+          );
+        }
+      }
+    }
+
     // 1. Rate limit check
     const rateLimit = await isRateLimited(ip, name);
     if (rateLimit.blocked) {

@@ -4,7 +4,7 @@
 //   • Welcome card on day 1 (first visit only)
 //   • Hero for the current week (title, subtitle, day N of 84)
 //   • Week picker (1–12)
-//   • Daily actions (food/weight/steps) — prominent, with weekly streak
+//   • Daily actions (food/weight) — prominent, with weekly streak
 //   • Weekly context list (secondary)
 //   • Workouts for this week (or friendly empty state)
 //   • Coach chat CTA
@@ -22,7 +22,6 @@ import FitnessCenterIcon from '@mui/icons-material/FitnessCenter'
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined'
 import MonitorWeightOutlinedIcon from '@mui/icons-material/MonitorWeightOutlined'
 import RestaurantOutlinedIcon from '@mui/icons-material/RestaurantOutlined'
-import DirectionsRunOutlinedIcon from '@mui/icons-material/DirectionsRunOutlined'
 import LocalDrinkOutlinedIcon from '@mui/icons-material/LocalDrinkOutlined'
 import ChevronRightIcon from '@mui/icons-material/ChevronRight'
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
@@ -103,7 +102,7 @@ function formatTaskTitle(title, weightKg) { return applyTaskVars(title, weightKg
 //   • 'mint'  trackable daily action (workout, log, etc.)
 //   • 'done'  same as mint but with the check icon (already complete)
 //   • 'logan' informational / educational behavioural habit
-function DailyTaskRow({ Icon, label, rightSlot, accent = 'mint', onClick, onIconClick }) {
+function DailyTaskRow({ num, Icon, label, rightSlot, accent = 'mint', onClick, onIconClick }) {
   const isLogan = accent === 'logan'
   const iconInteractive = typeof onIconClick === 'function'
   return (
@@ -119,7 +118,7 @@ function DailyTaskRow({ Icon, label, rightSlot, accent = 'mint', onClick, onIcon
       <Box
         onClick={iconInteractive ? (e) => { e.stopPropagation(); onIconClick(e) } : undefined}
         sx={{
-          width: 32, height: 32, borderRadius: '50%',
+          width: 28, height: 28, borderRadius: '50%',
           background: isLogan ? 'rgba(170,169,205,0.14)' : 'rgba(196,233,191,0.10)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           flexShrink: 0,
@@ -130,7 +129,10 @@ function DailyTaskRow({ Icon, label, rightSlot, accent = 'mint', onClick, onIcon
             : undefined,
         }}
       >
-        <Icon sx={{ fontSize: 17, color: isLogan ? '#AAA9CD' : '#C4E9BF' }} />
+        {num !== undefined
+          ? <Typography sx={{ fontSize: 12, fontWeight: 700, fontFamily: "'MontBlanc', sans-serif", color: isLogan ? '#AAA9CD' : '#C4E9BF', lineHeight: 1 }}>{num}</Typography>
+          : <Icon sx={{ fontSize: 17, color: isLogan ? '#AAA9CD' : '#C4E9BF' }} />
+        }
       </Box>
       <Typography sx={{
         flex: 1, minWidth: 0,
@@ -321,7 +323,7 @@ export default function OnlineHome() {
     return s
   }, [completions])
 
-  // Daily compliance — food/weight/steps are the dailies.
+  // Daily compliance — food/weight are the dailies.
   // Normalize stored dates: accept either YYYY-MM-DD or DD.MM.YYYY so a log
   // made today is recognized regardless of the field's storage format.
   const today = todayStr()
@@ -340,11 +342,7 @@ export default function OnlineHome() {
     () => (client?.weightLogs || []).some(w => sameDay(w.date, today)),
     [client?.weightLogs, today]
   )
-  const didStepsToday  = useMemo(
-    () => (client?.stepsLogs  || []).some(s => sameDay(s.date, today) && Number(s.steps) > 0),
-    [client?.stepsLogs, today]
-  )
-  const dailiesDoneCount = (didFoodToday ? 1 : 0) + (didWeightToday ? 1 : 0) + (didStepsToday ? 1 : 0)
+  const dailiesDoneCount = (didFoodToday ? 1 : 0) + (didWeightToday ? 1 : 0)
 
   // Weekly streak — how many days this week each tracker was logged.
   // If we have a program state, anchor to started_at + (currentWeek-1)*7.
@@ -378,12 +376,11 @@ export default function OnlineHome() {
     }
     const foodDays   = new Set((client?.meals      || []).filter(m => inWeek(m.date)).map(m => m.date))
     const weightDays = new Set((client?.weightLogs || []).filter(w => inWeek(w.date)).map(w => w.date))
-    const stepsDays  = new Set((client?.stepsLogs  || []).filter(s => inWeek(s.date) && Number(s.steps) > 0).map(s => s.date))
-    return { food: foodDays.size, weight: weightDays.size, steps: stepsDays.size }
-  }, [state?.started_at, currentWeek, today, client?.meals, client?.weightLogs, client?.stepsLogs])
+    return { food: foodDays.size, weight: weightDays.size }
+  }, [state?.started_at, currentWeek, today, client?.meals, client?.weightLogs])
 
   // First undone daily — priority marker
-  const firstUndoneView = !didWeightToday ? 'weight' : !didFoodToday ? 'food' : !didStepsToday ? 'steps' : null
+  const firstUndoneView = !didWeightToday ? 'weight' : !didFoodToday ? 'food' : null
 
   const progressPct = Math.round((dayNumber / TOTAL_DAYS) * 100)
 
@@ -643,7 +640,11 @@ export default function OnlineHome() {
 
               <Box sx={{ height: 1, background: C.border, my: 0.5 }} />
 
-              {/* Daily logs (weight / food / steps) — same row template as the
+              <Typography sx={{ fontSize: 10, letterSpacing: 1.4, fontWeight: 700, color: C.muted, px: 1, pt: 0.5, pb: 0.25 }}>
+                ДНЕВНИК
+              </Typography>
+
+              {/* Daily logs (weight / food) — same row template as the
                   workout banner above; mint accent signals they're trackable
                   daily actions. Streak count + info icon on the right match the
                   habit rows below so all five rows share one layout. */}
@@ -665,18 +666,10 @@ export default function OnlineHome() {
                       description: t('foodInfoBody'),
                     },
                   },
-                  {
-                    view: 'steps', label: t('logSteps'), Icon: DirectionsRunOutlinedIcon,
-                    done: didStepsToday, streak: weeklyStreaks.steps,
-                    info: {
-                      title_bg: t('stepsInfoTitle'),
-                      description: t('stepsInfoBody'),
-                    },
-                  },
-                ].map(item => (
+                ].map((item, idx) => (
                   <DailyTaskRow
                     key={item.view}
-                    Icon={item.Icon}
+                    num={idx + 1}
                     label={item.label}
                     rightSlot={
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
@@ -707,15 +700,17 @@ export default function OnlineHome() {
               {behaviouralHabits.length > 0 && (
                 <>
                   <Box sx={{ height: 1, background: C.border, my: 0.25 }} />
+                  <Typography sx={{ fontSize: 10, letterSpacing: 1.4, fontWeight: 700, color: C.muted, px: 1, pt: 0.5, pb: 0.25 }}>
+                    НАВИЦИ ЗА ТАЗИ СЕДМИЦА
+                  </Typography>
                   <Box sx={{ display: 'flex', flexDirection: 'column' }}>
-                    {behaviouralHabits.map(task => {
+                    {behaviouralHabits.map((task, idx) => {
                       const slot = habitCompletions[task.id] || { count: 0, doneToday: false }
                       const accent = slot.doneToday ? 'done' : 'logan'
-                      const RowIcon = slot.doneToday ? CheckCircleIcon : LocalDrinkOutlinedIcon
                       return (
                         <DailyTaskRow
                           key={task.id}
-                          Icon={RowIcon}
+                          num={idx + 3}
                           label={formatTaskTitle(pickLang(task, 'title_bg'), weightForTasks)}
                           rightSlot={
                             <Typography sx={{

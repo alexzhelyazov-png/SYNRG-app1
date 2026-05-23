@@ -614,7 +614,7 @@ function ClientInfoDialog({ open, onClose, client, plan, allClientPlans, workout
 }
 
 // ── Client Plan Row (compact) ─────────────────────────────────
-function ClientPlanRow({ client, plan, onOpen, onManage, onDelete, t, lang }) {
+function ClientPlanRow({ client, plan, onOpen, onManage, onDelete, onArchive, onUnarchive, t, lang }) {
   const active   = isPlanActive(plan)
   const credits  = plan ? creditsRemaining(plan) : null
   const isLow    = plan && plan.plan_type !== 'unlimited' && credits !== null && credits <= 2
@@ -673,6 +673,22 @@ function ClientPlanRow({ client, plan, onOpen, onManage, onDelete, t, lang }) {
           sx={{ color: C.muted, '&:hover': { color: C.purple } }}>
           <EditIcon sx={{ fontSize: 14 }} />
         </IconButton>
+        {onArchive && (
+          <Tooltip title={lang === 'en' ? 'Archive' : 'Архивирай'} arrow>
+            <IconButton size="small" onClick={e => { e.stopPropagation(); onArchive(client) }}
+              sx={{ color: C.muted, '&:hover': { color: '#FBBF24' } }}>
+              <Inventory2OutlinedIcon sx={{ fontSize: 14 }} />
+            </IconButton>
+          </Tooltip>
+        )}
+        {onUnarchive && (
+          <Tooltip title={lang === 'en' ? 'Restore' : 'Възстанови'} arrow>
+            <IconButton size="small" onClick={e => { e.stopPropagation(); onUnarchive(client) }}
+              sx={{ color: C.muted, '&:hover': { color: '#c4e9bf' } }}>
+              <UnarchiveOutlinedIcon sx={{ fontSize: 14 }} />
+            </IconButton>
+          </Tooltip>
+        )}
         {onDelete && (
           <IconButton size="small" onClick={e => { e.stopPropagation(); onDelete(client) }}
             sx={{ color: C.muted, '&:hover': { color: '#F87171' } }}>
@@ -1271,7 +1287,7 @@ function ClientModuleEditor({ clientId, currentModules, t, lang }) {
 }
 
 function ClientsTab({ t }) {
-  const { realClients, showSnackbar, lang, setConfirmDelete } = useApp()
+  const { realClients, showSnackbar, lang, setConfirmDelete, setClientArchived } = useApp()
   const { allPlans, loadAllPlans, activatePlan, extendPlan, adjustCredits, deactivatePlan } = useBooking()
   const [planDlg, setPlanDlg]   = useState(null)
   const [loaded, setLoaded]     = useState(false)
@@ -1292,17 +1308,39 @@ function ClientsTab({ t }) {
       !mods.includes('studio_access') && !mods.includes('program_access') && !mods.includes('booking_access') &&
       !getClientPlan(c.id)
   }
+  const [showArchived, setShowArchived] = useState(false)
+  const archived = realClients.filter(c => c.is_archived && searchMatch(c))
+
   const pending  = realClients.filter(c => {
+    if (c.is_archived) return false
     if (!searchMatch(c)) return false
     const p = getClientPlan(c.id)
     if (!p) return (c.modules || []).includes('studio_access') || isFreeRegistered(c)
     return !isPlanActive(p)
   })
   const active   = realClients.filter(c => {
+    if (c.is_archived) return false
     if (!searchMatch(c)) return false
     const p = getClientPlan(c.id)
     return p && isPlanActive(p)
   })
+
+  async function handleArchive(client) {
+    try {
+      await setClientArchived(client.id, true)
+      showSnackbar(lang === 'en' ? 'Client archived' : 'Клиентът е архивиран')
+    } catch (e) {
+      showSnackbar(t('errGeneric') + ': ' + (e?.message || 'archive failed'))
+    }
+  }
+  async function handleUnarchive(client) {
+    try {
+      await setClientArchived(client.id, false)
+      showSnackbar(lang === 'en' ? 'Client restored' : 'Клиентът е възстановен')
+    } catch (e) {
+      showSnackbar(t('errGeneric') + ': ' + (e?.message || 'unarchive failed'))
+    }
+  }
 
   async function handleActivate(clientId, planType, from, price, startCredits, isPaid, validTo) {
     const res = await activatePlan(clientId, planType, from, price, startCredits, isPaid, validTo)
@@ -1356,15 +1394,46 @@ function ClientsTab({ t }) {
                 onOpen={() => setInfoDlg({ client, plan: expiredPlan, allClientPlans: allPlans.filter(p => p.client_id === client.id), workouts: client.workouts || [] })}
                 t={t} lang={lang}
                 onManage={(c, p) => setPlanDlg({ client: c, plan: p })}
+                onArchive={handleArchive}
                 onDelete={handleDelete} />
             )
           })}
         </Paper>
       )}
 
+      {/* Archived clients */}
+      {archived.length > 0 && (
+        <>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1, cursor: 'pointer' }}
+            onClick={() => setShowArchived(v => !v)}>
+            <Typography sx={{ fontWeight: 700, fontSize: '14px', color: C.muted, flex: 1 }}>
+              {lang === 'en' ? 'Archived' : 'Архивирани'} ({archived.length})
+            </Typography>
+            <Typography sx={{ fontSize: '11px', color: C.muted }}>
+              {showArchived ? (lang === 'en' ? 'Hide' : 'Скрий') : (lang === 'en' ? 'Show' : 'Покажи')}
+            </Typography>
+          </Box>
+          {showArchived && (
+            <Paper sx={{ borderRadius: '16px', border: `1px solid ${C.border}`, overflow: 'hidden', mb: 3, opacity: 0.85 }}>
+              {archived.map(client => {
+                const plan = getClientPlan(client.id)
+                return (
+                  <ClientPlanRow key={client.id} client={client} plan={plan}
+                    onOpen={() => setInfoDlg({ client, plan, allClientPlans: allPlans.filter(p => p.client_id === client.id), workouts: client.workouts || [] })}
+                    t={t} lang={lang}
+                    onManage={(c, p) => setPlanDlg({ client: c, plan: p })}
+                    onUnarchive={handleUnarchive}
+                    onDelete={handleDelete} />
+                )
+              })}
+            </Paper>
+          )}
+        </>
+      )}
+
       {/* Active clients */}
       <Typography sx={{ fontWeight: 700, fontSize: '14px', color: C.text, mb: 1 }}>
-        {t('allClientsLbl')} ({realClients.length})
+        {t('allClientsLbl')} ({active.length})
       </Typography>
       <Paper sx={{ borderRadius: '16px', border: `1px solid ${C.border}`, overflow: 'hidden' }}>
         {active.map(client => {
@@ -1910,14 +1979,11 @@ function CoachesTab({ t }) {
 
 // ── Dashboard Tab ────────────────────────────────────────────
 function DashboardTab({ t, lang, goTo }) {
-  const { realClients, showSnackbar, setConfirmDelete, updateClientModules } = useApp()
+  const { realClients, showSnackbar, setConfirmDelete, updateClientModules, setClientArchived } = useApp()
   const { allPlans, loadAllPlans, activatePlan, extendPlan, adjustCredits } = useBooking()
   const [loaded,       setLoaded]       = useState(false)
   const [planDlg,      setPlanDlg]      = useState(null)
   const [broadcastDlg, setBroadcastDlg] = useState(null) // null | 'free' | { singleClient }
-  // Local overrides so the UI updates immediately after archive/unarchive
-  // without waiting for a full client reload. Keyed by client id.
-  const [archiveOverrides, setArchiveOverrides] = useState({}) // { [id]: true|false }
   const [showArchived, setShowArchived] = useState(false)
 
   useEffect(() => {
@@ -1996,9 +2062,8 @@ function DashboardTab({ t, lang, goTo }) {
   // expiry) from a genuinely new registration that has never paid.
   const hasAnyPlanHistory = c => allPlans.some(p => p.client_id === c.id)
 
-  const isArchived = c => (c.id in archiveOverrides) ? archiveOverrides[c.id] : !!c.is_archived
-  const active     = realClients.filter(c => !isArchived(c))
-  const archived   = realClients.filter(isArchived)
+  const active     = realClients.filter(c => !c.is_archived)
+  const archived   = realClients.filter(c => c.is_archived)
 
   // New registrations: never had a plan and either no modules or only free
   // tracking modules (the free.html landing flow). Former studio clients
@@ -2027,8 +2092,7 @@ function DashboardTab({ t, lang, goTo }) {
 
   async function handleArchive(client, archive) {
     try {
-      await DB.update('clients', client.id, { is_archived: archive })
-      setArchiveOverrides(prev => ({ ...prev, [client.id]: archive }))
+      await setClientArchived(client.id, archive)
       showSnackbar(archive
         ? (lang === 'en' ? 'Client archived' : 'Клиентът е архивиран')
         : (lang === 'en' ? 'Client unarchived' : 'Клиентът е възстановен'))
@@ -2042,7 +2106,6 @@ function DashboardTab({ t, lang, goTo }) {
       {/* Summary cards */}
       <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', mb: 3 }}>
         {newRegs.length > 0 && <StatCard icon={PersonAddIcon} label={t('newRegistrations')} value={newRegs.length} color="#60A5FA" onClick={() => goTo('clients', 'clients')} />}
-        <StatCard icon={PeopleIcon}       label={t('pendingCard')}  value={pending.length}   color="#F87171" onClick={() => goTo('clients', 'clients')} />
         <StatCard icon={WarningAmberIcon} label={t('expiringCard')} value={expiring.length}  color="#FB923C" onClick={() => goTo('clients', 'clients')} />
         <StatCard icon={CreditCardIcon}   label={t('lowCredCard')}  value={lowCred.length}   color="#FBBF24" onClick={() => goTo('clients', 'clients')} />
       </Box>
@@ -2062,36 +2125,6 @@ function DashboardTab({ t, lang, goTo }) {
                   sx={{ fontSize: '11px', minHeight: 0, py: 0.5, px: 1.5 }}>
                   {lang === 'en' ? '+ Add plan' : '+ Добави план'}
                 </Button>
-                <Tooltip title={t('deleteClientBtn')} arrow>
-                  <IconButton size="small" onClick={() => setConfirmDelete({ id: c.id, name: c.name })}
-                    sx={{ color: C.muted, '&:hover': { color: '#F87171' } }}>
-                    <DeleteOutlineIcon sx={{ fontSize: 16 }} />
-                  </IconButton>
-                </Tooltip>
-              </Box>
-            ))}
-          </Paper>
-        </>
-      )}
-
-      {/* Pending list */}
-      {pending.length > 0 && (
-        <>
-          <Typography sx={{ fontWeight: 700, fontSize: '14px', color: '#F87171', mb: 1 }}>
-            {t('pendingActivation')} ({pending.length})
-          </Typography>
-          <Paper sx={{ borderRadius: '14px', border: `1px solid rgba(248,113,113,0.25)`, mb: 2, overflow: 'hidden' }}>
-            {pending.map(c => (
-              <Box key={c.id} sx={{ px: 2, py: 1, display: 'flex', alignItems: 'center', gap: 1.5,
-                borderBottom: `1px solid ${C.border}`, '&:last-child': { borderBottom: 'none' } }}>
-                <Typography sx={{ fontWeight: 600, fontSize: '14px', color: C.text, flex: 1 }}>{c.name}</Typography>
-                <Typography sx={{ fontSize: '11px', color: '#F87171' }}>{t('noPlanShort')}</Typography>
-                <Tooltip title={lang === 'en' ? 'Archive' : 'Архивирай'} arrow>
-                  <IconButton size="small" onClick={() => handleArchive(c, true)}
-                    sx={{ color: C.muted, '&:hover': { color: '#FBBF24' } }}>
-                    <Inventory2OutlinedIcon sx={{ fontSize: 16 }} />
-                  </IconButton>
-                </Tooltip>
                 <Tooltip title={t('deleteClientBtn')} arrow>
                   <IconButton size="small" onClick={() => setConfirmDelete({ id: c.id, name: c.name })}
                     sx={{ color: C.muted, '&:hover': { color: '#F87171' } }}>

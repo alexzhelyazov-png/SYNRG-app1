@@ -1409,6 +1409,11 @@ export function AppProvider({ children }) {
   }
 
   // ── Module management (admin) ─────────────────────────────────
+  async function setClientArchived(clientId, archived) {
+    await DB.update('clients', clientId, { is_archived: !!archived })
+    setClients(prev => prev.map(c => c.id === clientId ? { ...c, is_archived: !!archived } : c))
+  }
+
   async function updateClientModules(clientId, newModules) {
     const prevClient = clients.find(c => c.id === clientId)
     const prevModules = prevClient?.modules || []
@@ -1652,6 +1657,7 @@ export function AppProvider({ children }) {
     sendReaction, dismissReaction,
     updateReminderSettings,
     updateClientModules,
+    setClientArchived,
     dismissBadge,
     dismissBadgesBulk,
     synrgHabits, setSynrgHabits,
