@@ -51,7 +51,7 @@ export const T = {
 
     // ── Navigation ───────────────────────────────────
     navDashboard:       'Днес',
-    navProgress:        'Прогрес',
+    navProgress:        'Класация',
     navFood:            'Хранителен тракер',
     navWeight:          'Тегло',
     navSteps:           'Стъпки',
@@ -1038,7 +1038,7 @@ export const T = {
 
     // ── Navigation ───────────────────────────────────
     navDashboard:       'Today',
-    navProgress:        'Progress',
+    navProgress:        'Ranking',
     navFood:            'Food Tracker',
     navWeight:          'Weight',
     navSteps:           'Steps',

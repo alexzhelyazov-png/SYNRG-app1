@@ -37,7 +37,7 @@ function getNavItems(auth, admin, isOnlineClient = false, isLead = false) {
 
   const items = [{ view: 'dashboard', Icon: DashboardIcon, labelKey: 'navDashboard' }]
   if (hasModule(modules, 'nutrition_tracking') || hasModule(modules, 'weight_tracking'))
-    items.push({ view: 'progress', Icon: TrendingUpIcon, labelKey: 'navProgress' })
+    items.push({ view: 'progress', Icon: LeaderboardIcon, labelKey: 'navProgress' })
 
   // Programs: always visible — locked with indicator if no program_access
   items.push({ view: 'programs', Icon: PlayCircleOutlineIcon, labelKey: 'navPrograms', isLocked: !hasProgramAccess })
