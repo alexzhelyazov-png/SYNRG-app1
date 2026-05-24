@@ -1117,7 +1117,7 @@ function PlansTab({ t }) {
   }
 
   const filtered = realClients.filter(c =>
-    !search || c.name.toLowerCase().includes(search.toLowerCase())
+    !c.is_archived && (!search || c.name.toLowerCase().includes(search.toLowerCase()))
   )
 
   return (
@@ -2072,12 +2072,6 @@ function DashboardTab({ t, lang, goTo }) {
     !hasAnyPlanHistory(c) && (!(c.modules || []).length || isFreeReg(c))
   )
   const leads      = newRegs.filter(isFreeReg) // free registered users only (not empty-module ghosts)
-  // Pending activation: no active plan AND either still tagged with
-  // studio_access OR has any prior plan history (i.e. expired studio client).
-  const pending    = active.filter(c => {
-    if (getActivePlan(c.id)) return false
-    return (c.modules || []).includes('studio_access') || hasAnyPlanHistory(c)
-  })
   const expiring   = active.filter(c => {
     const p = getActivePlan(c.id)
     if (!p) return false
