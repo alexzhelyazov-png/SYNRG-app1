@@ -60,6 +60,7 @@ export default function FoodModal() {
   const [aiFood,     setAiFood]     = useState(null)  // { name, grams, kcal, protein, kcalPer100, proteinPer100 }
   const [aiLoading,  setAiLoading]  = useState(false)
   const [aiError,    setAiError]    = useState('')
+  const [saving,     setSaving]     = useState(false)
   const fileInputRef = useRef(null)
 
   function handleRecentClick(meal) {
@@ -150,6 +151,8 @@ export default function FoodModal() {
   }
 
   function handleAdd() {
+    if (saving) return
+    setSaving(true)
     if (isAiMode) {
       const grams = Number(String(amount).replace(',', '.')) || aiFood.grams
       addBarcodeFood(aiFood.name, grams, aiFood.kcalPer100, aiFood.proteinPer100)
@@ -158,7 +161,7 @@ export default function FoodModal() {
     }
     if (isCustomMode) {
       const rawNum = Number(String(amount).replace(',', '.'))
-      if (!rawNum) return
+      if (!rawNum) { setSaving(false); return }
       addBarcodeFood(
         customFood.name,
         rawNum,
@@ -170,9 +173,9 @@ export default function FoodModal() {
       resetAndClose()
       return
     }
-    if (!selectedFood || !amount) return
+    if (!selectedFood || !amount) { setSaving(false); return }
     const rawNum = Number(String(amount).replace(',', '.'))
-    if (!rawNum) return
+    if (!rawNum) { setSaving(false); return }
     const grams = selectedFood.perPiece ? rawNum * (selectedFood.gramsPerPiece || 55) : rawNum
     addFoodFromModal(lookupKey, grams)
     resetAndClose()
@@ -542,8 +545,8 @@ export default function FoodModal() {
 
       <DialogActions sx={{ px: 3, pb: 3, pt: 0, gap: 1 }}>
         <Button onClick={resetAndClose} variant="outlined" fullWidth>{t('cancelLbl')}</Button>
-        <Button onClick={handleAdd} variant="contained" color="primary" fullWidth disabled={!canAdd}>
-          {t('addBtn')} →
+        <Button onClick={handleAdd} variant="contained" color="primary" fullWidth disabled={!canAdd || saving}>
+          {saving ? <CircularProgress size={16} sx={{ color: 'inherit' }} /> : `${t('addBtn')} →`}
         </Button>
       </DialogActions>
     </Dialog>

@@ -276,9 +276,16 @@ export default function FoodTracker() {
                       <WarningAmberIcon sx={{ fontSize: 15, color: 'rgba(255,160,60,0.85)', flexShrink: 0 }} />
                     </Tooltip>
                   )}
-                  <Typography sx={{ fontWeight: 600, fontSize: '14px', color: item._failed ? 'rgba(255,180,120,0.9)' : undefined }}>
-                    {lang === 'en' ? (foodDB[item.key]?.labelEn || item.label) : item.label}
-                  </Typography>
+                  <Box>
+                    <Typography sx={{ fontWeight: 600, fontSize: '14px', color: item._failed ? 'rgba(255,180,120,0.9)' : undefined }}>
+                      {lang === 'en' ? (foodDB[item.key]?.labelEn || item.label) : item.label}
+                    </Typography>
+                    {isMobile && (
+                      <Typography sx={{ fontSize: '11px', color: C.muted, lineHeight: 1.3 }}>
+                        {item.kcal} kcal · {item.protein}г б.
+                      </Typography>
+                    )}
+                  </Box>
                 </Box>
                 <Typography variant="body2" sx={{ color: C.muted }}>{item.grams}{t('gUnit')}</Typography>
                 {!isMobile && (
