@@ -223,13 +223,14 @@ export default function FoodModal() {
     setCustomFood(null)
     setAiError('')
     setAiLoading(false)
+    setSaving(false)
   }
 
   const canAdd = isAiMode
     ? true  // AI already estimated grams
     : isCustomMode
       ? amount && Number(String(amount).replace(',', '.')) > 0
-      : selectedFood && amount && Number(amount) > 0
+      : selectedFood && amount && Number(String(amount).replace(',', '.')) > 0
 
   // Compute preview values for AI mode
   const aiGrams = isAiMode ? (Number(String(amount).replace(',', '.')) || aiFood.grams) : 0
