@@ -248,7 +248,9 @@ function collectMonthlyStats(client, monthKey) {
   // We now average the first 4 and last 4 entries (or as many as we
   // have if fewer; minimum 2 per side, so at least 4 weigh-ins total
   // are required to qualify for the badge at all).
-  const sortedW = [...weights].sort((a, b) => a.date.localeCompare(b.date))
+  // Sanitize the FULL series first (so cross-month context catches an
+  // implausible jump at the month boundary), then keep just this month.
+  const sortedW = sanitizeWeightSeries(client.weightLogs || []).filter(w => matchMonth(w.date))
   const avgWeights = arr => arr.length === 0
     ? 0
     : arr.reduce((s, w) => s + Number(w.weight || 0), 0) / arr.length
@@ -430,10 +432,36 @@ function longestStreak(dateSet) {
 }
 
 
+/* ── Weight series sanitizer (anti-cheat) ────────────────────────
+   A real weigh-in can't change faster than physiology allows. Max
+   genuine fat loss is ~0.3 kg/day; we add a fixed buffer for water /
+   scale / measurement noise. Any reading that jumps (up OR down) more
+   than this vs the previous accepted reading is treated as a data-entry
+   error or gaming attempt and is EXCLUDED from weight-loss badge & XP
+   calculations. The reading still shows on the user's weight chart —
+   it just can't manufacture a fake "-10 kg" badge or top the ranking.
+   ──────────────────────────────────────────────────────────────── */
+const MAX_PLAUSIBLE_LOSS_PER_DAY = 0.3
+const WEIGHT_NOISE_BUFFER_KG     = 2.5
+
+function sanitizeWeightSeries(weightLogs) {
+  const sorted = [...(weightLogs || [])].sort((a, b) => parseDate(a.date) - parseDate(b.date))
+  const out = []
+  for (const cur of sorted) {
+    if (!out.length) { out.push(cur); continue }
+    const prev    = out[out.length - 1]
+    const days    = Math.max(1, Math.round((parseDate(cur.date) - parseDate(prev.date)) / 86400000))
+    const maxStep = WEIGHT_NOISE_BUFFER_KG + MAX_PLAUSIBLE_LOSS_PER_DAY * days
+    if (Math.abs(Number(cur.weight) - Number(prev.weight)) > maxStep) continue // implausible jump — ignore
+    out.push(cur)
+  }
+  return out
+}
+
 /* ── Weight loss from peak ───────────────────────────────────── */
 function weightLossFromPeak(weightLogs) {
-  if (weightLogs.length < 2) return 0
-  const sorted = [...weightLogs].sort((a, b) => parseDate(a.date) - parseDate(b.date))
+  const sorted = sanitizeWeightSeries(weightLogs)
+  if (sorted.length < 2) return 0
   const peak = Math.max(...sorted.map(w => Number(w.weight)))
   const latest = Number(sorted[sorted.length - 1].weight)
   return Math.max(peak - latest, 0)
