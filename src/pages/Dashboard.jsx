@@ -1377,15 +1377,10 @@ function DashboardClient({ isCoachView = false }) {
               isLocked: !recipesUnlocked,
             }
           })(),
-          { key: 'tasks', view: 'tasks', color: '#F87171', Icon: AssignmentIcon, label: t('navTasks'),
-            badge: (() => {
-              const seen = localStorage.getItem(`tasksLastSeen_${client.id}`) || '1970'
-              return (client.tasks || []).filter(tk => tk.status === 'pending' && (tk.created_at || '') > seen).length
-            })() },
+          { key: 'tasks', view: 'tasks', color: '#F87171', Icon: AssignmentIcon, label: t('navTasks') },
         ].filter(Boolean).map(({ key, view, color, Icon, label, badge, isLocked }) => (
           <Paper key={key} onClick={() => {
             if (isLocked) { setView('programs'); return }
-            if (key === 'tasks') localStorage.setItem(`tasksLastSeen_${client.id}`, new Date().toISOString())
             setView(view)
           }}
             sx={{

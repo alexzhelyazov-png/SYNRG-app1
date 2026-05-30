@@ -571,6 +571,14 @@ export function AppProvider({ children }) {
     })
     setAuth({ isLoggedIn: true, role: 'client', name, id: data.id, modules: FREE_MODULES })
 
+    // Meta Pixel: fire CompleteRegistration for ads attribution + retargeting
+    if (typeof window !== 'undefined' && window.synrgPixel) {
+      window.synrgPixel.track('CompleteRegistration', {
+        content_name: 'SYNRG App Registration',
+        status: 'success',
+      }, { eventID: `register_${data.id}` })
+    }
+
     // Notify coaches/admins about the new registration
     DB.insertNotification('Система', name, 'registration', name)
 
@@ -1131,81 +1139,6 @@ export function AppProvider({ children }) {
     setNotifications(fresh)
   }
 
-  // ── Task actions ──────────────────────────────────────────────
-  async function addTask(taskData) {
-    const data = await DB.insert('tasks', {
-      client_id:   client.id,
-      title:       taskData.title,
-      description: taskData.description || '',
-      assigned_by: auth.name,
-      status:      'pending',
-    })
-    setClients(prev => prev.map(c => c.id === client.id
-      ? { ...c, tasks: [{ ...data, comments: [] }, ...(c.tasks || [])] }
-      : c
-    ))
-    showSnackbar(t('taskSavedMsg'))
-    await sendCoachNotification('task', client.name, taskData.title)
-  }
-
-  async function addTaskForClient(clientId, taskData) {
-    const targetClient = clients.find(c => c.id === clientId)
-    if (!targetClient) return
-    const data = await DB.insert('tasks', {
-      client_id:   clientId,
-      title:       taskData.title,
-      description: taskData.description || '',
-      assigned_by: auth.name,
-      status:      'pending',
-    })
-    setClients(prev => prev.map(c => c.id === clientId
-      ? { ...c, tasks: [{ ...data, comments: [] }, ...(c.tasks || [])] }
-      : c
-    ))
-    showSnackbar(t('taskSavedMsg'))
-    await sendCoachNotification('task', targetClient.name, taskData.title)
-  }
-
-  async function toggleTaskDone(taskId, done) {
-    const newStatus = done ? 'done' : 'pending'
-    await DB.update('tasks', taskId, { status: newStatus })
-    // Update across all clients (supports AllClientsTasks view)
-    setClients(prev => prev.map(c => ({
-      ...c,
-      tasks: (c.tasks || []).map(tk => tk.id === taskId ? { ...tk, status: newStatus } : tk),
-    })))
-  }
-
-  async function deleteTask(taskId) {
-    await DB.deleteById('tasks', taskId)
-    // Remove across all clients (supports AllClientsTasks view)
-    setClients(prev => prev.map(c => ({
-      ...c,
-      tasks: (c.tasks || []).filter(tk => tk.id !== taskId),
-    })))
-  }
-
-  async function addTaskComment(taskId, text) {
-    const data = await DB.insert('task_comments', {
-      task_id:  taskId,
-      author:   auth.name,
-      text,
-      is_coach: auth.role === 'coach',
-    })
-    // Update across all clients (supports AllClientsTasks view)
-    setClients(prev => prev.map(c => ({
-      ...c,
-      tasks: (c.tasks || []).map(tk => tk.id === taskId
-        ? { ...tk, comments: [...(tk.comments || []), data] }
-        : tk
-      ),
-    })))
-    showSnackbar(t('commentSavedMsg'))
-    const task = (client.tasks || []).find(tk => tk.id === taskId)
-    const taskTitle = task?.title || ''
-    await sendCoachNotification('task_comment', client.name, `${taskTitle}: ${text}`)
-  }
-
   // ── Reaction / coach message actions ──────────────────────────
   async function sendReaction(reactionType, message) {
     const data = await DB.insert('reactions', {
@@ -1653,7 +1586,6 @@ export function AppProvider({ children }) {
     deleteClient,
     addFoodFromModal, addQuickFood, addBarcodeFood,
     saveWeight, saveSteps, addExercise, saveWorkout, deleteWorkout, updateWorkout,
-    addTask, addTaskForClient, toggleTaskDone, deleteTask, addTaskComment,
     sendReaction, dismissReaction,
     updateReminderSettings,
     updateClientModules,
