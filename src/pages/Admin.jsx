@@ -38,7 +38,7 @@ import AdminMessagesTab      from './AdminMessagesTab'
 import { useBooking }        from '../context/BookingContext'
 import { C }                 from '../theme'
 import { DB }                from '../lib/db'
-import { MODULE_DEFS, MODULE_PRESETS, ADMIN_MANAGEABLE_MODULES } from '../lib/modules'
+import { MODULE_DEFS, MODULE_PRESETS, ADMIN_MANAGEABLE_MODULES, REMOTE_MODULES, FREE_MODULES } from '../lib/modules'
 import {
   isoToday, isoDatePlusDays, groupByDate, dayLabel, fmtTime,
   occupancyStr, planLabel, fmtValidTo, isPlanActive, creditsRemaining,
@@ -1180,9 +1180,19 @@ function ClientModuleEditor({ clientId, currentModules, t, lang }) {
   const liveClient = clients.find(c => c.id === clientId)
   const liveModules = liveClient?.modules || currentModules || []
   const liveAssigned = liveClient?.assigned_coach_id || ''
+  // Modules hidden from the admin editor (redundant permission flags). They
+  // stay intact in the data + keep being granted by studio plan activation
+  // (BookingContext merges ADMIN_MANAGEABLE_MODULES) — we just don't surface
+  // a confusing toggle/chip for them here.
+  const HIDDEN_EDITOR_MODULES = ['synrg_method']
+  const displayModules  = liveModules.filter(m => !HIDDEN_EDITOR_MODULES.includes(m))
+  const editableModules = ADMIN_MANAGEABLE_MODULES.filter(k => !HIDDEN_EDITOR_MODULES.includes(k))
   const [modules, setModules] = useState(liveModules)
   const [assignedId, setAssignedId] = useState(liveAssigned)
   const [open, setOpen] = useState(false)
+  // Online (SYNRG Method) test access — 'unknown' until we read program_purchases.
+  const [onlineState, setOnlineState] = useState('unknown') // 'unknown' | 'none' | 'active'
+  const [onlineBusy, setOnlineBusy] = useState(false)
 
   // Only real coaches (exclude admin shadow profiles "Админ…")
   const realCoaches = coaches.filter(c => !/^Админ/i.test(c.name))
@@ -1191,6 +1201,76 @@ function ClientModuleEditor({ clientId, currentModules, t, lang }) {
     setModules(prev => prev.includes(key) ? prev.filter(m => m !== key) : [...prev, key])
   }
   function applyPreset(key) { setModules([...MODULE_PRESETS[key]]) }
+
+  // When the dialog opens, check whether this client already has an active
+  // online purchase (the authoritative signal for the online dashboard).
+  useEffect(() => {
+    if (!open) return
+    let cancelled = false
+    setOnlineState('unknown')
+    DB.getClientPurchases(clientId)
+      .then(rows => { if (!cancelled) setOnlineState((rows || []).some(r => r.status === 'active') ? 'active' : 'none') })
+      .catch(() => { if (!cancelled) setOnlineState('none') })
+    return () => { cancelled = true }
+  }, [open, clientId])
+
+  // Resolve the single online program (SYNRG Method — the one with a Stripe price).
+  async function resolveOnlineProgram() {
+    const progs = await DB.getPrograms('active')
+    return (progs || []).find(p => p.stripe_price_id) || (progs || [])[0] || null
+  }
+
+  // Grant the online dashboard to a registered client by writing a test
+  // program_purchases row + REMOTE_MODULES — the same end state a real Stripe
+  // purchase produces (see stripe-webhook handleCheckoutCompleted).
+  async function grantOnline() {
+    setOnlineBusy(true)
+    try {
+      const prog = await resolveOnlineProgram()
+      if (!prog) { showSnackbar(lang === 'en' ? 'No online program found' : 'Няма онлайн програма'); return }
+      const validUntil = new Date(Date.now() + 8 * 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
+      await DB.upsertByFields('program_purchases', {
+        client_id: clientId,
+        program_id: prog.id,
+        stripe_session_id: `test_manual_${clientId.slice(0, 8)}`,
+        amount_cents: 0,
+        currency: 'EUR',
+        status: 'active',
+        valid_until: validUntil,
+      }, ['client_id', 'program_id'])
+      const merged = [...new Set([...(liveClient?.modules || []), ...REMOTE_MODULES])]
+      await updateClientModules(clientId, merged)
+      await DB.update('clients', clientId, { account_type: 'online' })
+      setModules(merged)
+      setOnlineState('active')
+      showSnackbar(lang === 'en' ? 'Online access granted (test)' : 'Онлайн достъп даден (тест)')
+    } catch (e) {
+      showSnackbar((lang === 'en' ? 'Error: ' : 'Грешка: ') + (e?.message || 'grant failed'))
+    } finally { setOnlineBusy(false) }
+  }
+
+  // Revoke online test access — delete the purchase row(s) and drop the client
+  // back to freemium (unless an active studio plan should keep their modules).
+  async function revokeOnline() {
+    setOnlineBusy(true)
+    try {
+      const prog = await resolveOnlineProgram()
+      const rows = await DB.findWhere('program_purchases', 'client_id', clientId)
+      for (const r of (rows || []).filter(r => prog && r.program_id === prog.id)) {
+        await DB.deleteById('program_purchases', r.id)
+      }
+      const activePlan = await DB.getClientActivePlan(clientId)
+      if (!activePlan) {
+        await updateClientModules(clientId, [...FREE_MODULES])
+        setModules([...FREE_MODULES])
+      }
+      await DB.update('clients', clientId, { account_type: null })
+      setOnlineState('none')
+      showSnackbar(lang === 'en' ? 'Online access removed' : 'Онлайн достъпът е премахнат')
+    } catch (e) {
+      showSnackbar((lang === 'en' ? 'Error: ' : 'Грешка: ') + (e?.message || 'revoke failed'))
+    } finally { setOnlineBusy(false) }
+  }
 
   async function handleSave() {
     await updateClientModules(clientId, modules)
@@ -1204,7 +1284,7 @@ function ClientModuleEditor({ clientId, currentModules, t, lang }) {
   return (
     <>
       <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', alignItems: 'center' }}>
-        {liveModules.length > 0 ? liveModules.map(m => (
+        {displayModules.length > 0 ? displayModules.map(m => (
           <Chip key={m} label={MODULE_DEFS[m]?.[lang === 'bg' ? 'labelBg' : 'labelEn'] || m}
             size="small"
             sx={{ fontSize: '9px', height: '20px', background: C.primaryContainer, color: C.text }} />
@@ -1255,7 +1335,7 @@ function ClientModuleEditor({ clientId, currentModules, t, lang }) {
               {t('clearAll')}
             </Button>
           </Box>
-          {ADMIN_MANAGEABLE_MODULES.map(key => {
+          {editableModules.map(key => {
             const def = MODULE_DEFS[key]
             if (!def) return null
             return (
@@ -1273,6 +1353,33 @@ function ClientModuleEditor({ clientId, currentModules, t, lang }) {
               </Box>
             )
           })}
+
+          {/* Online dashboard (SYNRG Method) test access — gated by program_purchases,
+              not by the module chips, so it gets its own grant/revoke control. */}
+          <Box sx={{ mt: 2, pt: 2, borderTop: `1px solid ${C.border}` }}>
+            <Typography sx={{ fontSize: '11px', fontWeight: 700, color: C.muted, mb: 0.5, letterSpacing: '0.06em' }}>
+              {lang === 'en' ? 'SYNRG METHOD (ONLINE VIEW)' : 'SYNRG МЕТОД (ОНЛАЙН ИЗГЛЕД)'}
+            </Typography>
+            <Typography sx={{ fontSize: '11px', color: C.muted, mb: 1, lineHeight: 1.4 }}>
+              {lang === 'en'
+                ? 'Gives the online dashboard (day/week) as a paid purchase — for testers.'
+                : 'Дава онлайн таблото (ден/седмица) като платена покупка — за тестери.'}
+            </Typography>
+            {onlineState === 'active' ? (
+              <Button fullWidth size="small" variant="outlined" disabled={onlineBusy} onClick={revokeOnline}
+                sx={{ fontSize: '12px', textTransform: 'none', color: '#F87171', borderColor: 'rgba(248,113,113,0.4)',
+                  '&:hover': { borderColor: '#F87171' } }}>
+                {onlineBusy ? '...' : (lang === 'en' ? 'Remove online access' : 'Премахни онлайн достъп')}
+              </Button>
+            ) : (
+              <Button fullWidth size="small" variant="contained" disabled={onlineBusy || onlineState === 'unknown'} onClick={grantOnline}
+                sx={{ fontSize: '12px', textTransform: 'none', background: C.purple, color: '#0f1c11', fontWeight: 700 }}>
+                {onlineBusy ? '...' : onlineState === 'unknown'
+                  ? (lang === 'en' ? 'Checking…' : 'Проверка…')
+                  : (lang === 'en' ? 'Grant online access (test)' : 'Дай онлайн достъп (тест)')}
+              </Button>
+            )}
+          </Box>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
           <Button onClick={() => setOpen(false)} sx={{ color: C.muted }}>{t('cancelBtn')}</Button>

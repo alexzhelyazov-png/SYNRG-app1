@@ -31,6 +31,15 @@ export const MODULE_PRESETS = {
 // (used on registration and when a studio plan expires).
 export const FREE_MODULES = ['nutrition_tracking', 'weight_tracking', 'steps_tracking']
 
+// Modules granted to an ONLINE client (SYNRG Method buyer). Mirrors
+// REMOTE_MODULES in supabase/functions/stripe-webhook so an admin-granted
+// test purchase lands the client in exactly the same module state as a
+// real Stripe purchase.
+export const REMOTE_MODULES = [
+  'synrg_method', 'program_access', 'weight_tracking',
+  'nutrition_tracking', 'training_plan_access', 'planner_access',
+]
+
 // Modules the admin can toggle per client
 export const ADMIN_MANAGEABLE_MODULES = [
   'studio_access', 'booking_access', 'weight_tracking', 'nutrition_tracking', 'training_plan_access', 'program_access', 'synrg_method',
