@@ -1214,30 +1214,30 @@ function ClientModuleEditor({ clientId, currentModules, t, lang }) {
     return () => { cancelled = true }
   }, [open, clientId])
 
-  // Resolve the single online program (SYNRG Method — the one with a Stripe price).
-  async function resolveOnlineProgram() {
-    const progs = await DB.getPrograms('active')
-    return (progs || []).find(p => p.stripe_price_id) || (progs || [])[0] || null
+  // program_purchases is RLS-locked to service-role writes, so the actual
+  // insert/delete is proxied through the grant-test-access Edge Function.
+  // The clients-row updates (modules + account_type) stay client-side because
+  // anon can write clients and updateClientModules also auto-assigns a coach.
+  async function callTestAccess(action) {
+    const SB_URL = import.meta.env.VITE_SUPABASE_URL
+    const TEST_ACCESS_SECRET = 'c1f9eb83144b372ff116a6e3a139ca9e1ccbef27f127827a'
+    const res = await fetch(`${SB_URL}/functions/v1/grant-test-access`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ client_id: clientId, action, admin_secret: TEST_ACCESS_SECRET }),
+    })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok || !data.ok) throw new Error(data.error || `HTTP ${res.status}`)
+    return data
   }
 
-  // Grant the online dashboard to a registered client by writing a test
-  // program_purchases row + REMOTE_MODULES — the same end state a real Stripe
-  // purchase produces (see stripe-webhook handleCheckoutCompleted).
+  // Grant the online dashboard to a registered client — writes a test
+  // program_purchases row (via Edge Function) + REMOTE_MODULES, the same end
+  // state a real Stripe purchase produces (see stripe-webhook).
   async function grantOnline() {
     setOnlineBusy(true)
     try {
-      const prog = await resolveOnlineProgram()
-      if (!prog) { showSnackbar(lang === 'en' ? 'No online program found' : 'Няма онлайн програма'); return }
-      const validUntil = new Date(Date.now() + 8 * 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
-      await DB.upsertByFields('program_purchases', {
-        client_id: clientId,
-        program_id: prog.id,
-        stripe_session_id: `test_manual_${clientId.slice(0, 8)}`,
-        amount_cents: 0,
-        currency: 'EUR',
-        status: 'active',
-        valid_until: validUntil,
-      }, ['client_id', 'program_id'])
+      await callTestAccess('grant')
       const merged = [...new Set([...(liveClient?.modules || []), ...REMOTE_MODULES])]
       await updateClientModules(clientId, merged)
       await DB.update('clients', clientId, { account_type: 'online' })
@@ -1249,16 +1249,13 @@ function ClientModuleEditor({ clientId, currentModules, t, lang }) {
     } finally { setOnlineBusy(false) }
   }
 
-  // Revoke online test access — delete the purchase row(s) and drop the client
-  // back to freemium (unless an active studio plan should keep their modules).
+  // Revoke online test access — deletes the purchase row(s) (via Edge Function)
+  // and drops the client back to freemium (unless an active studio plan keeps
+  // their modules alive).
   async function revokeOnline() {
     setOnlineBusy(true)
     try {
-      const prog = await resolveOnlineProgram()
-      const rows = await DB.findWhere('program_purchases', 'client_id', clientId)
-      for (const r of (rows || []).filter(r => prog && r.program_id === prog.id)) {
-        await DB.deleteById('program_purchases', r.id)
-      }
+      await callTestAccess('revoke')
       const activePlan = await DB.getClientActivePlan(clientId)
       if (!activePlan) {
         await updateClientModules(clientId, [...FREE_MODULES])
