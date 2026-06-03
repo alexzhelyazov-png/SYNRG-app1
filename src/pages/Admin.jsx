@@ -2679,6 +2679,129 @@ function OnlineClientsTab({ t }) {
   )
 }
 
+// ── Online Access Tab ────────────────────────────────────────
+// Lists EVERY client currently holding online-app access (an ACTIVE
+// program_purchases row) — including admin-granted test access (test_manual_*),
+// which the revenue-focused OnlineClientsTab intentionally hides. Lets the
+// admin see + revoke who can reach the online SYNRG Method dashboard.
+function OnlineAccessTab() {
+  const { realClients, coaches, showSnackbar, updateClientModules } = useApp()
+  const [rows, setRows] = useState([])
+  const [loaded, setLoaded] = useState(false)
+  const [busyId, setBusyId] = useState(null)
+
+  function load() {
+    setLoaded(false)
+    DB.selectAll('program_purchases', '&status=eq.active')
+      .then(r => { setRows(r || []); setLoaded(true) })
+      .catch(() => setLoaded(true))
+  }
+  useEffect(() => { load() }, [])
+
+  async function revoke(p) {
+    const client = realClients.find(c => c.id === p.client_id)
+    if (!window.confirm(`Премахни онлайн достъпа на ${client?.name || 'клиента'}?`)) return
+    setBusyId(p.id)
+    try {
+      const SB_URL = import.meta.env.VITE_SUPABASE_URL
+      const TEST_ACCESS_SECRET = 'c1f9eb83144b372ff116a6e3a139ca9e1ccbef27f127827a'
+      const res = await fetch(`${SB_URL}/functions/v1/grant-test-access`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ client_id: p.client_id, action: 'revoke', admin_secret: TEST_ACCESS_SECRET }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok || !data.ok) throw new Error(data.error || `HTTP ${res.status}`)
+      // Drop to freemium unless an active studio plan should keep their modules.
+      const plan = await DB.getClientActivePlan(p.client_id)
+      if (!plan) await updateClientModules(p.client_id, [...FREE_MODULES])
+      await DB.update('clients', p.client_id, { account_type: null })
+      showSnackbar('Онлайн достъпът е премахнат')
+      load()
+    } catch (e) {
+      showSnackbar('Грешка: ' + (e?.message || 'revoke failed'))
+    } finally { setBusyId(null) }
+  }
+
+  const sorted = rows.slice().sort((a, b) => (b.purchased_at || '').localeCompare(a.purchased_at || ''))
+  const PROGRAM_WEEKS = 8
+  const weekOf = (d) => {
+    if (!d) return null
+    const days = Math.floor((Date.now() - new Date(d).getTime()) / (24 * 3600 * 1000))
+    return Math.min(PROGRAM_WEEKS, Math.max(1, Math.floor(days / 7) + 1))
+  }
+
+  return (
+    <Box>
+      <Typography sx={{ fontSize: '12px', color: C.muted, mb: 1.5 }}>
+        Всички с активен достъп до онлайн приложението ({sorted.length}). „ТЕСТ" = ръчно даден достъп без плащане.
+      </Typography>
+      {!loaded ? (
+        <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+          <CircularProgress size={24} sx={{ color: '#c4e9bf' }} />
+        </Box>
+      ) : sorted.length === 0 ? (
+        <Paper sx={{ p: 4, borderRadius: '14px', textAlign: 'center', border: '1px solid rgba(255,255,255,0.08)' }}>
+          <Typography sx={{ color: C.muted, fontSize: '14px' }}>Никой няма онлайн достъп още.</Typography>
+        </Paper>
+      ) : (
+        <Paper sx={{ borderRadius: '14px', border: '1px solid rgba(255,255,255,0.08)', overflow: 'hidden' }}>
+          {sorted.map((p, idx) => {
+            const client = realClients.find(c => c.id === p.client_id)
+            const coach = coaches.find(c => c.id === client?.assigned_coach_id)
+            const isTest = (p.stripe_session_id || '').startsWith('test_')
+            const week = weekOf(p.purchased_at)
+            return (
+              <Box key={p.id || idx} sx={{
+                px: 2, py: 1.5, borderBottom: '1px solid rgba(255,255,255,0.06)',
+                '&:last-child': { borderBottom: 'none' },
+                display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap',
+              }}>
+                <Box sx={{ flex: 1, minWidth: 140 }}>
+                  <Typography sx={{ fontWeight: 700, fontSize: '14px', color: '#e0e0e0' }}>
+                    {client?.name || '— изтрит клиент —'}
+                  </Typography>
+                  <Typography sx={{ fontSize: '11px', color: 'rgba(255,255,255,0.45)' }}>
+                    {client?.email || '—'}
+                  </Typography>
+                </Box>
+                {coach && (
+                  <Chip label={coach.name} size="small" sx={{
+                    height: '20px', fontSize: '10px', fontWeight: 700,
+                    background: 'rgba(165,180,252,0.15)', color: '#a5b4fc',
+                  }} />
+                )}
+                {week && (
+                  <Typography sx={{ fontSize: '11px', color: '#c4e9bf', fontWeight: 700, minWidth: 60 }}>
+                    седм. {week}/{PROGRAM_WEEKS}
+                  </Typography>
+                )}
+                <Chip label={isTest ? 'ТЕСТ' : 'ПЛАТЕН'} size="small" sx={{
+                  height: '20px', fontSize: '10px', fontWeight: 700,
+                  background: isTest ? 'rgba(251,191,36,0.15)' : 'rgba(196,233,191,0.15)',
+                  color: isTest ? '#FBBF24' : '#c4e9bf',
+                  border: `1px solid ${isTest ? '#FBBF2444' : '#c4e9bf44'}`,
+                }} />
+                <button
+                  onClick={() => revoke(p)}
+                  disabled={busyId === p.id}
+                  style={{
+                    background: 'rgba(248,113,113,0.12)', border: '1px solid rgba(248,113,113,0.4)',
+                    color: '#F87171', padding: '4px 10px', borderRadius: 8, fontSize: 11, fontWeight: 700,
+                    cursor: busyId === p.id ? 'default' : 'pointer', opacity: busyId === p.id ? 0.5 : 1,
+                  }}
+                >
+                  {busyId === p.id ? '...' : 'Премахни'}
+                </button>
+              </Box>
+            )
+          })}
+        </Paper>
+      )}
+    </Box>
+  )
+}
+
 // ── Admin SYNRG Method Tab ───────────────────────────────────
 const SHOW_CONDITIONS = [
   { value: 'always',   labelBg: 'Винаги',                  labelEn: 'Always' },
@@ -2999,6 +3122,7 @@ export default function Admin() {
     clients: [
       { key: 'clients',       label: t('clientsMgmt')     || 'Клиенти' },
       { key: 'online',        label: 'Онлайн' },
+      { key: 'online_access', label: 'Онлайн достъп' },
       { key: 'messages',      label: 'Съобщения' },
       { key: 'coaches',       label: t('coachesTab')      || 'Треньори' },
       { key: 'subscriptions', label: t('subscriptionsTab')|| 'Абонаменти' },
@@ -3069,6 +3193,7 @@ export default function Admin() {
       {section === 'clients' && <>
         {clientSub === 'clients'       && <ClientsTab t={t} />}
         {clientSub === 'online'        && <OnlineClientsTab t={t} />}
+        {clientSub === 'online_access' && <OnlineAccessTab />}
         {clientSub === 'messages'      && <AdminMessagesTab />}
         {clientSub === 'coaches'       && <CoachesTab t={t} />}
         {clientSub === 'subscriptions' && <SubscriptionsTab t={t} lang={lang} />}
