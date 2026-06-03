@@ -1406,27 +1406,31 @@ function ClientsTab({ t }) {
 
   const searchMatch = (c) => !clientSearch || c.name.toLowerCase().includes(clientSearch.toLowerCase())
 
-  const isFreeRegistered = c => {
-    const mods = c.modules || []
-    return mods.length > 0 &&
-      !mods.includes('studio_access') && !mods.includes('program_access') && !mods.includes('booking_access') &&
-      !getClientPlan(c.id)
-  }
+  // Studio vs online vs freemium classification for the client groupings.
+  // Authoritative studio signal = a client_plans row (past or present). The
+  // studio_access module alone is unreliable (online test grants can carry it),
+  // so it only counts as studio when the client is NOT an online client.
+  const hasPlanRow      = c => allPlans.some(p => p.client_id === c.id)
+  const hasStudioModule = c => { const m = c.modules || []; return m.includes('studio_access') || m.includes('booking_access') }
+  const isOnlineClient  = c => c.account_type === 'online' || (c.modules || []).includes('program_access') || (c.modules || []).includes('synrg_method')
+  const isStudioClient  = c => hasPlanRow(c) || (hasStudioModule(c) && !isOnlineClient(c))
+
   const [showArchived, setShowArchived] = useState(false)
   const archived = realClients.filter(c => c.is_archived && searchMatch(c))
 
-  const pending  = realClients.filter(c => {
-    if (c.is_archived) return false
-    if (!searchMatch(c)) return false
-    const p = getClientPlan(c.id)
-    if (!p) return (c.modules || []).includes('studio_access') || isFreeRegistered(c)
-    return !isPlanActive(p)
-  })
-  const active   = realClients.filter(c => {
-    if (c.is_archived) return false
-    if (!searchMatch(c)) return false
+  const active = realClients.filter(c => {
+    if (c.is_archived || !searchMatch(c)) return false
     const p = getClientPlan(c.id)
     return p && isPlanActive(p)
+  })
+  // Pending = studio clients (present or past studio access) without an active
+  // plan — i.e. awaiting (re)activation. Freemium sign-ups (shown in the
+  // dashboard's "Нови регистрации") and online-only clients are excluded.
+  const pending = realClients.filter(c => {
+    if (c.is_archived || !searchMatch(c)) return false
+    const p = getClientPlan(c.id)
+    if (p && isPlanActive(p)) return false
+    return isStudioClient(c)
   })
 
   async function handleArchive(client) {
