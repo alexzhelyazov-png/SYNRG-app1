@@ -421,10 +421,11 @@ export default function Auth() {
                   onChange={e => setConsentGdpr(e.target.checked)}
                   size="small"
                   sx={{
-                    color: C.border,
+                    color: C.text,
                     '&.Mui-checked': { color: C.purple },
                     p: '2px',
                     mt: '1px',
+                    '& .MuiSvgIcon-root': { fontSize: 24 },
                   }}
                 />
                 <Typography sx={{ fontSize: '12px', color: C.muted, lineHeight: 1.55 }}>

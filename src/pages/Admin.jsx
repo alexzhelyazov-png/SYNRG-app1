@@ -1626,7 +1626,7 @@ function AnalyticsTab({ t }) {
   const onlineRev = onlineOrders.reduce((s, o) => s + (Number(o.amount_total || o.amount || 0) / 100), 0)
 
   // Conversion rate
-  const activePlanIds = new Set(allPlans.filter(p => p.status === 'active').map(p => p.client_id))
+  const activePlanIds = new Set(allPlans.filter(p => isPlanActive(p)).map(p => p.client_id))
   const paidCount  = activePlanIds.size
   const convRate   = realClients.length ? Math.round(paidCount / realClients.length * 100) : 0
 
@@ -1648,7 +1648,7 @@ function AnalyticsTab({ t }) {
   }).length
 
   // Plan breakdown
-  const activePlans    = allPlans.filter(p => p.status === 'active')
+  const activePlans    = allPlans.filter(p => isPlanActive(p))
   const plan8Count     = activePlans.filter(p => p.plan_type === '8').length
   const plan12Count    = activePlans.filter(p => p.plan_type === '12').length
   const planUCount     = activePlans.filter(p => p.plan_type === 'unlimited').length
