@@ -17,7 +17,7 @@ import BoltIcon           from '@mui/icons-material/Bolt'
 import { useApp }         from '../context/AppContext'
 import { useBooking }     from '../context/BookingContext'
 import { C }              from '../theme'
-import { isAdmin, fmtTime, occupancyStr, isoToday } from '../lib/bookingUtils'
+import { isAdmin, fmtTime, occupancyStr, isoToday, isPlanActive } from '../lib/bookingUtils'
 
 // ── Constants ──────────────────────────────────────────────────
 const HOURS       = [9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]
@@ -489,7 +489,21 @@ export default function Schedule() {
     createSlot, createShiftSlots,
     updateSlot, deleteSlot,
     adminAddToSlot, adminRemoveFromSlot,
+    allPlans, loadAllPlans,
   } = useBooking()
+
+  // Load all studio plans once so the "add client" picker can be limited to
+  // clients with an ACTIVE plan (8/12/unlimited) — freemium/lead users without
+  // a plan must not appear in the schedule.
+  useEffect(() => { loadAllPlans() }, [loadAllPlans])
+
+  // Only clients with an active studio plan can be booked into a slot.
+  const studioClients = useMemo(() => {
+    const activeIds = new Set(
+      (allPlans || []).filter(isPlanActive).map(p => p.client_id)
+    )
+    return realClients.filter(c => activeIds.has(c.id))
+  }, [realClients, allPlans])
 
   const admin = isAdmin(auth)
   const today = isoToday()
@@ -784,7 +798,7 @@ export default function Schedule() {
           onClose={() => setShowAddDlg(false)}
           onAdd={handleAddClient}
           slot={addTarget}
-          realClients={realClients}
+          realClients={studioClients}
           t={t}
         />
       )}

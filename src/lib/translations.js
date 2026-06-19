@@ -374,6 +374,7 @@ export const T = {
     aiPhotoBtn:         'Снимай храната',
     aiAnalyzing:        'AI анализира снимката...',
     aiRecognizeError:   'Не успях да разпозная храната. Опитай отново или търси ръчно.',
+    aiServiceBusy:      'AI разпознаването е временно претоварено. Добави храната ръчно от търсачката по-горе.',
     aiGramsHint:        'Грамаж (коригирай ако трябва)',
 
     // ── Tasks (постоянни задачи от треньора) ───────────
@@ -1365,6 +1366,7 @@ export const T = {
     aiPhotoBtn:         'Snap your food',
     aiAnalyzing:        'AI is analyzing the photo...',
     aiRecognizeError:   'Could not recognize the food. Try again or search manually.',
+    aiServiceBusy:      'AI recognition is temporarily overloaded. Add the food manually using the search above.',
     aiGramsHint:        'Grams (adjust if needed)',
 
     // ── Tasks (permanent coach tasks) ──────────────────

@@ -675,7 +675,11 @@ export function AppProvider({ children }) {
   // ── actualIdx points into realClients for both roles ──────────
   const actualIdx = useMemo(() => {
     if (auth.role === 'coach' || auth.role === 'admin') return selIdx
-    const i = realClients.findIndex(c => c.name === auth.name)
+    // Identify the logged-in client by unique id (NOT name — names collide once
+    // many freemium users sign up, which would point a user at someone else's
+    // record). Fall back to name only for legacy sessions without an id.
+    let i = auth.id ? realClients.findIndex(c => c.id === auth.id) : -1
+    if (i < 0) i = realClients.findIndex(c => c.name === auth.name)
     return i >= 0 ? i : 0
   }, [auth, selIdx, realClients])
 

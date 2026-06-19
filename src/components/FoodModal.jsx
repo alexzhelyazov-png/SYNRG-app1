@@ -10,10 +10,12 @@ import { foodDB, foodLabel } from '../lib/constants'
 import { C } from '../theme'
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL
-const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_KEY
+const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
 
 // Send photo to AI Edge Function for food recognition
-// Returns: { ...result } on success, { quotaExceeded: true, message } on 429, null on other failures
+// Returns: { ...result } on success, { quotaExceeded } on 429 client quota,
+// { serviceBusy } when the AI provider is overloaded/unavailable (5xx),
+// or null when the food genuinely could not be recognized.
 async function recognizeFood(base64, clientId) {
   const res = await fetch(`${SUPABASE_URL}/functions/v1/food-recognize`, {
     method: 'POST',
@@ -24,6 +26,9 @@ async function recognizeFood(base64, clientId) {
     const data = await res.json().catch(() => ({}))
     return { quotaExceeded: true, message: data.message || 'Дневният лимит е достигнат.' }
   }
+  // 5xx = our Edge fn or the AI provider failed (e.g. Gemini rate/quota). Not the
+  // user's fault and not "unknown food" — tell them clearly to add it manually.
+  if (res.status >= 500) return { serviceBusy: true }
   if (!res.ok) return null
   const data = await res.json()
   if (data.error) return null
@@ -199,6 +204,11 @@ export default function FoodModal() {
       }
       if (result.quotaExceeded) {
         setAiError(result.message)
+        setAiLoading(false)
+        return
+      }
+      if (result.serviceBusy) {
+        setAiError(t('aiServiceBusy'))
         setAiLoading(false)
         return
       }
