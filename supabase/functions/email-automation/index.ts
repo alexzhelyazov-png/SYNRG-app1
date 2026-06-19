@@ -72,7 +72,63 @@ async function sendBrevoEmail(to: { email: string; name: string }, subject: stri
   } catch { return false; }
 }
 
-// ── Email templates ─────────────────────────────────────────────
+// ── DB-backed templates ─────────────────────────────────────────
+type AutoRow = { key: string; subject: string; body_html: string; enabled: boolean };
+
+async function loadAutomations(): Promise<Map<string, AutoRow>> {
+  const m = new Map<string, AutoRow>();
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/email_automations?select=key,subject,body_html,enabled`, { headers: sbHeaders() });
+    const rows = await res.json();
+    if (Array.isArray(rows)) for (const r of rows) m.set(r.key, r);
+  } catch (e) { console.error("loadAutomations failed:", e); }
+  return m;
+}
+
+// Active studio clients (client_plans) — must be excluded from freemium upsell.
+async function loadActiveStudioClientIds(): Promise<Set<string>> {
+  const s = new Set<string>();
+  try {
+    const today = new Date().toISOString().slice(0, 10);
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/client_plans?select=client_id,valid_to,extended_to&status=eq.active`, { headers: sbHeaders() });
+    const rows = await res.json();
+    if (Array.isArray(rows)) for (const r of rows) {
+      const end = r.extended_to || r.valid_to;
+      if (!end || end >= today) s.add(r.client_id);
+    }
+  } catch (e) { console.error("loadActiveStudioClientIds failed:", e); }
+  return s;
+}
+
+const applyName = (s: string, name: string) => (s || "").replaceAll("{name}", name);
+
+// Wrap inner body (DB-stored) with the shared email chrome.
+const chrome = (inner: string) => `<div style="font-family:Helvetica,Arial,sans-serif;max-width:520px;margin:0 auto;padding:32px;background:#1a1a1a;color:#e0e0e0;border-radius:16px;line-height:1.6">
+  ${inner}
+  <hr style="border:none;border-top:1px solid #333;margin:24px 0">
+  <p style="font-size:11px;color:#666;margin:0">SYNRG Beyond Fitness · Синерджи 93 ООД · ЕИК 207343690</p>
+  <p style="font-size:10px;color:#555;margin:8px 0 0">Получаваш този email защото си регистриран в SYNRG. <a href="${APP_URL}#/profile" style="color:#777">Настройки</a></p>
+</div>`;
+
+// Resolve a template for sending:
+//  - row exists + disabled  → null (skip)
+//  - row exists + enabled   → DB subject/body (chrome added)
+//  - row missing            → hardcoded fallback (full html), so emails never go out empty
+function resolveTemplate(
+  autoMap: Map<string, AutoRow>,
+  dbKey: string,
+  name: string,
+  fallback: (n: string) => { subject: string; html: string },
+): { subject: string; html: string } | null {
+  const row = autoMap.get(dbKey);
+  if (row) {
+    if (!row.enabled) return null;
+    return { subject: applyName(row.subject, name), html: chrome(applyName(row.body_html, name)) };
+  }
+  return fallback(name);
+}
+
+// ── Email templates (hardcoded fallback) ────────────────────────
 const wrap = (title: string, body: string) => `<div style="font-family:Helvetica,Arial,sans-serif;max-width:520px;margin:0 auto;padding:32px;background:#1a1a1a;color:#e0e0e0;border-radius:16px;line-height:1.6">
   <h2 style="color:#c4e9bf;margin:0 0 16px;font-size:22px">${title}</h2>
   ${body}
@@ -215,7 +271,7 @@ const tmpl_inactive_14d = (name: string) => ({
 });
 
 // ── Main handler ────────────────────────────────────────────────
-async function processBuyerSequence(): Promise<{ sent: number; checked: number }> {
+async function processBuyerSequence(autoMap: Map<string, AutoRow>): Promise<{ sent: number; checked: number }> {
   const stats = { sent: 0, checked: 0 };
   // Get all active program purchases from last 60 days
   const cutoff = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString();
@@ -228,37 +284,50 @@ async function processBuyerSequence(): Promise<{ sent: number; checked: number }
   for (const p of purchases) {
     stats.checked++;
     const days = Math.floor((Date.now() - new Date(p.purchased_at).getTime()) / (24 * 60 * 60 * 1000));
-    let key: string | null = null;
-    let tmpl: ((name: string) => { subject: string; html: string }) | null = null;
-    if (days === 1) { key = `buyer_d1_${p.id}`; tmpl = tmpl_buyer_d1; }
-    else if (days === 3) { key = `buyer_d3_${p.id}`; tmpl = tmpl_buyer_d3; }
-    else if (days === 7) { key = `buyer_d7_${p.id}`; tmpl = tmpl_buyer_d7; }
-    else if (days === 14) { key = `buyer_d14_${p.id}`; tmpl = tmpl_buyer_d14; }
-    else if (days === 28) { key = `buyer_d28_${p.id}`; tmpl = tmpl_buyer_d28; }
-    else if (days >= 56 && days <= 60) { key = `buyer_d56_review_${p.id}`; tmpl = tmpl_buyer_d56_review; }
-    if (!key || !tmpl) continue;
+    let dbKey: string | null = null;
+    let sendKey: string | null = null;
+    let fallback: ((name: string) => { subject: string; html: string }) | null = null;
+    if (days === 1) { dbKey = "buyer_d1"; sendKey = `buyer_d1_${p.id}`; fallback = tmpl_buyer_d1; }
+    else if (days === 3) { dbKey = "buyer_d3"; sendKey = `buyer_d3_${p.id}`; fallback = tmpl_buyer_d3; }
+    else if (days === 7) { dbKey = "buyer_d7"; sendKey = `buyer_d7_${p.id}`; fallback = tmpl_buyer_d7; }
+    else if (days === 14) { dbKey = "buyer_d14"; sendKey = `buyer_d14_${p.id}`; fallback = tmpl_buyer_d14; }
+    else if (days === 28) { dbKey = "buyer_d28"; sendKey = `buyer_d28_${p.id}`; fallback = tmpl_buyer_d28; }
+    else if (days >= 56 && days <= 60) { dbKey = "buyer_d56_review"; sendKey = `buyer_d56_review_${p.id}`; fallback = tmpl_buyer_d56_review; }
+    if (!dbKey || !sendKey || !fallback) continue;
 
-    if (await alreadySent(p.client_id, key)) continue;
+    // Skip early if disabled in DB
+    const row = autoMap.get(dbKey);
+    if (row && !row.enabled) continue;
+
+    if (await alreadySent(p.client_id, sendKey)) continue;
 
     // Get client email + name
     const cRes = await fetch(`${SUPABASE_URL}/rest/v1/clients?select=email,name&id=eq.${p.client_id}&limit=1`, { headers: sbHeaders() });
     const c = (await cRes.json())?.[0];
     if (!c?.email) continue;
 
-    const t = tmpl(c.name || "клиент");
+    const t = resolveTemplate(autoMap, dbKey, c.name || "клиент", fallback);
+    if (!t) continue;
     const ok = await sendBrevoEmail({ email: c.email, name: c.name || "клиент" }, t.subject, t.html);
-    await logSent(p.client_id, key, ok);
+    await logSent(p.client_id, sendKey, ok);
     if (ok) stats.sent++;
   }
   return stats;
 }
 
-async function processFreeUserNurture(): Promise<{ sent: number; checked: number }> {
+async function processFreeUserNurture(autoMap: Map<string, AutoRow>): Promise<{ sent: number; checked: number }> {
   const stats = { sent: 0, checked: 0 };
+  // Early exit if both freemium templates are disabled — avoids touching any client.
+  const d7Row = autoMap.get("free_d7");
+  const d14Row = autoMap.get("free_d14");
+  if ((d7Row && !d7Row.enabled) && (d14Row && !d14Row.enabled)) return stats;
+
   // Get clients registered 7-30 days ago who do NOT have any program_purchase
   const cutoff7 = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-  const cutoff14 = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString();
   const cutoff30 = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+
+  // BUG FIX: studio clients (client_plans) are NOT free users — never upsell them.
+  const studioIds = await loadActiveStudioClientIds();
 
   const res = await fetch(
     `${SUPABASE_URL}/rest/v1/clients?select=id,name,email,created_at&created_at=lt.${cutoff7}&created_at=gt.${cutoff30}&is_coach=eq.false`,
@@ -269,30 +338,40 @@ async function processFreeUserNurture(): Promise<{ sent: number; checked: number
   for (const c of clients) {
     if (!c.email) continue;
     stats.checked++;
-    // Skip if has purchase
+    // Skip active studio clients (paid in-studio plan)
+    if (studioIds.has(c.id)) continue;
+    // Skip if has online purchase
     const purch = await fetch(`${SUPABASE_URL}/rest/v1/program_purchases?select=id&client_id=eq.${c.id}&limit=1`, { headers: sbHeaders() });
     const pur = await purch.json();
     if (Array.isArray(pur) && pur.length > 0) continue;
 
     const days = Math.floor((Date.now() - new Date(c.created_at).getTime()) / (24 * 60 * 60 * 1000));
-    let key: string | null = null;
-    let tmpl: ((name: string) => { subject: string; html: string }) | null = null;
-    if (days === 7) { key = `free_d7_${c.id}`; tmpl = tmpl_free_d7; }
-    else if (days === 14) { key = `free_d14_${c.id}`; tmpl = tmpl_free_d14; }
-    if (!key || !tmpl) continue;
+    let dbKey: string | null = null;
+    let sendKey: string | null = null;
+    let fallback: ((name: string) => { subject: string; html: string }) | null = null;
+    if (days === 7) { dbKey = "free_d7"; sendKey = `free_d7_${c.id}`; fallback = tmpl_free_d7; }
+    else if (days === 14) { dbKey = "free_d14"; sendKey = `free_d14_${c.id}`; fallback = tmpl_free_d14; }
+    if (!dbKey || !sendKey || !fallback) continue;
 
-    if (await alreadySent(c.id, key)) continue;
+    const row = autoMap.get(dbKey);
+    if (row && !row.enabled) continue;
 
-    const t = tmpl(c.name || "клиент");
+    if (await alreadySent(c.id, sendKey)) continue;
+
+    const t = resolveTemplate(autoMap, dbKey, c.name || "клиент", fallback);
+    if (!t) continue;
     const ok = await sendBrevoEmail({ email: c.email, name: c.name || "клиент" }, t.subject, t.html);
-    await logSent(c.id, key, ok);
+    await logSent(c.id, sendKey, ok);
     if (ok) stats.sent++;
   }
   return stats;
 }
 
-async function processInactiveReengagement(): Promise<{ sent: number; checked: number }> {
+async function processInactiveReengagement(autoMap: Map<string, AutoRow>): Promise<{ sent: number; checked: number }> {
   const stats = { sent: 0, checked: 0 };
+  // Early exit if disabled in DB
+  const reRow = autoMap.get("inactive_14d");
+  if (reRow && !reRow.enabled) return stats;
   // Find clients with no meal/weight log in last 14 days
   const cutoff14 = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
   // Get all non-coach clients with email
@@ -316,7 +395,8 @@ async function processInactiveReengagement(): Promise<{ sent: number; checked: n
     // Send re-engagement email at most once per client per 30 days
     const key = `inactive_14d_${new Date().toISOString().slice(0, 7)}_${c.id}`; // monthly key
     if (await alreadySent(c.id, key)) continue;
-    const t = tmpl_inactive_14d(c.name || "клиент");
+    const t = resolveTemplate(autoMap, "inactive_14d", c.name || "клиент", tmpl_inactive_14d);
+    if (!t) continue;
     const ok = await sendBrevoEmail({ email: c.email, name: c.name || "клиент" }, t.subject, t.html);
     await logSent(c.id, key, ok);
     if (ok) stats.sent++;
@@ -327,9 +407,10 @@ async function processInactiveReengagement(): Promise<{ sent: number; checked: n
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS_HEADERS });
   try {
-    const buyer = await processBuyerSequence();
-    const free = await processFreeUserNurture();
-    const inactive = await processInactiveReengagement();
+    const autoMap = await loadAutomations();
+    const buyer = await processBuyerSequence(autoMap);
+    const free = await processFreeUserNurture(autoMap);
+    const inactive = await processInactiveReengagement(autoMap);
     return new Response(JSON.stringify({
       success: true,
       buyer,

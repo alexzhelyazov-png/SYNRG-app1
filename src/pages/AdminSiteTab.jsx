@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import {
-  Box, Typography, Paper, Button, IconButton, Chip,
+  Box, Typography, Paper, Button, IconButton, Chip, Switch,
   Dialog, DialogTitle, DialogContent, DialogActions, TextField,
   MenuItem, Select, FormControl, InputLabel, Checkbox, FormControlLabel,
 } from '@mui/material'
@@ -12,6 +12,7 @@ import VisibilityOffIcon     from '@mui/icons-material/VisibilityOff'
 import { C }                 from '../theme'
 import { DB }                from '../lib/db'
 import { useApp }            from '../context/AppContext'
+import { isFullAdmin }       from '../lib/bookingUtils'
 
 // ── Shared input style ───────────────────────────────────────
 const inputSx = {
@@ -592,11 +593,130 @@ function ContentTab({ t }) {
 }
 
 // ══════════════════════════════════════════════════════════════
+// EMAIL AUTOMATIONS SUB-TAB
+// ══════════════════════════════════════════════════════════════
+const EMAIL_CAT_LABEL = { buyer: 'emailCatBuyer', nurture: 'emailCatNurture', inactive: 'emailCatInactive' }
+const EMAIL_AUD_LABEL  = { buyers: 'audBuyers', freemium: 'audFreemium', inactive: 'audInactive' }
+const EMAIL_CAT_ORDER  = ['buyer', 'nurture', 'inactive']
+
+function EmailAutomationsTab({ t }) {
+  const { showSnackbar } = useApp()
+  const [items, setItems] = useState([])
+  const [dlg, setDlg] = useState(null)   // null | row for edit
+  const [busy, setBusy] = useState(false)
+
+  const load = async () => { setItems(await DB.selectAll('email_automations', '?order=sort_order')) }
+  useEffect(() => { load() }, [])
+
+  const toggle = async (row, enabled) => {
+    if (busy) return
+    setBusy(true)
+    setItems(prev => prev.map(r => r.id === row.id ? { ...r, enabled } : r))   // optimistic
+    try {
+      await DB.update('email_automations', row.id, { enabled, updated_at: new Date().toISOString() })
+      showSnackbar(t('savedMsg'))
+    } catch {
+      setItems(prev => prev.map(r => r.id === row.id ? { ...r, enabled: !enabled } : r))  // revert
+    }
+    setBusy(false)
+  }
+
+  const save = async (data) => {
+    await DB.update('email_automations', dlg.id, {
+      subject: data.subject, body_html: data.body_html, audience: data.audience,
+      updated_at: new Date().toISOString(),
+    })
+    showSnackbar(t('savedMsg'))
+    setDlg(null); load()
+  }
+
+  const groups = EMAIL_CAT_ORDER
+    .map(cat => ({ cat, rows: items.filter(r => r.category === cat) }))
+    .filter(g => g.rows.length)
+
+  return (
+    <Box>
+      {groups.map(({ cat, rows }) => (
+        <Box key={cat} sx={{ mb: 2.5 }}>
+          <Typography sx={{ fontWeight: 700, fontSize: '13px', color: C.muted, mb: 1 }}>
+            {t(EMAIL_CAT_LABEL[cat])}
+          </Typography>
+          {rows.map(row => (
+            <Paper key={row.id} sx={{ p: 1.75, mb: 1, background: C.card, border: `1px solid ${C.border}`, borderRadius: '14px' }}>
+              <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1 }}>
+                <Box sx={{ flex: 1, minWidth: 0 }}>
+                  <Typography sx={{ fontWeight: 700, fontSize: '13.5px', color: C.text }}>{row.label}</Typography>
+                  {row.trigger_desc && (
+                    <Typography sx={{ fontSize: '11.5px', color: C.muted, mt: 0.25 }}>{row.trigger_desc}</Typography>
+                  )}
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mt: 0.75, flexWrap: 'wrap' }}>
+                    <Chip label={t(EMAIL_AUD_LABEL[row.audience] || 'emailAudience')} size="small"
+                      sx={{ background: 'rgba(170,169,205,0.15)', color: '#C8C5FF', fontWeight: 700, fontSize: '10.5px', height: '22px' }} />
+                    <Typography sx={{ fontSize: '11px', color: C.muted, fontStyle: 'italic', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {row.subject}
+                    </Typography>
+                  </Box>
+                </Box>
+                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 0.5, flexShrink: 0 }}>
+                  <Switch checked={!!row.enabled} onChange={(e) => toggle(row, e.target.checked)} size="small" />
+                  <Button size="small" startIcon={<EditIcon sx={{ fontSize: '15px !important' }} />}
+                    onClick={() => setDlg(row)} sx={{ color: C.purple, fontSize: '11px', minWidth: 0 }}>
+                    {'Редактирай'}
+                  </Button>
+                </Box>
+              </Box>
+            </Paper>
+          ))}
+        </Box>
+      ))}
+
+      {dlg && <EmailEditDialog row={dlg} onClose={() => setDlg(null)} onSave={save} t={t} />}
+    </Box>
+  )
+}
+
+function EmailEditDialog({ row, onClose, onSave, t }) {
+  const [subject, setSubject] = useState(row.subject || '')
+  const [body, setBody] = useState(row.body_html || '')
+  const [audience, setAudience] = useState(row.audience || 'buyers')
+
+  return (
+    <Dialog open onClose={onClose} fullWidth maxWidth="sm" PaperProps={{ sx: { background: C.card, borderRadius: '16px' } }}>
+      <DialogTitle sx={{ color: C.text, fontWeight: 800 }}>{t('emailEditTpl')}</DialogTitle>
+      <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: '8px !important' }}>
+        <Typography sx={{ fontSize: '11.5px', color: C.muted }}>
+          {row.label} · {row.trigger_desc}
+        </Typography>
+        <TextField label={t('emailSubjectLbl')} value={subject} onChange={(e) => setSubject(e.target.value)} sx={inputSx} fullWidth />
+        <FormControl fullWidth sx={inputSx}>
+          <InputLabel>{t('emailAudience')}</InputLabel>
+          <Select label={t('emailAudience')} value={audience} onChange={(e) => setAudience(e.target.value)} sx={{ color: C.text }}>
+            <MenuItem value="buyers">{t('audBuyers')}</MenuItem>
+            <MenuItem value="freemium">{t('audFreemium')}</MenuItem>
+            <MenuItem value="inactive">{t('audInactive')}</MenuItem>
+          </Select>
+        </FormControl>
+        <TextField label={t('emailBodyLbl')} value={body} onChange={(e) => setBody(e.target.value)} sx={inputSx} fullWidth multiline minRows={8} />
+        <Typography sx={{ fontSize: '11px', color: C.muted }}>
+          {'Използвай {name} за името на клиента. HTML се обвива автоматично с фирмения дизайн.'}
+        </Typography>
+      </DialogContent>
+      <DialogActions sx={{ p: 2 }}>
+        <Button onClick={onClose} sx={{ color: C.muted }}>{t('cancelBtn')}</Button>
+        <Button onClick={() => onSave({ subject, body_html: body, audience })} variant="contained"
+          sx={{ background: C.primary, color: C.primaryOn, fontWeight: 700 }}>{t('saveBtn')}</Button>
+      </DialogActions>
+    </Dialog>
+  )
+}
+
+// ══════════════════════════════════════════════════════════════
 // MAIN SITE TAB (exported)
 // ══════════════════════════════════════════════════════════════
 export default function SiteTab() {
-  const { t } = useApp()
+  const { t, auth } = useApp()
   const [sub, setSub] = useState('products')
+  const fullAdmin = auth ? isFullAdmin(auth) : false
 
   const SUBS = [
     { label: t('siteProducts'),  key: 'products' },
@@ -605,6 +725,7 @@ export default function SiteTab() {
     { label: t('siteServices'),  key: 'services' },
     { label: t('siteInquiries'), key: 'inquiries' },
     { label: t('siteContent'),   key: 'content' },
+    ...(fullAdmin ? [{ label: t('emailsTab'), key: 'emails' }] : []),
   ]
 
   return (
@@ -633,6 +754,7 @@ export default function SiteTab() {
       {sub === 'services'  && <ServicesTab t={t} />}
       {sub === 'inquiries' && <InquiriesTab t={t} />}
       {sub === 'content'   && <ContentTab t={t} />}
+      {sub === 'emails'    && fullAdmin && <EmailAutomationsTab t={t} />}
     </Box>
   )
 }
