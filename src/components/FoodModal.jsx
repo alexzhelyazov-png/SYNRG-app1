@@ -260,13 +260,13 @@ export default function FoodModal() {
         <Box sx={{ display: 'grid', gap: 1.5 }}>
 
           {/* Search + camera button */}
-          <Box sx={{ display: 'flex', gap: 1 }}>
+          <Box sx={{ display: 'flex', gap: 1, alignItems: 'stretch' }}>
             <TextField
-              fullWidth
               placeholder={t('foodSearchPlaceholder')}
               value={search}
               onChange={e => handleSearchChange(e.target.value)}
               autoFocus
+              sx={{ flex: 1, minWidth: 0 }}
             />
             <input
               ref={fileInputRef}
@@ -280,8 +280,10 @@ export default function FoodModal() {
               onClick={() => fileInputRef.current?.click()}
               disabled={aiLoading}
               variant="outlined"
+              aria-label={t('aiPhotoBtn') || 'Снимай храна'}
               sx={{
-                minWidth: 'auto',
+                flexShrink: 0,
+                minWidth: 52,
                 borderRadius: '12px',
                 color: C.muted,
                 borderColor: C.border,
