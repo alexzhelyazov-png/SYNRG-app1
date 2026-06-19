@@ -1,13 +1,16 @@
-import { Box, Typography, TextField, Button, Chip, Paper, IconButton, Tooltip } from '@mui/material'
+import { useState } from 'react'
+import { Box, Typography, TextField, Button, Chip, Paper, IconButton, Tooltip, Dialog, DialogTitle, DialogContent, DialogActions } from '@mui/material'
 import ChevronLeftIcon    from '@mui/icons-material/ChevronLeft'
 import ChevronRightIcon   from '@mui/icons-material/ChevronRight'
 import WarningAmberIcon   from '@mui/icons-material/WarningAmber'
 import InfoOutlinedIcon   from '@mui/icons-material/InfoOutlined'
+import EditOutlinedIcon   from '@mui/icons-material/EditOutlined'
 import { useApp } from '../context/AppContext'
 import { quickFoods, foodDB, foodLabel } from '../lib/constants'
 import { C, EASE } from '../theme'
 import ProgressRing from '../components/ProgressRing'
 import FoodModal    from '../components/FoodModal'
+import RankingHint  from '../components/RankingHint'
 import { fmt1, todayDate, dateToInput } from '../lib/utils'
 
 export default function FoodTracker() {
@@ -20,10 +23,37 @@ export default function FoodTracker() {
     foodTotals, kcalPct, protPct, carbsPct, fatPct,
     carbsTarget, fatTarget,
     addQuickFood, deleteMealFromClient,
-    isTrackerReadOnly,
+    isTrackerReadOnly, updateClientTargets,
   } = useApp()
 
   const isMobile = window.innerWidth < 640
+
+  // Whether targets came from the SYNRG-method questionnaire (paid) or are
+  // freemium defaults the user can set themselves.
+  const hasQuestionnaire = !!client?.synrgQuiz
+
+  const [editOpen, setEditOpen]  = useState(false)
+  const [editKcal, setEditKcal]  = useState('')
+  const [editProt, setEditProt]  = useState('')
+  const [editCarbs, setEditCarbs] = useState('')
+  const [editFat, setEditFat]    = useState('')
+
+  const openEdit = () => {
+    setEditKcal(String(client.calorieTarget || ''))
+    setEditProt(String(client.proteinTarget || ''))
+    // Pre-fill carbs/fat with the currently-shown targets (manual or derived)
+    setEditCarbs(String(carbsTarget || ''))
+    setEditFat(String(fatTarget || ''))
+    setEditOpen(true)
+  }
+  const saveEdit = async () => {
+    const kcal  = Math.max(0, Math.round(Number(editKcal) || 0))
+    const prot  = Math.max(0, Math.round(Number(editProt) || 0))
+    const carbs = editCarbs === '' ? null : Math.max(0, Math.round(Number(editCarbs) || 0))
+    const fat   = editFat   === '' ? null : Math.max(0, Math.round(Number(editFat) || 0))
+    await updateClientTargets(client.id, kcal, prot, carbs, fat)
+    setEditOpen(false)
+  }
 
   return (
     <>
@@ -84,17 +114,44 @@ export default function FoodTracker() {
         </Box>
       )}
 
+      {!isTrackerReadOnly && <RankingHint />}
+
       {/* ── Personal targets banner ───────────────── */}
-      <Box sx={{
-        display: 'flex', alignItems: 'center', gap: 1,
-        mb: 1, px: 1.5, py: 0.75, borderRadius: '10px',
-        background: 'rgba(200,197,255,0.06)',
-        border: '1px solid rgba(200,197,255,0.18)',
-      }}>
-        <InfoOutlinedIcon sx={{ fontSize: 16, color: C.purple, flexShrink: 0 }} />
-        <Typography sx={{ fontSize: '12px', color: C.muted, lineHeight: 1.35 }}>
-          твоите лични дневни таргети — изчислени на база отговорите ти от въпросника
-        </Typography>
+      <Box
+        onClick={(!hasQuestionnaire && !isTrackerReadOnly) ? openEdit : undefined}
+        sx={{
+          display: 'flex', alignItems: 'center', gap: 1,
+          mb: 1, px: 1.5, py: hasQuestionnaire ? 0.75 : 1.1, borderRadius: '10px',
+          background: hasQuestionnaire ? 'rgba(200,197,255,0.06)' : 'rgba(200,197,255,0.14)',
+          border: `1px solid ${hasQuestionnaire ? 'rgba(200,197,255,0.18)' : 'rgba(200,197,255,0.45)'}`,
+          cursor: (!hasQuestionnaire && !isTrackerReadOnly) ? 'pointer' : 'default',
+          transition: 'background 0.15s ease',
+          '&:hover': (!hasQuestionnaire && !isTrackerReadOnly)
+            ? { background: 'rgba(200,197,255,0.2)' }
+            : undefined,
+        }}
+      >
+        <InfoOutlinedIcon sx={{ fontSize: hasQuestionnaire ? 16 : 18, color: C.purple, flexShrink: 0 }} />
+        {hasQuestionnaire ? (
+          <Typography sx={{ fontSize: '12px', color: C.muted, lineHeight: 1.35, flex: 1 }}>
+            твоите лични дневни таргети — изчислени на база отговорите ти от въпросника
+          </Typography>
+        ) : (
+          <Typography sx={{ fontSize: '13.5px', color: C.text, fontWeight: 700, lineHeight: 1.35, flex: 1 }}>
+            Задай сам своите таргети
+          </Typography>
+        )}
+        {!isTrackerReadOnly && (
+          <Tooltip title="Промени таргетите">
+            <IconButton
+              size="small"
+              onClick={(e) => { e.stopPropagation(); openEdit() }}
+              sx={{ color: C.purple, flexShrink: 0, p: 0.5 }}
+            >
+              <EditOutlinedIcon sx={{ fontSize: hasQuestionnaire ? 16 : 18 }} />
+            </IconButton>
+          </Tooltip>
+        )}
       </Box>
 
       {/* ── 4-macro progress row: Kcal | P | C | F ── */}
@@ -337,6 +394,45 @@ export default function FoodTracker() {
           </>
         )}
       </Paper>
+
+      {/* ── Edit targets dialog ────────────────────── */}
+      <Dialog open={editOpen} onClose={() => setEditOpen(false)} maxWidth="xs" fullWidth
+        PaperProps={{ sx: { borderRadius: '16px' } }}>
+        <DialogTitle sx={{ fontWeight: 800, fontSize: '16px' }}>Промени дневните таргети</DialogTitle>
+        <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: '8px !important' }}>
+          <Typography sx={{ fontSize: '12px', color: C.muted, lineHeight: 1.4 }}>
+            Задай своите дневни таргети за калории и макроси.
+          </Typography>
+          <TextField
+            label="Калории (kcal)" type="number" size="small" fullWidth
+            value={editKcal} onChange={e => setEditKcal(e.target.value)}
+            inputProps={{ min: 0, inputMode: 'numeric' }}
+          />
+          <TextField
+            label={`Протеин (${t('gUnit')})`} type="number" size="small" fullWidth
+            value={editProt} onChange={e => setEditProt(e.target.value)}
+            inputProps={{ min: 0, inputMode: 'numeric' }}
+          />
+          <TextField
+            label={`Въглехидрати (${t('gUnit')})`} type="number" size="small" fullWidth
+            value={editCarbs} onChange={e => setEditCarbs(e.target.value)}
+            inputProps={{ min: 0, inputMode: 'numeric' }}
+          />
+          <TextField
+            label={`Мазнини (${t('gUnit')})`} type="number" size="small" fullWidth
+            value={editFat} onChange={e => setEditFat(e.target.value)}
+            inputProps={{ min: 0, inputMode: 'numeric' }}
+          />
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setEditOpen(false)} sx={{ color: C.muted, fontWeight: 600 }}>
+            Отказ
+          </Button>
+          <Button onClick={saveEdit} variant="contained" color="primary" sx={{ fontWeight: 700 }}>
+            Запази
+          </Button>
+        </DialogActions>
+      </Dialog>
 
     </>
   )

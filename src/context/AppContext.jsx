@@ -206,6 +206,8 @@ export function AppProvider({ children }) {
         assigned_coach_id: c.assigned_coach_id || null,
         calorieTarget:  c.calorie_target  || c.calorieTarget  || 2000,
         proteinTarget:  c.protein_target  || c.proteinTarget  || 140,
+        carbsTargetManual: c.carbs_target ?? c.carbsTargetManual ?? null,
+        fatTargetManual:   c.fat_target   ?? c.fatTargetManual   ?? null,
         xp_monthly:     c.xp_monthly  || 0,
         xp_total:       c.xp_total    || 0,
         xp_level:       c.xp_level    || 1,
@@ -789,16 +791,22 @@ export function AppProvider({ children }) {
   const kcalPct  = Math.min((foodTotals.kcal    / (client.calorieTarget || 1)) * 100, 100)
   const protPct  = Math.min((foodTotals.protein / (client.proteinTarget || 1)) * 100, 100)
 
-  // ── Derive carbs / fat targets from kcal + protein ─────────────
-  // Standard split: fat ≈ 27% of total kcal (9 kcal/g),
+  // ── Carbs / fat targets ────────────────────────────────────────
+  // Use the user's manual values when set; otherwise derive from
+  // kcal + protein. Standard split: fat ≈ 27% of total kcal (9 kcal/g),
   // carbs = remaining kcal after protein and fat (4 kcal/g).
-  const fatTarget   = Math.round(((client.calorieTarget || 0) * 0.27) / 9)
-  const carbsTarget = Math.max(
-    0,
-    Math.round(
-      ((client.calorieTarget || 0) - (client.proteinTarget || 0) * 4 - fatTarget * 9) / 4
-    )
-  )
+  const fatTarget   = client.fatTargetManual != null
+    ? client.fatTargetManual
+    : Math.round(((client.calorieTarget || 0) * 0.27) / 9)
+  const carbsTarget = client.carbsTargetManual != null
+    ? client.carbsTargetManual
+    : Math.max(
+        0,
+        Math.round(
+          ((client.calorieTarget || 0) - (client.proteinTarget || 0) * 4
+            - Math.round(((client.calorieTarget || 0) * 0.27) / 9) * 9) / 4
+        )
+      )
   const carbsPct = Math.min((foodTotals.carbs / (carbsTarget || 1)) * 100, 100)
   const fatPct   = Math.min((foodTotals.fat   / (fatTarget   || 1)) * 100, 100)
 
@@ -849,9 +857,16 @@ export function AppProvider({ children }) {
     }
   }
 
-  async function updateClientTargets(id, calorieTarget, proteinTarget) {
-    await DB.update('clients', id, { calorie_target: calorieTarget, protein_target: proteinTarget })
-    setClients(prev => prev.map(c => c.id === id ? { ...c, calorieTarget, proteinTarget } : c))
+  async function updateClientTargets(id, calorieTarget, proteinTarget, carbsTargetManual = null, fatTargetManual = null) {
+    await DB.update('clients', id, {
+      calorie_target: calorieTarget,
+      protein_target: proteinTarget,
+      carbs_target:   carbsTargetManual,
+      fat_target:     fatTargetManual,
+    })
+    setClients(prev => prev.map(c => c.id === id
+      ? { ...c, calorieTarget, proteinTarget, carbsTargetManual, fatTargetManual }
+      : c))
   }
 
   async function addMealToClient(clientId, meal) {

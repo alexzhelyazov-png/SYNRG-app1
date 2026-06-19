@@ -18,6 +18,7 @@ import EventIcon             from '@mui/icons-material/Event'
 import PlayCircleOutlineIcon from '@mui/icons-material/PlayCircleOutline'
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings'
 import MenuBookIcon           from '@mui/icons-material/MenuBook'
+import AutoAwesomeIcon        from '@mui/icons-material/AutoAwesome'
 import { useApp }            from '../context/AppContext'
 import { C, EASE }           from '../theme'
 import { isAdmin }           from '../lib/bookingUtils'
@@ -57,6 +58,15 @@ function getNavItems(auth, admin, isOnlineClient = false, isLead = false) {
   // Leads (freemium) haven't bought anything — no studio booking for them either.
   if (!isOnlineClient && !isLead) {
     items.push({ view: 'schedule', labelKey: 'navBookSlot', Icon: EventIcon, isLocked: !hasBookingAccess })
+  }
+
+  // Freemium (lead) — surface premium SYNRG Метод features as locked teasers
+  // so users see what they're missing and have a reason to upgrade.
+  // Clicking opens the full SYNRG Метод sales landing page.
+  if (isLead) {
+    items.push({ view: 'synrg_method', labelKey: 'navMethod',  Icon: AutoAwesomeIcon,       isLocked: true, upsellLp: true })
+    items.push({ view: 'coach_chat',   labelKey: 'navCoach',   Icon: ChatBubbleOutlineIcon, isLocked: true, upsellLp: true })
+    items.push({ view: 'recipes',      labelKey: 'navRecipes', Icon: MenuBookIcon,          isLocked: true, upsellLp: true })
   }
   return items
 }
@@ -156,7 +166,7 @@ export default function Sidebar() {
 
       {/* ── Nav items ───────────────────────────────────── */}
       <List sx={{ px: 0, py: 0.5, flexShrink: 0 }}>
-        {navItems.map(({ view: v, labelKey, Icon, isLocked }) => {
+        {navItems.map(({ view: v, labelKey, Icon, isLocked, upsellLp }) => {
           const isActive = view === v && !viewingCoach
           // Show feed badge on 'ranking' (coach) and 'progress' (client)
           const showFeedBadge = unreadFeedCount > 0 && (v === 'ranking' || v === 'progress')
@@ -167,7 +177,9 @@ export default function Sidebar() {
                 selected={isActive}
                 data-tour={`nav-${v}`}
                 onClick={() => {
-                  // Locked item → redirect to Programs (upgrade/buy page)
+                  // Premium teaser → open the SYNRG Метод sales landing page
+                  if (isLocked && upsellLp) { window.location.href = '../synrg-method.html'; return }
+                  // Other locked items → in-app Programs (upgrade/buy page)
                   if (isLocked) { setView('programs'); setViewingCoach(null); setCoachClientMode(false); return }
                   if (coachClientMode && client?.id) saveWorkoutDraft(client.id)
                   setView(v); setViewingCoach(null); setCoachClientMode(false)

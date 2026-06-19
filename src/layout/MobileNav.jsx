@@ -8,6 +8,8 @@ import PlayCircleOutlineIcon  from '@mui/icons-material/PlayCircleOutline'
 import CalendarMonthIcon      from '@mui/icons-material/CalendarMonth'
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings'
 import MenuBookIcon           from '@mui/icons-material/MenuBook'
+import AutoAwesomeIcon        from '@mui/icons-material/AutoAwesome'
+import ChatBubbleOutlineIcon  from '@mui/icons-material/ChatBubbleOutline'
 import PersonIcon            from '@mui/icons-material/Person'
 import AssignmentIcon         from '@mui/icons-material/Assignment'
 import { useApp }             from '../context/AppContext'
@@ -47,6 +49,13 @@ function getNavItems(auth, admin, isOnlineClient = false, isLead = false) {
   // Leads (freemium) haven't bought anything yet — no studio booking for them either.
   if (!isOnlineClient && !isLead) {
     items.push({ view: 'schedule', Icon: CalendarMonthIcon, labelKey: 'navBookSlot', isLocked: !hasBookingAccess })
+  }
+
+  // Freemium (lead) — locked premium teasers; tap opens the SYNRG Метод LP.
+  if (isLead) {
+    items.push({ view: 'synrg_method', Icon: AutoAwesomeIcon,       labelKey: 'navMethod',  isLocked: true, upsellLp: true })
+    items.push({ view: 'coach_chat',   Icon: ChatBubbleOutlineIcon, labelKey: 'navCoach',   isLocked: true, upsellLp: true })
+    items.push({ view: 'recipes',      Icon: MenuBookIcon,          labelKey: 'navRecipes', isLocked: true, upsellLp: true })
   }
   return items
 }
@@ -168,8 +177,13 @@ export default function MobileNav() {
               setCoachClientMode(false)
               return
             }
-            // Locked item → redirect to Programs (upgrade/buy page)
+            // Premium teaser → open the SYNRG Метод sales landing page
             const item = navItems.find(n => n.view === newView)
+            if (item?.isLocked && item?.upsellLp) {
+              window.location.href = '../synrg-method.html'
+              return
+            }
+            // Other locked item → redirect to Programs (upgrade/buy page)
             if (item?.isLocked) {
               setView('programs')
               setShowClientMenu(false)

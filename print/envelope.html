@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="bg">
+<head>
+<meta charset="UTF-8">
+<title>SYNRG · Envelope C5</title>
+<style>
+@font-face {
+  font-family: 'MontBlanc';
+  src: url('MontBlanc-SemiBold.woff2') format('woff2');
+  font-weight: 600; font-style: normal;
+}
+@font-face {
+  font-family: 'MontBlanc';
+  src: url('MontBlanc-Bold.woff2') format('woff2');
+  font-weight: 700; font-style: normal;
+}
+@font-face {
+  font-family: 'MontBlanc';
+  src: url('MontBlanc-BoldItalic.woff2') format('woff2');
+  font-weight: 700; font-style: italic;
+}
+
+@page { size: 229mm 162mm; margin: 0; }  /* C5 landscape — fits A5 flat */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  background: #d9d9d9;
+  font-family: 'MontBlanc', sans-serif;
+}
+
+.envelope {
+  width: 229mm;
+  height: 162mm;
+  margin: 24px auto;
+  background: #f5f1ea;
+  padding: 9mm 11mm;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  position: relative;
+  box-shadow: 0 4px 30px rgba(0,0,0,0.15);
+}
+
+.label {
+  text-align: center;
+  font-size: 9pt;
+  color: #666;
+  margin-top: 14px;
+}
+
+@media print {
+  html, body { background: #fff; }
+  .envelope { margin: 0; box-shadow: none; page-break-after: always; }
+  .label { display: none; }
+}
+
+/* ── Top: sender (small, top-left) ── */
+.sender {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8mm;
+}
+
+.sender-brand {
+  font-weight: 700;
+  font-style: italic;
+  font-size: 11pt;
+  letter-spacing: -0.3pt;
+  color: #000;
+}
+
+.sender-line {
+  font-weight: 600;
+  font-size: 6pt;
+  letter-spacing: 0.2pt;
+  color: #000;
+  line-height: 1.4;
+}
+
+/* ── Center: large brand mark ── */
+.center-mark {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  pointer-events: none;
+}
+
+.center-mark .word {
+  font-weight: 700;
+  font-style: italic;
+  font-size: 32pt;
+  letter-spacing: -0.6pt;
+  color: #000;
+  line-height: 0.95;
+  white-space: nowrap;
+}
+
+.center-mark .sub {
+  margin-top: 3mm;
+  font-weight: 600;
+  font-size: 7pt;
+  letter-spacing: 2.5pt;
+  text-transform: uppercase;
+  color: #000;
+}
+
+/* ── Bottom: recipient address area ── */
+.recipient {
+  align-self: flex-end;
+  width: 78mm;
+  border-top: 0.25mm solid #000;
+  padding-top: 2mm;
+}
+
+.recipient-label {
+  font-weight: 600;
+  font-size: 5.5pt;
+  letter-spacing: 1.2pt;
+  text-transform: uppercase;
+  color: #000;
+  margin-bottom: 2mm;
+}
+
+.recipient-lines {
+  height: 18mm;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 4mm;
+}
+
+.recipient-lines .line {
+  border-bottom: 0.15mm solid #999;
+  height: 0;
+}
+
+/* ── Back side ── */
+.envelope.back {
+  align-items: center;
+  justify-content: center;
+}
+
+.back-message {
+  text-align: center;
+}
+
+.back-message .top {
+  font-weight: 700;
+  font-style: italic;
+  font-size: 18pt;
+  letter-spacing: -0.3pt;
+}
+</style>
+</head>
+<body>
+
+<div class="label">FRONT · C5 (229×162mm) — побира A5 писмо</div>
+<div class="envelope">
+  <div class="center-mark">
+    <div class="word">SYNRG метод</div>
+  </div>
+</div>
+
+<div class="label">BACK</div>
+<div class="envelope back">
+  <div class="back-message">
+    <div class="top">we care about u</div>
+  </div>
+</div>
+
+</body>
+</html>

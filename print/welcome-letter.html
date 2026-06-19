@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="bg">
+<head>
+<meta charset="UTF-8">
+<title>SYNRG · Приветствено писмо · A5</title>
+<style>
+@font-face {
+  font-family: 'MontBlanc';
+  src: url('MontBlanc-SemiBold.woff2') format('woff2');
+  font-weight: 600; font-style: normal;
+}
+@font-face {
+  font-family: 'MontBlanc';
+  src: url('MontBlanc-Bold.woff2') format('woff2');
+  font-weight: 700; font-style: normal;
+}
+@font-face {
+  font-family: 'MontBlanc';
+  src: url('MontBlanc-BoldItalic.woff2') format('woff2');
+  font-weight: 700; font-style: italic;
+}
+
+@page {
+  size: 148mm 210mm;   /* A5 portrait */
+  margin: 0;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  background: #ccc;
+  font-family: 'MontBlanc', 'Helvetica Neue', sans-serif;
+  color: #000;
+}
+
+.letter {
+  width: 148mm;
+  height: 210mm;
+  margin: 24px auto;
+  background: #fff;
+  padding: 10mm 11mm 9mm 11mm;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  box-shadow: 0 4px 30px rgba(0,0,0,0.18);
+}
+
+.label {
+  text-align: center;
+  font-size: 9pt;
+  color: #666;
+  margin-top: 14px;
+}
+
+@media print {
+  html, body { background: #fff; }
+  .letter { margin: 0; box-shadow: none; }
+  .label { display: none; }
+}
+
+/* ── Header ── */
+.brand {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding-bottom: 3mm;
+  border-bottom: 0.3mm solid #000;
+}
+
+.brand-logo {
+  font-weight: 700;
+  font-style: italic;
+  font-size: 16pt;
+  letter-spacing: -0.4pt;
+}
+
+.brand-tagline {
+  font-weight: 600;
+  font-size: 6pt;
+  letter-spacing: 1.5pt;
+  text-transform: uppercase;
+  color: #000;
+}
+
+/* ── Hero headline ── */
+.hero {
+  margin-top: 7mm;
+}
+
+.greeting {
+  font-weight: 700;
+  font-style: italic;
+  font-size: 38pt;
+  line-height: 0.95;
+  letter-spacing: -1pt;
+}
+
+/* ── Body text ── */
+.body-text {
+  margin-top: 6mm;
+  display: flex;
+  flex-direction: column;
+  gap: 3mm;
+}
+
+.para {
+  font-weight: 600;
+  font-size: 8.5pt;
+  line-height: 1.5;
+  color: #000;
+}
+
+.para strong {
+  font-weight: 700;
+}
+
+.para--steps-label {
+  font-weight: 700;
+  font-size: 7pt;
+  letter-spacing: 0.6pt;
+  text-transform: uppercase;
+  margin-top: 1mm;
+  margin-bottom: 0;
+}
+
+.steps {
+  margin: 1.5mm 0 0 5mm;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1mm;
+}
+
+.steps li {
+  font-weight: 600;
+  font-size: 7.5pt;
+  line-height: 1.45;
+  color: #000;
+}
+
+.steps li strong {
+  font-weight: 700;
+}
+
+.para--cta {
+  font-weight: 700;
+  font-style: italic;
+  font-size: 11pt;
+  letter-spacing: -0.2pt;
+  margin-top: 1mm;
+}
+
+/* ── Bottom: QR + signatures ── */
+.bottom {
+  margin-top: auto;
+  padding-top: 5mm;
+  border-top: 0.3mm solid #000;
+  display: flex;
+  align-items: flex-end;
+  gap: 7mm;
+}
+
+.qr-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.qr {
+  width: 32mm;
+  height: 32mm;
+  background: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.8mm;
+}
+
+.qr img {
+  width: 30.4mm;
+  height: 30.4mm;
+  display: block;
+}
+
+.qr-label {
+  margin-top: 1.8mm;
+  font-weight: 700;
+  font-style: italic;
+  font-size: 7.5pt;
+  text-align: center;
+  letter-spacing: -0.1pt;
+}
+
+.qr-url {
+  font-weight: 600;
+  font-size: 5.5pt;
+  color: #000;
+  text-align: center;
+  margin-top: 0.8mm;
+  letter-spacing: 0.2pt;
+}
+
+/* ── Signatures ── */
+.signatures {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 3.5mm;
+}
+
+.sig-name {
+  font-weight: 700;
+  font-style: italic;
+  font-size: 9.5pt;
+  letter-spacing: -0.2pt;
+}
+
+.sig-role {
+  margin-top: 0.5mm;
+  font-weight: 600;
+  font-size: 5.5pt;
+  letter-spacing: 0.4pt;
+  text-transform: uppercase;
+  color: #000;
+}
+
+/* ── Footer ── */
+.footer {
+  margin-top: 4mm;
+  padding-top: 2mm;
+  border-top: 0.12mm solid #555;
+  display: flex;
+  justify-content: space-between;
+  font-weight: 600;
+  font-size: 5.5pt;
+  letter-spacing: 0.3pt;
+  color: #000;
+}
+</style>
+</head>
+<body>
+
+<div class="label">A5 (148 × 210mm) · за плик C5</div>
+
+<div class="letter">
+
+  <header class="brand">
+    <div class="brand-logo">SYNRG метод</div>
+    <div class="brand-tagline">8 седмици · изграден от лекари</div>
+  </header>
+
+  <section class="hero">
+    <h1 class="greeting">Здравей.</h1>
+  </section>
+
+  <section class="body-text">
+    <p class="para">
+      Радваме се, че си тук. Следващите 56 дни ще имаш <strong>ментор-треньор на ръка разстояние</strong> — не защото ще се нуждаеш от помощ постоянно, а защото пътят към целта винаги е по-лесен, когато не си сам.
+    </p>
+    <p class="para">
+      SYNRG Метод е изграден без меню, без забранени храни и без усложнения. Екипът ни е избрал само навиците, които <strong>правят най-голяма разлика в борбата с килограмите</strong> — и те са изненадващо малко.
+    </p>
+    <p class="para para--steps-label">Как се активира профилът:</p>
+    <ol class="steps">
+      <li>Сканирай QR кода долу вляво (или отиди на <strong>synrg-beyondfitness.com/start</strong>)</li>
+      <li>Въведи имейла, с който направи поръчката</li>
+      <li>Избери парола</li>
+      <li>Влизаш в приложението с <strong>имейла</strong> + паролата, която избра</li>
+    </ol>
+    <p class="para para--cta">Нека се залавяме.</p>
+  </section>
+
+  <section class="bottom">
+    <div class="qr-block">
+      <div class="qr">
+        <img src="https://api.qrserver.com/v1/create-qr-code/?data=https%3A%2F%2Fwww.synrg-beyondfitness.com%2Fstart&size=600x600&margin=0&qzone=0&ecc=H" alt="QR">
+      </div>
+      <div class="qr-label">Сканирай за вход.</div>
+      <div class="qr-url">synrg-beyondfitness.com/start</div>
+    </div>
+    <div class="signatures">
+      <div>
+        <div class="sig-name">Д-р Желязова</div>
+        <div class="sig-role">Гастроентеролог · съосновател · SYNRG Метод</div>
+      </div>
+      <div>
+        <div class="sig-name">Д-р Соколова</div>
+        <div class="sig-role">Лекар и треньор</div>
+      </div>
+      <div>
+        <div class="sig-name">Александър</div>
+        <div class="sig-role">Основател · ментор</div>
+      </div>
+      <div>
+        <div class="sig-name">Ицко</div>
+        <div class="sig-role">Треньор</div>
+      </div>
+    </div>
+  </section>
+
+  <footer class="footer">
+    <div>info@synrg-beyondfitness.com</div>
+    <div>Синерджи 93 ООД</div>
+    <div>synrg-beyondfitness.com</div>
+  </footer>
+
+</div>
+
+</body>
+</html>

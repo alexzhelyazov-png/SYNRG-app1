@@ -5,6 +5,7 @@ import TrendingFlatIcon from '@mui/icons-material/TrendingFlat'
 import { useApp } from '../context/AppContext'
 import { C, EASE } from '../theme'
 import WeightChart from '../components/WeightChart'
+import RankingHint from '../components/RankingHint'
 import { fmt1 } from '../lib/utils'
 
 // ── Linear regression forecast ────────────────────────────────
@@ -84,6 +85,8 @@ export default function WeightTracker() {
           </Typography>
         </Box>
       )}
+
+      {!isTrackerReadOnly && <RankingHint />}
 
       {/* ── 1. Input + Chart side by side ─────────── */}
       <Paper sx={{ p: 2.5, mb: 2 }}>

@@ -1097,7 +1097,29 @@ export default function Programs() {
           onSelect={(r) => { DB.trackEvent(auth.id, 'resource_opened', r.id); setSelectedResource(r); window.scrollTo({ top: 0, behavior: 'smooth' }) }}
           t={t} lang={lang} />
       )}
-      {tab === 'recipes' && <Recipes />}
+      {tab === 'recipes' && (hasResourceAccess ? <Recipes /> : (
+        <Box sx={{ textAlign: 'center', py: 4 }}>
+          <Paper sx={{
+            p: 4, maxWidth: 440, mx: 'auto',
+            background: 'rgba(200,197,255,0.06)', border: '1px solid rgba(200,197,255,0.15)',
+          }}>
+            <Box sx={{ color: C.purple, mb: 1.5, '& svg': { width: 32, height: 32 } }}><LockSvg /></Box>
+            <Typography sx={{ fontSize: '18px', fontWeight: 800, color: C.text, mb: 1 }}>
+              {t('recipesLocked')}
+            </Typography>
+            <Typography sx={{ fontSize: '13px', color: C.muted, mb: 3, lineHeight: 1.5 }}>
+              {t('recipesLockedSub')}
+            </Typography>
+            <Button
+              variant="contained" color="primary"
+              onClick={() => { window.location.href = '../synrg-method.html' }}
+              sx={{ fontWeight: 800, py: 1.25, px: 3 }}
+            >
+              {t('recipesLockedCta')}
+            </Button>
+          </Paper>
+        </Box>
+      ))}
 
       {/* ── Checkout consent gate (3 mandatory checkboxes per BG/EU law) ── */}
       <CheckoutConsentDialog

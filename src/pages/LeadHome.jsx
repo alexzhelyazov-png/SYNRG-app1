@@ -128,8 +128,8 @@ export default function LeadHome() {
   const heroTitle      = lang === 'en' ? '8 weeks to transform your body and rhythm' : '8 седмици да променим тялото и ритъма ти'
   const heroOverline   = 'SYNRG МЕТОД'
   const heroSub        = lang === 'en'
-    ? 'The only platform in Bulgaria that brings together a mentor, a clear path, trackers, recipes and a community — all in one place.'
-    : 'Единствената платформа в България с ментор, ясен път, трекери, рецепти и общност — всичко на едно място.'
+    ? 'A method built by a doctor — no diets, no grueling workouts, but with a mentor, a clear path and a community. Everything you need.'
+    : 'Метод, изграден от лекар — без диети, без тежки тренировки, а с ментор, ясен път и общност. Всичко, което ти трябва.'
   const ctaLabel       = lang === 'en' ? 'Start SYNRG Method'  : 'Започни SYNRG Метод'
   // Dynamic price label — falls back to 397 лв if program hasn't loaded yet
   const priceFromDb    = program ? formatPrice(program.price_cents, program.currency) : '397 лв'

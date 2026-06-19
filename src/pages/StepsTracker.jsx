@@ -3,6 +3,7 @@ import { Box, Typography, TextField, Button, Paper } from '@mui/material'
 import { useApp } from '../context/AppContext'
 import { C, EASE } from '../theme'
 import StatCard from '../components/StatCard'
+import RankingHint from '../components/RankingHint'
 import { last30Days, parseDate } from '../lib/utils'
 
 function last7Days() {
@@ -49,6 +50,8 @@ export default function StepsTracker() {
         <Typography variant="h2">{t('stepsTrackerTitle')}</Typography>
         <Typography variant="body2" sx={{ color: C.muted, mt: 0.5 }}>{client.name}</Typography>
       </Box>
+
+      {!isTrackerReadOnly && <RankingHint />}
 
       {/* ── Input form ──────────────────────────────── */}
       {!isTrackerReadOnly && (
