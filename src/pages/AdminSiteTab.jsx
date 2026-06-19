@@ -507,6 +507,34 @@ function InquiryDialog({ t, item, onClose, onSave }) {
             <Typography sx={{ fontSize: '14px', color: C.text, whiteSpace: 'pre-wrap' }}>{item.message}</Typography>
           </Box>
         )}
+        {item.preferred_time && (
+          <Box>
+            <Typography sx={{ fontSize: '11px', fontWeight: 700, color: C.muted, mb: 0.3 }}>{t('preferredTimeLbl')}</Typography>
+            <Typography sx={{ fontSize: '14px', color: C.text, whiteSpace: 'pre-wrap' }}>{item.preferred_time}</Typography>
+          </Box>
+        )}
+        {item.health_issues && (
+          <Box>
+            <Typography sx={{ fontSize: '11px', fontWeight: 700, color: C.muted, mb: 0.3 }}>{t('healthLbl')}</Typography>
+            <Typography sx={{ fontSize: '14px', color: C.text, whiteSpace: 'pre-wrap' }}>{item.health_issues}</Typography>
+          </Box>
+        )}
+        {(item.age != null || item.weight != null) && (
+          <Box sx={{ display: 'flex', gap: 3 }}>
+            {item.age != null && (
+              <Box>
+                <Typography sx={{ fontSize: '11px', fontWeight: 700, color: C.muted, mb: 0.3 }}>{t('ageLbl')}</Typography>
+                <Typography sx={{ fontSize: '14px', color: C.text }}>{item.age}</Typography>
+              </Box>
+            )}
+            {item.weight != null && (
+              <Box>
+                <Typography sx={{ fontSize: '11px', fontWeight: 700, color: C.muted, mb: 0.3 }}>{t('weightLbl')}</Typography>
+                <Typography sx={{ fontSize: '14px', color: C.text }}>{item.weight} кг</Typography>
+              </Box>
+            )}
+          </Box>
+        )}
         <Typography sx={{ fontSize: '11px', color: C.muted }}>{new Date(item.created_at).toLocaleString('bg')}</Typography>
         <FormControl size="small" fullWidth sx={inputSx}>
           <InputLabel>{t('statusLbl')}</InputLabel>
