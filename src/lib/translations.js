@@ -25,7 +25,7 @@ export const T = {
     coachLoginTitle:    'Вход за треньори',
     clientLoginTitle:   'Клиентски вход',
     loginTitle:         'Вход',
-    namePlaceholder:    'Име и Фамилия или имейл',
+    namePlaceholder:    'Име и Фамилия',
     passPlaceholder:    'Парола',
     loginBtn:           'Влез →',
     newCoachTag:        'Нов треньор',

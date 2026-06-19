@@ -82,7 +82,7 @@ export default function Auth() {
       if (pass.length < 3)   { setError(t('errPassShort')); return }
       if (pass !== pass2)    { setError(t('errPassMismatch')); return }
       const trimmedEmail = email.trim()
-      if (trimmedEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+      if (!trimmedEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
         setError(t('errEmailInvalid')); return
       }
       if (!consentGdpr) { setError(t('errConsentRequired')); return }
@@ -381,7 +381,7 @@ export default function Auth() {
               <TextField
                 fullWidth
                 type="email"
-                placeholder={`${t('emailPlaceholder')} ${t('emailOptional')}`}
+                placeholder={t('emailPlaceholder')}
                 value={email}
                 onChange={e => setEmail(e.target.value)}
                 inputProps={{ style: { fontSize: '15px', padding: '13px 14px' } }}
