@@ -162,10 +162,11 @@ async function sendOrderConfirmationEmail(email: string, name: string): Promise<
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        action: "send_email",
+        action: "send_template",
+        key: "cod_order",
         email,
         name,
-        fields: {},
+        vars: { name, email },
         subject: "Поръчката ти е приета — SYNRG Метод",
         html,
       }),

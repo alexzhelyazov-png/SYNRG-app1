@@ -417,10 +417,11 @@ async function sendActivationEmail(args: {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        action: "send_email",
+        action: "send_template",
+        key: "cod_activation",
         email: args.email,
         name: args.loginName,
-        fields: {},
+        vars: { loginName: args.loginName, coachLine, invoiceLine },
         subject: "Профилът ти е активен — SYNRG Метод",
         html,
       }),

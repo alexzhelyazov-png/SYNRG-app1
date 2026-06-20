@@ -623,9 +623,34 @@ function ContentTab({ t }) {
 // ══════════════════════════════════════════════════════════════
 // EMAIL AUTOMATIONS SUB-TAB
 // ══════════════════════════════════════════════════════════════
-const EMAIL_CAT_LABEL = { buyer: 'emailCatBuyer', nurture: 'emailCatNurture', inactive: 'emailCatInactive' }
-const EMAIL_AUD_LABEL  = { buyers: 'audBuyers', freemium: 'audFreemium', inactive: 'audInactive' }
-const EMAIL_CAT_ORDER  = ['buyer', 'nurture', 'inactive']
+const EMAIL_CAT_LABEL = {
+  transactional: 'emailCatTransactional', reminder: 'emailCatReminder',
+  buyer: 'emailCatBuyer', nurture: 'emailCatNurture', inactive: 'emailCatInactive',
+}
+const EMAIL_AUD_LABEL  = {
+  buyers: 'audBuyers', freemium: 'audFreemium', inactive: 'audInactive',
+  all: 'audAll', studio: 'audStudio', online: 'audOnline',
+}
+const EMAIL_CAT_ORDER  = ['transactional', 'reminder', 'buyer', 'nurture', 'inactive']
+
+// Tokens each template understands — shown as a hint in the edit dialog so the
+// admin keeps the dynamic placeholders intact.
+const EMAIL_TOKENS = {
+  registration_welcome: '{name}',
+  password_reset: '{name} {code}',
+  plan_activated: '{name} {planLabel} {planExpires}',
+  plan_expired: '{name}',
+  purchase_success: '{name} {amountLine} {invoiceLine}',
+  onboarding_setup: '{name} {heading} {intro} {ctaLabel} {setupUrl} {code}',
+  refund: '{name} {refundLine}',
+  cod_order: '{name} {email}',
+  cod_activation: '{loginName} {coachLine} {invoiceLine}',
+  reminder_expiry_3d: '{name} {fmtDate}',
+  reminder_training: '{name} {timeStr}',
+  program_warn_7d: '{name}',
+  program_warn_1d: '{name}',
+  program_completed: '{name}',
+}
 
 function EmailAutomationsTab({ t }) {
   const { showSnackbar } = useApp()
@@ -666,9 +691,14 @@ function EmailAutomationsTab({ t }) {
     <Box>
       {groups.map(({ cat, rows }) => (
         <Box key={cat} sx={{ mb: 2.5 }}>
-          <Typography sx={{ fontWeight: 700, fontSize: '13px', color: C.muted, mb: 1 }}>
+          <Typography sx={{ fontWeight: 700, fontSize: '13px', color: C.muted, mb: 0.25 }}>
             {t(EMAIL_CAT_LABEL[cat])}
           </Typography>
+          {cat === 'transactional' && (
+            <Typography sx={{ fontSize: '11px', color: C.muted, mb: 1, fontStyle: 'italic' }}>
+              {t('emailAlwaysOnHint')}
+            </Typography>
+          )}
           {rows.map(row => (
             <Paper key={row.id} sx={{ p: 1.75, mb: 1, background: C.card, border: `1px solid ${C.border}`, borderRadius: '14px' }}>
               <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1 }}>
@@ -686,7 +716,12 @@ function EmailAutomationsTab({ t }) {
                   </Box>
                 </Box>
                 <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 0.5, flexShrink: 0 }}>
-                  <Switch checked={!!row.enabled} onChange={(e) => toggle(row, e.target.checked)} size="small" />
+                  {cat === 'transactional' ? (
+                    <Chip label={t('emailAlwaysOn')} size="small"
+                      sx={{ background: 'rgba(196,233,191,0.15)', color: C.primary, fontWeight: 700, fontSize: '10px', height: '20px' }} />
+                  ) : (
+                    <Switch checked={!!row.enabled} onChange={(e) => toggle(row, e.target.checked)} size="small" />
+                  )}
                   <Button size="small" startIcon={<EditIcon sx={{ fontSize: '15px !important' }} />}
                     onClick={() => setDlg(row)} sx={{ color: C.purple, fontSize: '11px', minWidth: 0 }}>
                     {'Редактирай'}
@@ -719,14 +754,22 @@ function EmailEditDialog({ row, onClose, onSave, t }) {
         <FormControl fullWidth sx={inputSx}>
           <InputLabel>{t('emailAudience')}</InputLabel>
           <Select label={t('emailAudience')} value={audience} onChange={(e) => setAudience(e.target.value)} sx={{ color: C.text }}>
+            <MenuItem value="all">{t('audAll')}</MenuItem>
             <MenuItem value="buyers">{t('audBuyers')}</MenuItem>
             <MenuItem value="freemium">{t('audFreemium')}</MenuItem>
             <MenuItem value="inactive">{t('audInactive')}</MenuItem>
+            <MenuItem value="studio">{t('audStudio')}</MenuItem>
+            <MenuItem value="online">{t('audOnline')}</MenuItem>
           </Select>
         </FormControl>
         <TextField label={t('emailBodyLbl')} value={body} onChange={(e) => setBody(e.target.value)} sx={inputSx} fullWidth multiline minRows={8} />
+        {EMAIL_TOKENS[row.key] && (
+          <Typography sx={{ fontSize: '11px', color: C.primary }}>
+            {t('emailTokensHint')}: <code>{EMAIL_TOKENS[row.key]}</code>
+          </Typography>
+        )}
         <Typography sx={{ fontSize: '11px', color: C.muted }}>
-          {'Използвай {name} за името на клиента. HTML се обвива автоматично с фирмения дизайн.'}
+          {t('emailBodyHint')}
         </Typography>
       </DialogContent>
       <DialogActions sx={{ p: 2 }}>

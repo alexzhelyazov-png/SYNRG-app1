@@ -838,4 +838,28 @@ export const DB = {
       })
     } catch { /* silent — email sync should not block UI */ }
   },
+
+  // Send a DB-backed template email (admin-editable in the Имейли tab).
+  // Falls back to the supplied subject/html if the template row is missing.
+  async sendTemplateEmail(key, email, name, vars = {}, fallbackSubject, fallbackHtml) {
+    if (!isUsingSupabase || !email) return
+    try {
+      await fetch(`${SUPABASE_URL}/functions/v1/mailerlite-sync`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${SUPABASE_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'send_template',
+          key,
+          email,
+          name,
+          vars,
+          subject: fallbackSubject,
+          html: fallbackHtml,
+        }),
+      })
+    } catch { /* silent — email sync should not block UI */ }
+  },
 }

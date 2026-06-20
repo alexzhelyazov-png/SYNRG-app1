@@ -84,6 +84,40 @@ Deno.serve(async (req) => {
         }),
       });
 
+      // Resolve email content from DB template (admin-editable), with a
+      // hardcoded fallback so password reset never breaks if the row is missing.
+      const fallbackSubject = "Код за смяна на парола";
+      const fallbackHtml = `<div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px;background:#1a1a1a;color:#e0e0e0;border-radius:16px">
+            <h2 style="color:#c4e9bf;margin:0 0 16px">${client.name},</h2>
+            <p style="font-size:16px;line-height:1.6">Твоят код за смяна на парола е:</p>
+            <div style="text-align:center;margin:24px 0">
+              <span style="font-size:32px;font-weight:bold;letter-spacing:8px;color:#c4e9bf;background:#252525;padding:16px 32px;border-radius:12px;display:inline-block">${resetCode}</span>
+            </div>
+            <p style="font-size:14px;color:#999">Кодът е валиден 15 минути. Ако не си поискал смяна на парола, игнорирай този имейл.</p>
+            <hr style="border:none;border-top:1px solid #333;margin:24px 0">
+            <p style="font-size:12px;color:#666">SYNRG Beyond Fitness</p>
+          </div>`;
+      let subjectLine = fallbackSubject;
+      let htmlContent = fallbackHtml;
+      try {
+        const tplRes = await fetch(
+          `${supabaseUrl}/rest/v1/email_automations?select=subject,body_html&key=eq.password_reset&limit=1`,
+          { headers: sbHeaders }
+        );
+        const tplRows = tplRes.ok ? await tplRes.json() : [];
+        const tpl = tplRows?.[0];
+        if (tpl) {
+          const fill = (s: string) =>
+            (s || "")
+              .split("{name}").join(client.name || "")
+              .split("{code}").join(resetCode);
+          subjectLine = fill(tpl.subject) || fallbackSubject;
+          htmlContent = fill(tpl.body_html) || fallbackHtml;
+        }
+      } catch (e) {
+        console.warn("password_reset template load failed:", e);
+      }
+
       // Send email via Brevo
       await fetch(`${BREVO_API}/smtp/email`, {
         method: "POST",
@@ -95,17 +129,8 @@ Deno.serve(async (req) => {
         body: JSON.stringify({
           sender: SENDER,
           to: [{ email, name: client.name }],
-          subject: "Код за смяна на парола",
-          htmlContent: `<div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px;background:#1a1a1a;color:#e0e0e0;border-radius:16px">
-            <h2 style="color:#c4e9bf;margin:0 0 16px">${client.name},</h2>
-            <p style="font-size:16px;line-height:1.6">Твоят код за смяна на парола е:</p>
-            <div style="text-align:center;margin:24px 0">
-              <span style="font-size:32px;font-weight:bold;letter-spacing:8px;color:#c4e9bf;background:#252525;padding:16px 32px;border-radius:12px;display:inline-block">${resetCode}</span>
-            </div>
-            <p style="font-size:14px;color:#999">Кодът е валиден 15 минути. Ако не си поискал смяна на парола, игнорирай този имейл.</p>
-            <hr style="border:none;border-top:1px solid #333;margin:24px 0">
-            <p style="font-size:12px;color:#666">SYNRG Beyond Fitness</p>
-          </div>`,
+          subject: subjectLine,
+          htmlContent,
         }),
       });
 

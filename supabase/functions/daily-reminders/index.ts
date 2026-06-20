@@ -31,6 +31,40 @@ async function sendEmail(brevoKey: string, to: { email: string; name?: string },
   });
 }
 
+// Resolve a reminder template from public.email_automations (admin-editable).
+// Returns null when the row exists but is disabled (admin turned it off) — the
+// caller then skips the email but still performs its bookkeeping updates.
+// Falls back to the hardcoded subject/html when no row exists.
+async function renderReminder(
+  supabaseUrl: string,
+  serviceKey: string,
+  key: string,
+  vars: Record<string, string>,
+  fallbackSubject: string,
+  fallbackHtml: string
+): Promise<{ subject: string; html: string } | null> {
+  const fill = (s: string) =>
+    Object.entries(vars).reduce(
+      (acc, [k, v]) => acc.split(`{${k}}`).join(v ?? ""),
+      s || ""
+    );
+  try {
+    const res = await fetch(
+      `${supabaseUrl}/rest/v1/email_automations?select=subject,body_html,enabled&key=eq.${encodeURIComponent(key)}&limit=1`,
+      { headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` } }
+    );
+    const rows = res.ok ? await res.json() : [];
+    const tpl = rows?.[0];
+    if (tpl) {
+      if (tpl.enabled === false) return null; // admin disabled this reminder
+      return { subject: fill(tpl.subject) || fallbackSubject, html: fill(tpl.body_html) || fallbackHtml };
+    }
+  } catch (e) {
+    console.warn(`renderReminder(${key}) failed:`, e);
+  }
+  return { subject: fill(fallbackSubject), html: fill(fallbackHtml) };
+}
+
 function isoDate(offset = 0): string {
   const d = new Date();
   d.setDate(d.getDate() + offset);
@@ -85,17 +119,21 @@ Deno.serve(async (req) => {
         day: "numeric", month: "long", year: "numeric",
       });
 
-      await sendEmail(brevoKey, { email: client.email, name: client.name },
+      const r = await renderReminder(supabaseUrl, serviceKey, "reminder_expiry_3d",
+        { name: client.name, fmtDate },
         "Планът ти изтича скоро!",
         `<div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px;background:#1a1a1a;color:#e0e0e0;border-radius:16px">
-          <h2 style="color:#FB923C;margin:0 0 16px">${client.name},</h2>
-          <p style="font-size:16px;line-height:1.6">Планът ти в SYNRG Beyond Fitness изтича на <strong style="color:#FB923C">${fmtDate}</strong>.</p>
+          <h2 style="color:#FB923C;margin:0 0 16px">{name},</h2>
+          <p style="font-size:16px;line-height:1.6">Планът ти в SYNRG Beyond Fitness изтича на <strong style="color:#FB923C">{fmtDate}</strong>.</p>
           <p style="font-size:14px;color:#999;line-height:1.6">Свържи се с нас за подновяване, за да не прекъсваш тренировките!</p>
           <hr style="border:none;border-top:1px solid #333;margin:24px 0">
           <p style="font-size:12px;color:#666">SYNRG Beyond Fitness</p>
         </div>`
       );
-      results.expiry_reminders++;
+      if (r) {
+        await sendEmail(brevoKey, { email: client.email, name: client.name }, r.subject, r.html);
+        results.expiry_reminders++;
+      }
     }
 
     // ── 2. Tomorrow's training reminders ───────────────────────
@@ -126,13 +164,14 @@ Deno.serve(async (req) => {
         const client = clients[0];
         const timeStr = slot.start_time?.slice(0, 5) || "";
 
-        await sendEmail(brevoKey, { email: client.email, name: client.name },
+        const r = await renderReminder(supabaseUrl, serviceKey, "reminder_training",
+          { name: client.name, timeStr },
           "Утре имаш тренировка!",
           `<div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px;background:#1a1a1a;color:#e0e0e0;border-radius:16px">
-            <h2 style="color:#c4e9bf;margin:0 0 16px">${client.name},</h2>
+            <h2 style="color:#c4e9bf;margin:0 0 16px">{name},</h2>
             <p style="font-size:16px;line-height:1.6">Напомняне: утре имаш тренировка!</p>
             <div style="background:#252525;border-radius:12px;padding:16px;margin:16px 0">
-              <p style="margin:0;font-size:18px;font-weight:bold;color:#c4e9bf">${timeStr}</p>
+              <p style="margin:0;font-size:18px;font-weight:bold;color:#c4e9bf">{timeStr}</p>
               <p style="margin:4px 0 0;font-size:13px;color:#999">SYNRG Beyond Fitness Studio</p>
             </div>
             <p style="font-size:13px;color:#666">Ако не можеш да присъстваш, моля отмени от приложението.</p>
@@ -140,7 +179,10 @@ Deno.serve(async (req) => {
             <p style="font-size:12px;color:#666">SYNRG Beyond Fitness</p>
           </div>`
         );
-        results.training_reminders++;
+        if (r) {
+          await sendEmail(brevoKey, { email: client.email, name: client.name }, r.subject, r.html);
+          results.training_reminders++;
+        }
       }
     }
 
@@ -155,10 +197,11 @@ Deno.serve(async (req) => {
       const cRes = await fetch(`${supabaseUrl}/rest/v1/clients?select=name,email&id=eq.${purch.client_id}&limit=1`, { headers: sbHeaders });
       const client = (await cRes.json())?.[0];
       if (client?.email) {
-        await sendEmail(brevoKey, { email: client.email, name: client.name },
+        const r = await renderReminder(supabaseUrl, serviceKey, "program_warn_7d",
+          { name: client.name || "клиент" },
           "Програмата ти приключва след 7 дни",
           `<div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px;background:#1a1a1a;color:#e0e0e0;border-radius:16px">
-            <h2 style="color:#c4e9bf;margin:0 0 16px">${client.name || "клиент"},</h2>
+            <h2 style="color:#c4e9bf;margin:0 0 16px">{name},</h2>
             <p style="font-size:16px;line-height:1.6">Остават 7 дни до края на твоята 8-седмична програма SYNRG Метод!</p>
             <p style="font-size:14px;color:#bbb;line-height:1.6">Това е момента да:</p>
             <ul style="font-size:14px;color:#bbb;line-height:1.7">
@@ -171,6 +214,7 @@ Deno.serve(async (req) => {
             <p style="font-size:12px;color:#666">SYNRG Beyond Fitness</p>
           </div>`
         );
+        if (r) await sendEmail(brevoKey, { email: client.email, name: client.name }, r.subject, r.html);
       }
       await fetch(`${supabaseUrl}/rest/v1/program_purchases?id=eq.${purch.id}`, {
         method: "PATCH",
@@ -191,10 +235,11 @@ Deno.serve(async (req) => {
       const cRes = await fetch(`${supabaseUrl}/rest/v1/clients?select=name,email&id=eq.${purch.client_id}&limit=1`, { headers: sbHeaders });
       const client = (await cRes.json())?.[0];
       if (client?.email) {
-        await sendEmail(brevoKey, { email: client.email, name: client.name },
+        const r = await renderReminder(supabaseUrl, serviceKey, "program_warn_1d",
+          { name: client.name || "клиент" },
           "Утре приключва програмата ти",
           `<div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px;background:#1a1a1a;color:#e0e0e0;border-radius:16px">
-            <h2 style="color:#FB923C;margin:0 0 16px">${client.name || "клиент"},</h2>
+            <h2 style="color:#FB923C;margin:0 0 16px">{name},</h2>
             <p style="font-size:16px;line-height:1.6">Утре е последният ти ден от 8-седмичната програма SYNRG Метод!</p>
             <p style="font-size:14px;color:#bbb;line-height:1.6">Това е завършен цикъл — поздравления! От утре:</p>
             <ul style="font-size:14px;color:#bbb;line-height:1.7">
@@ -206,6 +251,7 @@ Deno.serve(async (req) => {
             <p style="font-size:12px;color:#666">SYNRG Beyond Fitness</p>
           </div>`
         );
+        if (r) await sendEmail(brevoKey, { email: client.email, name: client.name }, r.subject, r.html);
       }
       await fetch(`${supabaseUrl}/rest/v1/program_purchases?id=eq.${purch.id}`, {
         method: "PATCH",
@@ -257,10 +303,11 @@ Deno.serve(async (req) => {
       const cRes = await fetch(`${supabaseUrl}/rest/v1/clients?select=name,email&id=eq.${purch.client_id}&limit=1`, { headers: sbHeaders });
       const client = (await cRes.json())?.[0];
       if (client?.email) {
-        await sendEmail(brevoKey, { email: client.email, name: client.name },
+        const r = await renderReminder(supabaseUrl, serviceKey, "program_completed",
+          { name: client.name || "клиент" },
           "Завърши SYNRG Метод — поздравления!",
           `<div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px;background:#1a1a1a;color:#e0e0e0;border-radius:16px">
-            <h2 style="color:#c4e9bf;margin:0 0 16px">${client.name || "клиент"},</h2>
+            <h2 style="color:#c4e9bf;margin:0 0 16px">{name},</h2>
             <p style="font-size:16px;line-height:1.6">Завърши успешно 8-седмичната програма SYNRG Метод. Поздравления!</p>
             <p style="font-size:14px;color:#bbb;line-height:1.6">Какво следва?</p>
             <ul style="font-size:14px;color:#bbb;line-height:1.7">
@@ -273,6 +320,7 @@ Deno.serve(async (req) => {
             <p style="font-size:12px;color:#666">SYNRG Beyond Fitness · Синерджи 93 ООД</p>
           </div>`
         );
+        if (r) await sendEmail(brevoKey, { email: client.email, name: client.name }, r.subject, r.html);
       }
       results.program_expired++;
     }

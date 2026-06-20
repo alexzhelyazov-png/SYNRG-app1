@@ -587,7 +587,7 @@ export function AppProvider({ children }) {
     // Sync to MailerLite + send welcome email (if email provided)
     if (email) {
       DB.syncToMailerLite('register', email, name)
-      DB.syncToMailerLite('send_email', email, name, {},
+      DB.sendTemplateEmail('registration_welcome', email, name, { name },
         'Добре дошъл в SYNRG Beyond Fitness!',
         `<div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px;background:#1a1a1a;color:#e0e0e0;border-radius:16px">
           <h2 style="color:#c4e9bf;margin:0 0 16px">${name},</h2>

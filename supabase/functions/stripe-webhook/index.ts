@@ -169,6 +169,7 @@ async function sendPurchaseEmail(clientEmail: string, clientName: string, amount
   const amountDisplay = amountTotal
     ? (amountTotal / 100).toFixed(2) + " " + currency.toUpperCase()
     : "";
+  const amountLine = amountDisplay ? ` (<strong>${amountDisplay}</strong>)` : "";
   const invoiceLine = invoiceNumber
     ? `<p style="font-size:13px;color:#bbb">Издадена е фактура № ${String(invoiceNumber).padStart(10, "0")}. Можеш да я изтеглиш от секция <strong>Моите фактури</strong> в приложението.</p>`
     : "";
@@ -194,10 +195,11 @@ async function sendPurchaseEmail(clientEmail: string, clientName: string, amount
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          action: "send_email",
+          action: "send_template",
+          key: "purchase_success",
           email: clientEmail,
           name: clientName,
-          fields: {},
+          vars: { name: clientName, amountLine, invoiceLine },
           subject: "Успешна покупка — SYNRG Beyond Fitness",
           html,
         }),
@@ -567,7 +569,9 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
         + `<p style="font-size:13px;color:#bbb">Кодът е валиден 24 часа.</p>`
         + `<hr style="border:none;border-top:1px solid #333;margin:20px 0">`
         + `<p style="font-size:12px;color:#666">SYNRG Beyond Fitness · Синерджи 93 ООД</p></div>`;
-      await sendEmail(clientEmail, clientName, subjectLine, html);
+      await sendTemplate(clientEmail, clientName, "onboarding_setup",
+        { name: clientName, heading, intro, ctaLabel, setupUrl, code },
+        subjectLine, html);
       console.log(`Onboarding email sent to ${clientEmail} (newClient=${onboardingNeeded})`);
     }
   }
@@ -596,6 +600,40 @@ async function sendEmail(to: string, name: string, subject: string, html: string
     return res.ok;
   } catch (e) {
     console.warn("sendEmail failed:", e);
+    return false;
+  }
+}
+
+// Send a DB-backed template email (admin-editable) via mailerlite-sync.
+// Falls back to the supplied subject/html if the template row is missing.
+async function sendTemplate(
+  to: string,
+  name: string,
+  key: string,
+  vars: Record<string, unknown>,
+  fallbackSubject: string,
+  fallbackHtml: string
+): Promise<boolean> {
+  try {
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/mailerlite-sync`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${Deno.env.get("SUPABASE_ANON_KEY") || ""}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        action: "send_template",
+        key,
+        email: to,
+        name,
+        vars,
+        subject: fallbackSubject,
+        html: fallbackHtml,
+      }),
+    });
+    return res.ok;
+  } catch (e) {
+    console.warn(`sendTemplate(${key}) failed:`, e);
     return false;
   }
 }
@@ -676,6 +714,7 @@ async function handleRefund(charge: Stripe.Charge) {
 
   if (client?.email) {
     const refundAmount = charge.amount_refunded ? (charge.amount_refunded / 100).toFixed(0) + " " + (charge.currency?.toUpperCase() || "EUR") : "";
+    const refundLine = refundAmount ? `от <strong>${refundAmount}</strong> ` : "";
     const html = `<div style="font-family:sans-serif;padding:24px;background:#1a1a1a;color:#e0e0e0;border-radius:16px;max-width:520px">`
       + `<h2 style="color:#c4e9bf;margin:0 0 16px">Възстановяване на сума</h2>`
       + `<p>Здравей, <strong>${client.name || "клиент"}</strong>!</p>`
@@ -685,7 +724,9 @@ async function handleRefund(charge: Stripe.Charge) {
       + `<p>Ако имаш въпроси — отговори на този имейл.</p>`
       + `<hr style="border:none;border-top:1px solid #333;margin:20px 0">`
       + `<p style="font-size:12px;color:#666">SYNRG Beyond Fitness · Синерджи 93 ООД</p></div>`;
-    await sendEmail(client.email, client.name || "клиент", "Възстановяване на сума — SYNRG", html);
+    await sendTemplate(client.email, client.name || "клиент", "refund",
+      { name: client.name || "клиент", refundLine },
+      "Възстановяване на сума — SYNRG", html);
   }
 
   await sendAdminAlert(`Refund processed`, `Purchase ${purchase.id} for client ${purchase.client_id} refunded. Modules revoked.`);
