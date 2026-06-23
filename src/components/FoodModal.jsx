@@ -483,7 +483,9 @@ export default function FoodModal() {
               borderRadius: '10px',
               px: 2, py: 1.5,
               display:      'flex',
+              flexWrap:     'wrap',
               gap: 3,
+              rowGap: 1.5,
             }}>
               <Box>
                 <Typography sx={{ fontSize: '11px', color: C.muted, textTransform: 'uppercase', letterSpacing: '0.6px' }}>
@@ -499,6 +501,22 @@ export default function FoodModal() {
                 </Typography>
                 <Typography sx={{ fontWeight: 800, color: C.purple }}>
                   {Math.round((selectedFood.protein / 100) * gramsForCalc * 10) / 10}{t('gUnit')}
+                </Typography>
+              </Box>
+              <Box>
+                <Typography sx={{ fontSize: '11px', color: C.muted, textTransform: 'uppercase', letterSpacing: '0.6px' }}>
+                  {t('carbsLbl')}
+                </Typography>
+                <Typography sx={{ fontWeight: 800, color: '#FFD070' }}>
+                  {Math.round(((selectedFood.carbs || 0) / 100) * gramsForCalc * 10) / 10}{t('gUnit')}
+                </Typography>
+              </Box>
+              <Box>
+                <Typography sx={{ fontSize: '11px', color: C.muted, textTransform: 'uppercase', letterSpacing: '0.6px' }}>
+                  {t('fatLbl')}
+                </Typography>
+                <Typography sx={{ fontWeight: 800, color: '#FF9F70' }}>
+                  {Math.round(((selectedFood.fat || 0) / 100) * gramsForCalc * 10) / 10}{t('gUnit')}
                 </Typography>
               </Box>
               {isPiece && (
