@@ -7,6 +7,8 @@ import {
 import CloseIcon from '@mui/icons-material/Close'
 import { useApp } from '../context/AppContext'
 import { foodDB, foodLabel } from '../lib/constants'
+import { lookupBarcode } from '../lib/openfoodfacts'
+import BarcodeScanner from './BarcodeScanner'
 import { C } from '../theme'
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL
@@ -67,6 +69,10 @@ export default function FoodModal() {
   const [aiError,    setAiError]    = useState('')
   const [saving,     setSaving]     = useState(false)
   const fileInputRef = useRef(null)
+
+  // Barcode scanning state
+  const [scanning,   setScanning]   = useState(false)
+  const [scanLoading, setScanLoading] = useState(false)
 
   function handleRecentClick(meal) {
     // Try to find the food in foodDB by matching the label (case-insensitive)
@@ -224,6 +230,35 @@ export default function FoodModal() {
     if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
+  async function handleBarcodeDetected(code) {
+    setScanning(false)
+    setScanLoading(true)
+    setAiError('')
+    try {
+      const product = await lookupBarcode(code)
+      if (!product) {
+        setAiError(t('barcodeNotFound'))
+        setScanLoading(false)
+        return
+      }
+      // Reuse the custom-food path so the user can edit grams before adding.
+      setCustomFood({
+        name:          product.brand ? `${product.name} (${product.brand})` : product.name,
+        kcalPer100:    product.kcalPer100,
+        proteinPer100: product.proteinPer100,
+        carbsPer100:   product.carbsPer100,
+        fatPer100:     product.fatPer100,
+      })
+      setSearch(product.name)
+      setAmount('100')
+      setSelectedKey(null)
+      setAiFood(null)
+    } catch {
+      setAiError(t('barcodeNotFound'))
+    }
+    setScanLoading(false)
+  }
+
   function resetAndClose() {
     setFoodModalOpen(false)
     setSearch('')
@@ -234,6 +269,8 @@ export default function FoodModal() {
     setAiError('')
     setAiLoading(false)
     setSaving(false)
+    setScanning(false)
+    setScanLoading(false)
   }
 
   const canAdd = isAiMode
@@ -295,6 +332,24 @@ export default function FoodModal() {
             >
               <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 15.2a3.2 3.2 0 1 0 0-6.4 3.2 3.2 0 0 0 0 6.4z"/><path d="M9 2 7.17 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2h-3.17L15 2H9zm3 15c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5z"/></svg>
             </Button>
+            <Button
+              onClick={() => { setAiError(''); setScanning(true) }}
+              disabled={aiLoading || scanLoading}
+              variant="outlined"
+              aria-label={t('barcodeBtn')}
+              sx={{
+                flexShrink: 0,
+                minWidth: 52,
+                borderRadius: '12px',
+                color: C.muted,
+                borderColor: C.border,
+                px: 1.5, py: 1,
+                lineHeight: 1,
+                '&:hover': { background: C.accentSoft, borderColor: C.purple, color: C.purple },
+              }}
+            >
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M3 5v14M7 5v14M11 5v14M14 5v14M17 5v14M21 5v14"/></svg>
+            </Button>
           </Box>
 
           {/* AI loading */}
@@ -302,6 +357,14 @@ export default function FoodModal() {
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, py: 1 }}>
               <CircularProgress size={20} sx={{ color: C.primary }} />
               <Typography sx={{ fontSize: '13px', color: C.muted }}>{t('aiAnalyzing')}</Typography>
+            </Box>
+          )}
+
+          {/* Barcode lookup loading */}
+          {scanLoading && (
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, py: 1 }}>
+              <CircularProgress size={20} sx={{ color: C.primary }} />
+              <Typography sx={{ fontSize: '13px', color: C.muted }}>{t('barcodeLooking')}</Typography>
             </Box>
           )}
 
@@ -580,6 +643,14 @@ export default function FoodModal() {
           {saving ? <CircularProgress size={16} sx={{ color: 'inherit' }} /> : `${t('addBtn')} →`}
         </Button>
       </DialogActions>
+
+      {scanning && (
+        <BarcodeScanner
+          t={t}
+          onDetected={handleBarcodeDetected}
+          onClose={() => setScanning(false)}
+        />
+      )}
     </Dialog>
   )
 }
