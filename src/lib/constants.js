@@ -55,7 +55,7 @@ export const foodDB = {
 
   // ── Яйца ─────────────────────────────────────────────────────────
   'яйца':                   { label: 'Яйца',   labelEn: 'Eggs',         kcal: 155, protein: 13, carbs: 1.1, fat: 11, perPiece: true, gramsPerPiece: 55 },
-  'яйце':                   { label: 'Яйце',   labelEn: 'Egg',          kcal: 155, protein: 13, carbs: 1.1, fat: 11, perPiece: true, gramsPerPiece: 55 },
+  'яйце':                   { label: 'Яйце',   labelEn: 'Egg',          kcal: 144, protein: 13.6, carbs: 0, fat: 9.2, perPiece: true, gramsPerPiece: 50 },
   'белтъци':                { label: 'Белтъци',                   labelEn: 'Egg whites',            kcal: 52,  protein: 11, carbs: 0.7, fat: 0.2   },
 
   // ── Млечни ───────────────────────────────────────────────────────
@@ -516,7 +516,7 @@ export const quickFoods = [
   { key: 'хляб',          grams: 35  },          // Филия хляб
   { key: 'зехтин',        grams: 10  },          // Супена лъжица зехтин
   { key: 'пилешко филе',  grams: 100 },          // 100г пилешко филе
-  { key: 'яйце',          grams: 55, count: 1 }, // 1 яйце
+  { key: 'яйце',          grams: 50, count: 1 }, // 1 яйце
 ]
 
 export const WORKOUT_CATEGORIES = [
