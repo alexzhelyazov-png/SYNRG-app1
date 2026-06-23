@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import {
   AppBar, Toolbar, Box, Typography, IconButton, Button, Badge, Dialog,
   Drawer, List, ListItemButton, ListItemIcon, ListItemText, Divider,
+  CircularProgress, TextField,
 } from '@mui/material'
 import MenuIcon             from '@mui/icons-material/Menu'
 import CloseIcon            from '@mui/icons-material/Close'
@@ -44,6 +45,10 @@ export default function MobileHeader() {
   const { myPlan } = useBooking()
   const [siteMenuOpen, setSiteMenuOpen] = useState(false)
   const [showProfile, setShowProfile] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [deletePassword, setDeletePassword] = useState('')
+  const [deleteError, setDeleteError] = useState('')
   // Online program purchase (Stripe). Loaded only when the profile dialog opens
   // so we avoid unnecessary network roundtrips for users who never tap it.
   const [onlineProgram, setOnlineProgram] = useState(null)
@@ -390,12 +395,96 @@ export default function MobileHeader() {
             </Box>
           </Box>
 
+          {/* GDPR right to erasure — every user can delete their account */}
+          <Box sx={{ mt: 2, pt: 2, borderTop: `1px solid ${C.border}` }}>
+            <Button fullWidth onClick={() => { setShowProfile(false); setDeletePassword(''); setDeleteError(''); setConfirmDelete(true) }}
+              sx={{
+                color: '#F87171', fontSize: '13px', fontWeight: 700,
+                border: '1px solid rgba(248,113,113,0.35)', borderRadius: '12px', py: 1,
+                '&:hover': { background: 'rgba(248,113,113,0.08)', borderColor: '#F87171' },
+              }}>
+              {t('deleteMyAccount')}
+            </Button>
+          </Box>
+
           <Button fullWidth onClick={() => setShowProfile(false)}
-            sx={{ mt: 2.5, color: C.muted, fontSize: '13px', fontWeight: 600 }}>
+            sx={{ mt: 1.5, color: C.muted, fontSize: '13px', fontWeight: 600 }}>
             {t('closeBtn')}
           </Button>
         </Dialog>
       )}
+
+      {/* ── Delete account confirmation — GDPR Art. 17 (Right to be Forgotten) ── */}
+      <Dialog
+        open={confirmDelete}
+        onClose={() => !deleting && setConfirmDelete(false)}
+        PaperProps={{ sx: { borderRadius: '20px', maxWidth: '380px', width: '100%', p: 3 } }}
+      >
+        <Typography sx={{ fontWeight: 800, fontSize: '17px', color: C.text, mb: 1 }}>
+          {t('deleteAccountTitle')}
+        </Typography>
+        <Typography sx={{ fontSize: '13px', color: C.muted, lineHeight: 1.5, mb: 2 }}>
+          {t('deleteAccountConfirm')}
+        </Typography>
+        <Typography sx={{ fontSize: '12px', color: C.muted, mb: 1 }}>
+          {t('enterPasswordToConfirm')}
+        </Typography>
+        <TextField
+          type="password"
+          fullWidth
+          size="small"
+          value={deletePassword}
+          onChange={e => setDeletePassword(e.target.value)}
+          placeholder={t('passPlaceholder')}
+          disabled={deleting}
+          autoComplete="current-password"
+        />
+        {deleteError && (
+          <Typography sx={{ fontSize: '12px', color: '#F87171', mt: 1 }}>
+            {deleteError}
+          </Typography>
+        )}
+        <Button
+          fullWidth
+          disabled={deleting || !deletePassword}
+          onClick={async () => {
+            if (!deletePassword) { setDeleteError(t('enterPasswordErr')); return }
+            setDeleting(true)
+            setDeleteError('')
+            try {
+              const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL
+              const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
+              const res = await fetch(`${SUPABASE_URL}/functions/v1/gdpr-delete-account`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ client_id: auth.id, password: deletePassword }),
+              })
+              const data = await res.json()
+              if (!res.ok || !data.ok) {
+                setDeleteError(data.error === 'Invalid password' ? t('wrongPasswordErr') : t('deleteFailedErr'))
+                setDeleting(false)
+                return
+              }
+              logout()
+            } catch {
+              setDeleteError(t('networkErr'))
+              setDeleting(false)
+            }
+          }}
+          sx={{
+            mt: 2,
+            background: '#F87171', color: '#1a0a0a', fontWeight: 800, fontSize: '14px',
+            borderRadius: '12px', py: 1.25,
+            '&:hover': { background: '#EF4444' },
+            '&.Mui-disabled': { background: 'rgba(248,113,113,0.4)', color: 'rgba(0,0,0,0.4)' },
+          }}>
+          {deleting ? <CircularProgress size={18} sx={{ color: '#1a0a0a' }} /> : t('deleteAccountBtn')}
+        </Button>
+        <Button fullWidth disabled={deleting} onClick={() => { setConfirmDelete(false); setDeletePassword(''); setDeleteError('') }}
+          sx={{ mt: 1, color: C.muted, fontSize: '13px', fontWeight: 600 }}>
+          {t('cancelLbl')}
+        </Button>
+      </Dialog>
     </>
   )
 }

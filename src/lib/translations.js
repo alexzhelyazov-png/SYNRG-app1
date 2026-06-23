@@ -897,10 +897,15 @@ export const T = {
     consentPre:            'Прочетох и приемам',
     privacyPolicyLink:     'Политиката за поверителност',
     errConsentRequired:    'Трябва да приемеш политиката за поверителност',
-    deleteMyAccount:       'Изтрий акаунта ми',
+    deleteMyAccount:       'Изтрий профила',
     deleteAccountTitle:    'Изтриване на акаунт',
     deleteAccountConfirm:  'Сигурен ли си? Всички твои данни (хранителен дневник, тренировки, тегло, стъпки) ще бъдат изтрити безвъзвратно.',
     deleteAccountBtn:      'Да, изтрий всичко',
+    enterPasswordToConfirm:'Въведи паролата си за потвърждение:',
+    enterPasswordErr:      'Въведи паролата си',
+    wrongPasswordErr:      'Грешна парола',
+    deleteFailedErr:       'Грешка при изтриване — опитай пак',
+    networkErr:            'Мрежова грешка — опитай пак',
 
     // ── Free user upgrade ────────────────────────────
     upgradeOnlineBanner:   'SYNRG ONLINE',
@@ -1924,10 +1929,15 @@ export const T = {
     consentPre:            'I have read and accept the',
     privacyPolicyLink:     'Privacy Policy',
     errConsentRequired:    'You must accept the privacy policy',
-    deleteMyAccount:       'Delete my account',
+    deleteMyAccount:       'Delete profile',
     deleteAccountTitle:    'Delete account',
     deleteAccountConfirm:  'Are you sure? All your data (food diary, workouts, weight, steps) will be permanently deleted.',
     deleteAccountBtn:      'Yes, delete everything',
+    enterPasswordToConfirm:'Enter your password to confirm:',
+    enterPasswordErr:      'Enter your password',
+    wrongPasswordErr:      'Wrong password',
+    deleteFailedErr:       'Delete failed — please try again',
+    networkErr:            'Network error — please try again',
 
     // ── Free user upgrade ────────────────────────────
     upgradeOnlineBanner:   'SYNRG ONLINE',
