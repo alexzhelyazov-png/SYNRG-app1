@@ -296,15 +296,17 @@ export default function FoodModal() {
       <DialogContent sx={{ pt: 1 }}>
         <Box sx={{ display: 'grid', gap: 1.5 }}>
 
-          {/* Search + camera button */}
-          <Box sx={{ display: 'flex', gap: 1, alignItems: 'stretch' }}>
-            <TextField
-              placeholder={t('foodSearchPlaceholder')}
-              value={search}
-              onChange={e => handleSearchChange(e.target.value)}
-              autoFocus
-              sx={{ flex: 1, minWidth: 0 }}
-            />
+          {/* Search */}
+          <TextField
+            placeholder={t('foodSearchPlaceholder')}
+            value={search}
+            onChange={e => handleSearchChange(e.target.value)}
+            autoFocus
+            fullWidth
+          />
+
+          {/* Camera + barcode buttons */}
+          <Box sx={{ display: 'flex', gap: 1 }}>
             <input
               ref={fileInputRef}
               type="file"
@@ -315,40 +317,41 @@ export default function FoodModal() {
             />
             <Button
               onClick={() => fileInputRef.current?.click()}
-              disabled={aiLoading}
+              disabled={aiLoading || scanLoading}
               variant="outlined"
-              aria-label={t('aiPhotoBtn') || 'Снимай храна'}
+              startIcon={
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 15.2a3.2 3.2 0 1 0 0-6.4 3.2 3.2 0 0 0 0 6.4z"/><path d="M9 2 7.17 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2h-3.17L15 2H9zm3 15c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5z"/></svg>
+              }
               sx={{
-                flexShrink: 0,
-                minWidth: 52,
+                flex: 1, minWidth: 0,
                 borderRadius: '12px',
                 color: C.muted,
                 borderColor: C.border,
-                px: 1.5, py: 1,
-                fontSize: '20px',
-                lineHeight: 1,
+                py: 1,
+                fontSize: '13px', fontWeight: 700, textTransform: 'none',
                 '&:hover': { background: C.accentSoft, borderColor: C.purple, color: C.purple },
               }}
             >
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 15.2a3.2 3.2 0 1 0 0-6.4 3.2 3.2 0 0 0 0 6.4z"/><path d="M9 2 7.17 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2h-3.17L15 2H9zm3 15c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5z"/></svg>
+              {t('camShortLbl')}
             </Button>
             <Button
               onClick={() => { setAiError(''); setScanning(true) }}
               disabled={aiLoading || scanLoading}
               variant="outlined"
-              aria-label={t('barcodeBtn')}
+              startIcon={
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M3 5v14M7 5v14M11 5v14M14 5v14M17 5v14M21 5v14"/></svg>
+              }
               sx={{
-                flexShrink: 0,
-                minWidth: 52,
+                flex: 1, minWidth: 0,
                 borderRadius: '12px',
                 color: C.muted,
                 borderColor: C.border,
-                px: 1.5, py: 1,
-                lineHeight: 1,
+                py: 1,
+                fontSize: '13px', fontWeight: 700, textTransform: 'none',
                 '&:hover': { background: C.accentSoft, borderColor: C.purple, color: C.purple },
               }}
             >
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M3 5v14M7 5v14M11 5v14M14 5v14M17 5v14M21 5v14"/></svg>
+              {t('barcodeShortLbl')}
             </Button>
           </Box>
 
