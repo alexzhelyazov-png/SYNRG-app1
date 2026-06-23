@@ -2093,6 +2093,7 @@ function DashboardTab({ t, lang, goTo }) {
   const [planDlg,      setPlanDlg]      = useState(null)
   const [broadcastDlg, setBroadcastDlg] = useState(null) // null | 'free' | { singleClient }
   const [showArchived, setShowArchived] = useState(false)
+  const [freeSearch,   setFreeSearch]   = useState('') // filter freemium list by name/email
 
   useEffect(() => {
     loadAllPlans().then(() => setLoaded(true))
@@ -2180,6 +2181,12 @@ function DashboardTab({ t, lang, goTo }) {
     !hasAnyPlanHistory(c) && (!(c.modules || []).length || isFreeReg(c))
   )
   const leads      = newRegs.filter(isFreeReg) // free registered users only (not empty-module ghosts)
+  const freeQ        = freeSearch.trim().toLowerCase()
+  const newRegsShown = freeQ
+    ? newRegs.filter(c =>
+        (c.name  || '').toLowerCase().includes(freeQ) ||
+        (c.email || '').toLowerCase().includes(freeQ))
+    : newRegs
   const expiring   = active.filter(c => {
     const p = getActivePlan(c.id)
     if (!p) return false
@@ -2218,11 +2225,33 @@ function DashboardTab({ t, lang, goTo }) {
           <Typography sx={{ fontWeight: 700, fontSize: '14px', color: '#60A5FA', mb: 1 }}>
             {t('newRegistrations')} ({newRegs.length})
           </Typography>
+          {newRegs.length > 5 && (
+            <TextField
+              fullWidth size="small"
+              placeholder={t('searchFreePh')}
+              value={freeSearch}
+              onChange={e => setFreeSearch(e.target.value)}
+              sx={{ mb: 1.5,
+                '& .MuiInputBase-input': { fontSize: '13px', py: '8px' },
+                '& .MuiOutlinedInput-notchedOutline': { borderColor: C.border },
+              }}
+            />
+          )}
           <Paper sx={{ borderRadius: '14px', border: '1px solid rgba(96,165,250,0.25)', mb: 2, overflow: 'hidden' }}>
-            {newRegs.map(c => (
+            {newRegsShown.length === 0 && (
+              <Typography sx={{ px: 2, py: 1.5, fontSize: '13px', color: C.muted }}>
+                {t('noResults')}
+              </Typography>
+            )}
+            {newRegsShown.map(c => (
               <Box key={c.id} sx={{ px: 2, py: 1, display: 'flex', alignItems: 'center', gap: 1.5,
                 borderBottom: `1px solid ${C.border}`, '&:last-child': { borderBottom: 'none' } }}>
-                <Typography sx={{ fontWeight: 600, fontSize: '14px', color: C.text, flex: 1 }}>{c.name}</Typography>
+                <Box sx={{ flex: 1, minWidth: 0 }}>
+                  <Typography sx={{ fontWeight: 600, fontSize: '14px', color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.name}</Typography>
+                  {c.email && c.email !== c.name && (
+                    <Typography sx={{ fontSize: '12px', color: C.muted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.email}</Typography>
+                  )}
+                </Box>
                 <Button size="small" variant="contained" onClick={() => handleAddPlan(c)}
                   sx={{ fontSize: '11px', minHeight: 0, py: 0.5, px: 1.5 }}>
                   {lang === 'en' ? '+ Add plan' : '+ Добави план'}
