@@ -68,6 +68,11 @@ export const ALLTIME_BADGES = [
   { id: 'first_weight', category: 'consistency', xp: 5,  tier: null, series: null, muiIcon: 'MonitorWeight',  condType: 'count', condField: 'weightCount', condValue: 1 },
   { id: 'first_steps',  category: 'consistency', xp: 5,  tier: null, series: null, muiIcon: 'DirectionsWalk', condType: 'count', condField: 'stepsCount',  condValue: 1 },
 
+  // ── 3-day tracking (early habit) ──
+  { id: 'meals_3days',  category: 'consistency', xp: 15, tier: null, series: null, muiIcon: 'Restaurant',     condType: 'count', condField: 'mealDays',    condValue: 3 },
+  { id: 'weight_3days', category: 'consistency', xp: 15, tier: null, series: null, muiIcon: 'MonitorWeight',  condType: 'count', condField: 'weightDays',  condValue: 3 },
+  { id: 'steps_3days',  category: 'consistency', xp: 15, tier: null, series: null, muiIcon: 'DirectionsWalk', condType: 'count', condField: 'stepsDays',   condValue: 3 },
+
   // ── Standalone ──
   { id: 'all_rounder',  category: 'special',  xp: 40, tier: null, series: null, muiIcon: 'AutoAwesome',  condType: 'compound',    condValue: 1   },
   { id: 'century_club', category: 'special',  xp: 50, tier: null, series: null, muiIcon: 'MilitaryTech', condType: 'meta',        condValue: 100 },
