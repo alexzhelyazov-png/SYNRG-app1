@@ -28,7 +28,7 @@ import {
   todayDate, dateToInput, inputToDate, parseDate,
   fmt1, avgArr, sameDateStr,
 } from '../lib/utils'
-import { computeXPRanking, computeTotalXP, computeMonthlyXP, computeLevel, evaluateBadges } from '../lib/gamification'
+import { computeXPRanking, computeTotalXP, computeMonthlyXP, computeLevel, evaluateBadges, evaluateMonthlyBadgesForMonth, getCurrentMonthKey } from '../lib/gamification'
 import { isAdmin as isAdminUser, isFullAdmin } from './../lib/bookingUtils'
 import { applyColors } from '../theme'
 
@@ -211,6 +211,8 @@ export function AppProvider({ children }) {
         xp_monthly:     c.xp_monthly  || 0,
         xp_total:       c.xp_total    || 0,
         xp_level:       c.xp_level    || 1,
+        earned_ids:         Array.isArray(c.earned_ids)         ? c.earned_ids         : [],
+        monthly_earned_ids: Array.isArray(c.monthly_earned_ids) ? c.monthly_earned_ids : [],
         meals: [
           ...dbMeals.map(m => ({
             id: m.id, label: m.label, grams: m.grams, kcal: m.kcal,
@@ -441,17 +443,24 @@ export function AppProvider({ children }) {
         // for m_community_* badges; without them admin computes lower XP than client.
         const curFeed     = feedPostsRef.current || []
         const curComments = postCommentsRef.current || []
+        const curMonthKey = getCurrentMonthKey()
         const xpPayload = merged.filter(c => !c.is_coach && c.id).map(c => {
           const enriched = {
             ...c,
             communityPosts:    curFeed.filter(p => p.author_name === c.name),
             communityComments: curComments.filter(cm => cm.author_name === c.name),
           }
-          const earnedIds = evaluateBadges(enriched)
+          const earnedIds        = evaluateBadges(enriched)
+          const monthlyEarnedIds = evaluateMonthlyBadgesForMonth(enriched, curMonthKey)
           const totalXP   = computeTotalXP(earnedIds, enriched)
           const monthlyXP = computeMonthlyXP(enriched)
           const { level } = computeLevel(totalXP)
-          return { id: c.id, xp_monthly: monthlyXP, xp_total: totalXP, xp_level: level }
+          // Persist badge id lists too so clients (who don't load other
+          // clients' raw logs) can render the same badges in the ranking dialog.
+          return {
+            id: c.id, xp_monthly: monthlyXP, xp_total: totalXP, xp_level: level,
+            earned_ids: earnedIds, monthly_earned_ids: monthlyEarnedIds,
+          }
         })
 
         // Update state with merged clients (fresh meals/weights/steps/workouts)
@@ -489,7 +498,12 @@ export function AppProvider({ children }) {
         setClients(prev => prev.map(c => {
           const fc = freshClients.find(x => x.id === c.id)
           if (!fc) return c
-          return { ...c, xp_monthly: fc.xp_monthly || 0, xp_total: fc.xp_total || 0, xp_level: fc.xp_level || 1 }
+          return {
+            ...c,
+            xp_monthly: fc.xp_monthly || 0, xp_total: fc.xp_total || 0, xp_level: fc.xp_level || 1,
+            earned_ids:         Array.isArray(fc.earned_ids)         ? fc.earned_ids         : (c.earned_ids || []),
+            monthly_earned_ids: Array.isArray(fc.monthly_earned_ids) ? fc.monthly_earned_ids : (c.monthly_earned_ids || []),
+          }
         }))
       } catch { /* silent */ }
     }
@@ -782,14 +796,20 @@ export function AppProvider({ children }) {
     // Client role: read from DB (written by admin's periodic sync every 2 min).
     // All clients read the same DB values → everyone sees an identical ranking.
     return [...realClients]
-      .map(c => ({
-        name:        c.name,
-        clientId:    c.id,
-        xp:          c.xp_monthly || 0,
-        totalXP:     c.xp_total   || 0,
-        level:       c.xp_level   || 1,
-        badge_count: 0,
-      }))
+      .map(c => {
+        const earnedIds        = Array.isArray(c.earned_ids)         ? c.earned_ids         : []
+        const monthlyEarnedIds = Array.isArray(c.monthly_earned_ids) ? c.monthly_earned_ids : []
+        return {
+          name:        c.name,
+          clientId:    c.id,
+          xp:          c.xp_monthly || 0,
+          totalXP:     c.xp_total   || 0,
+          level:       c.xp_level   || 1,
+          badgeCount:  earnedIds.length,
+          earnedIds,
+          monthlyEarnedIds,
+        }
+      })
       .sort((a, b) => b.xp - a.xp)
   }, [realClients, isCoachOrAdmin])
   const kcalPct  = Math.min((foodTotals.kcal    / (client.calorieTarget || 1)) * 100, 100)

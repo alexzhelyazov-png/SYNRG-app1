@@ -51,7 +51,7 @@ const PAGE_SIZE = 1000
 // Tables with column-level access restrictions — anon cannot SELECT *.
 // For these we explicitly list the safe columns to avoid permission errors.
 const SAFE_SELECTS = {
-  clients: 'id,name,calorie_target,protein_target,carbs_target,fat_target,created_at,is_coach,is_archived,modules,email,dismissed_badges,synrg_started_at,synrg_quiz,account_type,xp_monthly,xp_total,xp_level,assigned_coach_id',
+  clients: 'id,name,calorie_target,protein_target,carbs_target,fat_target,created_at,is_coach,is_archived,modules,email,dismissed_badges,synrg_started_at,synrg_quiz,account_type,xp_monthly,xp_total,xp_level,earned_ids,monthly_earned_ids,assigned_coach_id',
 }
 function selectColumns(table) {
   return SAFE_SELECTS[table] || '*'
@@ -316,17 +316,21 @@ export const DB = {
 
   // ── Ranking: batch-update xp_monthly / xp_total / xp_level on clients ───
   async batchUpdateXP(updates) {
-    // updates: [{ id, xp_monthly, xp_total, xp_level }, ...]
+    // updates: [{ id, xp_monthly, xp_total, xp_level, earned_ids?, monthly_earned_ids? }, ...]
     if (!isUsingSupabase || !updates.length) return
     // Surface failures instead of silently swallowing — previous version used
     // sbFetchSafe which returned null on RLS-denied / column-missing errors,
     // leaving DB stale and clients seeing wrong XP vs admin's local compute.
     const results = await Promise.all(updates.map(async u => {
       try {
+        const patch = { xp_monthly: u.xp_monthly, xp_total: u.xp_total, xp_level: u.xp_level }
+        // Persist badge id lists too (read by clients for the ranking profile dialog).
+        if (u.earned_ids)         patch.earned_ids         = u.earned_ids
+        if (u.monthly_earned_ids) patch.monthly_earned_ids = u.monthly_earned_ids
         const res = await fetch(sbUrl('clients', `?id=eq.${u.id}`), {
           method:  'PATCH',
           headers: { ...sbHeaders(), Prefer: 'return=minimal' },
-          body:    JSON.stringify({ xp_monthly: u.xp_monthly, xp_total: u.xp_total, xp_level: u.xp_level }),
+          body:    JSON.stringify(patch),
         })
         if (!res.ok) {
           const text = await res.text().catch(() => '')

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Box, Typography, Paper, Dialog, IconButton, Chip } from '@mui/material'
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline'
+import CloseIcon from '@mui/icons-material/Close'
 import { useApp } from '../context/AppContext'
 import { C, EASE } from '../theme'
 import { DB } from '../lib/db'
@@ -194,11 +195,16 @@ export default function Ranking() {
                       boxShadow:  '0 0 40px rgba(170,169,205,0.15), 0 0 0 1px rgba(170,169,205,0.12)',
                     } : {}),
                     transition: `box-shadow 0.25s ${EASE.standard}, transform 0.25s ${EASE.standard}`,
-                    '&:hover': {
-                      transform: 'translateY(-2px)',
-                      boxShadow: isFirst
-                        ? '0 0 50px rgba(170,169,205,0.2), 0 8px 32px rgba(0,0,0,0.4)'
-                        : '0 6px 24px rgba(0,0,0,0.4)',
+                    // Hover only on real pointer devices — on touch (iOS) a :hover
+                    // rule makes the first tap apply hover instead of firing the
+                    // click, forcing a second tap.
+                    '@media (hover: hover)': {
+                      '&:hover': {
+                        transform: 'translateY(-2px)',
+                        boxShadow: isFirst
+                          ? '0 0 50px rgba(170,169,205,0.2), 0 8px 32px rgba(0,0,0,0.4)'
+                          : '0 6px 24px rgba(0,0,0,0.4)',
+                      },
                     },
                   }}
                 >
@@ -302,10 +308,14 @@ export default function Ranking() {
                 transition:          `background-color 0.15s ${EASE.standard}`,
                 animation:           `fadeIn 0.2s ${EASE.standard} both`,
                 animationDelay:      `${i * 0.04 + 0.2}s`,
-                '&:hover':           {
-                  background: isMe
-                    ? 'rgba(170,169,205,0.09)'
-                    : 'rgba(255,255,255,0.025)',
+                // Hover only on real pointer devices — avoids the iOS "tap twice"
+                // issue where a :hover rule swallows the first tap.
+                '@media (hover: hover)': {
+                  '&:hover': {
+                    background: isMe
+                      ? 'rgba(170,169,205,0.09)'
+                      : 'rgba(255,255,255,0.025)',
+                  },
                 },
               }}
             >
@@ -410,7 +420,16 @@ export default function Ranking() {
         const monthlyEarned = MONTHLY_BADGES.filter(b => monthlyEarnedSet.has(b.id))
         return (
           <Dialog open onClose={() => setViewProfile(null)} maxWidth="xs" fullWidth
-            PaperProps={{ sx: { borderRadius: '20px', background: C.card, border: `1px solid ${C.border}`, p: 3 } }}>
+            PaperProps={{ sx: { borderRadius: '20px', background: C.card, border: `1px solid ${C.border}`, p: 3, position: 'relative' } }}>
+            {/* Close button — reliable single-tap exit on mobile (backdrop is a
+                thin, easy-to-miss target on a fullWidth phone dialog). */}
+            <IconButton
+              onClick={() => setViewProfile(null)}
+              aria-label="close"
+              sx={{ position: 'absolute', top: 8, right: 8, color: C.muted, zIndex: 1 }}
+            >
+              <CloseIcon sx={{ fontSize: 20 }} />
+            </IconButton>
             {/* Header */}
             <Box sx={{ textAlign: 'center', mb: 2.5 }}>
               <Box sx={{

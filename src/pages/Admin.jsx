@@ -2835,6 +2835,122 @@ function OnlineAccessTab() {
   )
 }
 
+// ── Challenge Signups Tab (7-day challenge cohorts) ──────────
+function ChallengeTab() {
+  const [cohorts, setCohorts] = useState([])
+  const [cohortId, setCohortId] = useState(null)
+  const [rows, setRows] = useState([])
+  const [loaded, setLoaded] = useState(false)
+
+  useEffect(() => {
+    DB.selectAll('cohorts', '&order=start_date.desc')
+      .then(cs => {
+        const list = cs || []
+        setCohorts(list)
+        // default to the soonest upcoming cohort, else the most recent.
+        const upcoming = list.filter(c => c.status === 'upcoming')
+          .sort((a, b) => (a.start_date || '').localeCompare(b.start_date || ''))[0]
+        setCohortId((upcoming || list[0])?.id || null)
+      })
+      .catch(() => setCohorts([]))
+  }, [])
+
+  useEffect(() => {
+    if (!cohortId) { setRows([]); setLoaded(true); return }
+    setLoaded(false)
+    DB.selectAll('challenge_signups', `&cohort_id=eq.${cohortId}&order=created_at.desc`)
+      .then(r => { setRows(r || []); setLoaded(true) })
+      .catch(() => { setRows([]); setLoaded(true) })
+  }, [cohortId])
+
+  const fmtDate = (d) => {
+    if (!d) return '—'
+    const [y, m, day] = d.split('-')
+    return `${day}.${m}.${y}`
+  }
+  const fmtDateTime = (ts) => {
+    if (!ts) return '—'
+    try {
+      const dt = new Date(ts)
+      return dt.toLocaleString('bg-BG', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
+    } catch { return ts }
+  }
+
+  return (
+    <Box>
+      <Typography sx={{ fontSize: '12px', color: C.muted, mb: 1.5 }}>
+        Записвания за 7-дневното предизвикателство по кохорти. Записва се само през формата (топли потребители).
+      </Typography>
+
+      {/* Cohort picker */}
+      <Box sx={{ display: 'flex', gap: 0.75, mb: 2, flexWrap: 'wrap' }}>
+        {cohorts.map(c => {
+          const active = c.id === cohortId
+          return (
+            <Box key={c.id} onClick={() => setCohortId(c.id)} sx={{
+              px: 1.5, py: 0.5, borderRadius: '100px', cursor: 'pointer',
+              fontSize: '12px', fontWeight: 700,
+              background: active ? 'rgba(196,233,191,0.15)' : 'transparent',
+              color: active ? '#c4e9bf' : C.muted,
+              border: `1px solid ${active ? '#c4e9bf44' : 'rgba(255,255,255,0.1)'}`,
+              transition: 'all 0.18s',
+            }}>
+              {fmtDate(c.start_date)}
+              <span style={{ opacity: 0.6, marginLeft: 6, fontWeight: 600 }}>
+                {c.status === 'upcoming' ? 'предстои' : c.status === 'active' ? 'активна' : 'минала'}
+              </span>
+            </Box>
+          )
+        })}
+        {cohorts.length === 0 && (
+          <Typography sx={{ fontSize: '12px', color: C.muted }}>Няма кохорти още.</Typography>
+        )}
+      </Box>
+
+      {!loaded ? (
+        <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+          <CircularProgress size={24} sx={{ color: '#c4e9bf' }} />
+        </Box>
+      ) : rows.length === 0 ? (
+        <Paper sx={{ p: 4, borderRadius: '14px', textAlign: 'center', border: '1px solid rgba(255,255,255,0.08)' }}>
+          <Typography sx={{ color: C.muted, fontSize: '14px' }}>Няма записвания за тази кохорта.</Typography>
+        </Paper>
+      ) : (
+        <>
+          <Typography sx={{ fontSize: '12px', color: '#c4e9bf', fontWeight: 700, mb: 1 }}>
+            {rows.length} записани
+          </Typography>
+          <Paper sx={{ borderRadius: '14px', border: '1px solid rgba(255,255,255,0.08)', overflow: 'hidden' }}>
+            {rows.map((r, idx) => (
+              <Box key={r.id || idx} sx={{
+                px: 2, py: 1.5, borderBottom: '1px solid rgba(255,255,255,0.06)',
+                '&:last-child': { borderBottom: 'none' },
+                display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap',
+              }}>
+                <Box sx={{ flex: 1, minWidth: 160 }}>
+                  <Typography sx={{ fontWeight: 700, fontSize: '14px', color: '#e0e0e0' }}>{r.name}</Typography>
+                  <Typography sx={{ fontSize: '11px', color: 'rgba(255,255,255,0.45)' }}>
+                    {r.email}{r.phone ? ` · ${r.phone}` : ''}
+                  </Typography>
+                </Box>
+                <Chip label={r.source === 'cold' ? 'НОВ' : 'ТОПЪЛ'} size="small" sx={{
+                  height: '20px', fontSize: '10px', fontWeight: 700,
+                  background: r.source === 'cold' ? 'rgba(201,196,240,0.15)' : 'rgba(196,233,191,0.15)',
+                  color: r.source === 'cold' ? '#C9C4F0' : '#c4e9bf',
+                  border: `1px solid ${r.source === 'cold' ? '#C9C4F044' : '#c4e9bf44'}`,
+                }} />
+                <Typography sx={{ fontSize: '11px', color: C.muted, minWidth: 90, textAlign: 'right' }}>
+                  {fmtDateTime(r.created_at)}
+                </Typography>
+              </Box>
+            ))}
+          </Paper>
+        </>
+      )}
+    </Box>
+  )
+}
+
 // ── Admin SYNRG Method Tab ───────────────────────────────────
 const SHOW_CONDITIONS = [
   { value: 'always',   labelBg: 'Винаги',                  labelEn: 'Always' },
@@ -3156,6 +3272,7 @@ export default function Admin() {
       { key: 'clients',       label: t('clientsMgmt')     || 'Клиенти' },
       { key: 'online',        label: 'Онлайн' },
       { key: 'online_access', label: 'Онлайн достъп' },
+      { key: 'challenge',     label: 'Challenge' },
       { key: 'messages',      label: 'Съобщения' },
       { key: 'coaches',       label: t('coachesTab')      || 'Треньори' },
       { key: 'subscriptions', label: t('subscriptionsTab')|| 'Абонаменти' },
@@ -3227,6 +3344,7 @@ export default function Admin() {
         {clientSub === 'clients'       && <ClientsTab t={t} />}
         {clientSub === 'online'        && <OnlineClientsTab t={t} />}
         {clientSub === 'online_access' && <OnlineAccessTab />}
+        {clientSub === 'challenge'     && <ChallengeTab />}
         {clientSub === 'messages'      && <AdminMessagesTab />}
         {clientSub === 'coaches'       && <CoachesTab t={t} />}
         {clientSub === 'subscriptions' && <SubscriptionsTab t={t} lang={lang} />}
