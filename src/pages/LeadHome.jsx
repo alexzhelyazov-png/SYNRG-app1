@@ -171,7 +171,7 @@ export default function LeadHome() {
         background: `linear-gradient(135deg, ${C.primaryContainer} 0%, rgba(200,197,255,0.06) 100%)`,
         border: `1px solid ${C.purpleA20}`,
         borderRadius: '20px',
-        p: { xs: 2.5, sm: 3.5 },
+        p: { xs: 2, sm: 2.75 },
         overflow: 'hidden',
       }}>
         {/* Subtle glow */}
@@ -195,22 +195,22 @@ export default function LeadHome() {
         </Typography>
 
         <Typography sx={{
-          fontSize: { xs: '26px', sm: '34px' },
+          fontSize: { xs: '22px', sm: '28px' },
           lineHeight: 1.1,
           fontWeight: 800,
           fontStyle: 'italic',
           fontFamily: "'MontBlanc', sans-serif",
           color: C.text,
-          mb: 1.5,
+          mb: 1.25,
         }}>
           {heroTitle}
         </Typography>
 
         <Typography sx={{
-          fontSize: { xs: '14px', sm: '15px' },
-          lineHeight: 1.55,
+          fontSize: { xs: '13px', sm: '14px' },
+          lineHeight: 1.5,
           color: C.muted,
-          mb: 2.5,
+          mb: 2,
           maxWidth: 560,
         }}>
           {heroSub}
@@ -275,8 +275,8 @@ export default function LeadHome() {
                 key={key}
                 onClick={() => enabled && setView(view)}
                 sx={{
-                  background: C.card,
-                  border: `1px solid ${C.border}`,
+                  background: C.cardHigh,
+                  border: `1.5px solid ${C.purpleA20}`,
                   borderRadius: '14px',
                   p: 1.75,
                   display: 'flex',
@@ -286,10 +286,12 @@ export default function LeadHome() {
                   cursor: enabled ? 'pointer' : 'default',
                   opacity: enabled ? 1 : 0.5,
                   transition: 'background 0.2s, border-color 0.2s',
-                  '&:hover': enabled ? {
-                    background: C.cardHigh,
-                    borderColor: C.purpleA20,
-                  } : {},
+                  '@media (hover: hover)': {
+                    '&:hover': enabled ? {
+                      background: C.card,
+                      borderColor: C.purple,
+                    } : {},
+                  },
                 }}
               >
                 <Icon sx={{ fontSize: 24, color: C.purple }} />
