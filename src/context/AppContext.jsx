@@ -517,7 +517,7 @@ export function AppProvider({ children }) {
   // Replaces client-side password comparison (which exposed plaintext via anon key).
   async function handleLogin(name, pass, turnstileToken = null) {
     const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL
-    const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_KEY
+    const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
     let result
     try {
       const res = await fetch(`${SUPABASE_URL}/functions/v1/auth-login`, {
@@ -540,12 +540,32 @@ export function AppProvider({ children }) {
       setViewingCoach(null)
       return null
     }
-    // Client login
-    const idx = clients.findIndex(x => x.id === c.id)
-    if (idx >= 0) {
-      setSelIdx(idx)
-      localStorage.setItem('synrg_selidx', String(idx))
-    }
+    // Client login.
+    // Ensure the logged-in client exists in the loaded list. The clients array
+    // may have been fetched before this account was created (e.g. a brand-new
+    // freemium/challenge registrant, or an account created after app load), in
+    // which case actualIdx can't find them. Without this they'd be matched to
+    // no record and (previously) shown another client's data. Append a mapped
+    // record with empty data so actualIdx (id-based) resolves to THEM.
+    setClients(prev => {
+      if (prev.some(x => x.id === c.id)) return prev
+      return [...prev, {
+        id: c.id, name: c.name, email: c.email || null,
+        created_at: c.created_at || null,
+        is_coach: false, assigned_coach_id: c.assigned_coach_id || null,
+        calorieTarget: c.calorie_target || 2000,
+        proteinTarget: c.protein_target || 140,
+        modules: c.modules || [],
+        xp_monthly: c.xp_monthly || 0, xp_total: c.xp_total || 0, xp_level: c.xp_level || 1,
+        earned_ids: Array.isArray(c.earned_ids) ? c.earned_ids : [],
+        monthly_earned_ids: Array.isArray(c.monthly_earned_ids) ? c.monthly_earned_ids : [],
+        dismissed_badges: Array.isArray(c.dismissed_badges) ? c.dismissed_badges : [],
+        synrg_started_at: c.synrg_started_at || null,
+        synrg_quiz: c.synrg_quiz || null,
+        meals: [], workouts: [], weightLogs: [], tasks: [], reactions: [],
+        reminderSettings: { protein: true, weight: true, foodLog: true, coach: true },
+      }]
+    })
     const a = { isLoggedIn: true, role: 'client', name: c.name, id: c.id, modules: c.modules || [] }
     setAuth(a)
     localStorage.setItem('synrg_auth', JSON.stringify(a))
@@ -554,7 +574,7 @@ export function AppProvider({ children }) {
 
   async function handleRegisterClient(name, pass, email = null, turnstileToken = null) {
     const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL
-    const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_KEY
+    const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
     const FREE_MODULES = ['nutrition_tracking', 'weight_tracking', 'steps_tracking']
 
     let result
@@ -694,7 +714,10 @@ export function AppProvider({ children }) {
     // record). Fall back to name only for legacy sessions without an id.
     let i = auth.id ? realClients.findIndex(c => c.id === auth.id) : -1
     if (i < 0) i = realClients.findIndex(c => c.name === auth.name)
-    return i >= 0 ? i : 0
+    // If the logged-in client isn't in the loaded list, return -1 (→ blank),
+    // NEVER fall back to index 0 — that would show another client's private
+    // data (XP, badges, meals). handleLogin appends the client so this is rare.
+    return i
   }, [auth, selIdx, realClients])
 
   // ── The active "subject" being viewed ─────────────────────────

@@ -253,7 +253,7 @@ async function sendColdOnboardingEmail(toEmail: string, name: string, code: stri
   <div style="max-width:520px;margin:0 auto;padding:32px 24px;font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#f2f2f2;">
     <div style="font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:#c4e9bf;margin-bottom:18px;">SYNRG · 7 дни предизвикателство</div>
     <p style="font-size:17px;line-height:1.6;margin:0 0 16px;">Здравей, ${firstName},</p>
-    <p style="font-size:17px;line-height:1.6;margin:0 0 16px;">Мястото ти е запазено — <strong style="color:#c4e9bf;">започваме в понеделник (29.06)</strong>. Създадохме ти и безплатен профил в приложението, за да броиш калории и да следиш напредъка си.</p>
+    <p style="font-size:17px;line-height:1.6;margin:0 0 16px;">Мястото ти е запазено — <strong style="color:#c4e9bf;">започваме в понеделник (29.06)</strong>. Създадохме ти и безплатен профил в нашето приложение, където ще правим дневните задачи.</p>
     <p style="font-size:17px;line-height:1.6;margin:0 0 20px;"><strong>Първа стъпка:</strong> задай си парола и влез:</p>
     <p style="margin:0 0 22px;">
       <a href="${setupUrl}" style="display:inline-block;background:#c4e9bf;color:#0e2018;text-decoration:none;font-weight:700;font-size:16px;padding:14px 26px;border-radius:10px;">Задай парола и влез</a>
