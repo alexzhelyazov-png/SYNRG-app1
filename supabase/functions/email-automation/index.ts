@@ -54,6 +54,9 @@ async function alreadySent(client_id: string, email_key: string): Promise<boolea
 }
 
 async function logSent(client_id: string, email_key: string, success: boolean) {
+  // Only record SUCCESSFUL sends. A failed send leaves no row, so the next
+  // hourly run retries it (alreadySent is an existence check).
+  if (!success) return;
   await fetch(`${SUPABASE_URL}/rest/v1/email_sends`, {
     method: "POST",
     headers: { ...sbHeaders(), Prefer: "return=minimal,resolution=ignore-duplicates" },
@@ -97,6 +100,22 @@ async function loadActiveStudioClientIds(): Promise<Set<string>> {
       if (!end || end >= today) s.add(r.client_id);
     }
   } catch (e) { console.error("loadActiveStudioClientIds failed:", e); }
+  return s;
+}
+
+// Clients who have logged anything (meals or weight) — used to pick the day-1 variant.
+async function loadActivityClientIds(): Promise<Set<string>> {
+  const s = new Set<string>();
+  try {
+    const [mRes, wRes] = await Promise.all([
+      fetch(`${SUPABASE_URL}/rest/v1/meals?select=client_id`, { headers: sbHeaders() }),
+      fetch(`${SUPABASE_URL}/rest/v1/weight_logs?select=client_id`, { headers: sbHeaders() }),
+    ]);
+    const meals = await mRes.json();
+    const weights = await wRes.json();
+    if (Array.isArray(meals)) for (const m of meals) s.add(m.client_id);
+    if (Array.isArray(weights)) for (const w of weights) s.add(w.client_id);
+  } catch (e) { console.error("loadActivityClientIds failed:", e); }
   return s;
 }
 
@@ -223,37 +242,6 @@ const tmpl_buyer_d56_review = (name: string) => ({
   `),
 });
 
-const tmpl_free_d7 = (name: string) => ({
-  subject: "Готов ли си за следващото ниво?",
-  html: wrap(`${name},`, `
-    <p>Седмица откакто си в SYNRG. Видя ли вече SYNRG Метод?</p>
-    <p>8-седмична програма с професионален ментор:</p>
-    <ul>
-      <li>Персонализиран хранителен режим</li>
-      <li>2 check-in сесии месечно с ментор</li>
-      <li>Тренировъчни планове</li>
-      <li>Достъп до общност</li>
-    </ul>
-    <p><strong>Early Bird цена за първите 100: €127</strong> (вместо €197).</p>
-    ${buttonCta("Виж SYNRG Метод", APP_URL + "#/programs")}
-  `),
-});
-
-const tmpl_free_d14 = (name: string) => ({
-  subject: "Last call — Early Bird тече",
-  html: wrap(`${name},`, `
-    <p>Early Bird цената на SYNRG Метод (€127) е валидна само за първите 100 клиента.</p>
-    <p>След това се връща на пълна цена €197.</p>
-    <p>Ако се колебаеш — ето защо клиентите ни го избират:</p>
-    <ul>
-      <li>Не е "още една програма" — има реален човек до теб</li>
-      <li>Адаптираме спрямо твоето ниво</li>
-      <li>Резултати се виждат от 2-ра седмица</li>
-    </ul>
-    ${buttonCta("Купи сега", APP_URL + "#/programs")}
-  `),
-});
-
 const tmpl_inactive_14d = (name: string) => ({
   subject: "Липсваш ни в SYNRG",
   html: wrap(`${name},`, `
@@ -270,9 +258,69 @@ const tmpl_inactive_14d = (name: string) => ({
   `),
 });
 
+// Freemium funnel — value sequence (day 1 active/inactive, day 3 protein).
+const tmpl_free_d1_active = (_name: string) => ({
+  subject: "Браво за старта! Ето как да си зададеш калориите",
+  html: chrome(`<h2 style="color:#c4e9bf;margin:0 0 16px;font-size:22px">Браво за старта!</h2>
+  <p style="margin:0 0 16px">Радваме се, че започна да използваш приложението — за нас това значи много.</p>
+  <p style="margin:0 0 16px">Видяхме, че вече въвеждаш данни — браво, това е най-трудната първа крачка. Сега да направим следенето ти смислено.</p>
+  <h3 style="color:#c4e9bf;margin:24px 0 8px;font-size:17px">Зададе ли си калорийните таргети?</h3>
+  <p style="margin:0 0 12px">Ако още не си, ето формула да си ги сметнеш спрямо целта:</p>
+  <p style="margin:0 0 10px"><strong>1. Базов метаболизъм (BMR):</strong><br>Жени: 10 × тегло(кг) + 6.25 × ръст(см) − 5 × възраст − 161<br>Мъже: 10 × тегло(кг) + 6.25 × ръст(см) − 5 × възраст + 5</p>
+  <p style="margin:0 0 10px"><strong>2. Умножи по активността:</strong><br>Заседнал × 1.2 · Лека (1–3 трен./седм.) × 1.375 · Умерена (3–5) × 1.55</p>
+  <p style="margin:0 0 10px"><strong>3. Спрямо целта:</strong><br>Сваляне − 20% · Поддържане без промяна · Качване + 10%</p>
+  <p style="margin:0 0 16px">Получената цифра въведи в <strong>Хранене → таргети</strong>. Пример: жена 70кг, 165см, 30г, лека активност, сваляне → ≈ <strong>1580 ккал/ден</strong>.</p>
+  <h3 style="color:#c4e9bf;margin:24px 0 8px;font-size:17px">И теглото</h3>
+  <p style="margin:0 0 12px">Знаеш как теглото се променя ден за ден — може и с 1–2 кг. Това е вода. Измервай се всяка сутрин на гладно и го въвеждай: приложението изглажда колебанията и ти показва <strong>реалното</strong> тегло, а след 3–4 измервания ти дава <strong>графика с колко кг на седмица</strong> реално се променяш.</p>
+  ${buttonCta("Отвори приложението", APP_URL)}`),
+});
+
+const tmpl_free_d1_inactive = (_name: string) => ({
+  subject: "Първата стъпка в SYNRG — твоите калории",
+  html: chrome(`<h2 style="color:#c4e9bf;margin:0 0 16px;font-size:22px">Добре дошъл в SYNRG</h2>
+  <p style="margin:0 0 16px">Радваме се, че се присъедини към приложението — за нас това значи много.</p>
+  <p style="margin:0 0 16px">Видяхме, че още не си въвел нищо — напълно нормално е, началото винаги е най-неясната част. Ако нещо те затруднява или не знаеш откъде да започнеш, просто отговори на този имейл и ще ти помогнем лично.</p>
+  <h3 style="color:#c4e9bf;margin:24px 0 8px;font-size:17px">Първата стъпка: калориите</h3>
+  <p style="margin:0 0 12px">Сметни си дневните калории спрямо целта:</p>
+  <p style="margin:0 0 10px"><strong>1. Базов метаболизъм (BMR):</strong><br>Жени: 10 × тегло(кг) + 6.25 × ръст(см) − 5 × възраст − 161<br>Мъже: 10 × тегло(кг) + 6.25 × ръст(см) − 5 × възраст + 5</p>
+  <p style="margin:0 0 10px"><strong>2. Умножи по активността:</strong><br>Заседнал × 1.2 · Лека (1–3 трен./седм.) × 1.375 · Умерена (3–5) × 1.55</p>
+  <p style="margin:0 0 10px"><strong>3. Спрямо целта:</strong><br>Сваляне − 20% · Поддържане без промяна · Качване + 10%</p>
+  <p style="margin:0 0 16px">Въведи числото в <strong>Хранене → таргети</strong>. Оттам само търсиш храната, която ще хапнеш, и въвеждаш грамажа — приложението смята калориите вместо теб.</p>
+  <h3 style="color:#c4e9bf;margin:24px 0 8px;font-size:17px">И теглото</h3>
+  <p style="margin:0 0 12px">Знаеш как теглото се променя ден за ден — може и с 1–2 кг. Това е вода. Измервай се всяка сутрин на гладно и го въвеждай: приложението изглажда колебанията и ти показва <strong>реалното</strong> тегло, а след 3–4 измервания ти дава <strong>графика с колко кг на седмица</strong> реално се променяш.</p>
+  ${buttonCta("Започни сега", APP_URL)}`),
+});
+
+const tmpl_free_d3_active = (_name: string) => ({
+  subject: "Ден 3: да добавим и протеина",
+  html: chrome(`<h2 style="color:#c4e9bf;margin:0 0 16px;font-size:22px">Сега да добавим протеина</h2>
+  <p style="margin:0 0 16px">Аз съм д-р Желязова, гастроентеролог и един от хората зад SYNRG Метод. Искам лично да ти кажа за следващата важна стъпка.</p>
+  <p style="margin:0 0 16px">Браво — вече следиш калориите. Нека добавим и протеина, защото той е макронутриентът, който решава <strong>как</strong> ще изглеждаш на финала, не само колко тежиш.</p>
+  <h3 style="color:#c4e9bf;margin:24px 0 8px;font-size:17px">Защо е важен</h3>
+  <p style="margin:0 0 16px">Протеинът е основният макронутриент, отговарящ за регенерирането и цялостното възстановяване. Докато сваляш килограми, достатъчно протеин пази мускула — така тялото изглежда <strong>стегнато</strong>, а не отпуснато.</p>
+  <h3 style="color:#c4e9bf;margin:24px 0 8px;font-size:17px">Твоят дневен таргет</h3>
+  <p style="margin:0 0 10px"><strong>Ако тренираш:</strong> тегло(кг) × 2 = грама протеин на ден.<br><strong>Ако не тренираш:</strong> тегло(кг) × 1.5 = грама протеин на ден.</p>
+  <p style="margin:0 0 16px">Пример: 70 кг и тренираш → ≈ <strong>140 г протеин/ден</strong>.</p>
+  <p style="margin:0 0 16px">Въведи числото в <strong>Хранене → таргети</strong>, до калориите. Приложението ще ти показва колко протеин събираш всеки ден, докато търсиш храната и въвеждаш грамажа.</p>
+  ${buttonCta("Отвори приложението", APP_URL)}
+  <p style="margin:16px 0 0;font-size:14px;color:#9bbf97">— Д-р Желязова · SYNRG Метод</p>`),
+});
+
+const tmpl_free_d3_inactive = (_name: string) => ({
+  subject: "Опитай само една седмица — д-р Желязова",
+  html: chrome(`<h2 style="color:#c4e9bf;margin:0 0 16px;font-size:22px">Опитай само една седмица</h2>
+  <p style="margin:0 0 16px">Аз съм д-р Желязова от SYNRG. Искам да ти кажа нещо лично.</p>
+  <p style="margin:0 0 16px">Да следиш калориите си за 1–2 седмици е нещо, което бих препоръчала на всеки. Не защото трябва да го правиш с години — за нормалния човек това не е устойчиво. А защото за тази седмица ще разбереш изключително много за навици, които си изграждал с години.</p>
+  <p style="margin:0 0 16px">Ще научиш как изглеждат 100 г от различни храни и кои са най-калоричните точно при теб. Това е старт, който носи яснота.</p>
+  <p style="margin:0 0 16px">Затова — опитай само седмица. Просто търсиш храната, която хапваш, и въвеждаш грамажа; приложението смята вместо теб.</p>
+  <p style="margin:0 0 16px">Едно действие днес е по-важно от перфектен план утре. А ако нещо те спира — просто отговори на този имейл и ще ти помогнем лично.</p>
+  ${buttonCta("Започни днес", APP_URL)}
+  <p style="margin:16px 0 0;font-size:14px;color:#9bbf97">— Д-р Желязова · SYNRG Метод</p>`),
+});
+
 // ── Main handler ────────────────────────────────────────────────
-async function processBuyerSequence(autoMap: Map<string, AutoRow>): Promise<{ sent: number; checked: number }> {
-  const stats = { sent: 0, checked: 0 };
+async function processBuyerSequence(autoMap: Map<string, AutoRow>): Promise<{ sent: number; checked: number; failed: number }> {
+  const stats = { sent: 0, checked: 0, failed: 0 };
   // Get all active program purchases from last 60 days
   const cutoff = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString();
   const res = await fetch(
@@ -310,27 +358,29 @@ async function processBuyerSequence(autoMap: Map<string, AutoRow>): Promise<{ se
     if (!t) continue;
     const ok = await sendBrevoEmail({ email: c.email, name: c.name || "клиент" }, t.subject, t.html);
     await logSent(p.client_id, sendKey, ok);
-    if (ok) stats.sent++;
+    if (ok) stats.sent++; else stats.failed++;
   }
   return stats;
 }
 
-async function processFreeUserNurture(autoMap: Map<string, AutoRow>): Promise<{ sent: number; checked: number }> {
-  const stats = { sent: 0, checked: 0 };
-  // Early exit if both freemium templates are disabled — avoids touching any client.
-  const d7Row = autoMap.get("free_d7");
-  const d14Row = autoMap.get("free_d14");
-  if ((d7Row && !d7Row.enabled) && (d14Row && !d14Row.enabled)) return stats;
+async function processFreeUserNurture(autoMap: Map<string, AutoRow>): Promise<{ sent: number; checked: number; failed: number }> {
+  const stats = { sent: 0, checked: 0, failed: 0 };
+  // Early exit only if EVERY freemium nurture template is disabled (missing row => fallback active).
+  const freeKeys = ["free_d1_active", "free_d1_inactive", "free_d3_active", "free_d3_inactive"];
+  const anyEnabled = freeKeys.some((k) => { const r = autoMap.get(k); return !r || r.enabled; });
+  if (!anyEnabled) return stats;
 
-  // Get clients registered 7-30 days ago who do NOT have any program_purchase
-  const cutoff7 = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-  const cutoff30 = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+  // Window: clients registered between 1 and 31 days ago (covers day 1 and 3).
+  const cutoff1 = new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString();
+  const cutoff31 = new Date(Date.now() - 31 * 24 * 60 * 60 * 1000).toISOString();
 
   // BUG FIX: studio clients (client_plans) are NOT free users — never upsell them.
   const studioIds = await loadActiveStudioClientIds();
+  // Activity split for the day-1 variant (logged something vs nothing).
+  const activeIds = await loadActivityClientIds();
 
   const res = await fetch(
-    `${SUPABASE_URL}/rest/v1/clients?select=id,name,email,created_at&created_at=lt.${cutoff7}&created_at=gt.${cutoff30}&is_coach=eq.false`,
+    `${SUPABASE_URL}/rest/v1/clients?select=id,name,email,created_at&created_at=lt.${cutoff1}&created_at=gt.${cutoff31}&is_coach=eq.false`,
     { headers: sbHeaders() }
   );
   const clients = await res.json() as Array<{ id: string; name: string; email: string; created_at: string }>;
@@ -347,28 +397,36 @@ async function processFreeUserNurture(autoMap: Map<string, AutoRow>): Promise<{ 
 
     const days = Math.floor((Date.now() - new Date(c.created_at).getTime()) / (24 * 60 * 60 * 1000));
     let dbKey: string | null = null;
-    let sendKey: string | null = null;
     let fallback: ((name: string) => { subject: string; html: string }) | null = null;
-    if (days === 7) { dbKey = "free_d7"; sendKey = `free_d7_${c.id}`; fallback = tmpl_free_d7; }
-    else if (days === 14) { dbKey = "free_d14"; sendKey = `free_d14_${c.id}`; fallback = tmpl_free_d14; }
-    if (!dbKey || !sendKey || !fallback) continue;
+    let siblingKey: string | null = null; // the other activity variant for the same stage
+    if (days === 1) {
+      if (activeIds.has(c.id)) { dbKey = "free_d1_active"; fallback = tmpl_free_d1_active; siblingKey = "free_d1_inactive"; }
+      else { dbKey = "free_d1_inactive"; fallback = tmpl_free_d1_inactive; siblingKey = "free_d1_active"; }
+    } else if (days === 3) {
+      if (activeIds.has(c.id)) { dbKey = "free_d3_active"; fallback = tmpl_free_d3_active; siblingKey = "free_d3_inactive"; }
+      else { dbKey = "free_d3_inactive"; fallback = tmpl_free_d3_inactive; siblingKey = "free_d3_active"; }
+    }
+    if (!dbKey || !fallback) continue;
+    const sendKey = `${dbKey}_${c.id}`;
 
     const row = autoMap.get(dbKey);
     if (row && !row.enabled) continue;
 
     if (await alreadySent(c.id, sendKey)) continue;
+    // If activity flipped mid-window and the sibling variant already went out, don't double-send this stage.
+    if (siblingKey && await alreadySent(c.id, `${siblingKey}_${c.id}`)) continue;
 
     const t = resolveTemplate(autoMap, dbKey, c.name || "клиент", fallback);
     if (!t) continue;
     const ok = await sendBrevoEmail({ email: c.email, name: c.name || "клиент" }, t.subject, t.html);
     await logSent(c.id, sendKey, ok);
-    if (ok) stats.sent++;
+    if (ok) stats.sent++; else stats.failed++;
   }
   return stats;
 }
 
-async function processInactiveReengagement(autoMap: Map<string, AutoRow>): Promise<{ sent: number; checked: number }> {
-  const stats = { sent: 0, checked: 0 };
+async function processInactiveReengagement(autoMap: Map<string, AutoRow>): Promise<{ sent: number; checked: number; failed: number }> {
+  const stats = { sent: 0, checked: 0, failed: 0 };
   // Early exit if disabled in DB
   const reRow = autoMap.get("inactive_14d");
   if (reRow && !reRow.enabled) return stats;
@@ -399,7 +457,7 @@ async function processInactiveReengagement(autoMap: Map<string, AutoRow>): Promi
     if (!t) continue;
     const ok = await sendBrevoEmail({ email: c.email, name: c.name || "клиент" }, t.subject, t.html);
     await logSent(c.id, key, ok);
-    if (ok) stats.sent++;
+    if (ok) stats.sent++; else stats.failed++;
   }
   return stats;
 }
@@ -411,12 +469,29 @@ Deno.serve(async (req: Request) => {
     const buyer = await processBuyerSequence(autoMap);
     const free = await processFreeUserNurture(autoMap);
     const inactive = await processInactiveReengagement(autoMap);
+    const totalFailed = buyer.failed + free.failed + inactive.failed;
+    // Health alert: if any send failed (e.g. Brevo throttling/outage), email the admin
+    // so silent failures never go unnoticed. Failed sends are not logged, so they retry next run.
+    if (totalFailed > 0) {
+      await sendBrevoEmail(
+        { email: "info@synrg-beyondfitness.com", name: "SYNRG" },
+        `⚠️ Email automation: ${totalFailed} провалени изпращания`,
+        `<p>Часовият ран на email-automation е имал провали (ще се пробват пак следващия час):</p>
+         <ul>
+           <li>Buyer: ${buyer.sent} пратени / ${buyer.failed} провалени (от ${buyer.checked})</li>
+           <li>Freemium: ${free.sent} пратени / ${free.failed} провалени (от ${free.checked})</li>
+           <li>Inactive: ${inactive.sent} пратени / ${inactive.failed} провалени (от ${inactive.checked})</li>
+         </ul>
+         <p>Ако се повтаря — провери Brevo лимита/статус.</p>`
+      );
+    }
     return new Response(JSON.stringify({
       success: true,
       buyer,
       free_nurture: free,
       inactive,
       total_sent: buyer.sent + free.sent + inactive.sent,
+      total_failed: totalFailed,
     }), { status: 200, headers: { ...CORS_HEADERS, "Content-Type": "application/json" } });
   } catch (err) {
     console.error("email-automation error:", err);

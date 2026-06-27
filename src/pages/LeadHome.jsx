@@ -275,7 +275,7 @@ export default function LeadHome() {
                 key={key}
                 onClick={() => enabled && setView(view)}
                 sx={{
-                  background: C.primaryContainer,
+                  background: 'rgba(170,169,205,0.22)',
                   border: `1.5px solid ${C.purpleA20}`,
                   borderRadius: '14px',
                   p: 1.75,

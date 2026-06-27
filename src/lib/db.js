@@ -302,10 +302,20 @@ export const DB = {
   async getAllPastBookings() {
     if (!isUsingSupabase) return []
     const today = new Date().toISOString().slice(0, 10)
-    const data = (await sbFetchSafe(
-      sbUrl('slot_bookings', '?select=client_id,booking_slots(slot_date,coach_name)&status=eq.active&limit=50000'),
-      { headers: sbHeaders() }
-    )) || []
+    // Paginate past PostgREST's 1000-row cap — a single limit=50000 request is
+    // still truncated to 1000, which under-counted booked sessions for XP.
+    const data = []
+    const PAGE = 1000
+    let offset = 0
+    while (offset < 500000) {
+      const page = (await sbFetchSafe(
+        sbUrl('slot_bookings', `?select=client_id,booking_slots(slot_date,coach_name)&status=eq.active&limit=${PAGE}&offset=${offset}`),
+        { headers: sbHeaders() }
+      )) || []
+      data.push(...page)
+      if (page.length < PAGE) break
+      offset += PAGE
+    }
     return data
       .filter(b => b.booking_slots?.slot_date && b.booking_slots.slot_date < today)
       .map(b => {
@@ -355,10 +365,21 @@ export const DB = {
   // ── Booking: all completed bookings with coach info ────────
   async getAllCompletedBookings() {
     if (isUsingSupabase) {
-      return (await sbFetchSafe(
-        sbUrl('slot_bookings', `?select=id,booking_slots(slot_date,coach_name)&status=eq.active`),
-        { headers: sbHeaders() }
-      )) || []
+      // Paginate past PostgREST's 1000-row cap — total active bookings exceed
+      // it (>1000), so a single request truncated the coach session counts.
+      const all = []
+      const PAGE = 1000
+      let offset = 0
+      while (offset < 500000) {
+        const page = (await sbFetchSafe(
+          sbUrl('slot_bookings', `?select=id,booking_slots(slot_date,coach_name)&status=eq.active&limit=${PAGE}&offset=${offset}`),
+          { headers: sbHeaders() }
+        )) || []
+        all.push(...page)
+        if (page.length < PAGE) break
+        offset += PAGE
+      }
+      return all
     }
     return []
   },

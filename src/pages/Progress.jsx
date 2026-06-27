@@ -637,8 +637,18 @@ function NextBadgesSection({ items, t, lang, onBadgeClick }) {
    BadgeTile — metallic badge card
    ═══════════════════════════════════════════════════════════════ */
 function BadgeTile({ badge, isEarned, index, t, onClick }) {
-  const color = tierColor(badge.tier)
-  const brd   = badge.tier ? `${TIER_COLORS[badge.tier]}70` : `${C.primary}70`
+  const isTier = !!badge.tier
+  const color  = tierColor(badge.tier)
+  const brd    = isTier ? `${TIER_COLORS[badge.tier]}70` : 'rgba(200,197,255,0.45)'
+  const bg     = isTier
+    ? `linear-gradient(145deg, ${color}28 0%, ${color}12 60%, transparent 100%)`
+    : `linear-gradient(145deg, rgba(170,169,205,0.24) 0%, rgba(170,169,205,0.10) 100%)`
+  const shadow = isTier
+    ? `0 0 18px ${color}30, 0 4px 14px ${color}18, inset 0 1px 0 ${color}20`
+    : `0 0 16px rgba(200,197,255,0.16), inset 0 1px 0 rgba(200,197,255,0.22)`
+  const hoverShadow = isTier
+    ? `0 0 24px ${color}40, 0 6px 20px ${color}25`
+    : `0 0 22px rgba(200,197,255,0.26), 0 6px 20px rgba(200,197,255,0.18)`
 
   return (
     <Box onClick={onClick} sx={{
@@ -646,8 +656,8 @@ function BadgeTile({ badge, isEarned, index, t, onClick }) {
       borderRadius: '14px',
       position: 'relative',
       border: `2px solid ${brd}`,
-      background: `linear-gradient(145deg, ${color}28 0%, ${color}12 60%, transparent 100%)`,
-      boxShadow: `0 0 18px ${color}30, 0 4px 14px ${color}18, inset 0 1px 0 ${color}20`,
+      background: bg,
+      boxShadow: shadow,
       cursor: 'pointer',
       textAlign: 'center',
       animation: `fadeIn 0.2s ${EASE.standard} both`,
@@ -655,7 +665,7 @@ function BadgeTile({ badge, isEarned, index, t, onClick }) {
       transition: `all 0.2s ${EASE.standard}`,
       '&:hover': {
         transform: 'translateY(-2px)',
-        boxShadow: `0 0 24px ${color}40, 0 6px 20px ${color}25`,
+        boxShadow: hoverShadow,
         borderColor: brd,
       },
     }}>
