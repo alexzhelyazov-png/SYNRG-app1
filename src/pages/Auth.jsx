@@ -79,7 +79,7 @@ export default function Auth() {
     if (!pass)        { setError(t('errPassShort')); return }
 
     if (mode === 'register') {
-      if (pass.length < 3)   { setError(t('errPassShort')); return }
+      if (pass.length < 6)   { setError(t('errPassShort')); return }
       if (pass !== pass2)    { setError(t('errPassMismatch')); return }
       const trimmedEmail = email.trim()
       if (!trimmedEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {

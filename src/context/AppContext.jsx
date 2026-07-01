@@ -591,10 +591,17 @@ export function AppProvider({ children }) {
         body: JSON.stringify({ name: name.trim(), password: pass, email, turnstile_token: turnstileToken }),
       })
       result = await res.json()
-      if (res.status === 409) return t('errClientExists')
-      if (!res.ok || !result.ok) return result.error || t('errLogin')
+      if (!res.ok || !result.ok) {
+        if (res.status === 409) return t('errClientExists')
+        if (res.status === 429) return t('errRateLimited')
+        if (res.status === 403) return t('errBotCheck')
+        if (res.status === 400) {
+          return /password/i.test(result.error || '') ? t('errPassShort') : t('errName')
+        }
+        return t('errRegisterFailed')
+      }
     } catch {
-      return t('errLogin')
+      return t('errNetwork')
     }
 
     const data = result.client
