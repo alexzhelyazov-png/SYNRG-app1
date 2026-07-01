@@ -628,14 +628,61 @@ export function AppProvider({ children }) {
     if (email) {
       DB.syncToMailerLite('register', email, name)
       DB.sendTemplateEmail('registration_welcome', email, name, { name },
-        'Добре дошъл в SYNRG Beyond Fitness!',
-        `<div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px;background:#1a1a1a;color:#e0e0e0;border-radius:16px">
-          <h2 style="color:#c4e9bf;margin:0 0 16px">${name},</h2>
-          <p style="font-size:16px;line-height:1.6">Добре дошъл в SYNRG Beyond Fitness!</p>
-          <p style="font-size:14px;color:#999;line-height:1.6">Профилът ти е създаден успешно. Очакваме те в студиото!</p>
-          <hr style="border:none;border-top:1px solid #333;margin:24px 0">
-          <p style="font-size:12px;color:#666">SYNRG Beyond Fitness</p>
-        </div>`)
+        'Регистрира се. Ето как да започнеш лесно.',
+        `<div style="margin:0;padding:0;background:#0f0f0f;">
+  <div style="max-width:560px;margin:0 auto;padding:32px 24px;font-family:Helvetica,Arial,sans-serif;color:#ececec;background:#1a1a1a;border-radius:16px;">
+
+    <div style="text-align:center;margin-bottom:28px;">
+      <span style="font-size:22px;font-weight:800;letter-spacing:1px;color:#ffffff;">SYNRG</span>
+      <span style="font-size:11px;color:#8a8a8a;display:block;letter-spacing:3px;margin-top:2px;">BEYOND FITNESS</span>
+    </div>
+
+    <p style="font-size:12px;font-weight:700;letter-spacing:2px;color:#c4e9bf;margin:0 0 10px;">7-ДНЕВЕН БЕЗПЛАТЕН ЧАЛЪНДЖ</p>
+
+    <h1 style="font-size:24px;line-height:1.25;font-weight:800;color:#ffffff;margin:0 0 16px;">
+      Отвори приложението — ще ти покажа откъде да започнеш
+    </h1>
+
+    <p style="font-size:15px;line-height:1.6;color:#cfcfcf;margin:0 0 16px;">
+      Здравей, ${name},
+    </p>
+
+    <p style="font-size:15px;line-height:1.6;color:#cfcfcf;margin:0 0 16px;">
+      Радвам се, че се регистрира при нас! За да не стоиш пред приложението и да не знаеш откъде да започнеш — а почти всеки започва така — ти подготвих нещо съвсем простичко.
+    </p>
+
+    <p style="font-size:15px;line-height:1.6;color:#cfcfcf;margin:0 0 16px;">
+      <strong style="color:#ffffff;">7 дни, по една малка стъпка на ден.</strong> Без диети, без броене на всяка хапка, без натиск. Отваряш приложението, правиш днешната стъпка — отнема няколко минути — и това е.
+    </p>
+
+    <p style="font-size:15px;line-height:1.6;color:#cfcfcf;margin:0 0 24px;">
+      Не е нужно да си „готов". Не е нужно да знаеш всичко. Просто започни с Ден 1, а за останалото сме тук, до теб.
+    </p>
+
+    <div style="text-align:center;margin:0 0 28px;">
+      <a href="https://synrg-beyondfitness.com/app/" style="display:inline-block;background:#c4e9bf;color:#0a0a0a;font-size:15px;font-weight:800;text-decoration:none;padding:14px 32px;border-radius:12px;">
+        Хайде, да започнем заедно →
+      </a>
+    </div>
+
+    <p style="font-size:13px;line-height:1.6;color:#9a9a9a;margin:0 0 8px;">
+      Отвори приложението и натисни „Започни" на challenge картата — Ден 1 тръгва веднага.
+    </p>
+
+    <p style="font-size:14px;line-height:1.6;color:#cfcfcf;margin:18px 0 0;">
+      До скоро,<br>
+      <strong style="color:#ffffff;">Екипът на SYNRG</strong>
+    </p>
+
+    <hr style="border:none;border-top:1px solid #2c2c2c;margin:28px 0 18px;">
+
+    <p style="font-size:11px;line-height:1.5;color:#6f6f6f;margin:0;">
+      SYNRG е образователен метод за здравословни навици. Не е медицинска услуга и не замества консултация с лекар. Индивидуалните резултати може да варират.<br><br>
+      Синерджи 93 ООД · info@synrg-beyondfitness.com
+    </p>
+
+  </div>
+</div>`)
     }
 
     return null
