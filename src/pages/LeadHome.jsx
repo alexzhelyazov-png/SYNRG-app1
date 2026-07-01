@@ -30,6 +30,7 @@ import { C } from '../theme'
 import { hasModule } from '../lib/modules'
 import { DB } from '../lib/db'
 import CheckoutConsentDialog from '../components/CheckoutConsentDialog'
+import ChallengeCard from '../components/ChallengeCard'
 
 // Format price helper — keeps in sync with Programs.jsx
 function formatPrice(cents, currency = 'BGN') {
@@ -165,91 +166,8 @@ export default function LeadHome() {
         {greeting}
       </Typography>
 
-      {/* ── Hero marketing card ─────────────────────────── */}
-      <Box sx={{
-        position: 'relative',
-        background: `linear-gradient(135deg, ${C.primaryContainer} 0%, rgba(200,197,255,0.06) 100%)`,
-        border: `1px solid ${C.purpleA20}`,
-        borderRadius: '20px',
-        p: { xs: 2, sm: 2.75 },
-        overflow: 'hidden',
-      }}>
-        {/* Subtle glow */}
-        <Box sx={{
-          position: 'absolute', top: -60, right: -60,
-          width: 180, height: 180, borderRadius: '50%',
-          background: C.purpleGlow,
-          filter: 'blur(60px)',
-          opacity: 0.6,
-          pointerEvents: 'none',
-        }} />
-
-        <Typography sx={{
-          fontSize: '11px',
-          fontWeight: 800,
-          letterSpacing: '3px',
-          color: C.purple,
-          mb: 1.25,
-        }}>
-          {heroOverline}
-        </Typography>
-
-        <Typography sx={{
-          fontSize: { xs: '22px', sm: '28px' },
-          lineHeight: 1.1,
-          fontWeight: 800,
-          fontStyle: 'italic',
-          fontFamily: "'MontBlanc', sans-serif",
-          color: C.text,
-          mb: 1.25,
-        }}>
-          {heroTitle}
-        </Typography>
-
-        <Typography sx={{
-          fontSize: { xs: '13px', sm: '14px' },
-          lineHeight: 1.5,
-          color: C.muted,
-          mb: 2,
-          maxWidth: 560,
-        }}>
-          {heroSub}
-        </Typography>
-
-        <Stack direction="row" spacing={1.5} alignItems="center" flexWrap="wrap" useFlexGap>
-          <Button
-            onClick={openConsent}
-            disabled={buyLoading}
-            variant="contained"
-            endIcon={buyLoading
-              ? <CircularProgress size={16} sx={{ color: '#0A0A14' }} />
-              : <ArrowForwardIcon />}
-            sx={{
-              background: C.purple,
-              color: '#0A0A14',
-              fontWeight: 800,
-              textTransform: 'none',
-              px: 2.5, py: 1.1,
-              borderRadius: '12px',
-              letterSpacing: '0.2px',
-              '&:hover': { background: C.purpleLighter },
-            }}
-          >
-            {ctaLabel}
-          </Button>
-          <Chip
-            label={priceLabel}
-            sx={{
-              background: 'transparent',
-              color: C.muted,
-              fontWeight: 700,
-              fontSize: '12px',
-              border: `1px solid ${C.border}`,
-              height: 32,
-            }}
-          />
-        </Stack>
-      </Box>
+      {/* ── In-app 7-day challenge (the zero-friction on-ramp) ── */}
+      <ChallengeCard />
 
       {/* ── Freemium trackers — keep them using the app ─── */}
       <Box>
@@ -306,33 +224,79 @@ export default function LeadHome() {
             )
           })}
         </Box>
+
+        {/* ── Viber group CTA — optional bonus community (needs a phone) ── */}
+        <Button
+          component="a"
+          href="https://invite.viber.com/?g2=AQAEHMI4GEukN1bA7byJAaMIQ0bmNQscqaB2r0HDjfG7PX23NyIbFPg20AHRLSyz"
+          target="_blank"
+          rel="noopener noreferrer"
+          fullWidth
+          startIcon={<GroupsIcon sx={{ fontSize: 20 }} />}
+          sx={{
+            mt: 1.25,
+            background: 'rgba(115,96,242,0.14)',
+            border: '1.5px solid rgba(115,96,242,0.5)',
+            color: '#b5a8ff',
+            fontWeight: 800,
+            textTransform: 'none',
+            py: 1,
+            borderRadius: '14px',
+            fontSize: '13px',
+            '&:hover': { background: 'rgba(115,96,242,0.24)', borderColor: '#7360f2' },
+          }}
+        >
+          {lang === 'en' ? 'Join the Viber group' : 'Влез в Viber групата'}
+        </Button>
       </Box>
 
-      {/* ── Final CTA (sticky feel) ─────────────────────── */}
-      <Button
-        onClick={openConsent}
-        disabled={buyLoading}
-        variant="outlined"
-        endIcon={buyLoading
-          ? <CircularProgress size={16} sx={{ color: C.purple }} />
-          : <ArrowForwardIcon />}
-        sx={{
-          alignSelf: 'stretch',
-          borderColor: C.purpleA20,
-          color: C.purple,
-          fontWeight: 800,
-          textTransform: 'none',
-          py: 1.25,
-          borderRadius: '14px',
-          fontSize: '14px',
-          '&:hover': {
-            borderColor: C.purple,
-            background: C.purpleA5,
-          },
-        }}
-      >
-        {ctaLabel}
-      </Button>
+      {/* ── Discreet SYNRG Метод card (secondary offer, below trackers) ── */}
+      <Box sx={{
+        background: C.primaryContainer,
+        border: `1px solid ${C.border}`,
+        borderRadius: '16px',
+        p: { xs: 1.75, sm: 2 },
+        display: 'flex',
+        flexDirection: { xs: 'column', sm: 'row' },
+        alignItems: { xs: 'flex-start', sm: 'center' },
+        justifyContent: 'space-between',
+        gap: 1.5,
+      }}>
+        <Box sx={{ minWidth: 0 }}>
+          <Typography sx={{ fontSize: '10px', fontWeight: 800, letterSpacing: '2.5px', color: C.purple, mb: 0.5 }}>
+            {heroOverline}
+          </Typography>
+          <Typography sx={{ fontSize: { xs: '14px', sm: '15px' }, fontWeight: 800, color: C.text, lineHeight: 1.25 }}>
+            {lang === 'en'
+              ? 'Let us help you reach your goal with the full program.'
+              : 'Нека ти помогнем да постигнеш целта си с пълната си програма.'}
+          </Typography>
+          <Typography sx={{ fontSize: '11px', color: C.muted, mt: 0.25 }}>
+            {priceLabel}
+          </Typography>
+        </Box>
+        <Button
+          onClick={openConsent}
+          disabled={buyLoading}
+          variant="outlined"
+          endIcon={buyLoading
+            ? <CircularProgress size={14} sx={{ color: C.purple }} />
+            : <ArrowForwardIcon sx={{ fontSize: 16 }} />}
+          sx={{
+            flexShrink: 0,
+            borderColor: C.purpleA20,
+            color: C.purple,
+            fontWeight: 800,
+            textTransform: 'none',
+            py: 0.85, px: 2,
+            borderRadius: '12px',
+            fontSize: '13px',
+            '&:hover': { borderColor: C.purple, background: C.purpleA5 },
+          }}
+        >
+          {ctaLabel}
+        </Button>
+      </Box>
 
       {/* ── Educational disclaimer ──────────────────────── */}
       <Typography sx={{

@@ -124,6 +124,30 @@ export default function Auth() {
     setLoading(false)
   }
 
+  // Resend a fresh code for the email already in context (deep-link or manual).
+  // Rescues new profiles whose 24h onboarding code expired or was superseded.
+  async function handleResendCode() {
+    setError(''); setSuccess('')
+    const em = resetEmail.trim().toLowerCase()
+    if (!em || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em)) { setError(t('errEmailInvalid')); return }
+    setLoading(true)
+    try {
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/password-reset`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'request', email: em }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setError(data.error === 'no_account' ? t('errNoAccount') : (data.error || 'Error'))
+      } else {
+        setResetCode('')
+        setSuccess(t('codeResent'))
+      }
+    } catch { setError('Network error') }
+    setLoading(false)
+  }
+
   async function handleForgotVerify() {
     setError('')
     if (!resetCode.trim()) { setError(t('errCodeRequired')); return }
@@ -329,6 +353,11 @@ export default function Auth() {
             <Typography sx={{ fontSize: '13px', color: C.muted, mb: 0.5 }}>
               {t('enterCode')}
             </Typography>
+            {resetEmail && (
+              <Typography sx={{ fontSize: '12px', color: C.muted, mb: 0.25 }}>
+                {t('codeSentTo')} <Box component="span" sx={{ color: C.text, fontWeight: 700 }}>{resetEmail}</Box>
+              </Typography>
+            )}
             <TextField
               fullWidth
               placeholder={t('codePlaceholder')}
@@ -353,8 +382,12 @@ export default function Auth() {
               sx={{ py: 1.625, mt: 0.5, fontWeight: 800, fontSize: '15px' }}>
               {loading ? t('saving') : t('resetPassword')}
             </Button>
+            <Button size="small" disabled={loading || !!success} onClick={handleResendCode}
+              sx={{ color: C.purple, fontSize: '12px', fontWeight: 700, mt: 0.5, textTransform: 'none' }}>
+              {t('resendCode')}
+            </Button>
             <Button size="small" onClick={() => switchMode('login')}
-              sx={{ color: C.muted, fontSize: '12px', fontWeight: 600, mt: 0.5 }}>
+              sx={{ color: C.muted, fontSize: '12px', fontWeight: 600 }}>
               {t('backToLogin')}
             </Button>
           </Box>

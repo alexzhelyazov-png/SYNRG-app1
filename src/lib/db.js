@@ -51,7 +51,7 @@ const PAGE_SIZE = 1000
 // Tables with column-level access restrictions — anon cannot SELECT *.
 // For these we explicitly list the safe columns to avoid permission errors.
 const SAFE_SELECTS = {
-  clients: 'id,name,calorie_target,protein_target,carbs_target,fat_target,created_at,is_coach,is_archived,modules,email,dismissed_badges,synrg_started_at,synrg_quiz,account_type,xp_monthly,xp_total,xp_level,earned_ids,monthly_earned_ids,assigned_coach_id',
+  clients: 'id,name,calorie_target,protein_target,carbs_target,fat_target,created_at,is_coach,is_archived,modules,email,dismissed_badges,synrg_started_at,synrg_quiz,account_type,xp_monthly,xp_total,xp_level,earned_ids,monthly_earned_ids,assigned_coach_id,challenge_started_on,challenge_status',
 }
 function selectColumns(table) {
   return SAFE_SELECTS[table] || '*'

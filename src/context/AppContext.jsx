@@ -255,6 +255,8 @@ export function AppProvider({ children }) {
           : { protein: true, weight: true, foodLog: true, coach: true },
         synrgStartedAt: c.synrg_started_at || null,
         synrgQuiz:      c.synrg_quiz       || null,
+        challengeStartedOn: c.challenge_started_on || null,
+        challengeStatus:    c.challenge_status     || null,
         }
       }))
 
@@ -562,6 +564,8 @@ export function AppProvider({ children }) {
         dismissed_badges: Array.isArray(c.dismissed_badges) ? c.dismissed_badges : [],
         synrg_started_at: c.synrg_started_at || null,
         synrg_quiz: c.synrg_quiz || null,
+        challengeStartedOn: c.challenge_started_on || null,
+        challengeStatus:    c.challenge_status     || null,
         meals: [], workouts: [], weightLogs: [], tasks: [], reactions: [],
         reminderSettings: { protein: true, weight: true, foodLog: true, coach: true },
       }]
@@ -913,6 +917,28 @@ export function AppProvider({ children }) {
     })
     setClients(prev => prev.map(c => c.id === id
       ? { ...c, calorieTarget, proteinTarget, carbsTargetManual, fatTargetManual }
+      : c))
+  }
+
+  // ── 7-day challenge enrollment (evergreen) ──────────────────────
+  // id-targeted writes only (c.id === auth.id) — NEVER the actualIdx path,
+  // so a stale clients array can never write another user's row.
+  async function startChallenge() {
+    const id = auth.id
+    if (!id) return
+    const iso = new Date().toISOString().split('T')[0]
+    await DB.update('clients', id, { challenge_started_on: iso, challenge_status: 'active' })
+    setClients(prev => prev.map(c => c.id === id
+      ? { ...c, challengeStartedOn: iso, challengeStatus: 'active' }
+      : c))
+  }
+
+  async function dismissChallenge() {
+    const id = auth.id
+    if (!id) return
+    await DB.update('clients', id, { challenge_status: 'dismissed' })
+    setClients(prev => prev.map(c => c.id === id
+      ? { ...c, challengeStatus: 'dismissed' }
       : c))
   }
 
@@ -1638,6 +1664,7 @@ export function AppProvider({ children }) {
     handleRegisterClient,
     logout,
     updateClient, updateClientTargets,
+    startChallenge, dismissChallenge,
     addMealToClient, deleteMealFromClient,
     saveWorkoutToClient,
     saveWeightLog, deleteWeightLog,

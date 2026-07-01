@@ -296,7 +296,10 @@ export const T = {
     errEmailInvalid:    'Невалиден имейл адрес',
     errNoAccount:       'Няма акаунт с този имейл',
     errCodeRequired:    'Въведи кода от имейла',
-    errInvalidCode:     'Невалиден или изтекъл код',
+    errInvalidCode:     'Кодът е невалиден или изтекъл. Натисни "Изпрати нов код".',
+    codeSentTo:         'Код, изпратен на:',
+    resendCode:         'Изпрати нов код',
+    codeResent:         'Изпратихме ти нов код. Провери имейла си.',
 
     // ── iOS Install Guide ────────────────────────────
     installStep1IOS:    'Натисни бутона за споделяне долу',
@@ -1332,7 +1335,10 @@ export const T = {
     errEmailInvalid:    'Invalid email address',
     errNoAccount:       'No account with this email',
     errCodeRequired:    'Enter the code from the email',
-    errInvalidCode:     'Invalid or expired code',
+    errInvalidCode:     'Invalid or expired code. Tap "Send new code".',
+    codeSentTo:         'Code sent to:',
+    resendCode:         'Send new code',
+    codeResent:         'We sent you a new code. Check your email.',
 
     // ── iOS Install Guide ────────────────────────────
     installStep1IOS:    'Tap the Share button below',
