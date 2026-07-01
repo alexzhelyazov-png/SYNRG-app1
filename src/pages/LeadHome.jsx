@@ -14,7 +14,7 @@
 //      consent dialog (3 mandatory checkboxes per BG/EU law) → Stripe.
 
 import { useState, useEffect } from 'react'
-import { Box, Typography, Button, Stack, Chip, CircularProgress } from '@mui/material'
+import { Box, Typography, Button, Stack, Chip, CircularProgress, Collapse, TextField } from '@mui/material'
 import RestaurantIcon   from '@mui/icons-material/Restaurant'
 import MonitorWeightIcon from '@mui/icons-material/MonitorWeight'
 import DirectionsRunIcon from '@mui/icons-material/DirectionsRun'
@@ -36,6 +36,18 @@ import ChallengeCard from '../components/ChallengeCard'
 function formatPrice(cents, currency = 'BGN') {
   const amount = (cents / 100).toFixed(2).replace(/\.00$/, '')
   return currency === 'EUR' ? `${amount} EUR` : `${amount} лв`
+}
+
+const VIBER_LINK = 'https://invite.viber.com/?g2=AQAEHMI4GEukN1bA7byJAaMIQ0bmNQscqaB2r0HDjfG7PX23NyIbFPg20AHRLSyz'
+
+// Normalize a Bulgarian mobile number to E.164 (+359XXXXXXXXX); null if invalid.
+// Accepts 0885123456, +359885123456, 359885..., with spaces/dashes.
+function normalizeBgPhone(raw) {
+  let d = String(raw || '').replace(/\D/g, '')
+  if (d.startsWith('00')) d = d.slice(2)
+  if (d.startsWith('359')) d = d.slice(3)
+  else if (d.startsWith('0')) d = d.slice(1)
+  return /^8[7-9]\d{7}$/.test(d) ? '+359' + d : null
 }
 
 // ── Result promises — concrete, specific, differentiating ─────────
@@ -71,7 +83,7 @@ const FEATURES_EN = [
 ]
 
 export default function LeadHome() {
-  const { auth, setView, lang, t, showSnackbar, setPendingProgramOpen } = useApp()
+  const { auth, client, setView, lang, t, showSnackbar, setPendingProgramOpen, savePhone } = useApp()
   const modules = auth?.modules || []
   const results  = lang === 'en' ? RESULTS_EN  : RESULTS_BG
   const features = lang === 'en' ? FEATURES_EN : FEATURES_BG
@@ -80,6 +92,22 @@ export default function LeadHome() {
   const [program, setProgram]     = useState(null)
   const [consentOpen, setConsentOpen] = useState(false)
   const [buyLoading, setBuyLoading]   = useState(false)
+
+  // ── Viber join: capture phone before opening the group invite ──────
+  const [viberOpen, setViberOpen]   = useState(false)
+  const [viberPhone, setViberPhone] = useState(client?.phone || '')
+  const [viberBusy, setViberBusy]   = useState(false)
+  const viberPhoneOk = !!normalizeBgPhone(viberPhone)
+
+  const confirmViber = async () => {
+    const normalized = normalizeBgPhone(viberPhone)
+    if (!normalized) return
+    setViberBusy(true)
+    try { await savePhone(normalized) } catch { /* non-blocking — still let them join */ }
+    setViberBusy(false)
+    setViberOpen(false)
+    window.open(VIBER_LINK, '_blank', 'noopener,noreferrer')
+  }
 
   useEffect(() => {
     let alive = true
@@ -225,12 +253,9 @@ export default function LeadHome() {
           })}
         </Box>
 
-        {/* ── Viber group CTA — optional bonus community (needs a phone) ── */}
+        {/* ── Viber group CTA — captures the phone before opening the invite ── */}
         <Button
-          component="a"
-          href="https://invite.viber.com/?g2=AQAEHMI4GEukN1bA7byJAaMIQ0bmNQscqaB2r0HDjfG7PX23NyIbFPg20AHRLSyz"
-          target="_blank"
-          rel="noopener noreferrer"
+          onClick={() => setViberOpen(o => !o)}
           fullWidth
           startIcon={<GroupsIcon sx={{ fontSize: 20 }} />}
           sx={{
@@ -248,6 +273,51 @@ export default function LeadHome() {
         >
           {lang === 'en' ? 'Join the Viber group' : 'Влез в Viber групата'}
         </Button>
+
+        <Collapse in={viberOpen}>
+          <Box sx={{ mt: 1.25 }}>
+            <Typography sx={{ fontSize: '12.5px', lineHeight: 1.45, color: C.muted, mb: 1 }}>
+              {lang === 'en'
+                ? 'Enter your Viber phone number so we can add you to the group.'
+                : 'Въведи телефона си във Viber, за да те добавим в групата.'}
+            </Typography>
+            <Stack direction="row" spacing={1} alignItems="stretch">
+              <TextField
+                value={viberPhone}
+                onChange={(e) => setViberPhone(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter' && viberPhoneOk && !viberBusy) confirmViber() }}
+                placeholder={lang === 'en' ? 'Viber phone' : 'Viber телефон'}
+                type="tel"
+                inputMode="tel"
+                autoComplete="tel"
+                size="small"
+                fullWidth
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    color: C.text, borderRadius: '12px', background: 'rgba(255,255,255,0.03)',
+                    '& fieldset': { borderColor: 'rgba(115,96,242,0.4)' },
+                    '&:hover fieldset': { borderColor: '#7360f2' },
+                    '&.Mui-focused fieldset': { borderColor: '#7360f2' },
+                  },
+                  '& input::placeholder': { color: C.muted, opacity: 0.7 },
+                }}
+              />
+              <Button
+                onClick={confirmViber}
+                disabled={!viberPhoneOk || viberBusy}
+                endIcon={viberBusy ? <CircularProgress size={15} sx={{ color: '#0A0A14' }} /> : <ArrowForwardIcon sx={{ fontSize: 17 }} />}
+                sx={{
+                  flexShrink: 0, background: '#7360f2', color: '#fff', fontWeight: 800, textTransform: 'none',
+                  px: 2, borderRadius: '12px', fontSize: '13px', whiteSpace: 'nowrap',
+                  '&:hover': { background: '#8676f5' },
+                  '&.Mui-disabled': { background: 'rgba(115,96,242,0.25)', color: 'rgba(255,255,255,0.5)' },
+                }}
+              >
+                {lang === 'en' ? 'Join' : 'Влез'}
+              </Button>
+            </Stack>
+          </Box>
+        </Collapse>
       </Box>
 
       {/* ── Discreet SYNRG Метод card (secondary offer, below trackers) ── */}

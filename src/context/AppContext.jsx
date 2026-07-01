@@ -257,6 +257,7 @@ export function AppProvider({ children }) {
         synrgQuiz:      c.synrg_quiz       || null,
         challengeStartedOn: c.challenge_started_on || null,
         challengeStatus:    c.challenge_status     || null,
+        phone:              c.phone                || '',
         }
       }))
 
@@ -566,6 +567,7 @@ export function AppProvider({ children }) {
         synrg_quiz: c.synrg_quiz || null,
         challengeStartedOn: c.challenge_started_on || null,
         challengeStatus:    c.challenge_status     || null,
+        phone:              c.phone                || '',
         meals: [], workouts: [], weightLogs: [], tasks: [], reactions: [],
         reminderSettings: { protein: true, weight: true, foodLog: true, coach: true },
       }]
@@ -940,6 +942,15 @@ export function AppProvider({ children }) {
     setClients(prev => prev.map(c => c.id === id
       ? { ...c, challengeStatus: 'dismissed' }
       : c))
+  }
+
+  // ── Persist the user's phone (captured on the Viber join CTA) ──────
+  // id-targeted write only — builds our long-term email+phone database.
+  async function savePhone(phone) {
+    const id = auth.id
+    if (!id || !phone) return
+    await DB.update('clients', id, { phone })
+    setClients(prev => prev.map(c => c.id === id ? { ...c, phone } : c))
   }
 
   async function addMealToClient(clientId, meal) {
@@ -1664,7 +1675,7 @@ export function AppProvider({ children }) {
     handleRegisterClient,
     logout,
     updateClient, updateClientTargets,
-    startChallenge, dismissChallenge,
+    startChallenge, dismissChallenge, savePhone,
     addMealToClient, deleteMealFromClient,
     saveWorkoutToClient,
     saveWeightLog, deleteWeightLog,
