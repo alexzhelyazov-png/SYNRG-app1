@@ -164,8 +164,8 @@ export default function LeadHome() {
   // Dynamic price label — falls back to 397 лв if program hasn't loaded yet
   const priceFromDb    = program ? formatPrice(program.price_cents, program.currency) : '397 лв'
   const priceLabel     = lang === 'en'
-    ? `${priceFromDb} · one-time · 8 weeks`
-    : `${priceFromDb} · еднократно · 8 седмици`
+    ? 'Online. A method built by doctors and coaches.'
+    : 'Онлайн. Метод изграден от лекари и треньори.'
   const trackersTitle  = lang === 'en' ? 'Your free trackers' : 'Безплатните ти трекери'
   const whatYouGetLabel= lang === 'en' ? "What you get with SYNRG Method" : 'Какво получаваш със SYNRG Метод'
   const resultsTitle   = lang === 'en' ? 'What you can expect' : 'Какво можеш да очакваш'
