@@ -172,7 +172,7 @@ export default function ChallengeCard() {
           Отвори приложението и не знаеш откъде да започнеш?
         </Typography>
         <Typography sx={{ fontSize: { xs: '13px', sm: '14px' }, lineHeight: 1.5, color: C.muted, mb: 2, maxWidth: 560 }}>
-          Ето кратък challenge, който те води стъпка по стъпка — малки действия всеки ден. Без диети, без натиск.
+          Ето кратък безплатен challenge, който те води стъпка по стъпка — малки действия всеки ден. Без диети, без натиск.
         </Typography>
         <Stack direction="row" spacing={1.5} alignItems="center" flexWrap="wrap" useFlexGap>
           <Button
