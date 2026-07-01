@@ -66,6 +66,20 @@ async function restGet(path: string): Promise<any[]> {
   return await res.json();
 }
 
+// PostgREST caps a single response at ~1000 rows. For full-table pulls
+// (e.g. all clients) page through with offset/limit so nobody is silently
+// dropped from the audience.
+async function restGetAll(path: string, pageSize = 1000): Promise<any[]> {
+  const sep = path.includes("?") ? "&" : "?";
+  const out: any[] = [];
+  for (let offset = 0; ; offset += pageSize) {
+    const page = await restGet(`${path}${sep}limit=${pageSize}&offset=${offset}`);
+    out.push(...page);
+    if (page.length < pageSize) break;
+  }
+  return out;
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method !== "POST") return json({ ok: false, error: "POST only" }, 405);
 
@@ -110,12 +124,12 @@ Deno.serve(async (req: Request) => {
   let mealClients: any[], weightClients: any[], alreadySent: any[];
   let signedUp: any[] = [];
   try {
-    clients = await restGet(`clients?select=id,name,email`);
+    clients = await restGetAll(`clients?select=id,name,email`);
     plans = await restGet(`client_plans?select=client_id&status=eq.active`);
     purchases = await restGet(`program_purchases?select=client_id`);
-    mealClients = await restGet(`meals?select=client_id`);
-    weightClients = await restGet(`weight_logs?select=client_id`);
-    alreadySent = await restGet(
+    mealClients = await restGetAll(`meals?select=client_id`);
+    weightClients = await restGetAll(`weight_logs?select=client_id`);
+    alreadySent = await restGetAll(
       `email_sends?select=client_id&email_key=eq.${encodeURIComponent(emailKey)}&success=eq.true`,
     );
     if (excludeSignups) signedUp = await restGet(`challenge_signups?select=email`);

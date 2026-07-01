@@ -104,9 +104,10 @@ export default function LeadHome() {
     if (!normalized) return
     setViberBusy(true)
     try { await savePhone(normalized) } catch { /* non-blocking — still let them join */ }
-    setViberBusy(false)
-    setViberOpen(false)
-    window.open(VIBER_LINK, '_blank', 'noopener,noreferrer')
+    // Navigate (not window.open): a popup opened after an await is blocked by the
+    // browser, so on mobile it looked like "nothing happened". location.href
+    // reliably fires the Viber deep-link / invite page.
+    window.location.href = VIBER_LINK
   }
 
   useEffect(() => {
