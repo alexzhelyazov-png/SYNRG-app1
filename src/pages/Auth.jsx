@@ -57,6 +57,9 @@ export default function Auth() {
       setResetCode(code)
       // Clean URL so the code isn't preserved in browser history
       try { window.history.replaceState({}, '', window.location.pathname) } catch {}
+    } else if (params.get('register')) {
+      // Deep-link from website "Регистрирай се" button → open register tab directly
+      setMode('register')
     }
   }, [])
 

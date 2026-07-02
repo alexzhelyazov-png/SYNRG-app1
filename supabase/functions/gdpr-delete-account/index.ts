@@ -82,26 +82,22 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Verify password (using current plain-text storage; will work after bcrypt migration too if we update this)
-    const clients = await sbQuery("clients", `?select=id,password,password_hash&id=eq.${client_id}`);
-    const client = (clients as Array<{ id: string; password?: string; password_hash?: string }>)?.[0];
-    if (!client) {
+    // Verify password server-side via Postgres crypt() (same proven path as auth-login).
+    // id-targeted RPC — no name-collision risk, and no Deno bcrypt Worker (which fails on Deno Deploy).
+    const verifyRes = await fetch(`${SUPABASE_URL}/rest/v1/rpc/verify_client_password_by_id`, {
+      method: "POST",
+      headers: { ...sbHeaders(), Prefer: "return=representation" },
+      body: JSON.stringify({ p_id: client_id, p_password: password }),
+    });
+    const verifyData = await verifyRes.json();
+    const row = Array.isArray(verifyData) ? verifyData[0] : verifyData;
+    if (!row) {
       return new Response(
         JSON.stringify({ error: "Client not found" }),
         { status: 404, headers: { ...cors, "Content-Type": "application/json" } }
       );
     }
-
-    // Check password — prefer hash if present, fall back to plain
-    let valid = false;
-    if (client.password_hash) {
-      // bcrypt compare via Deno (lazy import only when needed)
-      const bcrypt = await import("https://deno.land/x/bcrypt@v0.4.1/mod.ts");
-      valid = await bcrypt.compare(password, client.password_hash);
-    } else {
-      valid = client.password === password;
-    }
-    if (!valid) {
+    if (!row.valid) {
       return new Response(
         JSON.stringify({ error: "Invalid password" }),
         { status: 403, headers: { ...cors, "Content-Type": "application/json" } }
