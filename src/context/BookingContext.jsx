@@ -288,23 +288,25 @@ export function BookingProvider({ children }) {
         price:         Number(price) || 0,
         is_paid:       !!isPaid,
       })
-      // Auto-enable ALL modules when activating a plan
-      const targetClient = realClients.find(c => c.id === clientId)
-      if (targetClient) {
-        const currentModules = targetClient.modules || []
-        const merged = [...new Set([...currentModules, ...ADMIN_MANAGEABLE_MODULES])]
-        if (merged.length !== currentModules.length || !merged.every(m => currentModules.includes(m))) {
-          await DB.update('clients', clientId, { modules: merged })
-        }
-        // Send plan activation email
-        if (targetClient.email) {
-          const planLabel = planType === 'unlimited' ? 'Неограничен' : `${planType} тренировки`
-          DB.syncToMailerLite('plan_activated', targetClient.email, targetClient.name, {
-            PLAN_TYPE: planType,
-            PLAN_EXPIRES: to,
-            PLAN_STATUS: 'active',
-          })
-        }
+      // Auto-enable ALL studio modules when activating a plan. Studio access,
+      // booking ("запази час"), tracking, etc. must ALWAYS be granted by default
+      // — never left for the admin to toggle on manually. Works even when the
+      // client isn't in the in-memory realClients array (fetch fresh from DB) so
+      // the grant can never be silently skipped.
+      let targetClient = realClients.find(c => c.id === clientId)
+      if (!targetClient) targetClient = await DB.getClient(clientId)
+      const currentModules = targetClient?.modules || []
+      const merged = [...new Set([...currentModules, ...ADMIN_MANAGEABLE_MODULES])]
+      if (merged.length !== currentModules.length || !merged.every(m => currentModules.includes(m))) {
+        await DB.update('clients', clientId, { modules: merged })
+      }
+      // Send plan activation email
+      if (targetClient?.email) {
+        DB.syncToMailerLite('plan_activated', targetClient.email, targetClient.name, {
+          PLAN_TYPE: planType,
+          PLAN_EXPIRES: to,
+          PLAN_STATUS: 'active',
+        })
       }
       await loadAllPlans()
       return result

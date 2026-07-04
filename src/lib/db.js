@@ -384,6 +384,19 @@ export const DB = {
     return []
   },
 
+  // ── Clients: fetch a single client row by id ─────────────────
+  async getClient(clientId) {
+    if (isUsingSupabase) {
+      const data = await sbFetchSafe(
+        sbUrl('clients', `?select=${selectColumns('clients')}&id=eq.${clientId}&limit=1`),
+        { headers: sbHeaders() }
+      )
+      return (data && data[0]) || null
+    }
+    const all = await LS.selectAll('clients')
+    return all.find(c => c.id === clientId) || null
+  },
+
   // ── Plans: get client's current active plan ──────────────────
   async getClientActivePlan(clientId) {
     if (isUsingSupabase) {
