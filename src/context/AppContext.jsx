@@ -114,6 +114,9 @@ export function AppProvider({ children }) {
   const [stepsInput, setStepsInput] = useState('')
   const [stepsDate,  setStepsDate]  = useState(dateToInput(todayDate()))
 
+  // ── Water state ─────────────────────────────────────────────
+  const [waterDate, setWaterDate] = useState(dateToInput(todayDate()))
+
   // ── Load all data ─────────────────────────────────────────────
   const loadAll = useCallback(async () => {
     setLoading(true)
@@ -141,8 +144,11 @@ export function AppProvider({ children }) {
       const stepsQuery = isClientRole
         ? `&client_id=eq.${sessionAuth.id}&order=id.desc&limit=5000`
         : `&order=id.desc&created_at=gte.${twoYearsAgo}&limit=20000`
+      const waterQuery = isClientRole
+        ? `&client_id=eq.${sessionAuth.id}&order=id.desc&limit=5000`
+        : `&order=id.desc&created_at=gte.${twoYearsAgo}&limit=20000`
 
-      const [rawCoaches, rawClients, meals, workouts, weights, tasks, taskComments, reactions, stepsRaw, postsRaw, rawSynrgHabits, rawPostReactions, rawPostComments, pastBookingsAll] = await Promise.all([
+      const [rawCoaches, rawClients, meals, workouts, weights, tasks, taskComments, reactions, stepsRaw, postsRaw, rawSynrgHabits, rawPostReactions, rawPostComments, pastBookingsAll, waterRaw] = await Promise.all([
         DB.selectAll('coaches'),
         DB.selectAll('clients'),
         DB.selectAll('meals', mealQuery),
@@ -162,6 +168,7 @@ export function AppProvider({ children }) {
         // Completed slot_bookings — needed so gamification counts booked sessions
         // alongside manually-logged workout-tracker entries.
         DB.getAllPastBookings().catch(() => []),
+        DB.selectAll('water_logs', waterQuery).catch(() => []),
       ])
 
       // Note: password fields no longer loaded into client state — auth handled via auth-login Edge Function
@@ -232,6 +239,10 @@ export function AppProvider({ children }) {
         stepsLogs: stepsRaw.filter(s => s.client_id === c.id)
           .sort((a, b) => parseDate(a.date) - parseDate(b.date))
           .map(s => ({ id: s.id, date: s.date, steps: Number(s.steps) })),
+        waterTargetMl: c.water_target_ml || 2500,
+        waterLogs: waterRaw.filter(w => w.client_id === c.id)
+          .sort((a, b) => parseDate(a.date) - parseDate(b.date))
+          .map(w => ({ id: w.id, date: w.date, ml: Number(w.ml) })),
         tasks: tasks
           .filter(tk => tk.client_id === c.id)
           .sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))
@@ -378,7 +389,7 @@ export function AppProvider({ children }) {
         // periodic sync returns fewer rows than initial load (PostgREST defaults to
         // max 1000 rows) and SHRINKS the admin's dataset on refresh, silently
         // dropping clients' meals/weights/steps → incorrect XP computation.
-        const [freshMeals, freshWeights, freshSteps, freshWorkouts, freshPosts, freshComments, freshBookings] = await Promise.all([
+        const [freshMeals, freshWeights, freshSteps, freshWorkouts, freshPosts, freshComments, freshBookings, freshWater] = await Promise.all([
           DB.selectAll('meals',        `&order=id.desc&created_at=gte.${twoYearsAgo}&limit=100000`),
           DB.selectAll('weight_logs',  `&order=id.desc&created_at=gte.${twoYearsAgo}&limit=20000`).catch(() => []),
           DB.selectAll('steps_logs',   `&order=id.desc&created_at=gte.${twoYearsAgo}&limit=20000`).catch(() => []),
@@ -390,6 +401,7 @@ export function AppProvider({ children }) {
           DB.selectAll('post_comments',   '&order=created_at.desc&limit=100000').catch(() => null),
           // Slot bookings for all clients — needed so XP computation counts booked sessions
           DB.getAllPastBookings().catch(() => []),
+          DB.selectAll('water_logs',   `&order=id.desc&created_at=gte.${twoYearsAgo}&limit=20000`).catch(() => []),
         ])
         // Push fresh community data into state + refs so XP computation below uses it
         if (freshPosts) {
@@ -432,6 +444,9 @@ export function AppProvider({ children }) {
             stepsLogs: freshSteps.filter(s => s.client_id === c.id)
               .sort((a, b) => parseDate(a.date) - parseDate(b.date))
               .map(s => ({ id: s.id, date: s.date, steps: Number(s.steps) })),
+            waterLogs: freshWater.filter(w => w.client_id === c.id)
+              .sort((a, b) => parseDate(a.date) - parseDate(b.date))
+              .map(w => ({ id: w.id, date: w.date, ml: Number(w.ml) })),
             ...(freshWorkouts ? {
               workouts: freshWorkouts.filter(w => w.client_id === c.id)
                 .sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))
@@ -608,8 +623,8 @@ export function AppProvider({ children }) {
     const newClient = {
       id: data.id, name, is_coach: false,
       email: email || null,
-      calorieTarget: 2000, proteinTarget: 140, modules: FREE_MODULES,
-      meals: [], workouts: [], weightLogs: [], tasks: [], reactions: [],
+      calorieTarget: 2000, proteinTarget: 140, waterTargetMl: 2500, modules: FREE_MODULES,
+      meals: [], workouts: [], weightLogs: [], stepsLogs: [], waterLogs: [], tasks: [], reactions: [],
       reminderSettings: { protein: true, weight: true, foodLog: true, coach: true },
     }
     setClients(prev => {
@@ -866,6 +881,11 @@ export function AppProvider({ children }) {
     [client.stepsLogs]
   )
 
+  const sortedWaterLogs = useMemo(
+    () => [...(client.waterLogs || [])].sort((a, b) => parseDate(a.date) - parseDate(b.date)),
+    [client.waterLogs]
+  )
+
   // ── Ranking excludes coach profiles ───────────────────────────
   const isCoachOrAdmin = auth.role === 'coach' || auth.role === 'admin'
 
@@ -974,6 +994,14 @@ export function AppProvider({ children }) {
     setClients(prev => prev.map(c => c.id === id
       ? { ...c, calorieTarget, proteinTarget, carbsTargetManual, fatTargetManual }
       : c))
+  }
+
+  // Update a client's daily water target (ml). id-targeted write only.
+  async function updateWaterTarget(id, waterTargetMl) {
+    const ml = Math.max(250, Math.round(Number(waterTargetMl) || 2500))
+    await DB.update('clients', id, { water_target_ml: ml })
+    setClients(prev => prev.map(c => c.id === id ? { ...c, waterTargetMl: ml } : c))
+    return ml
   }
 
   // ── 7-day challenge enrollment (evergreen) ──────────────────────
@@ -1180,6 +1208,30 @@ export function AppProvider({ children }) {
     ))
   }
 
+  // Water: absolute daily total (ml) upserted per (client, date). The tracker
+  // owns the running total and passes the new absolute value, so rapid quick-add
+  // taps are last-write-wins with the correct cumulative amount.
+  async function saveWaterLog(clientId, date, ml) {
+    if (isTrackerReadOnly) return
+    const total = Math.max(0, Math.round(Number(ml) || 0))
+    const data = await DB.upsertByFields('water_logs', { client_id: clientId, date, ml: total }, ['client_id', 'date'])
+    setClients(prev => prev.map(c => {
+      if (c.id !== clientId) return c
+      const logs = (c.waterLogs || []).filter(l => l.date !== date)
+      return { ...c, waterLogs: [...logs, { id: data.id, date, ml: total }].sort((a, b) => parseDate(a.date) - parseDate(b.date)) }
+    }))
+    return data
+  }
+
+  async function deleteWaterLog(clientId, logId) {
+    if (isTrackerReadOnly) return
+    await DB.deleteById('water_logs', logId)
+    setClients(prev => prev.map(c => c.id === clientId
+      ? { ...c, waterLogs: (c.waterLogs || []).filter(l => l.id !== logId) }
+      : c
+    ))
+  }
+
   // ── Feed actions ────────────────────────────────────────────
   async function addFeedPost(content) {
     const tmpId = 'tmp_' + Date.now()
@@ -1247,13 +1299,14 @@ export function AppProvider({ children }) {
   }
 
   async function deleteClient(clientId) {
-    const [clientMeals, clientWorkouts, clientWeights, clientTasks, clientReactions, clientSteps, clientPlans, clientBookings] = await Promise.all([
+    const [clientMeals, clientWorkouts, clientWeights, clientTasks, clientReactions, clientSteps, clientWater, clientPlans, clientBookings] = await Promise.all([
       DB.findWhere('meals',          'client_id', clientId),
       DB.findWhere('workouts',       'client_id', clientId),
       DB.findWhere('weight_logs',    'client_id', clientId),
       DB.findWhere('tasks',          'client_id', clientId),
       DB.findWhere('reactions',      'client_id', clientId),
       DB.findWhere('steps_logs',     'client_id', clientId).catch(() => []),
+      DB.findWhere('water_logs',     'client_id', clientId).catch(() => []),
       DB.findWhere('client_plans',   'client_id', clientId).catch(() => []),
       DB.findWhere('slot_bookings',  'client_id', clientId).catch(() => []),
     ])
@@ -1271,6 +1324,7 @@ export function AppProvider({ children }) {
       ...clientTasks.map(tk    => DB.deleteById('tasks',          tk.id)),
       ...clientReactions.map(r => DB.deleteById('reactions',      r.id)),
       ...clientSteps.map(s     => DB.deleteById('steps_logs',     s.id)),
+      ...clientWater.map(w     => DB.deleteById('water_logs',     w.id)),
       ...clientPlans.map(p     => DB.deleteById('client_plans',   p.id)),
       ...clientBookings.map(b  => DB.deleteById('slot_bookings',  b.id)),
       DB.deleteById('clients', clientId),
@@ -1715,12 +1769,14 @@ export function AppProvider({ children }) {
     // Steps
     stepsInput, setStepsInput,
     stepsDate, setStepsDate,
+    // Water
+    waterDate, setWaterDate,
     // Computed
     client, actualIdx, selFoodDate,
     mealsForDate, foodTotals, foodSuggestions,
     sortedWeightLogs, weightChartData,
     latestWeight, latestAvg, weeklyRate,
-    sortedStepsLogs,
+    sortedStepsLogs, sortedWaterLogs,
     ranking, kcalPct, protPct, carbsPct, fatPct,
     carbsTarget, fatTarget, visibleClients,
     // Actions
@@ -1728,12 +1784,13 @@ export function AppProvider({ children }) {
     handleLogin,
     handleRegisterClient,
     logout,
-    updateClient, updateClientTargets,
+    updateClient, updateClientTargets, updateWaterTarget,
     startChallenge, dismissChallenge, savePhone,
     addMealToClient, deleteMealFromClient,
     saveWorkoutToClient,
     saveWeightLog, deleteWeightLog,
     saveStepsLog, deleteStepsLog,
+    saveWaterLog, deleteWaterLog,
     feedPosts, addFeedPost, deleteFeedPost,
     postReactions, postComments, togglePostReaction, addPostComment, deletePostComment,
     unreadFeedCount, markFeedSeen,

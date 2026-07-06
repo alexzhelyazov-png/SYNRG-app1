@@ -18,6 +18,7 @@ import { Box, Typography, Button, Stack, Chip, CircularProgress } from '@mui/mat
 import RestaurantIcon   from '@mui/icons-material/Restaurant'
 import MonitorWeightIcon from '@mui/icons-material/MonitorWeight'
 import DirectionsRunIcon from '@mui/icons-material/DirectionsRun'
+import WaterDropIcon     from '@mui/icons-material/WaterDrop'
 import CheckCircleIcon  from '@mui/icons-material/CheckCircle'
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward'
 import PersonPinIcon    from '@mui/icons-material/PersonPin'
@@ -153,6 +154,7 @@ export default function LeadHome() {
     { key: 'food',   Icon: RestaurantIcon,    label: t('navFood')   || 'Храна',   view: 'food',   module: 'nutrition_tracking' },
     { key: 'weight', Icon: MonitorWeightIcon, label: t('navWeight') || 'Тегло',  view: 'weight', module: 'weight_tracking'    },
     { key: 'steps',  Icon: DirectionsRunIcon, label: t('navSteps')  || 'Стъпки', view: 'steps',  module: 'nutrition_tracking' },
+    { key: 'water',  Icon: WaterDropIcon,     label: t('navWater')  || 'Вода',   view: 'water',  module: 'nutrition_tracking' },
   ]
 
   return (
@@ -185,7 +187,7 @@ export default function LeadHome() {
         </Typography>
         <Box sx={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(3, 1fr)',
+          gridTemplateColumns: { xs: 'repeat(2, 1fr)', sm: 'repeat(4, 1fr)' },
           gap: 1.25,
         }}>
           {trackers.map(({ key, Icon, label, view, module }) => {

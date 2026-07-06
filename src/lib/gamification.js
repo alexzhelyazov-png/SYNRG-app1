@@ -67,11 +67,17 @@ export const ALLTIME_BADGES = [
   { id: 'first_meal',   category: 'consistency', xp: 5,  tier: null, series: null, muiIcon: 'Restaurant',     condType: 'count', condField: 'mealCount',   condValue: 1 },
   { id: 'first_weight', category: 'consistency', xp: 5,  tier: null, series: null, muiIcon: 'MonitorWeight',  condType: 'count', condField: 'weightCount', condValue: 1 },
   { id: 'first_steps',  category: 'consistency', xp: 5,  tier: null, series: null, muiIcon: 'DirectionsWalk', condType: 'count', condField: 'stepsCount',  condValue: 1 },
+  { id: 'first_water',  category: 'consistency', xp: 5,  tier: null, series: null, muiIcon: 'WaterDrop',      condType: 'count', condField: 'waterDays',   condValue: 1 },
 
   // ── 3-day tracking (early habit) ──
   { id: 'meals_3days',  category: 'consistency', xp: 15, tier: null, series: null, muiIcon: 'Restaurant',     condType: 'count', condField: 'mealDays',    condValue: 3 },
   { id: 'weight_3days', category: 'consistency', xp: 15, tier: null, series: null, muiIcon: 'MonitorWeight',  condType: 'count', condField: 'weightDays',  condValue: 3 },
   { id: 'steps_3days',  category: 'consistency', xp: 15, tier: null, series: null, muiIcon: 'DirectionsWalk', condType: 'count', condField: 'stepsDays',   condValue: 3 },
+
+  // ── Water hydration streaks (consecutive days hitting 2 L) ──
+  { id: 'water_streak_3',    category: 'consistency', xp: 15,  tier: null,     series: null, muiIcon: 'WaterDrop',  condType: 'water_streak', condValue: 3  },
+  { id: 'water_streak_7',    category: 'consistency', xp: 40,  tier: 'silver', series: null, muiIcon: 'LocalDrink', condType: 'water_streak', condValue: 7  },
+  { id: 'water_streak_gold', category: 'consistency', xp: 100, tier: 'gold',   series: null, muiIcon: 'LocalDrink', condType: 'water_streak', condValue: 30 },
 
   // ── Standalone ──
   { id: 'all_rounder',  category: 'special',  xp: 40, tier: null, series: null, muiIcon: 'AutoAwesome',  condType: 'compound',    condValue: 1   },
@@ -117,6 +123,16 @@ export const MONTHLY_BADGES = [
   { id: 'm_steps_days_silver', monthly: true, xp: 30, tier: 'silver', series: 'm_steps_days', muiIcon: 'DirectionsRun', condType: 'monthly_count', condField: 'stepsDays', condValue: 15 },
   { id: 'm_steps_days_gold',   monthly: true, xp: 50, tier: 'gold',   series: 'm_steps_days', muiIcon: 'DirectionsRun', condType: 'monthly_count', condField: 'stepsDays', condValue: 30 },
 
+  // ── m_water series — days this month hitting the 2 L goal (consistency) ──
+  { id: 'm_water_bronze', monthly: true, xp: 15, tier: 'bronze', series: 'm_water', muiIcon: 'WaterDrop', condType: 'monthly_count', condField: 'waterDays2L', condValue: 7  },
+  { id: 'm_water_silver', monthly: true, xp: 30, tier: 'silver', series: 'm_water', muiIcon: 'WaterDrop', condType: 'monthly_count', condField: 'waterDays2L', condValue: 15 },
+  { id: 'm_water_gold',   monthly: true, xp: 50, tier: 'gold',   series: 'm_water', muiIcon: 'WaterDrop', condType: 'monthly_count', condField: 'waterDays2L', condValue: 30 },
+
+  // ── m_water3l series — days this month hitting the higher 3 L goal ──
+  { id: 'm_water3l_bronze', monthly: true, xp: 20, tier: 'bronze', series: 'm_water3l', muiIcon: 'LocalDrink', condType: 'monthly_count', condField: 'waterDays3L', condValue: 7  },
+  { id: 'm_water3l_silver', monthly: true, xp: 35, tier: 'silver', series: 'm_water3l', muiIcon: 'LocalDrink', condType: 'monthly_count', condField: 'waterDays3L', condValue: 15 },
+  { id: 'm_water3l_gold',   monthly: true, xp: 55, tier: 'gold',   series: 'm_water3l', muiIcon: 'LocalDrink', condType: 'monthly_count', condField: 'waterDays3L', condValue: 30 },
+
   // ── m_cal_target series ──
   { id: 'm_cal_target_bronze', monthly: true, xp: 25, tier: 'bronze', series: 'm_cal_target', muiIcon: 'LocalDining', condType: 'monthly_target', condField: 'calTargetDays', condValue: 7  },
   { id: 'm_cal_target_silver', monthly: true, xp: 45, tier: 'silver', series: 'm_cal_target', muiIcon: 'LocalDining', condType: 'monthly_target', condField: 'calTargetDays', condValue: 15 },
@@ -161,6 +177,7 @@ function collectStats(client) {
   const weights        = client.weightLogs     || []
   const workouts       = client.workouts       || []
   const steps          = client.stepsLogs      || []
+  const water          = client.waterLogs      || []
   // bookedSessions: completed calendar sessions ({ date: 'DD.MM.YYYY', coach })
   // Kept separate from workouts (which have exercises/items) so UI isn't affected.
   const bookedSessions = client.bookedSessions || []
@@ -180,6 +197,12 @@ function collectStats(client) {
   const wLoss  = weightLossFromPeak(weights)
   const hasPR  = hasStrengthPR(workouts)
 
+  // Water: distinct logged days + longest run of consecutive days that hit
+  // the base hydration goal (2 L). Streak rewards consistency, not volume.
+  const waterDaySet     = new Set(water.filter(w => Number(w.ml) > 0).map(w => w.date))
+  const waterGoalDaySet = new Set(water.filter(w => Number(w.ml) >= WATER_GOAL_ML).map(w => w.date))
+  const waterStreak     = longestStreak(waterGoalDaySet)
+
   const calTargetDays  = targetDaysCount(meals, client.calorieTarget || 99999, 'kcal')
   const protTargetDays = targetDaysCount(meals, client.proteinTarget || 99999, 'protein')
 
@@ -191,6 +214,8 @@ function collectStats(client) {
     weightCount:    weights.length,
     workoutCount:   totalWorkoutDays,
     stepsCount:     steps.length,
+    waterDays:      waterDaySet.size,
+    waterStreak,
     mealDays:       mealDateSet.size,
     weightDays:     weightDateSet.size,
     stepsDays:      stepsDateSet.size,
@@ -224,6 +249,7 @@ function collectMonthlyStats(client, monthKey) {
   const weights        = (client.weightLogs     || []).filter(w => matchMonth(w.date))
   const workouts       = (client.workouts       || []).filter(w => matchMonth(w.date))
   const steps          = (client.stepsLogs      || []).filter(s => matchMonth(s.date))
+  const water          = (client.waterLogs      || []).filter(w => matchMonth(w.date))
   // Completed calendar sessions for this month — dedup with tracker on date
   const bookedThisMonth = (client.bookedSessions || []).filter(s => matchMonth(s.date))
 
@@ -270,12 +296,20 @@ function collectMonthlyStats(client, monthKey) {
     ? avgWeights(sortedW.slice(0, winSize)) - avgWeights(sortedW.slice(-winSize))
     : 0
 
+  // Water: count days in the month that hit the 2 L and 3 L goals.
+  const waterMlByDate = {}
+  for (const w of water) waterMlByDate[w.date] = (waterMlByDate[w.date] || 0) + Number(w.ml || 0)
+  const waterDays2L = Object.values(waterMlByDate).filter(v => v >= WATER_GOAL_ML).length
+  const waterDays3L = Object.values(waterMlByDate).filter(v => v >= WATER_GOAL_3L_ML).length
+
   return {
     workoutCount: workoutDateSet.size, // unique training days: tracker + bookings
     mealCount:    meals.length,
     weightCount:  weights.length,
     stepsDays:    stepsDateSet.size,
     totalSteps,
+    waterDays2L,
+    waterDays3L,
     streak,
     calTargetDays,
     protTargetDays,
@@ -299,6 +333,7 @@ function getDistinctMonthKeys(client) {
   ;(client.weightLogs || []).forEach(w => addDate(w.date))
   ;(client.workouts   || []).forEach(w => addDate(w.date))
   ;(client.stepsLogs  || []).forEach(s => addDate(s.date))
+  ;(client.waterLogs  || []).forEach(w => addDate(w.date))
   // Community posts/comments use ISO dates
   ;(client.communityPosts    || []).forEach(p => { const m = (p.created_at || '').substring(0, 7); if (m) keys.add(m) })
   ;(client.communityComments || []).forEach(c => { const m = (c.created_at || '').substring(0, 7); if (m) keys.add(m) })
@@ -459,6 +494,11 @@ const WEIGHT_NOISE_BUFFER_KG     = 2.5
 // above a very active human day (elite hikers ~30k); anything beyond is treated
 // as a typo/gaming attempt and clamped for scoring only.
 const MAX_PLAUSIBLE_STEPS_PER_DAY = 40000
+
+// Water hydration goals (ml). Fixed thresholds — independent of the user's
+// editable personal target — so badges can't be farmed by lowering the target.
+const WATER_GOAL_ML    = 2000
+const WATER_GOAL_3L_ML = 3000
 
 // Monthly badge series whose tiers do NOT stack in XP — only the highest tier
 // earned in a given month counts. Used for self-reported "outcome" metrics so a
@@ -688,6 +728,8 @@ function checkBadge(badge, stats) {
       return stats.hasPR
     case 'streak':
       return stats.streak >= badge.condValue
+    case 'water_streak':
+      return (stats.waterStreak || 0) >= badge.condValue
     case 'target_days':
       return (stats[badge.condField] || 0) >= badge.condValue
     case 'compound':
@@ -736,6 +778,8 @@ export function getBadgeProgress(badge, client) {
       return { current: stats.hasPR ? 1 : 0, target: 1 }
     case 'streak':
       return { current: Math.min(stats.streak, badge.condValue), target: badge.condValue }
+    case 'water_streak':
+      return { current: Math.min(stats.waterStreak || 0, badge.condValue), target: badge.condValue }
     case 'target_days':
       return { current: Math.min(stats[badge.condField] || 0, badge.condValue), target: badge.condValue }
     case 'compound':

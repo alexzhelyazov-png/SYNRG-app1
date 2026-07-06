@@ -9,6 +9,7 @@ import CheckIcon from '@mui/icons-material/Check'
 import RestaurantIcon from '@mui/icons-material/Restaurant'
 import MonitorWeightIcon from '@mui/icons-material/MonitorWeight'
 import DirectionsWalkIcon from '@mui/icons-material/DirectionsWalk'
+import WaterDropIcon from '@mui/icons-material/WaterDrop'
 import AssignmentIcon from '@mui/icons-material/Assignment'
 import FitnessCenterIcon from '@mui/icons-material/FitnessCenter'
 import MenuBookIcon from '@mui/icons-material/MenuBook'
@@ -1365,6 +1366,7 @@ function DashboardClient({ isCoachView = false }) {
           hasModule(auth.modules, 'nutrition_tracking') && { key: 'food', view: 'food', color: '#5EC6D0', Icon: RestaurantIcon, label: t('addFoodBtn') },
           hasModule(auth.modules, 'weight_tracking') && { key: 'weight', view: 'weight', color: '#C8C5FF', Icon: MonitorWeightIcon, label: t('addWeightBtn') },
           (hasModule(auth.modules, 'nutrition_tracking') || hasModule(auth.modules, 'weight_tracking')) && { key: 'steps', view: 'steps', color: '#FFD070', Icon: DirectionsWalkIcon, label: t('addStepsBtn') },
+          (hasModule(auth.modules, 'nutrition_tracking') || hasModule(auth.modules, 'weight_tracking')) && { key: 'water', view: 'water', color: '#6EC6E8', Icon: WaterDropIcon, label: t('addWaterBtn') },
           { key: 'workout', view: 'workout', color: '#A78BFA', Icon: FitnessCenterIcon, label: t('addWorkoutBtn') },
           !isCoachView && (() => {
             const recipesUnlocked = hasModule(auth.modules, 'program_access') || hasModule(auth.modules, 'training_plan_access')

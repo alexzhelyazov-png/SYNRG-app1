@@ -34,6 +34,7 @@ import Schedule       from './pages/Schedule'
 import Admin          from './pages/Admin'
 import Programs       from './pages/Programs'
 import StepsTracker   from './pages/StepsTracker'
+import WaterTracker   from './pages/WaterTracker'
 import ClientWorkout  from './pages/ClientWorkout'
 import Notifications  from './pages/Notifications'
 import Recipes        from './pages/Recipes'
@@ -129,8 +130,8 @@ function BadgeUnlockWatcher() {
   const prevLevelRef   = useRef(null)
 
   const currentMonthKey  = useMemo(() => getCurrentMonthKey(), [])
-  const earnedIds        = useMemo(() => evaluateBadges(client), [client.meals, client.weightLogs, client.workouts, client.stepsLogs])
-  const monthlyEarnedIds = useMemo(() => evaluateMonthlyBadgesForMonth(client, currentMonthKey), [client.meals, client.weightLogs, client.workouts, client.stepsLogs, currentMonthKey])
+  const earnedIds        = useMemo(() => evaluateBadges(client), [client.meals, client.weightLogs, client.workouts, client.stepsLogs, client.waterLogs])
+  const monthlyEarnedIds = useMemo(() => evaluateMonthlyBadgesForMonth(client, currentMonthKey), [client.meals, client.weightLogs, client.workouts, client.stepsLogs, client.waterLogs, currentMonthKey])
   const totalXP          = useMemo(() => computeTotalXP(earnedIds, client), [earnedIds, client])
   const levelData        = useMemo(() => computeLevel(totalXP), [totalXP])
 
@@ -339,6 +340,7 @@ function AppShell() {
                 {view === 'schedule'  && auth.role === 'client' && hasModule(auth.modules, 'booking_access')       && <ClientSchedule />}
                 {view === 'schedule'  && auth.role !== 'client' && <Schedule />}
                 {view === 'steps'     && (auth.role !== 'client' || hasModule(auth.modules, 'nutrition_tracking') || hasModule(auth.modules, 'weight_tracking')) && <StepsTracker />}
+                {view === 'water'     && (auth.role !== 'client' || hasModule(auth.modules, 'nutrition_tracking') || hasModule(auth.modules, 'weight_tracking')) && <WaterTracker />}
                 {view === 'workout'  && <ClientWorkout />}
                 {view === 'programs'  && (auth.role === 'coach' || auth.role === 'admin' || auth.role === 'client') && <Programs />}
                 {view === 'notifications' && auth.role === 'coach' && <Notifications />}
