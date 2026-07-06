@@ -93,17 +93,64 @@ const cardSx = {
   overflow: 'hidden',
 }
 
+// ── Challenge-graduate offer: €47 (instead of €98), unlocked by finishing the
+// 7-day challenge. Wired straight to Stripe checkout so the discount stays
+// exclusive to Day-7 finishers (the public LP is always €98). ──
+const GRADUATE_PRICE_EUR = 47
+const FULL_PRICE_EUR = 98
+const PROGRAM_ID = 'b83982f2-7d7c-4ede-b721-4d0e3642c8ed'
+const CHECKOUT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-checkout-session`
+
 export default function ChallengeCard() {
-  const { startChallenge, dismissChallenge, setView } = useApp()
+  const { startChallenge, dismissChallenge, setView, client } = useApp()
   const ch = useChallenge()
   const [busy, setBusy] = useState(false)
+  const [checkoutBusy, setCheckoutBusy] = useState(false)
+  const [checkoutErr, setCheckoutErr] = useState('')
   const [openHow, setOpenHow] = useState({})   // per-task "виж как" toggle, keyed by task id
   const toggleHow = (id) => setOpenHow(o => ({ ...o, [id]: !o[id] }))
   const [previewDay, setPreviewDay] = useState(null)   // DEV-only forced day (1..7) or null
   const [selectedNeed, setSelectedNeed] = useState(null)   // Day-7 offer: chosen answer key or null
 
-  // Same target as LeadHome's CTA — the full SYNRG Метод sales LP (has checkout).
-  const openMethod = () => { window.location.href = '../synrg-method.html' }
+  // Start the €47 graduate checkout. The discounted amount is created inline as
+  // price_data so it never appears on the public LP; only reachable from this
+  // Day-7 offer card. metadata carries client_id + program_id so the
+  // stripe-webhook links the purchase to this exact client and grants access.
+  async function startGraduateCheckout() {
+    setCheckoutErr('')
+    setCheckoutBusy(true)
+    try {
+      const origin = window.location.origin
+      const res = await fetch(CHECKOUT_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          line_items: [{
+            price_data: {
+              currency: 'eur',
+              unit_amount: GRADUATE_PRICE_EUR * 100,
+              product_data: { name: 'SYNRG Метод — специална цена (завършен 7-дневен challenge)' },
+            },
+            quantity: 1,
+          }],
+          locale: 'bg',
+          success_url: origin + '/remote.html?checkout=success&session_id={CHECKOUT_SESSION_ID}',
+          cancel_url:  origin + '/app/?checkout=cancel',
+          metadata: {
+            program_id: PROGRAM_ID,
+            client_id: client?.id || '',
+            customer_email: client?.email || '',
+            campaign: 'challenge_graduate',
+          },
+        }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (data.url) { window.location.href = data.url; return }
+      setCheckoutErr(data.message || data.error || 'Не успяхме да започнем плащането. Опитай отново.')
+    } catch {
+      setCheckoutErr('Мрежова грешка. Опитай отново.')
+    } finally { setCheckoutBusy(false) }
+  }
 
   // DEV switcher UI — rendered above the card so we can jump to any day.
   const devBar = DEV_PREVIEW ? (
@@ -264,17 +311,45 @@ export default function ChallengeCard() {
                 {NEEDS.find(n => n.key === selectedNeed)?.text}
               </Typography>
             </Box>
+
+            {/* Graduate discount — explains WHY it's cheaper (finished the challenge) */}
+            <Box sx={{
+              mt: 1.75, p: 1.5, borderRadius: '12px',
+              background: C.purpleA5, border: `1px solid ${C.purpleA20}`,
+            }}>
+              <Typography sx={{ fontSize: '12.5px', lineHeight: 1.5, color: C.text }}>
+                Защото <strong>завърши 7-дневния challenge</strong>, отключи специална цена само за теб:
+              </Typography>
+              <Stack direction="row" spacing={1} alignItems="baseline" sx={{ mt: 0.75 }}>
+                <Typography sx={{ fontSize: '15px', fontWeight: 700, color: C.muted, textDecoration: 'line-through' }}>
+                  €{FULL_PRICE_EUR}
+                </Typography>
+                <Typography sx={{ fontSize: '26px', fontWeight: 900, fontFamily: "'MontBlanc', sans-serif", color: C.purple, lineHeight: 1 }}>
+                  €{GRADUATE_PRICE_EUR}
+                </Typography>
+                <Typography sx={{ fontSize: '12px', fontWeight: 700, color: C.primary }}>
+                  · спестяваш €{FULL_PRICE_EUR - GRADUATE_PRICE_EUR}
+                </Typography>
+              </Stack>
+            </Box>
+
+            {checkoutErr && (
+              <Typography sx={{ mt: 1, fontSize: '12px', color: C.danger }}>{checkoutErr}</Typography>
+            )}
+
             <Button
-              onClick={openMethod}
+              onClick={startGraduateCheckout}
+              disabled={checkoutBusy}
               variant="contained"
-              endIcon={<ArrowForwardIcon sx={{ fontSize: 18 }} />}
+              endIcon={checkoutBusy ? <CircularProgress size={16} sx={{ color: '#0A0A14' }} /> : <ArrowForwardIcon sx={{ fontSize: 18 }} />}
               sx={{
                 mt: 1.75, background: C.purple, color: '#0A0A14', fontWeight: 800, textTransform: 'none',
                 px: 2.75, py: 1.1, borderRadius: '12px', fontSize: '14px', letterSpacing: '0.2px',
                 '&:hover': { background: C.purpleLighter },
+                '&.Mui-disabled': { background: C.purpleA20, color: C.muted },
               }}
             >
-              Започни SYNRG Метод
+              {checkoutBusy ? 'Отваряме плащането…' : `Започни SYNRG Метод за €${GRADUATE_PRICE_EUR}`}
             </Button>
           </Collapse>
         </Box>
