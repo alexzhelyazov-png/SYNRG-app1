@@ -6,10 +6,14 @@
 
 import { parseDate } from './utils'
 
-// ── Level thresholds (20 levels) ────────────────────────────
+// ── Level thresholds (30 levels) ────────────────────────────
+// Levels 1–20 kept identical to the original curve so no existing user drops
+// a level. Levels 21–30 are new headroom with progressively LARGER XP gaps
+// (250 → 1610), so climbing near the top is a real grind.
 export const LEVEL_THRESHOLDS = [
   0, 20, 50, 85, 130, 185, 250, 330, 420, 530,
   650, 790, 950, 1120, 1300, 1400, 1500, 1600, 1700, 1800,
+  2050, 2370, 2770, 3270, 3890, 4650, 5570, 6690, 8040, 9650,
 ]
 
 export const LEVEL_NAMES = {
@@ -17,13 +21,17 @@ export const LEVEL_NAMES = {
     'Новак','Активен','Трениращ','Атлет','Напреднал',
     'Силен','Много силен','Експерт','Мастер','Елит',
     'Про','Шампион','Ветеран','Лидер','Доминиращ',
-    'Титан','Гранд Мастер','Легенда','Икона','Synergy Elite',
+    'Титан','Гранд Мастер','Легенда','Икона','Виртуоз',
+    'Феномен','Колос','Безсмъртен','Полубог','Митичен',
+    'Аватар','Върховен','Трансцендент','Апекс','Synergy Elite',
   ],
   en: [
     'Rookie','Active','Training','Athlete','Advanced',
     'Strong','Very Strong','Expert','Master','Elite',
     'Pro','Champion','Veteran','Leader','Dominant',
-    'Titan','Grand Master','Legend','Icon','Synergy Elite',
+    'Titan','Grand Master','Legend','Icon','Virtuoso',
+    'Phenom','Colossus','Immortal','Demigod','Mythic',
+    'Avatar','Supreme','Transcendent','Apex','Synergy Elite',
   ],
 }
 

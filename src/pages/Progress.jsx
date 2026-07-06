@@ -452,7 +452,7 @@ function LevelCard({ levelData, levelName, t, lang, earnedCount }) {
           fontSize: '11px', fontWeight: 700, textTransform: 'uppercase',
           letterSpacing: '0.9px', color: C.muted, mb: 0.75,
         }}>
-          {t('levelLbl')} {levelData.level}/20
+          {t('levelLbl')} {levelData.level}/{LEVEL_THRESHOLDS.length}
         </Typography>
 
         <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1.5, mb: 2 }}>
@@ -509,7 +509,7 @@ function LevelCard({ levelData, levelName, t, lang, earnedCount }) {
             return (
               <Box key={lvl} sx={{
                 display: 'flex', alignItems: 'center', gap: 1.5, py: 1,
-                borderBottom: `1px solid ${i < 19 ? 'rgba(255,255,255,0.04)' : 'transparent'}`,
+                borderBottom: `1px solid ${i < LEVEL_THRESHOLDS.length - 1 ? 'rgba(255,255,255,0.04)' : 'transparent'}`,
                 opacity: isReached ? 1 : 0.45,
               }}>
                 <Typography sx={{
@@ -525,7 +525,7 @@ function LevelCard({ levelData, levelName, t, lang, earnedCount }) {
                     {names[i]}
                   </Typography>
                   <Typography sx={{ fontSize: '10px', color: C.muted }}>
-                    {xp} {t('xpLbl')}{i < 19 ? ` — ${LEVEL_THRESHOLDS[i + 1] - 1} ${t('xpLbl')}` : '+'}
+                    {xp} {t('xpLbl')}{i < LEVEL_THRESHOLDS.length - 1 ? ` — ${LEVEL_THRESHOLDS[i + 1] - 1} ${t('xpLbl')}` : '+'}
                   </Typography>
                 </Box>
                 {isCurrent && (
