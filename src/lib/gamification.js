@@ -74,10 +74,12 @@ export const ALLTIME_BADGES = [
   { id: 'weight_3days', category: 'consistency', xp: 15, tier: null, series: null, muiIcon: 'MonitorWeight',  condType: 'count', condField: 'weightDays',  condValue: 3 },
   { id: 'steps_3days',  category: 'consistency', xp: 15, tier: null, series: null, muiIcon: 'DirectionsWalk', condType: 'count', condField: 'stepsDays',   condValue: 3 },
 
-  // ── Water hydration streaks (consecutive days hitting 2 L) ──
-  { id: 'water_streak_3',    category: 'consistency', xp: 15,  tier: null,     series: null, muiIcon: 'WaterDrop',  condType: 'water_streak', condValue: 3  },
-  { id: 'water_streak_7',    category: 'consistency', xp: 40,  tier: 'silver', series: null, muiIcon: 'LocalDrink', condType: 'water_streak', condValue: 7  },
-  { id: 'water_streak_gold', category: 'consistency', xp: 100, tier: 'gold',   series: null, muiIcon: 'LocalDrink', condType: 'water_streak', condValue: 30 },
+  // ── Water hydration streaks — CONSECUTIVE days hitting 2 L (distinct from the
+  //    monthly m_water "days in a month" series; numbers 3/7/14 avoid colliding
+  //    with the monthly 7/15/30). ──
+  { id: 'water_streak_3',  category: 'consistency', xp: 15, tier: null,     series: null, muiIcon: 'WaterDrop',  condType: 'water_streak', condValue: 3  },
+  { id: 'water_streak_7',  category: 'consistency', xp: 40, tier: 'silver', series: null, muiIcon: 'LocalDrink', condType: 'water_streak', condValue: 7  },
+  { id: 'water_streak_14', category: 'consistency', xp: 90, tier: 'gold',   series: null, muiIcon: 'LocalDrink', condType: 'water_streak', condValue: 14 },
 
   // ── Standalone ──
   { id: 'all_rounder',  category: 'special',  xp: 40, tier: null, series: null, muiIcon: 'AutoAwesome',  condType: 'compound',    condValue: 1   },

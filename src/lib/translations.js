@@ -227,7 +227,7 @@ export const T = {
     badge_first_meal: 'Първо хранене', badge_first_weight: 'Първо тегло', badge_first_steps: 'Първи крачки',
     badge_meals_3days: '3 дни калории', badge_weight_3days: '3 дни тегло', badge_steps_3days: '3 дни стъпки',
     badge_first_water: 'Първа глътка',
-    badge_water_streak_3: '3 дни хидратация', badge_water_streak_7: '7 дни хидратация', badge_water_streak_gold: '30 дни хидратация',
+    badge_water_streak_3: '3 дни подред', badge_water_streak_7: '7 дни подред', badge_water_streak_14: '14 дни подред',
     badge_first_pr: 'Първи личен рекорд', badge_all_rounder: 'Всестранец', badge_century_club: '100 XP клуб',
     // All-time badge descriptions
     badgeDesc_workouts_30:      'Запиши 30 тренировки',
@@ -243,7 +243,7 @@ export const T = {
     badgeDesc_first_meal: 'Въведи първото си хранене', badgeDesc_first_weight: 'Въведи първото си тегло', badgeDesc_first_steps: 'Въведи първите си крачки',
     badgeDesc_meals_3days: 'Запиши хранене в 3 различни дни', badgeDesc_weight_3days: 'Запиши теглото си в 3 различни дни', badgeDesc_steps_3days: 'Запиши стъпки в 3 различни дни',
     badgeDesc_first_water: 'Запиши вода за първи път',
-    badgeDesc_water_streak_3: 'Достигни 2 л вода 3 поредни дни', badgeDesc_water_streak_7: 'Достигни 2 л вода 7 поредни дни', badgeDesc_water_streak_gold: 'Достигни 2 л вода 30 поредни дни',
+    badgeDesc_water_streak_3: 'Пий поне 2 л вода 3 дни подред без прекъсване', badgeDesc_water_streak_7: 'Пий поне 2 л вода 7 дни подред без прекъсване', badgeDesc_water_streak_14: 'Пий поне 2 л вода 14 дни подред без прекъсване',
     badgeDesc_first_pr: 'Подобри личен рекорд', badgeDesc_all_rounder: '5+ тренировки, 20+ хранения, 5+ тегла', badgeDesc_century_club: 'Спечели 100+ XP',
     // Monthly series
     series_m_workouts:    'Тренировки',
@@ -1293,7 +1293,7 @@ export const T = {
     badge_first_meal: 'First Meal', badge_first_weight: 'First Weigh-in', badge_first_steps: 'First Steps',
     badge_meals_3days: '3 Days Calories', badge_weight_3days: '3 Days Weight', badge_steps_3days: '3 Days Steps',
     badge_first_water: 'First Sip',
-    badge_water_streak_3: '3 Days Hydrated', badge_water_streak_7: '7 Days Hydrated', badge_water_streak_gold: '30 Days Hydrated',
+    badge_water_streak_3: '3 Days in a Row', badge_water_streak_7: '7 Days in a Row', badge_water_streak_14: '14 Days in a Row',
     badge_first_pr: 'First PR', badge_all_rounder: 'All-Rounder', badge_century_club: '100 XP Club',
     // All-time badge descriptions
     badgeDesc_workouts_30:      'Log 30 workouts',
@@ -1309,7 +1309,7 @@ export const T = {
     badgeDesc_first_meal: 'Log your first meal', badgeDesc_first_weight: 'Log your first weight', badgeDesc_first_steps: 'Log your first steps',
     badgeDesc_meals_3days: 'Log meals on 3 different days', badgeDesc_weight_3days: 'Log your weight on 3 different days', badgeDesc_steps_3days: 'Log steps on 3 different days',
     badgeDesc_first_water: 'Log water for the first time',
-    badgeDesc_water_streak_3: 'Hit 2 L of water 3 days in a row', badgeDesc_water_streak_7: 'Hit 2 L of water 7 days in a row', badgeDesc_water_streak_gold: 'Hit 2 L of water 30 days in a row',
+    badgeDesc_water_streak_3: 'Drink at least 2 L of water 3 days in a row', badgeDesc_water_streak_7: 'Drink at least 2 L of water 7 days in a row', badgeDesc_water_streak_14: 'Drink at least 2 L of water 14 days in a row',
     badgeDesc_first_pr: 'Beat a personal record', badgeDesc_all_rounder: '5+ workouts, 20+ meals, 5+ weights', badgeDesc_century_club: 'Earn 100+ total XP',
     // Monthly series
     series_m_workouts:    'Workouts',
