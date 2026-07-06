@@ -6,8 +6,11 @@ import { C } from '../theme'
 // Small info banner shown on the trackers (weight / steps / food) explaining
 // that logging data earns XP toward the monthly ranking, where the top three
 // win a prize each month.
-export default function RankingHint() {
+export default function RankingHint({ messageBg, messageEn }) {
   const { lang } = useApp()
+  const text = lang === 'en'
+    ? (messageEn || 'Every entry you log earns points in the ranking. Each month the top three win a prize.')
+    : (messageBg || 'Всяко записване ти носи точки в класацията. Всеки месец първите трима печелят награда.')
   return (
     <Box sx={{
       display: 'flex', alignItems: 'center', gap: 1,
@@ -17,9 +20,7 @@ export default function RankingHint() {
     }}>
       <EmojiEventsOutlinedIcon sx={{ fontSize: 18, color: '#FFD070', flexShrink: 0 }} />
       <Typography sx={{ fontSize: '12px', color: C.text, lineHeight: 1.4, flex: 1 }}>
-        {lang === 'en'
-          ? 'Every entry you log earns points in the ranking. Each month the top three win a prize.'
-          : 'Всяко записване ти носи точки в класацията. Всеки месец първите трима печелят награда.'}
+        {text}
       </Typography>
     </Box>
   )

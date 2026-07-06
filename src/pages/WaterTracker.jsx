@@ -96,13 +96,6 @@ export default function WaterTracker() {
     })
   }
 
-  function resetDay() {
-    if (isTrackerReadOnly) return
-    clearTimeout(writeTimer.current)
-    setOptimisticMl(0)
-    saveWaterLog(client.id, targetDate, 0)
-  }
-
   // ── Target editing ────────────────────────────────────────────
   const [editingTarget, setEditingTarget] = useState(false)
   const [targetInput, setTargetInput] = useState('')
@@ -141,7 +134,12 @@ export default function WaterTracker() {
         <Typography variant="body2" sx={{ color: C.muted, mt: 0.5 }}>{client.name}</Typography>
       </Box>
 
-      {!isTrackerReadOnly && <RankingHint />}
+      {!isTrackerReadOnly && (
+        <RankingHint
+          messageBg="Стигни 2 л на ден за значка, а 3 л за по-голяма. Дни подред те качват в класацията."
+          messageEn="Hit 2 L a day for a badge, 3 L for a bigger one. Days in a row climb the ranking."
+        />
+      )}
 
       {/* ── Today ring + quick add ──────────────────── */}
       <Paper sx={{ p: 3, mb: 2.5, textAlign: 'center' }}>
@@ -180,14 +178,10 @@ export default function WaterTracker() {
         )}
 
         {!isTrackerReadOnly && (
-          <Box sx={{ display: 'flex', gap: 2, justifyContent: 'center', mt: 1.75 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'center', mt: 1.75 }}>
             <Button size="small" onClick={() => addWater(-250)} disabled={displayMl <= 0}
               sx={{ color: C.muted, fontSize: '13px', minWidth: 'auto' }}>
-              −250
-            </Button>
-            <Button size="small" onClick={resetDay} disabled={displayMl <= 0}
-              sx={{ color: C.muted, fontSize: '13px', minWidth: 'auto' }}>
-              {t('resetDayLbl')}
+              {t('undoWaterLbl')}
             </Button>
           </Box>
         )}
