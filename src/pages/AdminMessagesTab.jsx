@@ -416,6 +416,14 @@ export default function AdminMessagesTab() {
   // inboxes via the coach tabs. Real coaches — incl. Елина, who also has
   // admin rights — see ONLY their own clients here (each answers their own).
   const isShadowAdmin = auth.role === 'admin' || /^Админ/i.test(auth.name || '')
+
+  // Coach logins authenticate against CLIENTS (auth.id = clients.id) while
+  // assigned_coach_id references COACHES — resolve this staff member's coach
+  // id by name, else scoping compares ids from two different tables → 0 hits.
+  const myCoachId = useMemo(() => {
+    const match = coaches.find(k => k.id === auth.id) || coaches.find(k => k.name === auth.name)
+    return match?.id || null
+  }, [coaches, auth.id, auth.name])
   const [selectedClientId, setSelectedClientId] = useState(null)
   // Default to Studio — that's where all current clients live. Online will
   // populate once real Stripe-subscribed clients start signing up.
@@ -505,11 +513,14 @@ export default function AdminMessagesTab() {
   // Visible scope: shadow admin → the selected coach tab; real coach → ONLY
   // their own clients (assigned OR with an existing thread with them).
   const scopedClients = useMemo(() => {
-    if (!isShadowAdmin) return realClientList.filter(c => belongsToCoach(c, auth.id))
+    if (!isShadowAdmin) {
+      if (!myCoachId) return []
+      return realClientList.filter(c => belongsToCoach(c, myCoachId))
+    }
     const set = (coachTab && tabClientIds[coachTab]) || new Set()
     return realClientList.filter(c => set.has(c.id))
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [realClientList, isShadowAdmin, auth.id, tabClientIds, coachTab, threadCoachesByClient])
+  }, [realClientList, isShadowAdmin, myCoachId, tabClientIds, coachTab, threadCoachesByClient])
 
   const eligibleClients = useMemo(() => {
     return clientTypeFilter === 'online'
@@ -555,8 +566,9 @@ export default function AdminMessagesTab() {
   async function handleSend() {
     const text = draft.trim()
     if (!text || !selected || sending) return
-    // For admin sending on behalf: use the assigned_coach_id, else fallback to current user.
-    const coachId = selected.assigned_coach_id || (!isAdminUser ? auth.id : null)
+    // For admin sending on behalf: use the assigned_coach_id, else fallback to
+    // the current user's COACH id (auth.id is their clients-table id — wrong table).
+    const coachId = selected.assigned_coach_id || (!isAdminUser ? myCoachId : null)
     if (!coachId) {
       alert('Клиентът няма назначен треньор. Първо му назначи треньор.')
       return

@@ -1628,6 +1628,16 @@ export function AppProvider({ children }) {
     }
   }, [auth.role, auth.name, showSnackbar])
 
+  // Coach logins authenticate against the CLIENTS table (auth.id = clients.id),
+  // but clients.assigned_coach_id references the COACHES table — the same
+  // person has two different ids. Resolve the staff member's COACH id by name
+  // so ownership checks (unread badge, mark-read) actually match.
+  const staffCoachId = useMemo(() => {
+    if (auth.role !== 'coach') return null
+    const match = coaches.find(k => k.id === auth.id) || coaches.find(k => k.name === auth.name)
+    return match?.id || null
+  }, [coaches, auth.role, auth.id, auth.name])
+
   // ── Coach chat: mark read ─────────────────────────────────
   const markCoachMessagesRead = useCallback(async (clientId) => {
     if (!clientId) return
@@ -1640,7 +1650,7 @@ export function AppProvider({ children }) {
     if (readerRole === 'coach') {
       const cl = (clientsRef.current || []).find(c => c.id === clientId)
       const isShadowAdmin = auth.role === 'admin' || /^Админ/i.test(auth.name || '')
-      const isOwner  = cl?.assigned_coach_id === auth.id
+      const isOwner  = !!staffCoachId && cl?.assigned_coach_id === staffCoachId
       const isOrphan = !cl?.assigned_coach_id
       if (!isOwner && !(isShadowAdmin && isOrphan)) return
     }
@@ -1654,7 +1664,7 @@ export function AppProvider({ children }) {
         return { ...m, read_at: now }
       }))
     } catch { /* silent */ }
-  }, [auth.role, auth.id, auth.name])
+  }, [auth.role, auth.id, auth.name, staffCoachId])
 
   // ── Coach chat: assign coach (admin only) ─────────────────
   const assignCoach = useCallback(async (clientId, coachId) => {
@@ -1699,11 +1709,12 @@ export function AppProvider({ children }) {
       return coachMessages.filter(m => m.sender_role === 'client' && !m.read_at).length
     }
     if (auth.role === 'coach') {
-      const myClientIds = new Set(clients.filter(c => c.assigned_coach_id === auth.id).map(c => c.id))
+      if (!staffCoachId) return 0
+      const myClientIds = new Set(clients.filter(c => c.assigned_coach_id === staffCoachId).map(c => c.id))
       return coachMessages.filter(m => m.sender_role === 'client' && !m.read_at && myClientIds.has(m.client_id)).length
     }
     return 0
-  }, [coachMessages, auth, clients])
+  }, [coachMessages, auth, clients, staffCoachId])
 
   async function dismissBadge(badgeId, monthKey = null) {
     const cl = client
