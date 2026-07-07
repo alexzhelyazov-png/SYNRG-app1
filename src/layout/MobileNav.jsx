@@ -20,14 +20,16 @@ import useClientTier          from '../hooks/useClientTier'
 
 // Build role-specific nav item list (module-aware for clients)
 function getNavItems(auth, admin, isOnlineClient = false, isLead = false) {
-  // Coach/admin nav — unchanged
+  // Coach/admin nav — Съобщения sits right after График so client messages
+  // are one tap away on the phone too (pink unread badge, same as sidebar).
   if (auth.role !== 'client') {
     const items = [
-      { view: 'dashboard', Icon: DashboardIcon,     labelKey: 'navDashboard' },
-      { view: 'schedule',  Icon: CalendarMonthIcon, labelKey: 'navSchedule'  },
-      { view: 'ranking',   Icon: LeaderboardIcon,   labelKey: 'navRanking'   },
-      { view: 'tasks',     Icon: AssignmentIcon,    labelKey: 'navTasks'     },
-      { view: 'recipes',   Icon: MenuBookIcon,      labelKey: 'navRecipes'   },
+      { view: 'dashboard',        Icon: DashboardIcon,         labelKey: 'navDashboard' },
+      { view: 'schedule',         Icon: CalendarMonthIcon,     labelKey: 'navSchedule'  },
+      { view: 'coach_chat_admin', Icon: ChatBubbleOutlineIcon, labelKey: 'navMessages'  },
+      { view: 'ranking',          Icon: LeaderboardIcon,       labelKey: 'navRanking'   },
+      { view: 'tasks',            Icon: AssignmentIcon,        labelKey: 'navTasks'     },
+      { view: 'recipes',          Icon: MenuBookIcon,          labelKey: 'navRecipes'   },
     ]
     if (admin) items.push({ view: 'admin', Icon: AdminPanelSettingsIcon, labelKey: 'navAdmin' })
     return items
@@ -84,7 +86,7 @@ function LockBadge() {
 // so we attach `data-tour` via a callback ref directly on the DOM root.
 // Without this hack the WelcomeTour can't locate the bottom-nav buttons
 // on mobile and falls back to a no-highlight centered tooltip.
-function NavAction({ value, Icon, label, isSelected, onClick, badge, isLocked, dataTour, ...rest }) {
+function NavAction({ value, Icon, label, isSelected, onClick, badge, badgeColor, isLocked, dataTour, ...rest }) {
   const iconColor = isSelected ? C.purple : isLocked ? 'rgba(196,209,205,0.3)' : C.muted
   const labelColor = isSelected ? C.purple : isLocked ? 'rgba(196,209,205,0.3)' : C.muted
 
@@ -117,7 +119,8 @@ function NavAction({ value, Icon, label, isSelected, onClick, badge, isLocked, d
               <Box sx={{
                 position: 'absolute', top: -4, right: -6,
                 minWidth: 16, height: 16, borderRadius: '8px',
-                background: '#c4e9bf', color: '#111',
+                background: badgeColor || '#c4e9bf',
+                color: badgeColor ? '#fff' : '#111',
                 fontSize: '9px', fontWeight: 900,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 px: 0.4, lineHeight: 1,
@@ -149,7 +152,7 @@ export default function MobileNav() {
     viewingCoach, setViewingCoach,
     coachClientMode, setCoachClientMode,
     client, saveWorkoutDraft,
-    unreadFeedCount,
+    unreadFeedCount, unreadCoachMsgCount,
   } = useApp()
 
   const admin = isAdmin(auth)
@@ -202,6 +205,8 @@ export default function MobileNav() {
           {/* Role-specific nav items */}
           {navItems.map(({ view: v, Icon, labelKey, isLocked }) => {
             const showBadge = unreadFeedCount > 0 && (v === 'progress' || v === 'ranking')
+            // Messages badge is PINK (like the sidebar) — unread client messages
+            const msgBadge = v === 'coach_chat_admin' ? unreadCoachMsgCount : 0
             return (
               <NavAction
                 key={v}
@@ -209,7 +214,8 @@ export default function MobileNav() {
                 Icon={Icon}
                 label={t(labelKey)}
                 isSelected={view === v && !viewingCoach}
-                badge={showBadge ? unreadFeedCount : 0}
+                badge={showBadge ? unreadFeedCount : msgBadge}
+                badgeColor={msgBadge > 0 ? C.danger : undefined}
                 isLocked={!!isLocked}
                 // Tour anchor — WelcomeTour highlights nav-dashboard / nav-progress / nav-programs
                 dataTour={`nav-${v}`}
