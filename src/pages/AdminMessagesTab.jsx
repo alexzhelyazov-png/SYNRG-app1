@@ -412,6 +412,10 @@ export default function AdminMessagesTab() {
 
   // Admin status is determined by name (role is 'coach' for everyone in coaches table)
   const isAdminUser = isAdmin(auth) || isFullAdmin(auth) || auth.role === 'admin'
+  // Shadow admins (АдминАлекс, АдминКари) are pure overseers: they see ALL
+  // inboxes via the coach tabs. Real coaches — incl. Елина, who also has
+  // admin rights — see ONLY their own clients here (each answers their own).
+  const isShadowAdmin = auth.role === 'admin' || /^Админ/i.test(auth.name || '')
   const [selectedClientId, setSelectedClientId] = useState(null)
   // Default to Studio — that's where all current clients live. Online will
   // populate once real Stripe-subscribed clients start signing up.
@@ -469,13 +473,11 @@ export default function AdminMessagesTab() {
   const belongsToCoach = (c, coachId) =>
     c.assigned_coach_id === coachId || threadCoachesByClient.get(c.id)?.has(coachId)
 
-  const [coachTab, setCoachTab] = useState(null) // coach id | 'other'
+  const [coachTab, setCoachTab] = useState(null) // coach id | 'other' (shadow admins only)
   useEffect(() => {
     if (coachTab || !mainCoaches.length) return
-    // Default: a coach lands on their own tab; admins land on the first.
-    const mine = mainCoaches.find(k => k.id === auth.id)
-    setCoachTab(mine ? mine.id : mainCoaches[0].id)
-  }, [mainCoaches, coachTab, auth.id])
+    setCoachTab(mainCoaches[0].id)
+  }, [mainCoaches, coachTab])
 
   const realClientList = useMemo(() => clients.filter(c => !c.is_coach && c.id), [clients])
 
@@ -500,14 +502,21 @@ export default function AdminMessagesTab() {
     return res
   }, [coachMessages, tabClientIds, mainCoaches])
 
-  const eligibleClients = useMemo(() => {
+  // Visible scope: shadow admin → the selected coach tab; real coach → ONLY
+  // their own clients (assigned OR with an existing thread with them).
+  const scopedClients = useMemo(() => {
+    if (!isShadowAdmin) return realClientList.filter(c => belongsToCoach(c, auth.id))
     const set = (coachTab && tabClientIds[coachTab]) || new Set()
-    const scoped = realClientList.filter(c => set.has(c.id))
-    return clientTypeFilter === 'online'
-      ? scoped.filter(isOnline)
-      : scoped.filter(c => !isOnline(c))
+    return realClientList.filter(c => set.has(c.id))
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [realClientList, tabClientIds, coachTab, clientTypeFilter, onlineClientIds])
+  }, [realClientList, isShadowAdmin, auth.id, tabClientIds, coachTab, threadCoachesByClient])
+
+  const eligibleClients = useMemo(() => {
+    return clientTypeFilter === 'online'
+      ? scopedClients.filter(isOnline)
+      : scopedClients.filter(c => !isOnline(c))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scopedClients, clientTypeFilter, onlineClientIds])
 
   // Compute per-client chat summary
   const clientRows = useMemo(() => {
@@ -694,38 +703,49 @@ export default function AdminMessagesTab() {
         Съобщения
       </Typography>
 
-      {/* Coach tabs — shared inbox: everyone sees both coaches' unread */}
-      <Box sx={{ display: 'flex', gap: 0.75, mb: 1.5, flexWrap: 'wrap' }}>
-        {mainCoaches.map(k => (
+      {/* Coach tabs — ONLY shadow admins oversee all inboxes (ИЦКО | ЕЛИНА |
+          ДРУГИ). Real coaches see just their own clients — no tabs. */}
+      {isShadowAdmin && (
+        <Box sx={{ display: 'flex', gap: 0.75, mb: 1.5, flexWrap: 'wrap' }}>
+          {mainCoaches.map(k => (
+            <CoachTab
+              key={k.id}
+              active={coachTab === k.id}
+              onClick={() => setCoachTab(k.id)}
+              label={(k.name || '').toUpperCase()}
+              unread={unreadByTab[k.id] || 0}
+            />
+          ))}
           <CoachTab
-            key={k.id}
-            active={coachTab === k.id}
-            onClick={() => setCoachTab(k.id)}
-            label={(k.name || '').toUpperCase()}
-            unread={unreadByTab[k.id] || 0}
+            active={coachTab === 'other'}
+            onClick={() => setCoachTab('other')}
+            label="ДРУГИ"
+            unread={unreadByTab.other || 0}
           />
-        ))}
-        <CoachTab
-          active={coachTab === 'other'}
-          onClick={() => setCoachTab('other')}
-          label="ДРУГИ"
-          unread={unreadByTab.other || 0}
-        />
-      </Box>
+        </Box>
+      )}
 
-      {/* Online / Studio filter — shown for BOTH admins and regular coaches */}
+      {/* Online / Studio filter — shown for BOTH admins and regular coaches.
+          Pink bubbles show unread per bucket so a message can't hide behind
+          the other filter. */}
       <Box sx={{ display: 'flex', gap: 0.75, mb: 2, flexWrap: 'wrap' }}>
         {(() => {
-          const set = (coachTab && tabClientIds[coachTab]) || new Set()
-          const scoped = realClientList.filter(c => set.has(c.id))
-          const onlineCount = scoped.filter(isOnline).length
-          const studioCount = scoped.filter(c => !isOnline(c)).length
+          const onlineScoped = scopedClients.filter(isOnline)
+          const studioScoped = scopedClients.filter(c => !isOnline(c))
+          const unreadIn = (list) => {
+            const s = new Set(list.map(c => c.id))
+            return coachMessages.filter(m => m.sender_role === 'client' && !m.read_at && s.has(m.client_id)).length
+          }
+          const onlineUnread = unreadIn(onlineScoped)
+          const studioUnread = unreadIn(studioScoped)
+          const onlineCount = onlineScoped.length
+          const studioCount = studioScoped.length
           return (
             <>
-              <FilterChip active={clientTypeFilter === 'online'} onClick={() => setClientTypeFilter('online')}>
+              <FilterChip active={clientTypeFilter === 'online'} onClick={() => setClientTypeFilter('online')} unread={onlineUnread}>
                 Онлайн ({onlineCount})
               </FilterChip>
-              <FilterChip active={clientTypeFilter === 'studio'} onClick={() => setClientTypeFilter('studio')}>
+              <FilterChip active={clientTypeFilter === 'studio'} onClick={() => setClientTypeFilter('studio')} unread={studioUnread}>
                 Студио ({studioCount})
               </FilterChip>
             </>
@@ -845,11 +865,12 @@ function CoachTab({ active, onClick, label, unread }) {
   )
 }
 
-function FilterChip({ active, onClick, children }) {
+function FilterChip({ active, onClick, children, unread = 0 }) {
   return (
     <Box
       onClick={onClick}
       sx={{
+        display: 'flex', alignItems: 'center', gap: 0.75,
         px: 1.25, py: 0.5, borderRadius: '100px', cursor: 'pointer',
         fontSize: 12, fontWeight: 700,
         background: active ? C.purple : 'transparent',
@@ -860,6 +881,17 @@ function FilterChip({ active, onClick, children }) {
       }}
     >
       {children}
+      {unread > 0 && (
+        <Box sx={{
+          minWidth: 18, height: 18, px: 0.5, borderRadius: '9px',
+          background: C.danger,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          <Typography sx={{ color: '#fff', fontSize: 10, fontWeight: 800, lineHeight: 1 }}>
+            {unread > 9 ? '9+' : unread}
+          </Typography>
+        </Box>
+      )}
     </Box>
   )
 }

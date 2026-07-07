@@ -1632,6 +1632,18 @@ export function AppProvider({ children }) {
   const markCoachMessagesRead = useCallback(async (clientId) => {
     if (!clientId) return
     const readerRole = auth.role === 'client' ? 'client' : 'coach'
+    // Staff reads: ONLY the client's assigned coach clears the unread state.
+    // A shadow admin (АдминАлекс/АдминКари) just LOOKING at a thread must NOT
+    // eat the coach's pink notification — the coach still has to see it and
+    // answer. Admins clear only ownerless threads (no assigned coach), so
+    // those don't stay lit forever.
+    if (readerRole === 'coach') {
+      const cl = (clientsRef.current || []).find(c => c.id === clientId)
+      const isShadowAdmin = auth.role === 'admin' || /^Админ/i.test(auth.name || '')
+      const isOwner  = cl?.assigned_coach_id === auth.id
+      const isOrphan = !cl?.assigned_coach_id
+      if (!isOwner && !(isShadowAdmin && isOrphan)) return
+    }
     try {
       await DB.markCoachMessagesRead({ clientId, readerRole })
       const now = new Date().toISOString()
@@ -1642,7 +1654,7 @@ export function AppProvider({ children }) {
         return { ...m, read_at: now }
       }))
     } catch { /* silent */ }
-  }, [auth.role])
+  }, [auth.role, auth.id, auth.name])
 
   // ── Coach chat: assign coach (admin only) ─────────────────
   const assignCoach = useCallback(async (clientId, coachId) => {
@@ -1677,16 +1689,18 @@ export function AppProvider({ children }) {
     if (auth.role === 'client') {
       return coachMessages.filter(m => m.sender_role !== 'client' && !m.read_at).length
     }
-    // Admin (by name or role) → counts across all clients
-    const isAdmn = isAdminUser(auth) || isFullAdmin(auth) || auth.role === 'admin'
-    if (isAdmn) {
+    // ONLY shadow-admin profiles (АдминАлекс, АдминКари) oversee everything —
+    // their badge counts every unread client message in the system.
+    // Real coaches (Ицко, Елина — even though Елина has admin rights) get
+    // pinged ONLY for their own clients: the other coach's messages must not
+    // ring their bell (each answers their own; the owner supervises all).
+    const isShadowAdmin = auth.role === 'admin' || /^Админ/i.test(auth.name || '')
+    if (isShadowAdmin) {
       return coachMessages.filter(m => m.sender_role === 'client' && !m.read_at).length
     }
-    // Coaches share ONE inbox: every coach sees every unread client message
-    // (incl. the other coach's), so nothing can sit unseen in a colleague's
-    // list. Requirement: no client message may ever go unnoticed.
     if (auth.role === 'coach') {
-      return coachMessages.filter(m => m.sender_role === 'client' && !m.read_at).length
+      const myClientIds = new Set(clients.filter(c => c.assigned_coach_id === auth.id).map(c => c.id))
+      return coachMessages.filter(m => m.sender_role === 'client' && !m.read_at && myClientIds.has(m.client_id)).length
     }
     return 0
   }, [coachMessages, auth, clients])
