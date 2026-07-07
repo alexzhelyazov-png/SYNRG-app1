@@ -1682,10 +1682,11 @@ export function AppProvider({ children }) {
     if (isAdmn) {
       return coachMessages.filter(m => m.sender_role === 'client' && !m.read_at).length
     }
-    // Regular coach → only messages from their assigned clients
+    // Coaches share ONE inbox: every coach sees every unread client message
+    // (incl. the other coach's), so nothing can sit unseen in a colleague's
+    // list. Requirement: no client message may ever go unnoticed.
     if (auth.role === 'coach') {
-      const myClientIds = new Set(clients.filter(c => c.assigned_coach_id === auth.id).map(c => c.id))
-      return coachMessages.filter(m => m.sender_role === 'client' && !m.read_at && myClientIds.has(m.client_id)).length
+      return coachMessages.filter(m => m.sender_role === 'client' && !m.read_at).length
     }
     return 0
   }, [coachMessages, auth, clients])

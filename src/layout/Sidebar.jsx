@@ -86,10 +86,11 @@ export default function Sidebar() {
   const admin = isAdmin(auth)
   // Chat visibility:
   //  - client with synrg_method → CoachChat (client side)
-  //  - non-admin coach (e.g. Ицко) → AdminMessagesTab (his clients)
+  //  - ANY coach or admin (Ицко, Елина, АдминАлекс…) → shared messages inbox
+  //    with pink unread badge, so no client message ever goes unseen.
   const hasCoachChat     = auth.role === 'client' && hasModule(auth.modules, 'synrg_method')
-  const isNonAdminCoach  = auth.role === 'coach' && !admin
-  const showChatEntry    = hasCoachChat || isNonAdminCoach
+  const isStaff          = auth.role === 'coach' || auth.role === 'admin'
+  const showChatEntry    = hasCoachChat || isStaff
   const chatView         = hasCoachChat ? 'coach_chat' : 'coach_chat_admin'
   const chatLabel        = hasCoachChat ? (t('navCoach') || 'Треньор') : (t('navMessages') || 'Съобщения')
 

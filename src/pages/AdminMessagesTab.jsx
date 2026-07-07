@@ -442,13 +442,72 @@ export default function AdminMessagesTab() {
   }, [])
 
   const isOnline = (c) => onlineClientIds.has(c.id)
+
+  // ── Shared inbox: coach tabs ИЦКО | ЕЛИНА | ДРУГИ ────────────
+  // EVERY staff member (both coaches + admins) sees ALL tabs with per-tab
+  // unread counts, so a client message can never sit unseen in a colleague's
+  // inbox. A client shows in a coach's tab if assigned to them OR has a
+  // message thread with them (union — a thread is never invisible).
+  const mainCoaches = useMemo(() => {
+    const icko  = realCoaches.find(c => /ицко/i.test(c.name || ''))
+    const elina = realCoaches.find(c => /елина/i.test(c.name || ''))
+    return [icko, elina].filter(Boolean)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [coaches])
+
+  // clientId → Set(coach ids they have a thread with)
+  const threadCoachesByClient = useMemo(() => {
+    const map = new Map()
+    for (const m of coachMessages) {
+      if (!m.client_id || !m.coach_id) continue
+      if (!map.has(m.client_id)) map.set(m.client_id, new Set())
+      map.get(m.client_id).add(m.coach_id)
+    }
+    return map
+  }, [coachMessages])
+
+  const belongsToCoach = (c, coachId) =>
+    c.assigned_coach_id === coachId || threadCoachesByClient.get(c.id)?.has(coachId)
+
+  const [coachTab, setCoachTab] = useState(null) // coach id | 'other'
+  useEffect(() => {
+    if (coachTab || !mainCoaches.length) return
+    // Default: a coach lands on their own tab; admins land on the first.
+    const mine = mainCoaches.find(k => k.id === auth.id)
+    setCoachTab(mine ? mine.id : mainCoaches[0].id)
+  }, [mainCoaches, coachTab, auth.id])
+
+  const realClientList = useMemo(() => clients.filter(c => !c.is_coach && c.id), [clients])
+
+  const tabClientIds = useMemo(() => {
+    const res = {}
+    for (const k of mainCoaches) {
+      res[k.id] = new Set(realClientList.filter(c => belongsToCoach(c, k.id)).map(c => c.id))
+    }
+    res.other = new Set(
+      realClientList
+        .filter(c => !mainCoaches.some(k => belongsToCoach(c, k.id)))
+        .map(c => c.id)
+    )
+    return res
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [realClientList, mainCoaches, threadCoachesByClient])
+
+  const unreadByTab = useMemo(() => {
+    const count = (set) => coachMessages.filter(m => m.sender_role === 'client' && !m.read_at && set?.has(m.client_id)).length
+    const res = { other: count(tabClientIds.other) }
+    for (const k of mainCoaches) res[k.id] = count(tabClientIds[k.id])
+    return res
+  }, [coachMessages, tabClientIds, mainCoaches])
+
   const eligibleClients = useMemo(() => {
-    const real = clients.filter(c => !c.is_coach && c.id)
-    const scoped = isAdminUser ? real : real.filter(c => c.assigned_coach_id === auth.id)
+    const set = (coachTab && tabClientIds[coachTab]) || new Set()
+    const scoped = realClientList.filter(c => set.has(c.id))
     return clientTypeFilter === 'online'
       ? scoped.filter(isOnline)
       : scoped.filter(c => !isOnline(c))
-  }, [clients, isAdminUser, auth.id, clientTypeFilter, onlineClientIds])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [realClientList, tabClientIds, coachTab, clientTypeFilter, onlineClientIds])
 
   // Compute per-client chat summary
   const clientRows = useMemo(() => {
@@ -635,11 +694,30 @@ export default function AdminMessagesTab() {
         Съобщения
       </Typography>
 
+      {/* Coach tabs — shared inbox: everyone sees both coaches' unread */}
+      <Box sx={{ display: 'flex', gap: 0.75, mb: 1.5, flexWrap: 'wrap' }}>
+        {mainCoaches.map(k => (
+          <CoachTab
+            key={k.id}
+            active={coachTab === k.id}
+            onClick={() => setCoachTab(k.id)}
+            label={(k.name || '').toUpperCase()}
+            unread={unreadByTab[k.id] || 0}
+          />
+        ))}
+        <CoachTab
+          active={coachTab === 'other'}
+          onClick={() => setCoachTab('other')}
+          label="ДРУГИ"
+          unread={unreadByTab.other || 0}
+        />
+      </Box>
+
       {/* Online / Studio filter — shown for BOTH admins and regular coaches */}
       <Box sx={{ display: 'flex', gap: 0.75, mb: 2, flexWrap: 'wrap' }}>
         {(() => {
-          const real = clients.filter(c => !c.is_coach && c.id)
-          const scoped = isAdminUser ? real : real.filter(c => c.assigned_coach_id === auth.id)
+          const set = (coachTab && tabClientIds[coachTab]) || new Set()
+          const scoped = realClientList.filter(c => set.has(c.id))
           const onlineCount = scoped.filter(isOnline).length
           const studioCount = scoped.filter(c => !isOnline(c)).length
           return (
@@ -730,6 +808,39 @@ export default function AdminMessagesTab() {
           )
         })}
       </Paper>
+    </Box>
+  )
+}
+
+// Coach inbox tab — bold pill with a PINK unread bubble (same accent as the
+// sidebar notification badge), so unread counts scream from across the room.
+function CoachTab({ active, onClick, label, unread }) {
+  return (
+    <Box
+      onClick={onClick}
+      sx={{
+        display: 'flex', alignItems: 'center', gap: 0.75,
+        px: 1.75, py: 0.75, borderRadius: '12px', cursor: 'pointer',
+        fontSize: 13, fontWeight: 800, letterSpacing: '0.05em',
+        background: active ? C.purple : 'rgba(200,197,255,0.06)',
+        color:      active ? '#fff' : C.text,
+        border:     `1.5px solid ${active ? C.purple : C.border}`,
+        transition: 'all 0.18s',
+        '&:hover':  active ? {} : { borderColor: C.purple },
+      }}
+    >
+      {label}
+      {unread > 0 && (
+        <Box sx={{
+          minWidth: 20, height: 20, px: 0.5, borderRadius: '10px',
+          background: C.danger,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          <Typography sx={{ color: '#fff', fontSize: 11, fontWeight: 800, lineHeight: 1 }}>
+            {unread > 9 ? '9+' : unread}
+          </Typography>
+        </Box>
+      )}
     </Box>
   )
 }

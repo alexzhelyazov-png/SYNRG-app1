@@ -346,7 +346,7 @@ function AppShell() {
                 {view === 'notifications' && auth.role === 'coach' && <Notifications />}
                 {view === 'recipes'      && (auth.role !== 'client' || hasModule(auth.modules, 'program_access') || hasModule(auth.modules, 'training_plan_access')) && <Recipes />}
                 {view === 'coach_chat'   && auth.role === 'client' && hasModule(auth.modules, 'synrg_method') && <CoachChat />}
-                {view === 'coach_chat_admin' && auth.role === 'coach' && <AdminMessagesTab />}
+                {view === 'coach_chat_admin' && (auth.role === 'coach' || auth.role === 'admin') && <AdminMessagesTab />}
                 {view === 'profile'   && auth.role !== 'client' && <Profile />}
                 {view === 'admin'     && admin && <Admin />}
               </>
