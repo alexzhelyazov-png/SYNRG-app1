@@ -46,6 +46,12 @@ function getNavItems(auth, admin, isOnlineClient = false, isLead = false) {
   // Programs: always visible — locked with indicator if no program_access
   items.push({ view: 'programs', Icon: PlayCircleOutlineIcon, labelKey: 'navPrograms', isLocked: !hasProgramAccess })
 
+  // Coach chat — paying clients (synrg_method) reach their mentor straight
+  // from the bottom nav (pink badge = unread mentor messages).
+  if (hasModule(modules, 'synrg_method')) {
+    items.push({ view: 'coach_chat', Icon: ChatBubbleOutlineIcon, labelKey: 'navCoach' })
+  }
+
   // Schedule (Тренировки / Резервации): only for studio clients.
   // Online clients don't use the physical studio schedule.
   // Leads (freemium) haven't bought anything yet — no studio booking for them either.
@@ -205,8 +211,9 @@ export default function MobileNav() {
           {/* Role-specific nav items */}
           {navItems.map(({ view: v, Icon, labelKey, isLocked }) => {
             const showBadge = unreadFeedCount > 0 && (v === 'progress' || v === 'ranking')
-            // Messages badge is PINK (like the sidebar) — unread client messages
-            const msgBadge = v === 'coach_chat_admin' ? unreadCoachMsgCount : 0
+            // Messages badge is PINK (like the sidebar) — staff see unread client
+            // messages; clients see unread mentor replies.
+            const msgBadge = (v === 'coach_chat_admin' || v === 'coach_chat') ? unreadCoachMsgCount : 0
             return (
               <NavAction
                 key={v}
