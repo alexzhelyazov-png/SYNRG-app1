@@ -571,7 +571,10 @@ export default function OnlineHome() {
         }}
       >
         {Array.from({ length: TOTAL_WEEKS }, (_, i) => i + 1).map(n => {
-          const locked = false // unlocked for dev — all weeks viewable
+          // Weeks unlock SEQUENTIALLY: only the current and past weeks are
+          // viewable. Week 2 opens when week 1 ends (currentWeek advances
+          // with started_at). Future weeks show a lock and don't react.
+          const locked = n > currentWeek
           const active = n === selectedWeek
           return (
             <Chip
@@ -806,7 +809,9 @@ export default function OnlineHome() {
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.25 }}>
                 {selected.workouts.map(w => {
                   const done = doneWorkoutIds.has(w.id)
-                  const locked = false // unlocked for dev — all weeks viewable
+                  // Defensive: workouts of a future week stay locked (the week
+                  // chips already prevent selecting one, but belt-and-braces).
+                  const locked = selected.week_number > currentWeek
                   return (
                     <Paper
                       key={w.id}
