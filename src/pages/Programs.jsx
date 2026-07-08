@@ -582,38 +582,23 @@ function LessonView({ lesson, allLessons, progress, onBack, onToggle, onNavigate
 }
 
 // ── Resources List View ──────────────────────────────────────
-function ResourcesList({ resources, resourceSteps, resourceProgress, hasAccess, onSelect, t, lang }) {
+function ResourcesList({ resources, resourceSteps, resourceProgress, hasAccess, onSelect, t, lang, category }) {
   const n = (r) => lang === 'en' && r.name_en ? r.name_en : r.name_bg
   const d = (r) => lang === 'en' && r.description_en ? r.description_en : r.description_bg
   const cat = (r) => lang === 'en' && r.category_en ? r.category_en : r.category_bg
 
-  // Fixed tab order (BG + EN labels); unknown categories go after, alphabetically.
-  const CAT_ORDER = ['Болки и мобилност', 'Pain & Mobility', 'Допълнителни тренировки', 'Extra Workouts', 'Хранене', 'Nutrition']
-  const categories = useMemo(() => {
-    const map = {}
-    resources.forEach(r => { const c = cat(r) || '' ; if (!map[c]) map[c] = []; map[c].push(r) })
-    return Object.entries(map).sort((a, b) => {
-      const ia = CAT_ORDER.indexOf(a[0]), ib = CAT_ORDER.indexOf(b[0])
-      if (ia !== -1 || ib !== -1) return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib)
-      return a[0].localeCompare(b[0], 'bg')
-    })
+  // The parent (Programs) renders the category tabs — this list just shows
+  // the resources of the selected category.
+  const activeItems = useMemo(
+    () => resources.filter(r => (cat(r) || '') === category),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [resources, lang])
-
-  // Category tabs — one visible group at a time
-  const [selCat, setSelCat] = useState(null)
-  const activeCat = (selCat && categories.some(([c]) => c === selCat))
-    ? selCat
-    : (categories[0]?.[0] ?? null)
-  const activeItems = categories.find(([c]) => c === activeCat)?.[1] || []
+    [resources, lang, category]
+  )
 
   const completedSet = useMemo(() => new Set(resourceProgress.map(p => p.step_id)), [resourceProgress])
 
   return (
     <Box>
-      <Typography variant="overline" sx={{ color: C.text, display: 'block', mb: 0.5 }}>{t('resourcesOverline')}</Typography>
-      <Typography variant="h2" sx={{ color: C.text, mb: 3 }}>{t('resourcesTitle')}</Typography>
-
       {!hasAccess && (
         <Paper sx={{ p: 3, mb: 3, textAlign: 'center', background: 'rgba(200,197,255,0.06)', border: '1px solid rgba(200,197,255,0.15)' }}>
           <LockSvg />
@@ -621,39 +606,13 @@ function ResourcesList({ resources, resourceSteps, resourceProgress, hasAccess, 
         </Paper>
       )}
 
-      {resources.length === 0 && (
+      {activeItems.length === 0 && (
         <Paper sx={{ p: 4, textAlign: 'center' }}>
           <Typography sx={{ color: C.muted, fontSize: '15px' }}>{t('noResources')}</Typography>
         </Paper>
       )}
 
-      {/* Category tabs */}
-      {categories.length > 1 && (
-        <Box sx={{ display: 'flex', gap: 1, mb: 2.5, flexWrap: 'wrap' }}>
-          {categories.map(([category]) => {
-            const active = category === activeCat
-            return (
-              <Box
-                key={category || '_'}
-                onClick={() => setSelCat(category)}
-                sx={{
-                  px: 2, py: 0.9, borderRadius: '999px', cursor: 'pointer',
-                  fontSize: '13px', fontWeight: 700, whiteSpace: 'nowrap',
-                  background: active ? C.primary : 'rgba(255,255,255,0.05)',
-                  color: active ? C.primaryOn : C.text,
-                  border: `1px solid ${active ? C.primary : C.border}`,
-                  transition: 'all 0.18s',
-                  '&:hover': active ? {} : { borderColor: C.muted },
-                }}
-              >
-                {category || '…'}
-              </Box>
-            )
-          })}
-        </Box>
-      )}
-
-      {activeCat !== null && (
+      {activeItems.length > 0 && (
         <Box sx={{ mb: 3 }}>
           <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2 }}>
             {activeItems.map((res, i) => {
@@ -862,7 +821,7 @@ export default function Programs() {
   // Single source of truth for "does this client currently have an active plan"
   const planActive = auth.role === 'coach' ? true : isPlanActive(myPlan)
 
-  const [tab, setTab] = useState('resources') // 'resources' | 'recipes'
+  const [tab, setTab] = useState(null) // category name | 'recipes' | null (→ first category)
   const [programs, setPrograms]   = useState([])
   const [modules, setModules]     = useState([])
   const [lessons, setLessons]     = useState([])
@@ -880,6 +839,23 @@ export default function Programs() {
   const [selectedLesson, setSelectedLesson]   = useState(null)
   const [selectedResource, setSelectedResource] = useState(null)
   const [selectedStep, setSelectedStep] = useState(null)
+
+  // Top tab bar = resource categories + Рецепти (categories REPLACE the old
+  // Ресурси/Рецепти pair per owner request). Fixed order, unknowns append.
+  const CAT_ORDER = ['Болки и мобилност', 'Pain & Mobility', 'Допълнителни тренировки', 'Extra Workouts', 'Хранене', 'Nutrition']
+  const resourceCats = useMemo(() => {
+    const name = (r) => (lang === 'en' && r.category_en ? r.category_en : r.category_bg) || ''
+    const set = [...new Set(resources.map(name).filter(Boolean))]
+    return set.sort((a, b) => {
+      const ia = CAT_ORDER.indexOf(a), ib = CAT_ORDER.indexOf(b)
+      if (ia !== -1 || ib !== -1) return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib)
+      return a.localeCompare(b, 'bg')
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resources, lang])
+  const activeTab = (tab && (tab === 'recipes' || resourceCats.includes(tab)))
+    ? tab
+    : (resourceCats[0] || 'recipes')
 
   // Check for purchase success URL param — verifies actual purchase in DB
   // (with poll-retry to handle webhook delay) before showing success message
@@ -1109,30 +1085,30 @@ export default function Programs() {
   // The Programs page is now a reference library: educational resources + recipes.
   return (
     <Box>
-      {/* Sub-tab bar */}
-      <Box sx={{ display: 'flex', gap: 0.75, mb: 3 }}>
-        {['resources', 'recipes'].map(key => (
+      {/* Tab bar: resource categories + Рецепти in ONE row */}
+      <Box sx={{ display: 'flex', gap: 0.75, mb: 3, flexWrap: 'wrap' }}>
+        {[...resourceCats, 'recipes'].map(key => (
           <Box key={key} onClick={() => setTab(key)} sx={{
-            px: 2.5, py: 1, borderRadius: '100px', cursor: 'pointer',
-            fontSize: '14px', fontWeight: 700,
-            background: tab === key ? C.primary : 'transparent',
-            color: tab === key ? C.primaryOn : C.text,
-            border: `1px solid ${tab === key ? C.primary : C.loganBorder}`,
+            px: 2.25, py: 1, borderRadius: '100px', cursor: 'pointer',
+            fontSize: '13.5px', fontWeight: 700, whiteSpace: 'nowrap',
+            background: activeTab === key ? C.primary : 'transparent',
+            color: activeTab === key ? C.primaryOn : C.text,
+            border: `1px solid ${activeTab === key ? C.primary : C.loganBorder}`,
             transition: 'all 0.22s',
-            '&:hover': tab === key ? {} : { borderColor: C.logan, background: C.loganDeep },
+            '&:hover': activeTab === key ? {} : { borderColor: C.logan, background: C.loganDeep },
           }}>
-            {key === 'resources' ? t('tabResources') : (t('navRecipes') || 'Рецепти')}
+            {key === 'recipes' ? (t('navRecipes') || 'Рецепти') : key}
           </Box>
         ))}
       </Box>
 
-      {tab === 'resources' && (
+      {activeTab !== 'recipes' && (
         <ResourcesList resources={resources} resourceSteps={resourceSteps} resourceProgress={resourceProgress}
-          hasAccess={hasResourceAccess}
+          hasAccess={hasResourceAccess} category={activeTab}
           onSelect={(r) => { DB.trackEvent(auth.id, 'resource_opened', r.id); setSelectedResource(r); window.scrollTo({ top: 0, behavior: 'smooth' }) }}
           t={t} lang={lang} />
       )}
-      {tab === 'recipes' && (hasResourceAccess ? <Recipes /> : (
+      {activeTab === 'recipes' && (hasResourceAccess ? <Recipes /> : (
         <Box sx={{ textAlign: 'center', py: 4 }}>
           <Paper sx={{
             p: 4, maxWidth: 440, mx: 'auto',
