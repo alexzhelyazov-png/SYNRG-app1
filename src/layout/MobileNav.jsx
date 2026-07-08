@@ -11,7 +11,6 @@ import MenuBookIcon           from '@mui/icons-material/MenuBook'
 import AutoAwesomeIcon        from '@mui/icons-material/AutoAwesome'
 import ChatBubbleOutlineIcon  from '@mui/icons-material/ChatBubbleOutline'
 import PersonIcon            from '@mui/icons-material/Person'
-import AssignmentIcon         from '@mui/icons-material/Assignment'
 import { useApp }             from '../context/AppContext'
 import { isAdmin }            from '../lib/bookingUtils'
 import { hasModule }          from '../lib/modules'
@@ -22,14 +21,14 @@ import useClientTier          from '../hooks/useClientTier'
 function getNavItems(auth, admin, isOnlineClient = false, isLead = false) {
   // Coach/admin nav — Съобщения sits right after График so client messages
   // are one tap away on the phone too (pink unread badge, same as sidebar).
+  // Задачи и Рецепти live INSIDE "Моят тракер" (Dashboard action buttons),
+  // not in the bottom bar — keeps it uncluttered (owner request 2026-07-08).
   if (auth.role !== 'client') {
     const items = [
       { view: 'dashboard',        Icon: DashboardIcon,         labelKey: 'navDashboard' },
       { view: 'schedule',         Icon: CalendarMonthIcon,     labelKey: 'navSchedule'  },
       { view: 'coach_chat_admin', Icon: ChatBubbleOutlineIcon, labelKey: 'navMessages'  },
       { view: 'ranking',          Icon: LeaderboardIcon,       labelKey: 'navRanking'   },
-      { view: 'tasks',            Icon: AssignmentIcon,        labelKey: 'navTasks'     },
-      { view: 'recipes',          Icon: MenuBookIcon,          labelKey: 'navRecipes'   },
     ]
     if (admin) items.push({ view: 'admin', Icon: AdminPanelSettingsIcon, labelKey: 'navAdmin' })
     return items

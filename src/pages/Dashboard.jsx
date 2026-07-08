@@ -1368,8 +1368,11 @@ function DashboardClient({ isCoachView = false }) {
           (hasModule(auth.modules, 'nutrition_tracking') || hasModule(auth.modules, 'weight_tracking')) && { key: 'steps', view: 'steps', color: '#FFD070', Icon: DirectionsWalkIcon, label: t('addStepsBtn') },
           (hasModule(auth.modules, 'nutrition_tracking') || hasModule(auth.modules, 'weight_tracking')) && { key: 'water', view: 'water', color: '#6EC6E8', Icon: WaterDropIcon, label: t('addWaterBtn') },
           { key: 'workout', view: 'workout', color: '#A78BFA', Icon: FitnessCenterIcon, label: t('addWorkoutBtn') },
-          !isCoachView && (() => {
-            const recipesUnlocked = hasModule(auth.modules, 'program_access') || hasModule(auth.modules, 'training_plan_access')
+          (() => {
+            // Coaches/admins always have recipes access; from "Моят тракер" this
+            // is their entry point now that Рецепти left the staff bottom nav.
+            const recipesUnlocked = isCoachView
+              || hasModule(auth.modules, 'program_access') || hasModule(auth.modules, 'training_plan_access')
             return {
               key: 'recipes',
               view: 'recipes',
