@@ -587,11 +587,25 @@ function ResourcesList({ resources, resourceSteps, resourceProgress, hasAccess, 
   const d = (r) => lang === 'en' && r.description_en ? r.description_en : r.description_bg
   const cat = (r) => lang === 'en' && r.category_en ? r.category_en : r.category_bg
 
+  // Fixed tab order (BG + EN labels); unknown categories go after, alphabetically.
+  const CAT_ORDER = ['Болки и мобилност', 'Pain & Mobility', 'Допълнителни тренировки', 'Extra Workouts', 'Хранене', 'Nutrition']
   const categories = useMemo(() => {
     const map = {}
-    resources.forEach(r => { const c = cat(r) || ''; if (!map[c]) map[c] = []; map[c].push(r) })
-    return Object.entries(map)
+    resources.forEach(r => { const c = cat(r) || '' ; if (!map[c]) map[c] = []; map[c].push(r) })
+    return Object.entries(map).sort((a, b) => {
+      const ia = CAT_ORDER.indexOf(a[0]), ib = CAT_ORDER.indexOf(b[0])
+      if (ia !== -1 || ib !== -1) return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib)
+      return a[0].localeCompare(b[0], 'bg')
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resources, lang])
+
+  // Category tabs — one visible group at a time
+  const [selCat, setSelCat] = useState(null)
+  const activeCat = (selCat && categories.some(([c]) => c === selCat))
+    ? selCat
+    : (categories[0]?.[0] ?? null)
+  const activeItems = categories.find(([c]) => c === activeCat)?.[1] || []
 
   const completedSet = useMemo(() => new Set(resourceProgress.map(p => p.step_id)), [resourceProgress])
 
@@ -613,15 +627,36 @@ function ResourcesList({ resources, resourceSteps, resourceProgress, hasAccess, 
         </Paper>
       )}
 
-      {categories.map(([category, items]) => (
-        <Box key={category} sx={{ mb: 3 }}>
-          {category && (
-            <Typography sx={{ fontSize: '12px', fontWeight: 700, color: C.text, letterSpacing: '0.08em', textTransform: 'uppercase', mb: 1.5 }}>
-              {category}
-            </Typography>
-          )}
+      {/* Category tabs */}
+      {categories.length > 1 && (
+        <Box sx={{ display: 'flex', gap: 1, mb: 2.5, flexWrap: 'wrap' }}>
+          {categories.map(([category]) => {
+            const active = category === activeCat
+            return (
+              <Box
+                key={category || '_'}
+                onClick={() => setSelCat(category)}
+                sx={{
+                  px: 2, py: 0.9, borderRadius: '999px', cursor: 'pointer',
+                  fontSize: '13px', fontWeight: 700, whiteSpace: 'nowrap',
+                  background: active ? C.primary : 'rgba(255,255,255,0.05)',
+                  color: active ? C.primaryOn : C.text,
+                  border: `1px solid ${active ? C.primary : C.border}`,
+                  transition: 'all 0.18s',
+                  '&:hover': active ? {} : { borderColor: C.muted },
+                }}
+              >
+                {category || '…'}
+              </Box>
+            )
+          })}
+        </Box>
+      )}
+
+      {activeCat !== null && (
+        <Box sx={{ mb: 3 }}>
           <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2 }}>
-            {items.map((res, i) => {
+            {activeItems.map((res, i) => {
               const steps = resourceSteps.filter(s => s.resource_id === res.id)
               const doneCount = steps.filter(s => completedSet.has(s.id)).length
               const totalCount = steps.length
@@ -679,7 +714,7 @@ function ResourcesList({ resources, resourceSteps, resourceProgress, hasAccess, 
             })}
           </Box>
         </Box>
-      ))}
+      )}
     </Box>
   )
 }
