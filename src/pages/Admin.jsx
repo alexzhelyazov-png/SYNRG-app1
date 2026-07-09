@@ -251,15 +251,22 @@ function PlanDialog({ open, onClose, onActivate, onExtend, onAdjust, onTogglePai
   const [validTo,       setValidTo]      = useState(() => isoDatePlusDays(30))
   const [extendTo,      setExtendTo]     = useState('')
   const [credUsed,      setCredUsed]     = useState(plan?.credits_used ?? 0)
-  const [price,         setPrice]        = useState(plan?.price ?? DEFAULT_PRICES['8'])
+  // Price never defaults to 0: existing plan's price if >0, else the tariff for
+  // its type, else the 8-session tariff. Keeps revenue from silently going 0.
+  const [price,         setPrice]        = useState(
+    (plan?.price && Number(plan.price) > 0)
+      ? plan.price
+      : (DEFAULT_PRICES[plan?.plan_type] ?? DEFAULT_PRICES['8'])
+  )
   const [isPaid,        setIsPaid]       = useState(plan?.is_paid ?? true)
   const [startCredits,  setStartCredits] = useState('')
   const [saving,        setSaving]       = useState(false)
 
-  // When planType changes, reset startCredits and update default price
+  // When planType changes, reset startCredits and update default price.
+  // Never fall to 0 — an unselected type shows the 8-session tariff as a floor.
   useEffect(() => {
     setStartCredits('')
-    if (!plan) setPrice(DEFAULT_PRICES[planType] ?? 0)
+    if (!plan) setPrice(DEFAULT_PRICES[planType] ?? DEFAULT_PRICES['8'])
   }, [planType])
 
   // When validFrom changes, update validTo to 30 days later
@@ -278,25 +285,31 @@ function PlanDialog({ open, onClose, onActivate, onExtend, onAdjust, onTogglePai
 
   async function handleSave() {
     setSaving(true)
+    // Price can never be 0 — fall back to the plan's tariff. This is what feeds
+    // the Finance revenue, so a blank/zero here would silently lose the income.
+    const safePrice = (Number(price) > 0)
+      ? Number(price)
+      : (DEFAULT_PRICES[planType || plan?.plan_type] ?? DEFAULT_PRICES['8'])
     let res
     if (mode === 'activate' && planType) {
       const sc = startCredits !== '' ? Number(startCredits) : null
-      res = await onActivate(client.id, planType, validFrom, price, sc, isPaid, validTo)
+      res = await onActivate(client.id, planType, validFrom, safePrice, sc, isPaid, validTo)
     } else if (mode === 'extend') {
       res = await onExtend(plan.id, extendTo)
     } else if (mode === 'adjust') {
       res = await onAdjust(plan.id, Number(credUsed))
     }
-    // Update is_paid separately if plan exists and changed (or if no new plan was created)
-    if (plan && plan.is_paid !== isPaid && onTogglePaid) {
-      await onTogglePaid(plan.id, isPaid)
+    // Toggling paid on an existing plan ALSO writes the price — otherwise a plan
+    // activated with price 0 would flip to paid but add 0 to revenue.
+    if (plan && onTogglePaid && (plan.is_paid !== isPaid || Number(plan.price) !== safePrice)) {
+      await onTogglePaid(plan.id, isPaid, safePrice)
     }
     setSaving(false)
     if (!res?.error) onClose()
   }
 
-  // Allow save when plan exists and only is_paid changed (no need to select new planType)
-  const paidChanged = plan && plan.is_paid !== isPaid
+  // Allow save when plan exists and paid-status OR price changed (no new planType needed)
+  const paidChanged = plan && (plan.is_paid !== isPaid || Number(plan.price || 0) !== Number(price || 0))
 
   const inputSx = {
     '& .MuiInputBase-input':           { color: C.text },
@@ -1111,8 +1124,13 @@ function PlansTab({ t }) {
     showSnackbar(t('creditsAdjustedMsg'))
     return { ok: true }
   }
-  async function handleTogglePaid(planId, newValue) {
-    await DB.update('client_plans', planId, { is_paid: newValue })
+  async function handleTogglePaid(planId, newValue, price) {
+    // Persist the price alongside the paid flag so revenue is never lost when a
+    // plan flips to paid. Coerce a missing/zero price to its tariff default.
+    const patch = { is_paid: newValue }
+    const p = Number(price)
+    if (Number.isFinite(p) && p > 0) patch.price = p
+    await DB.update('client_plans', planId, patch)
     await loadAllPlans()
   }
 
@@ -1463,8 +1481,12 @@ function ClientsTab({ t }) {
     showSnackbar(t('deactivatePlanMsg'))
   }
 
-  async function handleTogglePaid(planId, newValue) {
-    await DB.update('client_plans', planId, { is_paid: newValue })
+  async function handleTogglePaid(planId, newValue, price) {
+    // Persist price with the paid flag so revenue is never lost (see other tab).
+    const patch = { is_paid: newValue }
+    const p = Number(price)
+    if (Number.isFinite(p) && p > 0) patch.price = p
+    await DB.update('client_plans', planId, patch)
     await loadAllPlans()
     showSnackbar(newValue ? t('markedPaid') : t('markedUnpaid'))
   }
@@ -2155,8 +2177,13 @@ function DashboardTab({ t, lang, goTo }) {
     showSnackbar(t('creditsAdjustedMsg'))
     return { ok: true }
   }
-  async function handleTogglePaid(planId, newValue) {
-    await DB.update('client_plans', planId, { is_paid: newValue })
+  async function handleTogglePaid(planId, newValue, price) {
+    // Persist the price alongside the paid flag so revenue is never lost when a
+    // plan flips to paid. Coerce a missing/zero price to its tariff default.
+    const patch = { is_paid: newValue }
+    const p = Number(price)
+    if (Number.isFinite(p) && p > 0) patch.price = p
+    await DB.update('client_plans', planId, patch)
     await loadAllPlans()
   }
 
