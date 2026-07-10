@@ -255,7 +255,7 @@ async function assignCoach(clientId: string, clientName: string): Promise<{ ok: 
         coach_id: picked.id,
         sender_role: "coach",
         sender_name: picked.name,
-        text: `Здравей, ${clientName}! Аз съм ${picked.name}, твоят ментор в SYNRG Метод. Добре дошъл/дошла! Имаш 2 check-in сесии на месец — пиши ми тук когато имаш въпроси или се нуждаеш от корекция на програмата.`,
+        text: `Здравей! 👋 Аз съм ${picked.name} — твоят ментор през следващите 8 седмици. Радвам се, че си тук!\n\nАз съм насреща за всичко — въпрос, корекция, или просто да ми кажеш как върви. Разкажи ми накратко: каква е целта ти и кое ти е най-трудно засега?`,
       });
     } catch (e) { console.warn("Welcome message failed:", e); }
 
