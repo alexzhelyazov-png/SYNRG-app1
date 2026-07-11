@@ -23,6 +23,7 @@ import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined'
 import MonitorWeightOutlinedIcon from '@mui/icons-material/MonitorWeightOutlined'
 import RestaurantOutlinedIcon from '@mui/icons-material/RestaurantOutlined'
 import LocalDrinkOutlinedIcon from '@mui/icons-material/LocalDrinkOutlined'
+import DirectionsWalkOutlinedIcon from '@mui/icons-material/DirectionsWalkOutlined'
 import ChevronRightIcon from '@mui/icons-material/ChevronRight'
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
 import ExpandLessIcon from '@mui/icons-material/ExpandLess'
@@ -341,6 +342,14 @@ export default function OnlineHome() {
   const didWeightToday = useMemo(
     () => (client?.weightLogs || []).some(w => sameDay(w.date, today)),
     [client?.weightLogs, today]
+  )
+  const didStepsToday = useMemo(
+    () => (client?.stepsLogs || []).some(s => sameDay(s.date, today)),
+    [client?.stepsLogs, today]
+  )
+  const didWaterToday = useMemo(
+    () => (client?.waterLogs || []).some(w => Number(w.ml) > 0 && sameDay(w.date, today)),
+    [client?.waterLogs, today]
   )
   const dailiesDoneCount = (didFoodToday ? 1 : 0) + (didWeightToday ? 1 : 0)
 
@@ -732,6 +741,37 @@ export default function OnlineHome() {
                   </Box>
                 </>
               )}
+
+              {/* Extra trackers — steps & water, carried over from the freemium
+                  home. Kept visually secondary (compact tiles, logan accent, no
+                  numbers) so they don't compete with the program's daily tasks. */}
+              <Box sx={{ height: 1, background: C.border, my: 0.25 }} />
+              <Typography sx={{ fontSize: 10, letterSpacing: 1.4, fontWeight: 700, color: C.muted, px: 1, pt: 0.5, pb: 0.75 }}>
+                ОЩЕ ТРЕКЕРИ
+              </Typography>
+              <Box sx={{ display: 'flex', gap: 1, px: 1, pb: 0.5 }}>
+                {[
+                  { view: 'steps', label: t('navSteps') || 'Стъпки', Icon: DirectionsWalkOutlinedIcon, done: didStepsToday },
+                  { view: 'water', label: t('navWater') || 'Вода',   Icon: LocalDrinkOutlinedIcon,     done: didWaterToday },
+                ].map(tr => (
+                  <Box
+                    key={tr.view}
+                    onClick={() => setView(tr.view)}
+                    sx={{
+                      flex: 1, display: 'flex', alignItems: 'center', gap: 1,
+                      p: 1.25, borderRadius: 2, cursor: 'pointer',
+                      border: `1px solid ${tr.done ? C.primaryA20 : C.border}`,
+                      background: tr.done ? C.primaryContainer : 'rgba(255,255,255,0.02)',
+                      transition: 'border-color .15s, background .15s',
+                      '&:hover': { borderColor: C.logan, background: 'rgba(255,255,255,0.05)' },
+                    }}
+                  >
+                    <tr.Icon sx={{ fontSize: 20, color: tr.done ? C.primary : C.logan }} />
+                    <Typography sx={{ fontSize: 13, fontWeight: 700, color: C.text }}>{tr.label}</Typography>
+                    {tr.done && <CheckCircleIcon sx={{ fontSize: 15, color: C.primary, ml: 'auto' }} />}
+                  </Box>
+                ))}
+              </Box>
             </Paper>
           </Box>{/* /ДНЕС unified block */}
 
