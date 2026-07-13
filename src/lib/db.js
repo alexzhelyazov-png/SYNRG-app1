@@ -57,6 +57,24 @@ function selectColumns(table) {
   return SAFE_SELECTS[table] || '*'
 }
 
+// Max page requests fired at once. Turns N sequential round-trips (≈N × RTT)
+// into ≈ceil(N/CONCURRENCY) waves — e.g. 20 pages of meals go from ~12s to ~2s.
+const PAGE_CONCURRENCY = 8
+
+// Fetch one page AND read the total row count from the Content-Range header
+// (needs `Prefer: count=exact`). Returns { data, total } where total is null
+// if the server didn't report it.
+async function sbFetchPageWithCount(url, options) {
+  const res = await fetch(url, options)
+  if (!res.ok) { const text = await res.text(); throw new Error(`Supabase ${res.status}: ${text}`) }
+  if (res.status === 204) return { data: [], total: 0 }
+  const data = await res.json()
+  const cr = res.headers.get('content-range') // e.g. "0-999/19993"
+  let total = null
+  if (cr) { const m = cr.match(/\/(\d+)\s*$/); if (m) total = parseInt(m[1], 10) }
+  return { data: data || [], total }
+}
+
 async function sbFetchPaginated(table, extra = '') {
   const sel = selectColumns(table)
   // Respect caller's explicit limit — if it's <= PAGE_SIZE just do a single request
@@ -67,22 +85,50 @@ async function sbFetchPaginated(table, extra = '') {
   }
   // Strip caller's limit — we'll control it per-page via limit/offset
   const extraNoLimit = extra.replace(/(?:^|&)limit=\d+/g, '')
-  const all = []
-  let offset = 0
-  // Safety cap: never loop forever; cap at whatever the caller asked for (or 500k)
   const hardCap = Math.min(explicitLimit, 500000)
-  while (offset < hardCap) {
-    const remaining = hardCap - offset
-    const pageSize = Math.min(PAGE_SIZE, remaining)
-    const page = await sbFetch(
-      sbUrl(table, `?select=${sel}${extraNoLimit}&limit=${pageSize}&offset=${offset}`),
-      { headers: sbHeaders(), cache: 'no-store' }
-    ) || []
-    all.push(...page)
-    if (page.length < pageSize) break  // short page → reached end
-    offset += pageSize
+
+  // First page carries an exact count so we can fetch the rest in parallel
+  // instead of one-page-at-a-time (the old loop serialised every round-trip).
+  const first = await sbFetchPageWithCount(
+    sbUrl(table, `?select=${sel}${extraNoLimit}&limit=${PAGE_SIZE}&offset=0`),
+    { headers: sbHeaders({ Prefer: 'count=exact' }), cache: 'no-store' }
+  )
+  if (first.data.length < PAGE_SIZE) return first.data // everything fit in one page
+
+  const total = first.total != null ? Math.min(first.total, hardCap) : null
+
+  // Fallback: server didn't report a count → keep the safe sequential loop.
+  if (total == null) {
+    const all = [...first.data]
+    let offset = PAGE_SIZE
+    while (offset < hardCap) {
+      const page = await sbFetch(
+        sbUrl(table, `?select=${sel}${extraNoLimit}&limit=${PAGE_SIZE}&offset=${offset}`),
+        { headers: sbHeaders(), cache: 'no-store' }
+      ) || []
+      all.push(...page)
+      if (page.length < PAGE_SIZE) break
+      offset += PAGE_SIZE
+    }
+    return all
   }
-  return all
+
+  // Remaining page offsets, fetched by a small pool of parallel workers.
+  const offsets = []
+  for (let off = PAGE_SIZE; off < total; off += PAGE_SIZE) offsets.push(off)
+  const pages = new Array(offsets.length)
+  let cursor = 0
+  async function worker() {
+    while (cursor < offsets.length) {
+      const my = cursor++
+      pages[my] = (await sbFetch(
+        sbUrl(table, `?select=${sel}${extraNoLimit}&limit=${PAGE_SIZE}&offset=${offsets[my]}`),
+        { headers: sbHeaders(), cache: 'no-store' }
+      )) || []
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(PAGE_CONCURRENCY, offsets.length) }, worker))
+  return first.data.concat(...pages)
 }
 
 const SB = {
