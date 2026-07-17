@@ -1214,7 +1214,13 @@ function ClientModuleEditor({ clientId, currentModules, t, lang }) {
   const HIDDEN_EDITOR_MODULES = ['synrg_method']
   const displayModules  = liveModules.filter(m => !HIDDEN_EDITOR_MODULES.includes(m))
   const editableModules = ADMIN_MANAGEABLE_MODULES.filter(k => !HIDDEN_EDITOR_MODULES.includes(k))
-  const [modules, setModules] = useState(liveModules)
+  // This editor only ever opens from the studio-plan dialog, so the studio
+  // toggles (достъп + записване на час + трекери) start ON by default — the
+  // admin shouldn't have to tick them for every new studio client. They can
+  // still untick for the rare freemium-only case.
+  const STUDIO_DEFAULT = ['studio_access', 'booking_access', 'weight_tracking', 'nutrition_tracking', 'steps_tracking']
+  const withStudioDefaults = (base) => [...new Set([...(base || []), ...STUDIO_DEFAULT])]
+  const [modules, setModules] = useState(() => withStudioDefaults(liveModules))
   const [assignedId, setAssignedId] = useState(liveAssigned)
   const [open, setOpen] = useState(false)
   // Online (SYNRG Method) test access — 'unknown' until we read program_purchases.
@@ -1316,7 +1322,7 @@ function ClientModuleEditor({ clientId, currentModules, t, lang }) {
           <Chip label={t('noModules')} size="small" variant="outlined"
             sx={{ fontSize: '9px', height: '20px', borderColor: C.border, color: C.muted }} />
         )}
-        <IconButton size="small" onClick={() => { setModules(liveModules); setAssignedId(liveAssigned); setOpen(true) }}
+        <IconButton size="small" onClick={() => { setModules(withStudioDefaults(liveModules)); setAssignedId(liveAssigned); setOpen(true) }}
           sx={{ width: 20, height: 20 }}>
           <EditIcon sx={{ fontSize: 12, color: C.muted }} />
         </IconButton>
