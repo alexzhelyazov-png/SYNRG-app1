@@ -656,26 +656,35 @@ function ClientPlanRow({ client, plan, onOpen, onManage, onDelete, onArchive, on
         {client.name}
       </Typography>
 
-      {/* Plan info: credits remaining */}
+      {/* Plan info: credits remaining. For an EXPIRED plan we surface the
+          leftover credits ("изтекъл · остават 3") so the admin knows how many
+          to carry over when extending — they never burn. */}
       {plan ? (
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, flexShrink: 0 }}>
-          {plan.plan_type !== 'unlimited' ? (
-            <Typography sx={{ fontSize: '12px', fontWeight: 800,
-              color: isLow ? '#FB923C' : C.purple }}>
-              {credits}
+        active ? (
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, flexShrink: 0 }}>
+            {plan.plan_type !== 'unlimited' ? (
+              <Typography sx={{ fontSize: '12px', fontWeight: 800, color: isLow ? '#FB923C' : C.purple }}>
+                {credits}
+              </Typography>
+            ) : (
+              <Typography sx={{ fontSize: '10px', fontWeight: 700, color: C.text }}>∞</Typography>
+            )}
+            <Tooltip title={isPaid ? t('markedPaid') : t('markedUnpaid')} arrow>
+              <Box sx={{ width: 8, height: 8, borderRadius: '50%', flexShrink: 0, background: isPaid ? C.primary : '#F87171' }} />
+            </Tooltip>
+          </Box>
+        ) : (
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.6, flexShrink: 0 }}>
+            <Typography sx={{ fontSize: '10px', fontWeight: 700, color: '#F87171' }}>
+              {lang === 'en' ? 'expired' : 'изтекъл'}
             </Typography>
-          ) : (
-            <Typography sx={{ fontSize: '10px', fontWeight: 700, color: C.text }}>
-              ∞
-            </Typography>
-          )}
-          <Tooltip title={isPaid ? t('markedPaid') : t('markedUnpaid')} arrow>
-            <Box sx={{
-              width: 8, height: 8, borderRadius: '50%', flexShrink: 0,
-              background: isPaid ? C.primary : '#F87171',
-            }} />
-          </Tooltip>
-        </Box>
+            {plan.plan_type !== 'unlimited' && credits > 0 && (
+              <Typography sx={{ fontSize: '11px', fontWeight: 800, color: '#c4e9bf', whiteSpace: 'nowrap' }}>
+                · {lang === 'en' ? `${credits} left` : `остават ${credits}`}
+              </Typography>
+            )}
+          </Box>
+        )
       ) : (
         <Typography sx={{ fontSize: '10px', color: '#F87171', fontWeight: 700, flexShrink: 0 }}>—</Typography>
       )}
@@ -1422,6 +1431,16 @@ function ClientsTab({ t }) {
     return allPlans.find(p => p.client_id === clientId && p.status === 'active') || null
   }
 
+  // Active plan if any, else the most recent (expired) one — so a lapsed client
+  // still shows their leftover credits (which never burn; we extend to use them).
+  function getLatestPlan(clientId) {
+    const active = getClientPlan(clientId)
+    if (active) return active
+    const plans = allPlans.filter(p => p.client_id === clientId)
+    if (!plans.length) return null
+    return plans.slice().sort((a, b) => (b.valid_from || '').localeCompare(a.valid_from || ''))[0]
+  }
+
   const searchMatch = (c) => !clientSearch || c.name.toLowerCase().includes(clientSearch.toLowerCase())
 
   // Studio vs online vs freemium classification for the client groupings.
@@ -1518,7 +1537,7 @@ function ClientsTab({ t }) {
       ) : (
         <Paper sx={{ borderRadius: '16px', border: `1px solid rgba(248,113,113,0.3)`, overflow: 'hidden', mb: 3 }}>
           {pending.map(client => {
-            const expiredPlan = getClientPlan(client.id)
+            const expiredPlan = getLatestPlan(client.id)
             return (
               <ClientPlanRow key={client.id} client={client} plan={expiredPlan}
                 onOpen={() => setInfoDlg({ client, plan: expiredPlan, allClientPlans: allPlans.filter(p => p.client_id === client.id), workouts: client.workouts || [] })}
