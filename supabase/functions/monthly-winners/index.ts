@@ -53,41 +53,85 @@ type Client   = {
   calorie_target?: number; protein_target?: number;
 };
 
-// ── MONTHLY_BADGES (verbatim from gamification.js) ───────────────────
+// ── MONTHLY_BADGES — MUST stay 1:1 with src/lib/gamification.js so the recorded
+//    winner matches exactly what clients saw live. Post-rebalance values +
+//    water series + m_weight_loss no-stack (see NO_STACK_SERIES below). ───────
 type Badge = {
-  id: string; xp: number; condType: string; condField?: string; condValue: number;
+  id: string; xp: number; condType: string; condField?: string; condValue: number; series: string;
 };
 const MONTHLY_BADGES: Badge[] = [
-  { id: 'm_workouts_bronze', xp: 10, condType: 'monthly_count', condField: 'workoutCount', condValue: 8  },
-  { id: 'm_workouts_silver', xp: 20, condType: 'monthly_count', condField: 'workoutCount', condValue: 12 },
-  { id: 'm_workouts_gold',   xp: 35, condType: 'monthly_count', condField: 'workoutCount', condValue: 16 },
-  // m_meals series intentionally removed (founder, 2026-05-01) — see
-  // src/lib/gamification.js for the rationale.
-  { id: 'm_weights_bronze',  xp: 10, condType: 'monthly_count', condField: 'weightCount',  condValue: 7  },
-  { id: 'm_weights_silver',  xp: 20, condType: 'monthly_count', condField: 'weightCount',  condValue: 20 },
-  { id: 'm_weights_gold',    xp: 35, condType: 'monthly_count', condField: 'weightCount',  condValue: 30 },
-  { id: 'm_streak_bronze',   xp: 10, condType: 'monthly_streak',                            condValue: 7  },
-  { id: 'm_streak_silver',   xp: 20, condType: 'monthly_streak',                            condValue: 20 },
-  { id: 'm_streak_gold',     xp: 35, condType: 'monthly_streak',                            condValue: 30 },
-  { id: 'm_steps_bronze',    xp: 15, condType: 'monthly_steps',                             condValue: 200000 },
-  { id: 'm_steps_silver',    xp: 35, condType: 'monthly_steps',                             condValue: 300000 },
-  { id: 'm_steps_gold',      xp: 60, condType: 'monthly_steps',                             condValue: 450000 },
-  { id: 'm_steps_days_bronze', xp: 10, condType: 'monthly_count', condField: 'stepsDays',   condValue: 7  },
-  { id: 'm_steps_days_silver', xp: 20, condType: 'monthly_count', condField: 'stepsDays',   condValue: 15 },
-  { id: 'm_steps_days_gold',   xp: 35, condType: 'monthly_count', condField: 'stepsDays',   condValue: 30 },
-  { id: 'm_cal_target_bronze', xp: 30, condType: 'monthly_target', condField: 'calTargetDays',  condValue: 7  },
-  { id: 'm_cal_target_silver', xp: 50, condType: 'monthly_target', condField: 'calTargetDays',  condValue: 15 },
-  { id: 'm_cal_target_gold',   xp: 80, condType: 'monthly_target', condField: 'calTargetDays',  condValue: 30 },
-  { id: 'm_prot_target_bronze',xp: 15, condType: 'monthly_target', condField: 'protTargetDays', condValue: 7  },
-  { id: 'm_prot_target_silver',xp: 30, condType: 'monthly_target', condField: 'protTargetDays', condValue: 15 },
-  { id: 'm_prot_target_gold',  xp: 50, condType: 'monthly_target', condField: 'protTargetDays', condValue: 30 },
-  { id: 'm_weight_loss_bronze',xp: 50, condType: 'monthly_weight_loss',                     condValue: 1 },
-  { id: 'm_weight_loss_silver',xp: 90, condType: 'monthly_weight_loss',                     condValue: 2 },
-  { id: 'm_weight_loss_gold',  xp: 120,condType: 'monthly_weight_loss',                     condValue: 4 },
-  { id: 'm_community_bronze',  xp: 10, condType: 'monthly_count', condField: 'communityCount', condValue: 1  },
-  { id: 'm_community_silver',  xp: 20, condType: 'monthly_count', condField: 'communityCount', condValue: 5  },
-  { id: 'm_community_gold',    xp: 35, condType: 'monthly_count', condField: 'communityCount', condValue: 10 },
+  { id: 'm_workouts_bronze', xp: 10, series: 'm_workouts', condType: 'monthly_count', condField: 'workoutCount', condValue: 8  },
+  { id: 'm_workouts_silver', xp: 20, series: 'm_workouts', condType: 'monthly_count', condField: 'workoutCount', condValue: 12 },
+  { id: 'm_workouts_gold',   xp: 35, series: 'm_workouts', condType: 'monthly_count', condField: 'workoutCount', condValue: 16 },
+  { id: 'm_weights_bronze',  xp: 10, series: 'm_weights', condType: 'monthly_count', condField: 'weightCount',  condValue: 7  },
+  { id: 'm_weights_silver',  xp: 20, series: 'm_weights', condType: 'monthly_count', condField: 'weightCount',  condValue: 15 },
+  { id: 'm_weights_gold',    xp: 35, series: 'm_weights', condType: 'monthly_count', condField: 'weightCount',  condValue: 30 },
+  { id: 'm_streak_bronze',   xp: 25, series: 'm_streak', condType: 'monthly_streak', condValue: 7  },
+  { id: 'm_streak_silver',   xp: 50, series: 'm_streak', condType: 'monthly_streak', condValue: 10 },
+  { id: 'm_streak_gold',     xp: 90, series: 'm_streak', condType: 'monthly_streak', condValue: 30 },
+  { id: 'm_steps_bronze',    xp: 8,  series: 'm_steps', condType: 'monthly_steps', condValue: 200000 },
+  { id: 'm_steps_silver',    xp: 15, series: 'm_steps', condType: 'monthly_steps', condValue: 300000 },
+  { id: 'm_steps_gold',      xp: 25, series: 'm_steps', condType: 'monthly_steps', condValue: 450000 },
+  { id: 'm_steps_days_bronze', xp: 15, series: 'm_steps_days', condType: 'monthly_count', condField: 'stepsDays', condValue: 7  },
+  { id: 'm_steps_days_silver', xp: 30, series: 'm_steps_days', condType: 'monthly_count', condField: 'stepsDays', condValue: 15 },
+  { id: 'm_steps_days_gold',   xp: 50, series: 'm_steps_days', condType: 'monthly_count', condField: 'stepsDays', condValue: 30 },
+  { id: 'm_water_bronze', xp: 15, series: 'm_water', condType: 'monthly_count', condField: 'waterDays2L', condValue: 7  },
+  { id: 'm_water_silver', xp: 30, series: 'm_water', condType: 'monthly_count', condField: 'waterDays2L', condValue: 15 },
+  { id: 'm_water_gold',   xp: 50, series: 'm_water', condType: 'monthly_count', condField: 'waterDays2L', condValue: 30 },
+  { id: 'm_water3l_bronze', xp: 20, series: 'm_water3l', condType: 'monthly_count', condField: 'waterDays3L', condValue: 7  },
+  { id: 'm_water3l_silver', xp: 35, series: 'm_water3l', condType: 'monthly_count', condField: 'waterDays3L', condValue: 15 },
+  { id: 'm_water3l_gold',   xp: 55, series: 'm_water3l', condType: 'monthly_count', condField: 'waterDays3L', condValue: 30 },
+  { id: 'm_cal_target_bronze', xp: 25, series: 'm_cal_target', condType: 'monthly_target', condField: 'calTargetDays',  condValue: 7  },
+  { id: 'm_cal_target_silver', xp: 45, series: 'm_cal_target', condType: 'monthly_target', condField: 'calTargetDays',  condValue: 15 },
+  { id: 'm_cal_target_gold',   xp: 70, series: 'm_cal_target', condType: 'monthly_target', condField: 'calTargetDays',  condValue: 30 },
+  { id: 'm_prot_target_bronze',xp: 15, series: 'm_prot_target', condType: 'monthly_target', condField: 'protTargetDays', condValue: 7  },
+  { id: 'm_prot_target_silver',xp: 30, series: 'm_prot_target', condType: 'monthly_target', condField: 'protTargetDays', condValue: 15 },
+  { id: 'm_prot_target_gold',  xp: 50, series: 'm_prot_target', condType: 'monthly_target', condField: 'protTargetDays', condValue: 30 },
+  { id: 'm_weight_loss_bronze',xp: 20, series: 'm_weight_loss', condType: 'monthly_weight_loss', condValue: 1 },
+  { id: 'm_weight_loss_silver',xp: 35, series: 'm_weight_loss', condType: 'monthly_weight_loss', condValue: 2 },
+  { id: 'm_weight_loss_gold',  xp: 50, series: 'm_weight_loss', condType: 'monthly_weight_loss', condValue: 4 },
+  { id: 'm_community_bronze',  xp: 10, series: 'm_community', condType: 'monthly_count', condField: 'communityCount', condValue: 1  },
+  { id: 'm_community_silver',  xp: 20, series: 'm_community', condType: 'monthly_count', condField: 'communityCount', condValue: 5  },
+  { id: 'm_community_gold',    xp: 35, series: 'm_community', condType: 'monthly_count', condField: 'communityCount', condValue: 10 },
 ];
+
+// Anti-cheat constants — must match gamification.js exactly.
+const MAX_PLAUSIBLE_STEPS_PER_DAY = 40000;
+const MAX_PLAUSIBLE_LOSS_PER_DAY  = 0.3;
+const WEIGHT_NOISE_BUFFER_KG      = 2.5;
+const WATER_GOAL_ML    = 2000;
+const WATER_GOAL_3L_ML = 3000;
+// Series whose tiers do NOT stack — only the highest earned tier counts.
+const NO_STACK_SERIES = new Set(['m_weight_loss']);
+
+// Sum earned monthly-badge XP, collapsing no-stack series to their top tier.
+function sumMonthlyBadgeXP(earnedIds: string[]): number {
+  const seriesMax: Record<string, number> = {};
+  let total = 0;
+  for (const id of earnedIds) {
+    const b = MONTHLY_BADGES.find(x => x.id === id);
+    if (!b) continue;
+    if (NO_STACK_SERIES.has(b.series)) seriesMax[b.series] = Math.max(seriesMax[b.series] || 0, b.xp);
+    else total += b.xp;
+  }
+  for (const s in seriesMax) total += seriesMax[s];
+  return total;
+}
+
+// Drop physiologically implausible weigh-ins (same rule as gamification.js).
+function sanitizeWeightSeries(weightLogs: Weight[]): Weight[] {
+  const sorted = [...weightLogs].sort((a, b) => parseDotDate(a.date).getTime() - parseDotDate(b.date).getTime());
+  const out: Weight[] = [];
+  for (const cur of sorted) {
+    if (!out.length) { out.push(cur); continue; }
+    const prev = out[out.length - 1];
+    const days = Math.max(1, Math.round((parseDotDate(cur.date).getTime() - parseDotDate(prev.date).getTime()) / 86400000));
+    const maxStep = WEIGHT_NOISE_BUFFER_KG + MAX_PLAUSIBLE_LOSS_PER_DAY * days;
+    if (Math.abs(Number(cur.weight) - Number(prev.weight)) > maxStep) continue;
+    out.push(cur);
+  }
+  return out;
+}
 
 // ── Helpers (ported from gamification.js) ────────────────────────────
 function parseDotDate(d: string): Date {
@@ -116,14 +160,16 @@ function targetDaysCount(meals: Meal[], target: number, field: 'kcal' | 'protein
   return Object.values(byDate).filter(v => v >= target).length;
 }
 
+type Water = { date: string; ml: number };
 type MonthlyStats = {
   workoutCount: number; mealCount: number; weightCount: number; stepsDays: number;
-  totalSteps: number; streak: number; calTargetDays: number; protTargetDays: number;
+  totalSteps: number; waterDays2L: number; waterDays3L: number;
+  streak: number; calTargetDays: number; protTargetDays: number;
   monthWeightLoss: number; communityCount: number;
 };
 
 function collectMonthlyStats(client: {
-  meals: Meal[]; weights: Weight[]; workouts: Workout[]; steps: Step[];
+  meals: Meal[]; weights: Weight[]; workouts: Workout[]; steps: Step[]; water?: Water[];
   bookedSessions: { date: string }[]; communityPosts: Post[]; communityComments: Post[];
   calorieTarget: number; proteinTarget: number;
 }, monthKey: string): MonthlyStats {
@@ -139,6 +185,7 @@ function collectMonthlyStats(client: {
   const weights  = client.weights.filter(w => matchMonth(w.date));
   const workouts = client.workouts.filter(w => matchMonth(w.date));
   const steps    = client.steps.filter(s => matchMonth(s.date));
+  const water    = (client.water || []).filter(w => matchMonth(w.date));
   const booked   = client.bookedSessions.filter(s => matchMonth(s.date));
 
   const communityCount =
@@ -154,15 +201,24 @@ function collectMonthlyStats(client: {
     ...stepsDateSet,
   ]);
 
-  const totalSteps = steps.reduce((sum, s) => sum + Number(s.steps || 0), 0);
+  // Steps: per-day clamp before summing (anti-cheat), like gamification.js.
+  const stepsByDate: Record<string, number> = {};
+  for (const s of steps) stepsByDate[s.date] = (stepsByDate[s.date] || 0) + Number(s.steps || 0);
+  const totalSteps = Object.values(stepsByDate).reduce((sum, v) => sum + Math.min(v, MAX_PLAUSIBLE_STEPS_PER_DAY), 0);
   const streak     = longestStreak(allDateSet);
 
   const calTargetDays  = targetDaysCount(meals, client.calorieTarget || 99999, 'kcal');
   const protTargetDays = targetDaysCount(meals, client.proteinTarget || 99999, 'protein');
 
-  // Averaged weight loss — see gamification.js for the rationale.
-  // 4-day rolling window each end, min 2-per-side (so ≥4 logs needed).
-  const sortedW = [...weights].sort((a, b) => a.date.localeCompare(b.date));
+  // Water: days hitting the 2 L and 3 L goals this month.
+  const waterMlByDate: Record<string, number> = {};
+  for (const w of water) waterMlByDate[w.date] = (waterMlByDate[w.date] || 0) + Number(w.ml || 0);
+  const waterDays2L = Object.values(waterMlByDate).filter(v => v >= WATER_GOAL_ML).length;
+  const waterDays3L = Object.values(waterMlByDate).filter(v => v >= WATER_GOAL_3L_ML).length;
+
+  // Averaged weight loss — sanitize the FULL series first (cross-month context
+  // catches boundary jumps), then keep this month. 4-day window each end, ≥2/side.
+  const sortedW = sanitizeWeightSeries(client.weights || []).filter(w => matchMonth(w.date));
   const avgW = (arr: Weight[]) => arr.length === 0
     ? 0
     : arr.reduce((s, w) => s + Number(w.weight || 0), 0) / arr.length;
@@ -177,6 +233,8 @@ function collectMonthlyStats(client: {
     weightCount:  weights.length,
     stepsDays:    stepsDateSet.size,
     totalSteps,
+    waterDays2L,
+    waterDays3L,
     streak,
     calTargetDays,
     protTargetDays,
@@ -198,11 +256,13 @@ function checkMonthlyBadge(badge: Badge, stats: MonthlyStats): boolean {
 
 function evaluateMonthlyXP(client: any, monthKey: string): { xp: number; badgeCount: number } {
   const stats = collectMonthlyStats(client, monthKey);
-  let xp = 0, count = 0;
+  const earned: string[] = [];
   for (const b of MONTHLY_BADGES) {
-    if (checkMonthlyBadge(b, stats)) { xp += b.xp; count++; }
+    if (checkMonthlyBadge(b, stats)) earned.push(b.id);
   }
-  return { xp, badgeCount: count };
+  // XP uses the no-stack collapse (matches computeMonthlyXP); badge count is the
+  // raw number of earned badges (matches monthlyEarnedIds.length in the app).
+  return { xp: sumMonthlyBadgeXP(earned), badgeCount: earned.length };
 }
 
 // ── Paginated PostgREST fetch (handles >1000 rows) ───────────────────
@@ -309,13 +369,14 @@ Deno.serve(async (req) => {
     }
 
     // ── 1. Pull all relevant data (paginated to bypass 1000-row cap) ──
-    const [clients, workouts, meals, weights, steps, posts, comments, slots, bookings] =
+    const [clients, workouts, meals, weights, steps, water, posts, comments, slots, bookings] =
       await Promise.all([
         fetchAll<Client>(supabaseUrl,  'clients',         'id,name,email,is_coach,calorie_target,protein_target', sbHeaders),
         fetchAll<Workout>(supabaseUrl, 'workouts',        'client_id,date',                    sbHeaders),
         fetchAll<Meal>(supabaseUrl,    'meals',           'client_id,date,kcal,protein',       sbHeaders),
         fetchAll<Weight>(supabaseUrl,  'weight_logs',     'client_id,date,weight',             sbHeaders),
         fetchAll<Step>(supabaseUrl,    'steps_logs',      'client_id,date,steps',              sbHeaders),
+        fetchAll<{client_id:string;date:string;ml:number}>(supabaseUrl, 'water_logs', 'client_id,date,ml', sbHeaders).catch(() => []),
         fetchAll<Post>(supabaseUrl,    'community_posts', 'author_name,created_at',            sbHeaders),
         fetchAll<Post>(supabaseUrl,    'post_comments',   'author_name,created_at',            sbHeaders).catch(() => []),
         fetchAll<Slot>(supabaseUrl,    'booking_slots',   'id,slot_date',                      sbHeaders).catch(() => []),
@@ -343,6 +404,7 @@ Deno.serve(async (req) => {
         weights:  weights.filter(w => w.client_id === c.id),
         workouts: workouts.filter(w => w.client_id === c.id),
         steps:    steps.filter(s => s.client_id === c.id),
+        water:    water.filter((w: any) => w.client_id === c.id).map((w: any) => ({ date: w.date, ml: Number(w.ml) })),
         bookedSessions: sessionsByClient[c.id] || [],
         communityPosts:    posts.filter(p => p.author_name === c.name),
         communityComments: comments.filter(cm => cm.author_name === c.name),
