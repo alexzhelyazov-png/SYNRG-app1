@@ -314,16 +314,32 @@ export function BookingProvider({ children }) {
   }, [auth, loadAllPlans, realClients])
 
   // ── Admin: extend plan ────────────────────────────────────
-  const extendPlan = useCallback(async (planId, extendedTo) => {
+  // Extending is ALSO how a lapsed plan gets revived so its leftover credits can
+  // be used, instead of activating a new 0-lv plan. Writing extended_to alone is
+  // not enough: isPlanActive() also requires status === 'active', and loadMyPlan()
+  // strips the client down to FREE_MODULES the moment a plan expires — so both
+  // have to be put back, exactly like activatePlan does.
+  const extendPlan = useCallback(async (planId, extendedTo, clientId = null) => {
     try {
       await DB.update('client_plans', planId, {
         extended_to: extendedTo,
+        status:      'active',
         updated_at:  new Date().toISOString(),
       })
+      const cid = clientId || allPlans.find(p => p.id === planId)?.client_id
+      if (cid) {
+        let target = realClients.find(c => c.id === cid)
+        if (!target) target = await DB.getClient(cid)
+        const currentModules = target?.modules || []
+        const merged = [...new Set([...currentModules, ...ADMIN_MANAGEABLE_MODULES])]
+        if (merged.length !== currentModules.length || !merged.every(m => currentModules.includes(m))) {
+          await DB.update('clients', cid, { modules: merged })
+        }
+      }
       await loadAllPlans()
       return { ok: true }
     } catch (e) { return { error: e.message } }
-  }, [loadAllPlans])
+  }, [allPlans, realClients, loadAllPlans])
 
   // ── Admin: adjust credits used ────────────────────────────
   const adjustCredits = useCallback(async (planId, newCreditsUsed) => {

@@ -627,11 +627,15 @@ function ClientInfoDialog({ open, onClose, client, plan, allClientPlans, workout
 }
 
 // ── Client Plan Row (compact) ─────────────────────────────────
-function ClientPlanRow({ client, plan, onOpen, onManage, onDelete, onArchive, onUnarchive, t, lang }) {
+function ClientPlanRow({ client, plan, onOpen, onManage, onDelete, onArchive, onUnarchive, onQuickExtend, t, lang }) {
   const active   = isPlanActive(plan)
   const credits  = plan ? creditsRemaining(plan) : null
   const isLow    = plan && plan.plan_type !== 'unlimited' && credits !== null && credits <= 2
   const isPaid   = plan?.is_paid
+  // An expired plan with credits left can be revived by just pushing its end
+  // date out — no need to activate a new 0-lv plan just to unlock what's left.
+  const canQuickExtend = !!onQuickExtend && plan && !active
+    && plan.plan_type !== 'unlimited' && credits > 0
 
   return (
     <Box sx={{
@@ -691,6 +695,14 @@ function ClientPlanRow({ client, plan, onOpen, onManage, onDelete, onArchive, on
 
       {/* Actions */}
       <Box sx={{ display: 'flex', gap: 0.25, flexShrink: 0 }}>
+        {canQuickExtend && (
+          <Tooltip title={lang === 'en' ? `Extend — ${credits} credits left` : `Удължи — остават ${credits} кредита`} arrow>
+            <IconButton size="small" onClick={e => { e.stopPropagation(); onQuickExtend(client, plan) }}
+              sx={{ color: '#c4e9bf', '&:hover': { color: C.primary, background: 'rgba(196,233,191,0.12)' } }}>
+              <CalendarMonthIcon sx={{ fontSize: 14 }} />
+            </IconButton>
+          </Tooltip>
+        )}
         <IconButton size="small" onClick={e => { e.stopPropagation(); onManage(client, plan) }}
           sx={{ color: C.muted, '&:hover': { color: C.purple } }}>
           <EditIcon sx={{ fontSize: 14 }} />
@@ -719,6 +731,63 @@ function ClientPlanRow({ client, plan, onOpen, onManage, onDelete, onArchive, on
         )}
       </Box>
     </Box>
+  )
+}
+
+// ── Quick extend dialog ──────────────────────────────────────
+// One-purpose dialog for reviving a lapsed plan that still has credits: pick a
+// new end date, press once. Deliberately NOT the full plan dialog — no plan type,
+// no price, no credits, because none of that changes when you only extend.
+function QuickExtendDialog({ open, client, plan, onClose, onExtend, t, lang }) {
+  const [date, setDate]     = useState(isoDatePlusDays(30))
+  const [saving, setSaving] = useState(false)
+  const credits = plan ? creditsRemaining(plan) : 0
+
+  useEffect(() => { if (open) setDate(isoDatePlusDays(30)) }, [open])
+
+  async function save() {
+    if (!date) return
+    setSaving(true)
+    const res = await onExtend(plan.id, date, client.id)
+    setSaving(false)
+    if (!res?.error) onClose()
+  }
+
+  return (
+    <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth
+      PaperProps={{ sx: { borderRadius: '20px', background: C.card, border: `1px solid ${C.border}` } }}>
+      <DialogTitle sx={{ fontWeight: 700, color: C.text }}>
+        {t('extendPlanBtn')}: {client?.name}
+      </DialogTitle>
+      <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: '4px !important' }}>
+        <Box sx={{ p: 1.5, borderRadius: '10px', background: 'rgba(196,233,191,0.08)', border: '1px solid rgba(196,233,191,0.25)' }}>
+          <Typography sx={{ fontSize: '13px', fontWeight: 800, color: '#c4e9bf' }}>
+            {lang === 'en' ? `${credits} credits left` : `Остават ${credits} кредита`}
+          </Typography>
+          <Typography sx={{ fontSize: '11px', color: C.muted, mt: 0.5 }}>
+            {lang === 'en'
+              ? 'Kept as-is. Extending only moves the end date — no new plan, no charge.'
+              : 'Запазват се. Удължаването само мести крайната дата — без нов план и без сума.'}
+          </Typography>
+        </Box>
+        <TextField label={t('extendTo')} type="date" size="small" fullWidth
+          value={date} onChange={e => setDate(e.target.value)}
+          InputLabelProps={{ shrink: true }}
+          sx={{
+            '& .MuiInputBase-input':              { color: C.text },
+            '& .MuiOutlinedInput-notchedOutline': { borderColor: C.border },
+            '& .MuiInputLabel-root':              { color: C.muted },
+            '& .MuiInputBase-input::-webkit-calendar-picker-indicator': { filter: 'invert(0.7)' },
+          }} />
+      </DialogContent>
+      <DialogActions sx={{ px: 3, pb: 2 }}>
+        <Button onClick={onClose} sx={{ color: C.muted, textTransform: 'none' }}>{t('cancelBtn')}</Button>
+        <Button onClick={save} disabled={saving || !date} variant="contained"
+          sx={{ background: C.primary, color: C.primaryOn, textTransform: 'none', fontWeight: 700, borderRadius: '100px', px: 3 }}>
+          {t('extendPlanBtn')}
+        </Button>
+      </DialogActions>
+    </Dialog>
   )
 }
 
@@ -1427,6 +1496,7 @@ function ClientsTab({ t }) {
   const { realClients, showSnackbar, lang, setConfirmDelete, setClientArchived } = useApp()
   const { allPlans, loadAllPlans, activatePlan, extendPlan, adjustCredits, deactivatePlan } = useBooking()
   const [planDlg, setPlanDlg]   = useState(null)
+  const [quickExt, setQuickExt] = useState(null) // { client, plan }
   const [loaded, setLoaded]     = useState(false)
   const [clientSearch, setClientSearch] = useState('')
   const [infoDlg, setInfoDlg] = useState(null) // { client, plan, allClientPlans, workouts }
@@ -1549,6 +1619,7 @@ function ClientsTab({ t }) {
                 onOpen={() => setInfoDlg({ client, plan: expiredPlan, allClientPlans: allPlans.filter(p => p.client_id === client.id), workouts: client.workouts || [] })}
                 t={t} lang={lang}
                 onManage={(c, p) => setPlanDlg({ client: c, plan: p })}
+                onQuickExtend={(c, p) => setQuickExt({ client: c, plan: p })}
                 onArchive={handleArchive}
                 onDelete={handleDelete} />
             )
@@ -1617,6 +1688,17 @@ function ClientsTab({ t }) {
           onAdjust={async (planId, credits) => { const r = await adjustCredits(planId, credits); if (r?.error) { showSnackbar('Грешка: ' + r.error); return r } showSnackbar(t('creditsAdjustedMsg')); return { ok: true } }}
           onTogglePaid={handleTogglePaid}
           client={planDlg.client} plan={planDlg.plan} t={t} />
+      )}
+
+      {quickExt && (
+        <QuickExtendDialog open={!!quickExt} onClose={() => setQuickExt(null)}
+          client={quickExt.client} plan={quickExt.plan} t={t} lang={lang}
+          onExtend={async (planId, date, clientId) => {
+            const r = await extendPlan(planId, date, clientId)
+            if (r?.error) { showSnackbar('Грешка: ' + r.error); return r }
+            showSnackbar(t('planExtendedMsg'))
+            return { ok: true }
+          }} />
       )}
     </Box>
   )
