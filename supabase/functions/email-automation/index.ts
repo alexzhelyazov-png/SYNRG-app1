@@ -470,9 +470,14 @@ Deno.serve(async (req: Request) => {
     const free = await processFreeUserNurture(autoMap);
     const inactive = await processInactiveReengagement(autoMap);
     const totalFailed = buyer.failed + free.failed + inactive.failed;
-    // Health alert: if any send failed (e.g. Brevo throttling/outage), email the admin
-    // so silent failures never go unnoticed. Failed sends are not logged, so they retry next run.
-    if (totalFailed > 0) {
+    const totalSent = buyer.sent + free.sent + inactive.sent;
+    const attempted = totalSent + totalFailed;
+    // Health alert: only for failures that actually mean something. Alerting on a
+    // single failure fired every hour — a mail that says "1 of 19 failed" 24 times a
+    // day trains you to ignore it, which is worse than no alert at all. A one-off
+    // failure retries next run anyway; a real outage shows up as most sends failing.
+    const outage = attempted > 0 && totalFailed / attempted > 0.5;
+    if (totalFailed >= 5 || outage) {
       await sendBrevoEmail(
         { email: "info@synrg-beyondfitness.com", name: "SYNRG" },
         `⚠️ Email automation: ${totalFailed} провалени изпращания`,
