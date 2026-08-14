@@ -35,6 +35,7 @@ import SiteTab               from './AdminSiteTab'
 import ProgramsTab           from './AdminProgramsTab'
 import SubscriptionsTab      from './AdminSubscriptionsTab'
 import AdminMessagesTab      from './AdminMessagesTab'
+import AdminAttentionTab     from './AdminAttentionTab'
 import { useBooking }        from '../context/BookingContext'
 import { C }                 from '../theme'
 import { DB }                from '../lib/db'
@@ -3404,6 +3405,7 @@ export default function Admin() {
   const SUB_TABS = {
     clients: [
       { key: 'clients',       label: t('clientsMgmt')     || 'Клиенти' },
+      { key: 'attention',     label: 'Нужда от внимание' },
       { key: 'online',        label: 'Онлайн' },
       { key: 'online_access', label: 'Онлайн достъп' },
       { key: 'challenge',     label: 'Challenge' },
@@ -3476,6 +3478,7 @@ export default function Admin() {
 
       {section === 'clients' && <>
         {clientSub === 'clients'       && <ClientsTab t={t} />}
+        {clientSub === 'attention'     && <AdminAttentionTab />}
         {clientSub === 'online'        && <OnlineClientsTab t={t} />}
         {clientSub === 'online_access' && <OnlineAccessTab />}
         {clientSub === 'challenge'     && <ChallengeTab />}

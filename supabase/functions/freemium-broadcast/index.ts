@@ -121,7 +121,7 @@ Deno.serve(async (req: Request) => {
 
   // ── Build freemium audience (no active plan, no purchase) ──
   let clients: any[], plans: any[], purchases: any[];
-  let mealClients: any[], weightClients: any[], alreadySent: any[];
+  let mealClients: any[], weightClients: any[], stepsClients: any[], waterClients: any[], alreadySent: any[];
   let signedUp: any[] = [];
   try {
     clients = await restGetAll(`clients?select=id,name,email`);
@@ -129,6 +129,11 @@ Deno.serve(async (req: Request) => {
     purchases = await restGet(`program_purchases?select=client_id`);
     mealClients = await restGetAll(`meals?select=client_id`);
     weightClients = await restGetAll(`weight_logs?select=client_id`);
+    // "active" = has ENTERED anything (meals/weight/steps/water), so the
+    // "never logged a thing" cohort is excluded even if they only tracked
+    // steps or water.
+    stepsClients = await restGetAll(`steps_logs?select=client_id`);
+    waterClients = await restGetAll(`water_logs?select=client_id`);
     alreadySent = await restGetAll(
       `email_sends?select=client_id&email_key=eq.${encodeURIComponent(emailKey)}&success=eq.true`,
     );
@@ -148,11 +153,22 @@ Deno.serve(async (req: Request) => {
   const activeIds = new Set<string>([
     ...mealClients.map((m) => m.client_id),
     ...weightClients.map((w) => w.client_id),
+    ...stepsClients.map((s) => s.client_id),
+    ...waterClients.map((w) => w.client_id),
   ]);
   const sentIds = new Set<string>(alreadySent.map((s) => s.client_id));
 
+  // First name for personalization — but only when `name` is a real name, not
+  // an email address (legacy rows store the email in `name`). Falls back to a
+  // neutral greeting so no one gets "Здравей, [email]!".
+  const firstName = (c: any) => {
+    const n = String(c.name || "").trim();
+    if (!n || EMAIL_RE.test(n)) return "";
+    return n.split(/\s+/)[0];
+  };
+
   const seenEmail = new Set<string>();
-  const recipients: { id: string; email: string }[] = [];
+  const recipients: { id: string; email: string; name: string }[] = [];
   for (const c of clients) {
     if (paid.has(c.id)) continue;
     if (sentIds.has(c.id)) continue; // idempotent skip
@@ -166,7 +182,7 @@ Deno.serve(async (req: Request) => {
     if (!email || seenEmail.has(email)) continue;
     if (excludeSignups && signedUpEmails.has(email)) continue; // already signed up
     seenEmail.add(email);
-    recipients.push({ id: c.id, email });
+    recipients.push({ id: c.id, email, name: firstName(c) });
   }
 
   const pending = recipients.length;
@@ -192,14 +208,19 @@ Deno.serve(async (req: Request) => {
     const slice = queue.slice(i, i + BATCH);
     const results = await Promise.all(slice.map(async (r) => {
       try {
+        // Personalize {{name}}. With no usable name, ", {{name}}" collapses so
+        // "Здравей, {{name}}!" degrades to "Здравей!" instead of "Здравей, !".
+        const fill = (s: string) => r.name
+          ? s.replaceAll("{{name}}", r.name)
+          : s.replaceAll(", {{name}}", "").replaceAll(" {{name}}", "").replaceAll("{{name}}", "");
         const res = await fetch("https://api.brevo.com/v3/smtp/email", {
           method: "POST",
           headers: { "api-key": BREVO_API_KEY, "Content-Type": "application/json", Accept: "application/json" },
           body: JSON.stringify({
             sender: SENDER,
             to: [{ email: r.email }],
-            subject,
-            htmlContent: html,
+            subject: fill(subject),
+            htmlContent: fill(html),
             headers: { "X-Mailer": "SYNRG Freemium Broadcast" },
           }),
         });

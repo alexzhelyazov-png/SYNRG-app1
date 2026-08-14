@@ -80,7 +80,7 @@ Deno.serve(async (req: Request) => {
   if (!REPORT_EMAIL_TOKEN || token !== REPORT_EMAIL_TOKEN) {
     return new Response(JSON.stringify({ ok: false, error: "unauthorized" }), { status: 401 });
   }
-  let body: { dry_run?: boolean };
+  let body: { dry_run?: boolean; only_if_new?: boolean };
   try { body = await req.json(); } catch { body = {}; }
 
   const res = await fetch(
@@ -116,6 +116,19 @@ Deno.serve(async (req: Request) => {
     return new Response(JSON.stringify({ ok: true, skipped: "няма отговори" }), {
       headers: { "Content-Type": "application/json" },
     });
+  }
+
+  // Дневният крон вика с only_if_new: мълчи в дните без нови попълвания, вместо
+  // да праща един и същи отчет всяка сутрин. Имейл, който не носи новина, се
+  // превръща в имейл, който не се отваря.
+  if (body.only_if_new) {
+    const since = Date.now() - 24 * 60 * 60 * 1000;
+    const fresh = rows.filter((r) => new Date(r.created_at).getTime() >= since).length;
+    if (!fresh) {
+      return new Response(JSON.stringify({ ok: true, skipped: "няма нови от 24ч", total: n }), {
+        headers: { "Content-Type": "application/json" },
+      });
+    }
   }
 
   // ── разпределение по скалите: всяка стойност 1–5 с брой, за да се виждат крайностите

@@ -46,6 +46,7 @@ import LeadHome       from './pages/LeadHome'
 import useClientTier  from './hooks/useClientTier'
 
 import ConfirmDeleteModal from './components/ConfirmDeleteModal'
+import MonthlyCheckIn     from './components/MonthlyCheckIn'
 import WelcomeTour        from './components/WelcomeTour'
 
 const isStandalone = window.navigator.standalone || window.matchMedia('(display-mode: standalone)').matches
@@ -366,6 +367,10 @@ function AppShell() {
       {auth.role === 'client' && isOnlineClient && auth.synrgQuiz && <WelcomeTour />}
 
       {auth.role === 'client' && <BadgeUnlockWatcher />}
+
+      {/* Месечен check-in — само за студио клиентите, които реално тренират тук.
+          Онлайн и freemium профилите нямат треньор, при когото да "върви нещо". */}
+      {auth.role === 'client' && hasModule(auth.modules, 'booking_access') && <MonthlyCheckIn />}
 
       <Snackbar
         open={snackbar.open}
