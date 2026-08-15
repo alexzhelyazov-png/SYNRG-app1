@@ -32,6 +32,10 @@ export function monthKey(d = new Date()) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
 }
 
+// През август 2026 разпратихме голямата анкета. Няма смисъл същите хора да
+// отговарят два пъти в един месец, затова check-in-ът тръгва от септември.
+const FIRST_MONTH = '2026-09'
+
 /** Оценка 1–5. Същият вид като скалите в анкетата, за да е разпознаваем. */
 function Scale({ value, onChange }) {
   return (
@@ -69,6 +73,7 @@ export default function MonthlyCheckIn() {
   useEffect(() => {
     let cancelled = false
     if (auth?.role !== 'client' || !clientId) return
+    if (mk < FIRST_MONTH) return
     if (sessionStorage.getItem(`synrg_checkin_skip_${mk}`)) return
 
     ;(async () => {
@@ -136,7 +141,7 @@ export default function MonthlyCheckIn() {
     <Dialog open onClose={dismiss} maxWidth="xs" fullWidth
       PaperProps={{ sx: { borderRadius: '20px', background: C.card, border: `1px solid ${C.border}` } }}>
       <DialogTitle sx={{ fontWeight: 800, color: C.text, fontSize: '19px', pb: 0.5 }}>
-        {en ? 'How are things this month? 💜' : 'Как вървят нещата този месец? 💜'}
+        {en ? 'How are things this month?' : 'Как вървят нещата този месец?'}
       </DialogTitle>
 
       <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, pt: '4px !important' }}>
