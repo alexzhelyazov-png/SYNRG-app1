@@ -1,7 +1,7 @@
 // Bumped on every deploy to force-refresh PWA caches.
 // When this string changes, SW activates fresh, deletes old caches,
 // and serves the latest JS bundle on next request.
-const CACHE = 'synrg-v45-2026-08-15';
+const CACHE = 'synrg-v46-2026-08-15';
 const BASE = '/app/';
 const ASSETS = [BASE, BASE + 'index.html'];
 

@@ -153,7 +153,9 @@ export default function MonthlyCheckIn() {
 
         <Box>
           <Typography sx={{ fontWeight: 700, fontSize: '14px', color: C.text, mb: 1.25 }}>
-            {en ? 'How do you feel about your training right now?' : 'Как се чувстваш с тренировките си в момента?'}
+            {/* Не „как се чувстваш С тренировките“ — това се чете като „как се
+                чувстваш ОТ тях“ и умореният човек дава 3, без да е недоволен. */}
+            {en ? 'How satisfied are you with your training right now?' : 'Колко си доволен/а от тренировките си в момента?'}
           </Typography>
           <Scale value={feeling} onChange={setFeeling} />
         </Box>
