@@ -129,6 +129,18 @@ export function AppProvider({ children }) {
       try { sessionAuth = JSON.parse(localStorage.getItem('synrg_auth') || '{}') } catch {}
       const isClientRole = sessionAuth.role === 'client' && sessionAuth.id
 
+      // ── Nobody is logged in → load nothing ──────────────────────
+      // Without this the login screen fell through to the coach branch and
+      // pulled the entire database — 116 requests and every meal in the gym,
+      // before the visitor had even typed a password. handleLogin() runs
+      // loadAll() again once a session exists, so nothing is lost by waiting.
+      if (!sessionAuth.role) {
+        setCoaches([])
+        setClients([])
+        setLoading(false)
+        return
+      }
+
       // ── Query bounds: per-client for client role, date-bounded for coaches ──
       // Prevents unbounded table scans at scale (1000 clients × daily entries = millions of rows).
       const twoYearsAgo = new Date(Date.now() - 730 * 86400000).toISOString().slice(0, 10)
@@ -148,9 +160,16 @@ export function AppProvider({ children }) {
         ? `&client_id=eq.${sessionAuth.id}&order=id.desc&limit=5000`
         : `&order=id.desc&created_at=gte.${twoYearsAgo}&limit=20000`
 
+      // A client needs exactly ONE row from `clients` — their own. Loading the
+      // whole table was the single biggest cost of app start and it grew with
+      // every signup: 62 rows in May, 3 781 by September (8 requests, ~660 KB).
+      // The only screen that needs everyone is Класация, which now loads its
+      // own slim list on open (DB.getRankingRows).
+      const clientsQuery = isClientRole ? `&id=eq.${sessionAuth.id}` : ''
+
       const [rawCoaches, rawClients, meals, workouts, weights, tasks, taskComments, reactions, stepsRaw, postsRaw, rawSynrgHabits, rawPostReactions, rawPostComments, pastBookingsAll, waterRaw] = await Promise.all([
         DB.selectAll('coaches'),
-        DB.selectAll('clients'),
+        DB.selectAll('clients', clientsQuery),
         DB.selectAll('meals', mealQuery),
         DB.selectAll('workouts', workoutQuery).catch(() => []),
         DB.selectAll('weight_logs', weightQuery).catch(() => []),
@@ -269,6 +288,8 @@ export function AppProvider({ children }) {
         challengeStartedOn: c.challenge_started_on || null,
         challengeStatus:    c.challenge_status     || null,
         phone:              c.phone                || '',
+        nutritionMode:      c.nutrition_mode       || null,
+        nutritionProfile:   c.nutrition_profile    || null,
         }
       }))
 
@@ -318,6 +339,9 @@ export function AppProvider({ children }) {
       try {
         let visAuth = { role: null, id: null }
         try { visAuth = JSON.parse(localStorage.getItem('synrg_auth') || '{}') } catch {}
+        // No session → nothing to re-sync. Without this, every return to the
+        // foreground on the login screen re-downloaded all 36 000 meals.
+        if (!visAuth.role) return
         const visIsClient = visAuth.role === 'client' && visAuth.id
         const visTwoYearsAgo = new Date(Date.now() - 730 * 86400000).toISOString().slice(0, 10)
         const visQuery = visIsClient
@@ -481,17 +505,46 @@ export function AppProvider({ children }) {
           }
         })
 
+        // Fold the freshly computed XP back into the client objects before they
+        // become state. Without this, `merged` keeps the values that were read
+        // from the DB, so the change-detection below would see a difference on
+        // every single sync and re-write all 3 773 rows forever.
+        const xpById = new Map(xpPayload.map(x => [x.id, x]))
+        const mergedWithXP = merged.map(c => {
+          const x = xpById.get(c.id)
+          return x ? { ...c, xp_monthly: x.xp_monthly, xp_total: x.xp_total, xp_level: x.xp_level,
+                       earned_ids: x.earned_ids, monthly_earned_ids: x.monthly_earned_ids } : c
+        })
+
         // Update state with merged clients (fresh meals/weights/steps/workouts)
-        setClients(merged)
-        clientsRef.current = merged
+        setClients(mergedWithXP)
+        clientsRef.current = mergedWithXP
 
         // Write authoritative XP to DB — clients read from here.
-        // Await so any error surfaces in catch below (was silently swallowed before).
-        if (xpPayload.length) {
+        // ONLY the rows that actually changed. This used to PATCH every client
+        // unconditionally: with 3 773 accounts that meant ~3 800 writes every
+        // two minutes from each open coach tab, which exhausted the browser's
+        // connection pool (ERR_INSUFFICIENT_RESOURCES) and hammered the
+        // database. On a normal sync a handful of rows differ, or none.
+        const sameIds = (a, b) => {
+          const x = Array.isArray(a) ? a : []
+          const y = Array.isArray(b) ? b : []
+          return x.length === y.length && x.every((v, i) => v === y[i])
+        }
+        const prevById = new Map(merged.map(c => [c.id, c]))
+        const changed = xpPayload.filter(x => {
+          const prev = prevById.get(x.id)
+          if (!prev) return true
+          return (prev.xp_monthly || 0) !== x.xp_monthly
+              || (prev.xp_total   || 0) !== x.xp_total
+              || (prev.xp_level   || 1) !== x.xp_level
+              || !sameIds(prev.earned_ids, x.earned_ids)
+              || !sameIds(prev.monthly_earned_ids, x.monthly_earned_ids)
+        })
+        if (changed.length) {
           try {
-            console.log('[syncFresh] Writing XP to DB:', xpPayload.length, 'clients',
-              xpPayload.map(x => `${x.id.slice(0,8)}=${x.xp_monthly}`).join(' '))
-            await DB.batchUpdateXP(xpPayload)
+            console.log('[syncFresh] Writing XP to DB:', changed.length, 'of', xpPayload.length, 'clients')
+            await DB.batchUpdateXP(changed)
           } catch (err) {
             console.error('[syncFresh] batchUpdateXP failed:', err)
           }
@@ -511,24 +564,22 @@ export function AppProvider({ children }) {
     if (!auth.isLoggedIn || auth.role !== 'client') return
     async function refreshXP() {
       try {
-        const freshClients = await DB.selectAll('clients').catch(() => null)
-        if (!freshClients?.length) return
-        setClients(prev => prev.map(c => {
-          const fc = freshClients.find(x => x.id === c.id)
-          if (!fc) return c
-          return {
-            ...c,
-            xp_monthly: fc.xp_monthly || 0, xp_total: fc.xp_total || 0, xp_level: fc.xp_level || 1,
-            earned_ids:         Array.isArray(fc.earned_ids)         ? fc.earned_ids         : (c.earned_ids || []),
-            monthly_earned_ids: Array.isArray(fc.monthly_earned_ids) ? fc.monthly_earned_ids : (c.monthly_earned_ids || []),
-          }
+        // One row, six columns — this used to re-read the entire clients table
+        // (3 781 rows, 4 requests) every five minutes to refresh one person.
+        const fc = await DB.getMyXP(auth.id).catch(() => null)
+        if (!fc) return
+        setClients(prev => prev.map(c => c.id !== fc.id ? c : {
+          ...c,
+          xp_monthly: fc.xp_monthly || 0, xp_total: fc.xp_total || 0, xp_level: fc.xp_level || 1,
+          earned_ids:         Array.isArray(fc.earned_ids)         ? fc.earned_ids         : (c.earned_ids || []),
+          monthly_earned_ids: Array.isArray(fc.monthly_earned_ids) ? fc.monthly_earned_ids : (c.monthly_earned_ids || []),
         }))
       } catch { /* silent */ }
     }
     refreshXP()  // run immediately on login to pick up latest admin-written values
     const interval = setInterval(refreshXP, 300000)  // every 5 min
     return () => clearInterval(interval)
-  }, [auth.isLoggedIn, auth.role])
+  }, [auth.isLoggedIn, auth.role, auth.id])
 
   // ── Auth ──────────────────────────────────────────────────────
   // Server-side bcrypt verification via auth-login Edge Function.
@@ -556,6 +607,11 @@ export function AppProvider({ children }) {
       localStorage.setItem('synrg_auth', JSON.stringify(a))
       setSelCoach(c.name)
       setViewingCoach(null)
+      // loadAll() reads the role back out of localStorage (set on the line
+      // above), so it must run after the write. Before the logged-out guard
+      // existed this was implicit: the pre-login load had already pulled the
+      // whole database. Now the data is fetched here, scoped to the session.
+      loadAll()
       return null
     }
     // Client login.
@@ -590,6 +646,10 @@ export function AppProvider({ children }) {
     const a = { isLoggedIn: true, role: 'client', name: c.name, id: c.id, modules: c.modules || [] }
     setAuth(a)
     localStorage.setItem('synrg_auth', JSON.stringify(a))
+    // Pull this client's own rows (meals, weights, steps, workouts). The
+    // appended record above carries empty arrays purely so actualIdx resolves
+    // to them while this runs.
+    loadAll()
     return null
   }
 
@@ -633,7 +693,11 @@ export function AppProvider({ children }) {
       setSelIdx(newRealIdx)
       return updated
     })
-    setAuth({ isLoggedIn: true, role: 'client', name, id: data.id, modules: FREE_MODULES })
+    const regAuth = { isLoggedIn: true, role: 'client', name, id: data.id, modules: FREE_MODULES }
+    setAuth(regAuth)
+    // Persist it — login does this, registration never did, so a brand-new
+    // account was signed out again by the first page reload.
+    localStorage.setItem('synrg_auth', JSON.stringify(regAuth))
 
     // Meta Pixel: fire CompleteRegistration for ads attribution + retargeting
     if (typeof window !== 'undefined' && window.synrgPixel) {
@@ -889,6 +953,24 @@ export function AppProvider({ children }) {
   // ── Ranking excludes coach profiles ───────────────────────────
   const isCoachOrAdmin = auth.role === 'coach' || auth.role === 'admin'
 
+  // ── Lazily-loaded ranking rows ────────────────────────────────
+  // Клиент no longer carries every other client in memory. Ranking.jsx calls
+  // loadRanking() when the screen opens; sessions that never open Класация
+  // never pay for it. Cached for the session — the numbers only change when
+  // admin's 2-minute sync writes them.
+  const [rankingRows, setRankingRows] = useState([])
+  const rankingLoadedRef = useRef(false)
+  const loadRanking = useCallback(async (force = false) => {
+    if (isCoachOrAdmin) return          // coaches already hold the full list
+    if (rankingLoadedRef.current && !force) return
+    rankingLoadedRef.current = true
+    try {
+      const rows = await DB.getRankingRows()
+      setRankingRows(Array.isArray(rows) ? rows.filter(r => !r.is_coach) : [])
+    } catch { rankingLoadedRef.current = false }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isCoachOrAdmin])
+
   const ranking = useMemo(() => {
     if (isCoachOrAdmin) {
       // realClients is already enriched with community data (see realClients useMemo),
@@ -898,7 +980,9 @@ export function AppProvider({ children }) {
     }
     // Client role: read from DB (written by admin's periodic sync every 2 min).
     // All clients read the same DB values → everyone sees an identical ranking.
-    return [...realClients]
+    // Source is the lazily-fetched slim list; realClients now holds only the
+    // logged-in client, so falling back to it would show a ranking of one.
+    return [...rankingRows]
       .map(c => {
         const earnedIds        = Array.isArray(c.earned_ids)         ? c.earned_ids         : []
         const monthlyEarnedIds = Array.isArray(c.monthly_earned_ids) ? c.monthly_earned_ids : []
@@ -914,7 +998,7 @@ export function AppProvider({ children }) {
         }
       })
       .sort((a, b) => b.xp - a.xp)
-  }, [realClients, isCoachOrAdmin])
+  }, [realClients, rankingRows, isCoachOrAdmin])
   const kcalPct  = Math.min((foodTotals.kcal    / (client.calorieTarget || 1)) * 100, 100)
   const protPct  = Math.min((foodTotals.protein / (client.proteinTarget || 1)) * 100, 100)
 
@@ -1033,6 +1117,21 @@ export function AppProvider({ children }) {
     if (!id || !phone) return
     await DB.update('clients', id, { phone })
     setClients(prev => prev.map(c => c.id === id ? { ...c, phone } : c))
+  }
+
+  // ── Nutrition plan (Хранителен план tab) ────────────────────────
+  // Which of the three approaches the client picked, plus the body data the
+  // targets are computed from. id-targeted write only (never actualIdx), so a
+  // stale clients array can't write another user's row.
+  async function saveNutritionPlan(mode, profile = null) {
+    const id = auth.id
+    if (!id) return
+    const patch = { nutrition_mode: mode }
+    if (profile) patch.nutrition_profile = profile
+    await DB.update('clients', id, patch)
+    setClients(prev => prev.map(c => c.id === id
+      ? { ...c, nutritionMode: mode, ...(profile ? { nutritionProfile: profile } : {}) }
+      : c))
   }
 
   async function addMealToClient(clientId, meal) {
@@ -1811,7 +1910,8 @@ export function AppProvider({ children }) {
     handleRegisterClient,
     logout,
     updateClient, updateClientTargets, updateWaterTarget,
-    startChallenge, dismissChallenge, savePhone,
+    startChallenge, dismissChallenge, savePhone, saveNutritionPlan,
+    loadRanking,
     addMealToClient, deleteMealFromClient,
     saveWorkoutToClient,
     saveWeightLog, deleteWeightLog,

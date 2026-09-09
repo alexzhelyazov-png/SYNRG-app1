@@ -64,7 +64,11 @@ function BadgeIcon({ muiIcon, size = 24, color: clr = C.muted }) {
    Main Progress page — Gamification v3
    ═══════════════════════════════════════════════════════════════ */
 export default function Progress() {
-  const { client, auth, ranking, t, lang, dismissBadge, markFeedSeen, feedPosts, postComments, unreadFeedCount, pendingProgressTab, setPendingProgressTab } = useApp()
+  const { client, auth, ranking, t, lang, dismissBadge, markFeedSeen, feedPosts, postComments, unreadFeedCount, pendingProgressTab, setPendingProgressTab, loadRanking } = useApp()
+
+  // Progress renders a mini-leaderboard, so it needs the ranking rows too.
+  // Same cached loader as Ranking.jsx — whichever screen opens first pays.
+  useEffect(() => { loadRanking() }, [loadRanking])
   const isMobile = window.innerWidth < 640
   const [selectedBadge, setSelectedBadge] = useState(null)
   const [tab, setTab] = useState(() => pendingProgressTab || 'progress') // 'progress' | 'ranking' | 'feed'

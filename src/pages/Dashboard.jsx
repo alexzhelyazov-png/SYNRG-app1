@@ -1382,7 +1382,10 @@ function DashboardClient({ isCoachView = false }) {
               isLocked: !recipesUnlocked,
             }
           })(),
-          { key: 'tasks', view: 'tasks', color: '#F87171', Icon: AssignmentIcon, label: t('navTasks') },
+          // Clients land on the Хранителен план chooser here; coaches still get
+          // the read-only habit curriculum, which is what "Задачи" means to them.
+          { key: 'tasks', view: 'tasks', color: '#F87171', Icon: AssignmentIcon,
+            label: auth.role === 'client' ? t('navNutritionPlan') : t('navTasks') },
         ].filter(Boolean).map(({ key, view, color, Icon, label, badge, isLocked }) => (
           <Paper key={key} onClick={() => {
             if (isLocked) { setView('programs'); return }

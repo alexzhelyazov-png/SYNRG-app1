@@ -114,6 +114,8 @@ function PlanView() {
   )
 }
 
-// Coach view (Profile tab + App routing) renders the same read-only plan.
+// Coach view (Profile tab + App routing) renders the read-only habit plan.
+// Clients no longer come here — their "tasks" view is NutritionPlan, which
+// carries the same habits as its "15 правила" option.
 export function AllClientsTasks() { return <PlanView /> }
-export default function Tasks() { return <PlanView /> }
+export default AllClientsTasks

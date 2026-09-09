@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef } from 'react'
+import { useState, useMemo, useEffect, useRef, lazy, Suspense } from 'react'
 import { Box, CircularProgress, Typography, Button, Alert, Snackbar, IconButton, useMediaQuery } from '@mui/material'
 import WarningAmberIcon from '@mui/icons-material/WarningAmber'
 import ArrowBackIcon from '@mui/icons-material/ArrowBack'
@@ -27,21 +27,22 @@ import FoodTracker    from './pages/FoodTracker'
 import WeightTracker  from './pages/WeightTracker'
 import Progress, { BadgeUnlockedToast, LevelUpCelebration } from './pages/Progress'
 import Ranking        from './pages/Ranking'
-import Tasks, { AllClientsTasks } from './pages/Tasks'
-import SynrgMethod from './pages/SynrgMethod'
+import { AllClientsTasks } from './pages/Tasks'
+const NutritionPlan = lazy(() => import('./pages/NutritionPlan'))
+const SynrgMethod = lazy(() => import('./pages/SynrgMethod'))
 import Booking        from './pages/Booking'
-import Schedule       from './pages/Schedule'
-import Admin          from './pages/Admin'
-import Programs       from './pages/Programs'
+const Schedule = lazy(() => import('./pages/Schedule'))
+const Admin = lazy(() => import('./pages/Admin'))
+const Programs = lazy(() => import('./pages/Programs'))
 import StepsTracker   from './pages/StepsTracker'
 import WaterTracker   from './pages/WaterTracker'
-import ClientWorkout  from './pages/ClientWorkout'
-import Notifications  from './pages/Notifications'
-import Recipes        from './pages/Recipes'
-import CoachChat      from './pages/CoachChat'
-import AdminMessagesTab from './pages/AdminMessagesTab'
-import Profile        from './pages/Profile'
-import OnlineHome     from './pages/OnlineHome'
+const ClientWorkout = lazy(() => import('./pages/ClientWorkout'))
+const Notifications = lazy(() => import('./pages/Notifications'))
+const Recipes = lazy(() => import('./pages/Recipes'))
+const CoachChat = lazy(() => import('./pages/CoachChat'))
+const AdminMessagesTab = lazy(() => import('./pages/AdminMessagesTab'))
+const Profile = lazy(() => import('./pages/Profile'))
+const OnlineHome = lazy(() => import('./pages/OnlineHome'))
 import LeadHome       from './pages/LeadHome'
 import useClientTier  from './hooks/useClientTier'
 
@@ -312,6 +313,9 @@ function AppShell() {
             minWidth:  0,
           }}
         >
+          {/* Lazily-loaded screens (Admin, Schedule, Programs, …) resolve here.
+              LoadingScreen is the same spinner the app already shows on boot. */}
+          <Suspense fallback={<LoadingScreen t={t} />}>
           <PageTransition viewKey={showClientDetail ? `client-${client?.id}` : view}>
             {showClientDetail ? (
               <ClientDetail />
@@ -335,7 +339,7 @@ function AppShell() {
                 {view === 'weight'    && (auth.role !== 'client' || hasModule(auth.modules, 'weight_tracking'))    && <WeightTracker />}
                 {view === 'ranking'   && <Ranking />}
                 {view === 'tasks'     && (auth.role === 'coach' || auth.role === 'admin') && <AllClientsTasks />}
-                {view === 'tasks'     && auth.role === 'client' && <Tasks />}
+                {view === 'tasks'     && auth.role === 'client' && <NutritionPlan />}
                 {view === 'synrg_method' && auth.role === 'client' && hasModule(auth.modules, 'synrg_method') && <SynrgMethod />}
                 {view === 'booking'   && (auth.role !== 'client' || hasModule(auth.modules, 'booking_access'))     && <Booking />}
                 {view === 'schedule'  && auth.role === 'client' && hasModule(auth.modules, 'booking_access')       && <ClientSchedule />}
@@ -353,6 +357,7 @@ function AppShell() {
               </>
             )}
           </PageTransition>
+          </Suspense>
         </Box>
       </Box>
 

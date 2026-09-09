@@ -142,3 +142,47 @@ export const HABIT_PLAN = [
     ],
   },
 ]
+
+// ── "15 правила за устойчиво сваляне" ──────────────────────────
+// A flat, numbered cut of HABIT_PLAN for clients who want the rules
+// without the week-by-week pacing. Single source of truth stays
+// HABIT_PLAN above — this only re-orders and trims it, so a copy fix
+// there lands here too. Five habits are intentionally left out:
+// "Балансирай едно основно хранене" and "Супа за вечеря" (overlap with
+// the carb rule), "+2000 крачки над базата" (duplicate of +3 000),
+// "Опитай фаст 12–16 часа" (optional, not a rule), and "Поддържай
+// навиците без списък" (meta — it's the goal, not a step).
+const RULE_TITLES = [
+  'Тегли се всяка сутрин',
+  'Записвай храната си всеки ден',
+  '+3 000 крачки на ден',
+  'Намали бързата храна до 1-2 пъти седмично',
+  'Без напитки с калории',
+  'Пакетирана храна до 250 ккал',
+  'Протеин на всяко хранене',
+  'Дневен протеинов таргет',
+  'Фибри на всяко хранене',
+  '½ с.л. мазнина на порция',
+  'Замени пърженото',
+  'Макс 30 г ядки на ден',
+  'Избери един въглехидрат на вечеря',
+  'Яж когато си гладен',
+  'Спирай когато си сит',
+]
+
+// Flatten → pick by title in RULE_TITLES order. Any title that no longer
+// matches is skipped rather than rendering an empty row, and the list is
+// topped up from the remaining habits so the count never silently drops.
+export function getSustainableRules() {
+  const all = HABIT_PLAN.flatMap(w => w.habits)
+  const picked = RULE_TITLES
+    .map(title => all.find(h => h.title === title))
+    .filter(Boolean)
+  if (picked.length < RULE_TITLES.length) {
+    for (const h of all) {
+      if (picked.length >= RULE_TITLES.length) break
+      if (!picked.includes(h)) picked.push(h)
+    }
+  }
+  return picked
+}

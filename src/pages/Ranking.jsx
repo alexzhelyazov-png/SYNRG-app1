@@ -47,7 +47,10 @@ const PODIUM_H     = [130, 110, 90]
 const PODIUM_ORDER = [1, 0, 2] // 2nd, 1st, 3rd in display order
 
 export default function Ranking() {
-  const { auth, ranking, t, lang, markFeedSeen } = useApp()
+  const { auth, ranking, t, lang, markFeedSeen, loadRanking } = useApp()
+
+  // The full ranking list is fetched here, not at app start — see loadRanking.
+  useEffect(() => { loadRanking() }, [loadRanking])
   const isMobile = window.innerWidth < 640
   const [viewProfile, setViewProfile] = useState(null)
   const [tab, setTab] = useState('ranking') // 'ranking' | 'feed'

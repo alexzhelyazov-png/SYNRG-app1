@@ -51,7 +51,7 @@ const PAGE_SIZE = 1000
 // Tables with column-level access restrictions — anon cannot SELECT *.
 // For these we explicitly list the safe columns to avoid permission errors.
 const SAFE_SELECTS = {
-  clients: 'id,name,calorie_target,protein_target,carbs_target,fat_target,created_at,is_coach,is_archived,modules,email,dismissed_badges,synrg_started_at,synrg_quiz,account_type,xp_monthly,xp_total,xp_level,earned_ids,monthly_earned_ids,assigned_coach_id,challenge_started_on,challenge_status,phone,water_target_ml',
+  clients: 'id,name,calorie_target,protein_target,carbs_target,fat_target,created_at,is_coach,is_archived,modules,email,dismissed_badges,synrg_started_at,synrg_quiz,account_type,xp_monthly,xp_total,xp_level,earned_ids,monthly_earned_ids,assigned_coach_id,challenge_started_on,challenge_status,phone,water_target_ml,nutrition_mode,nutrition_profile',
 }
 function selectColumns(table) {
   return SAFE_SELECTS[table] || '*'
@@ -208,6 +208,8 @@ const impl = isUsingSupabase ? SB : LS
 // ── Public API ───────────────────────────────────────────────
 export const DB = {
   selectAll:  (table, extra)        => impl.selectAll(table, extra),
+  getRankingRows: ()                => impl.getRankingRows(),
+  getMyXP:    (clientId)            => impl.getMyXP(clientId),
   insert:     (table, row)          => impl.insert(table, row),
   update:     (table, id, patch)    => impl.update(table, id, patch),
   deleteById: (table, id)           => impl.deleteById(table, id),
@@ -236,6 +238,30 @@ export const DB = {
         body: JSON.stringify({ from_coach: fromCoach, client_name: clientName, action_type: actionType, content }),
       })
     } catch { /* table may not exist yet */ }
+  },
+
+  // Ranking rows — the ONLY reason a client ever needs every other client.
+  // Seven columns instead of the full 25 (which drag along modules, synrg_quiz,
+  // nutrition_profile and other jsonb): ~38 KB for the whole gym vs ~660 KB.
+  // Called lazily when the Класация screen opens, never on app start.
+  async getRankingRows() {
+    if (!isUsingSupabase) return []
+    const data = await sbFetchSafe(
+      sbUrl('clients', '?select=id,name,is_coach,xp_monthly,xp_total,xp_level,earned_ids,monthly_earned_ids&is_archived=is.false&limit=100000'),
+      { headers: sbHeaders() }
+    )
+    return data || []
+  },
+
+  // A single client's XP fields — replaces re-reading the whole clients table
+  // every 5 minutes just to refresh one person's numbers.
+  async getMyXP(clientId) {
+    if (!isUsingSupabase || !clientId) return null
+    const data = await sbFetchSafe(
+      sbUrl('clients', `?select=id,xp_monthly,xp_total,xp_level,earned_ids,monthly_earned_ids&id=eq.${clientId}`),
+      { headers: sbHeaders() }
+    )
+    return data?.[0] || null
   },
 
   async getNotifications(sinceHours = 48) {
@@ -377,7 +403,12 @@ export const DB = {
     // Surface failures instead of silently swallowing — previous version used
     // sbFetchSafe which returned null on RLS-denied / column-missing errors,
     // leaving DB stale and clients seeing wrong XP vs admin's local compute.
-    const results = await Promise.all(updates.map(async u => {
+    // One PATCH per client, but at most XP_WRITE_CONCURRENCY in flight. A flat
+    // Promise.all over every client opened thousands of sockets at once, which
+    // the browser refuses (ERR_INSUFFICIENT_RESOURCES) and the database
+    // struggles to absorb — the failures then looked like RLS errors.
+    const XP_WRITE_CONCURRENCY = 8
+    async function writeOne(u) {
       try {
         const patch = { xp_monthly: u.xp_monthly, xp_total: u.xp_total, xp_level: u.xp_level }
         // Persist badge id lists too (read by clients for the ranking profile dialog).
@@ -396,7 +427,18 @@ export const DB = {
       } catch (err) {
         return { id: u.id, ok: false, err: String(err) }
       }
-    }))
+    }
+    const results = new Array(updates.length)
+    let next = 0
+    async function xpWorker() {
+      while (next < updates.length) {
+        const mine = next++
+        results[mine] = await writeOne(updates[mine])
+      }
+    }
+    await Promise.all(
+      Array.from({ length: Math.min(XP_WRITE_CONCURRENCY, updates.length) }, xpWorker)
+    )
     const failed = results.filter(r => !r.ok)
     if (failed.length) {
       console.error('[batchUpdateXP] Failed writes:', failed.length, '/', updates.length, failed.slice(0, 3))

@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, lazy, Suspense } from 'react'
 import {
   Dialog, DialogTitle, DialogContent, DialogActions,
   TextField, Button, Box, Typography, IconButton, CircularProgress,
@@ -8,7 +8,9 @@ import CloseIcon from '@mui/icons-material/Close'
 import { useApp } from '../context/AppContext'
 import { foodDB, foodLabel } from '../lib/constants'
 import { lookupBarcode } from '../lib/openfoodfacts'
-import BarcodeScanner from './BarcodeScanner'
+// @zxing weighs more than the rest of this dialog put together and is only
+// needed once the user actually taps the scanner, so it loads on demand.
+const BarcodeScanner = lazy(() => import('./BarcodeScanner'))
 import { C } from '../theme'
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL
@@ -648,11 +650,13 @@ export default function FoodModal() {
       </DialogActions>
 
       {scanning && (
-        <BarcodeScanner
-          t={t}
-          onDetected={handleBarcodeDetected}
-          onClose={() => setScanning(false)}
-        />
+        <Suspense fallback={null}>
+          <BarcodeScanner
+            t={t}
+            onDetected={handleBarcodeDetected}
+            onClose={() => setScanning(false)}
+          />
+        </Suspense>
       )}
     </Dialog>
   )
