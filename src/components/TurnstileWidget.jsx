@@ -38,7 +38,9 @@ export default function TurnstileWidget({ onVerify, onExpire, action }) {
         widgetIdRef.current = window.turnstile.render(ref.current, {
           sitekey: SITE_KEY,
           action: action || 'auth',
-          size: 'invisible',
+          // Same removed value as in getTurnstileToken below.
+          size: 'flexible',
+          appearance: 'interaction-only',
           callback: (token) => onVerify?.(token),
           'expired-callback': () => onExpire?.(),
           'error-callback': () => onExpire?.(),
@@ -101,7 +103,13 @@ export function getTurnstileToken(action = 'auth') {
         widgetId = window.turnstile.render(container, {
           sitekey: SITE_KEY,
           action,
-          size: 'invisible',
+          // Cloudflare removed size:'invisible' — passing it makes render()
+          // throw asynchronously (outside the try below), so no callback ever
+          // fires and login used to sit on the hard timeout. 'flexible' with
+          // appearance:'interaction-only' is the current equivalent: no UI
+          // unless the visitor actually has to prove something.
+          size: 'flexible',
+          appearance: 'interaction-only',
           callback: (token) => {
             if (resolved) return
             resolved = true
@@ -119,13 +127,16 @@ export function getTurnstileToken(action = 'auth') {
         cleanup()
         resolve(null)
       }
-      // Hard timeout — never block longer than 15 sec
+      // Hard timeout. The server treats a missing token as "no bot check
+      // available" and still verifies the password, so a stuck widget must
+      // never hold the login hostage — 15 s looked like a broken app and had
+      // people clicking again, which tripped the rate limiter.
       setTimeout(() => {
         if (resolved) return
         resolved = true
         cleanup()
         resolve(null)
-      }, 15000)
+      }, 3500)
     }
     // Ensure script is loaded
     if (!window.turnstile) {

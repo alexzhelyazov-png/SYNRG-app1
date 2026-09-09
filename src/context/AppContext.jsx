@@ -595,7 +595,15 @@ export function AppProvider({ children }) {
         body: JSON.stringify({ name: name.trim(), password: pass, turnstile_token: turnstileToken }),
       })
       result = await res.json()
-      if (!res.ok || !result.ok) return t('errLogin')
+      if (!res.ok || !result.ok) {
+        // Distinguish the reasons. Showing "wrong name or password" for a rate
+        // limit or a failed bot check sends people off hunting for a password
+        // problem that isn't there.
+        if (res.status === 429) return t('errTooManyAttempts')
+        if (res.status === 403) return t('errBotCheck')
+        if (res.status >= 500)  return t('errServer')
+        return t('errLogin')
+      }
     } catch {
       return t('errLogin')
     }
