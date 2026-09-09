@@ -790,8 +790,18 @@ export function AppProvider({ children }) {
     if (!auth.isLoggedIn) return
     // If data failed to load (network error etc.) keep the user logged in — don't log out on a transient error
     if (loadError) return
+    // Never sign somebody out because their data simply isn't here. An empty
+    // list means the load didn't deliver (transient failure, RLS hiccup), not
+    // that the session is invalid — logging out on that is how a working
+    // account gets bounced back to the login form.
+    if (!clients.length) return
     if (auth.role === 'coach') {
-      const valid = coaches.find(c => c.id === auth.id)
+      // Coaches authenticate as `clients` rows with is_coach = true, so auth.id
+      // is a clients.id. The separate `coaches` table has its OWN ids — not one
+      // of them matches — so looking them up there always failed. It went
+      // unnoticed while this effect only ever ran at boot, before anyone was
+      // logged in; it fires after login now that handleLogin reloads data.
+      const valid = clients.find(c => c.id === auth.id && c.is_coach)
       if (!valid) { logout(); return }
       setSelCoach(auth.name)
     } else if (auth.role === 'client') {
