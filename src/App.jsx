@@ -291,7 +291,12 @@ function AppShell() {
          () => import('./pages/CoachChat')]
 
     let cancelled = false
-    const idle = window.requestIdleCallback || (cb => setTimeout(() => cb({ timeRemaining: () => 50 }), 400))
+    // requestIdleCallback never fires while the tab is in the background, which
+    // is exactly when we'd most like to warm the cache — the `timeout` option
+    // forces the callback to run even if idle time never arrives.
+    const idle = window.requestIdleCallback
+      ? (cb => window.requestIdleCallback(cb, { timeout: 2000 }))
+      : (cb => setTimeout(() => cb({ timeRemaining: () => 50 }), 400))
     // One at a time — a burst of chunk requests would compete with the data
     // requests we just finished waiting for.
     const step = (i) => {
