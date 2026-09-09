@@ -273,6 +273,38 @@ function AppShell() {
     if (coachClientMode) window.scrollTo({ top: 0, behavior: 'smooth' })
   }, [coachClientMode])
 
+  // ── Warm the split chunks once the app is idle ────────────────
+  // Code-splitting keeps start-up small, but it moves the download to the
+  // moment of the click. On an admin session the data requests are still in
+  // flight then, so the chunk queues behind them and the tab looks like it
+  // ignored the tap — the "had to click twice" symptom. Fetching them while
+  // nothing else is happening makes every later navigation instant.
+  useEffect(() => {
+    if (loading || !auth.isLoggedIn) return
+    const staff = auth.role === 'coach' || auth.role === 'admin'
+    const load = staff
+      ? [() => import('./pages/Admin'), () => import('./pages/Schedule'),
+         () => import('./pages/AdminMessagesTab'), () => import('./pages/Profile'),
+         () => import('./pages/Recipes')]
+      : [() => import('./pages/NutritionPlan'), () => import('./pages/Programs'),
+         () => import('./pages/Recipes'), () => import('./pages/ClientWorkout'),
+         () => import('./pages/CoachChat')]
+
+    let cancelled = false
+    const idle = window.requestIdleCallback || (cb => setTimeout(() => cb({ timeRemaining: () => 50 }), 400))
+    // One at a time — a burst of chunk requests would compete with the data
+    // requests we just finished waiting for.
+    const step = (i) => {
+      if (cancelled || i >= load.length) return
+      idle(() => {
+        if (cancelled) return
+        load[i]().catch(() => {}).then(() => step(i + 1))
+      })
+    }
+    const timer = setTimeout(() => step(0), 1200)
+    return () => { cancelled = true; clearTimeout(timer) }
+  }, [loading, auth.isLoggedIn, auth.role])
+
   if (loading)      return <LoadingScreen t={t} />
   if (loadError)    return <ErrorScreen error={loadError} onRetry={() => loadAll()} t={t} />
   if (!auth.isLoggedIn) return <Auth />

@@ -118,6 +118,10 @@ export function AppProvider({ children }) {
   const [waterDate, setWaterDate] = useState(dateToInput(todayDate()))
 
   // ── Load all data ─────────────────────────────────────────────
+  // When loadAll last finished a full (coach/admin) load. syncFresh reuses that
+  // data instead of pulling the same ~37 pages of meals again seconds later.
+  const lastFullLoadRef = useRef(0)
+
   const loadAll = useCallback(async () => {
     setLoading(true)
     setLoadError('')
@@ -323,6 +327,7 @@ export function AppProvider({ children }) {
       setPostReactions(rawPostReactions || [])
       setPostComments(rawPostComments || [])
       setSynrgHabits((rawSynrgHabits || []).sort((a, b) => a.sort_order - b.sort_order))
+      if (!isClientRole) lastFullLoadRef.current = Date.now()
     } catch(e) {
       console.error('loadAll error:', JSON.stringify(e), e?.message)
       setLoadError(`${e?.name || 'Error'}: ${e?.message || JSON.stringify(e)}`)
@@ -406,8 +411,98 @@ export function AppProvider({ children }) {
   // always sees the same numbers with no competing writes.
   useEffect(() => {
     if (!auth.isLoggedIn || (auth.role !== 'coach' && auth.role !== 'admin')) return
+    // Wait for loadAll to finish. This effect used to start the moment auth was
+    // restored from localStorage, so syncFresh ran *alongside* the initial load
+    // and fetched everything a second time in parallel. Waiting lets it reuse
+    // what loadAll just brought in.
+    if (loading) return
+      // Compute XP for every client and write back only what changed.
+      // Shared by both paths: the normal periodic sync and the start-up
+      // pass that reuses loadAll's freshly-loaded data.
+      async function writeXPFrom(merged) {
+          // Compute XP for all non-coach clients from fresh merged data.
+          // Must enrich with community data (posts/comments) — XP system uses these
+          // for m_community_* badges; without them admin computes lower XP than client.
+          const curFeed     = feedPostsRef.current || []
+          const curComments = postCommentsRef.current || []
+          const curMonthKey = getCurrentMonthKey()
+          const xpPayload = merged.filter(c => !c.is_coach && c.id).map(c => {
+            const enriched = {
+              ...c,
+              communityPosts:    curFeed.filter(p => p.author_name === c.name),
+              communityComments: curComments.filter(cm => cm.author_name === c.name),
+            }
+            const earnedIds        = evaluateBadges(enriched)
+            const monthlyEarnedIds = evaluateMonthlyBadgesForMonth(enriched, curMonthKey)
+            const totalXP   = computeTotalXP(earnedIds, enriched)
+            const monthlyXP = computeMonthlyXP(enriched)
+            const { level } = computeLevel(totalXP)
+            // Persist badge id lists too so clients (who don't load other
+            // clients' raw logs) can render the same badges in the ranking dialog.
+            return {
+              id: c.id, xp_monthly: monthlyXP, xp_total: totalXP, xp_level: level,
+              earned_ids: earnedIds, monthly_earned_ids: monthlyEarnedIds,
+            }
+          })
+
+          // Fold the freshly computed XP back into the client objects before they
+          // become state. Without this, `merged` keeps the values that were read
+          // from the DB, so the change-detection below would see a difference on
+          // every single sync and re-write all 3 773 rows forever.
+          const xpById = new Map(xpPayload.map(x => [x.id, x]))
+          const mergedWithXP = merged.map(c => {
+            const x = xpById.get(c.id)
+            return x ? { ...c, xp_monthly: x.xp_monthly, xp_total: x.xp_total, xp_level: x.xp_level,
+                         earned_ids: x.earned_ids, monthly_earned_ids: x.monthly_earned_ids } : c
+          })
+
+          // Update state with merged clients (fresh meals/weights/steps/workouts)
+          setClients(mergedWithXP)
+          clientsRef.current = mergedWithXP
+
+          // Write authoritative XP to DB — clients read from here.
+          // ONLY the rows that actually changed. This used to PATCH every client
+          // unconditionally: with 3 773 accounts that meant ~3 800 writes every
+          // two minutes from each open coach tab, which exhausted the browser's
+          // connection pool (ERR_INSUFFICIENT_RESOURCES) and hammered the
+          // database. On a normal sync a handful of rows differ, or none.
+          const sameIds = (a, b) => {
+            const x = Array.isArray(a) ? a : []
+            const y = Array.isArray(b) ? b : []
+            return x.length === y.length && x.every((v, i) => v === y[i])
+          }
+          const prevById = new Map(merged.map(c => [c.id, c]))
+          const changed = xpPayload.filter(x => {
+            const prev = prevById.get(x.id)
+            if (!prev) return true
+            return (prev.xp_monthly || 0) !== x.xp_monthly
+                || (prev.xp_total   || 0) !== x.xp_total
+                || (prev.xp_level   || 1) !== x.xp_level
+                || !sameIds(prev.earned_ids, x.earned_ids)
+                || !sameIds(prev.monthly_earned_ids, x.monthly_earned_ids)
+          })
+          if (changed.length) {
+            try {
+              console.log('[syncFresh] Writing XP to DB:', changed.length, 'of', xpPayload.length, 'clients')
+              await DB.batchUpdateXP(changed)
+            } catch (err) {
+              console.error('[syncFresh] batchUpdateXP failed:', err)
+            }
+          }
+      }
     async function syncFresh() {
       try {
+        // loadAll() just pulled exactly this data — for an admin that is ~37
+        // pages of meals plus everything else. Running the same queries again
+        // seconds later doubled the start-up traffic to 116 requests and left
+        // tab clicks queued behind them (which is why a tab sometimes needed a
+        // second click). Reuse what is already in state; the 2-minute interval
+        // refetches normally after that.
+        const REUSE_MS = 90000
+        if (Date.now() - lastFullLoadRef.current < REUSE_MS && (clientsRef.current || []).length) {
+          writeXPFrom(clientsRef.current)
+          return
+        }
         const twoYearsAgo = new Date(Date.now() - 730 * 86400000).toISOString().slice(0, 10)
         // CRITICAL: queries MUST match initial loadAll() limits exactly — otherwise
         // periodic sync returns fewer rows than initial load (PostgREST defaults to
@@ -480,75 +575,7 @@ export function AppProvider({ children }) {
           }
         })
 
-        // Compute XP for all non-coach clients from fresh merged data.
-        // Must enrich with community data (posts/comments) — XP system uses these
-        // for m_community_* badges; without them admin computes lower XP than client.
-        const curFeed     = feedPostsRef.current || []
-        const curComments = postCommentsRef.current || []
-        const curMonthKey = getCurrentMonthKey()
-        const xpPayload = merged.filter(c => !c.is_coach && c.id).map(c => {
-          const enriched = {
-            ...c,
-            communityPosts:    curFeed.filter(p => p.author_name === c.name),
-            communityComments: curComments.filter(cm => cm.author_name === c.name),
-          }
-          const earnedIds        = evaluateBadges(enriched)
-          const monthlyEarnedIds = evaluateMonthlyBadgesForMonth(enriched, curMonthKey)
-          const totalXP   = computeTotalXP(earnedIds, enriched)
-          const monthlyXP = computeMonthlyXP(enriched)
-          const { level } = computeLevel(totalXP)
-          // Persist badge id lists too so clients (who don't load other
-          // clients' raw logs) can render the same badges in the ranking dialog.
-          return {
-            id: c.id, xp_monthly: monthlyXP, xp_total: totalXP, xp_level: level,
-            earned_ids: earnedIds, monthly_earned_ids: monthlyEarnedIds,
-          }
-        })
-
-        // Fold the freshly computed XP back into the client objects before they
-        // become state. Without this, `merged` keeps the values that were read
-        // from the DB, so the change-detection below would see a difference on
-        // every single sync and re-write all 3 773 rows forever.
-        const xpById = new Map(xpPayload.map(x => [x.id, x]))
-        const mergedWithXP = merged.map(c => {
-          const x = xpById.get(c.id)
-          return x ? { ...c, xp_monthly: x.xp_monthly, xp_total: x.xp_total, xp_level: x.xp_level,
-                       earned_ids: x.earned_ids, monthly_earned_ids: x.monthly_earned_ids } : c
-        })
-
-        // Update state with merged clients (fresh meals/weights/steps/workouts)
-        setClients(mergedWithXP)
-        clientsRef.current = mergedWithXP
-
-        // Write authoritative XP to DB — clients read from here.
-        // ONLY the rows that actually changed. This used to PATCH every client
-        // unconditionally: with 3 773 accounts that meant ~3 800 writes every
-        // two minutes from each open coach tab, which exhausted the browser's
-        // connection pool (ERR_INSUFFICIENT_RESOURCES) and hammered the
-        // database. On a normal sync a handful of rows differ, or none.
-        const sameIds = (a, b) => {
-          const x = Array.isArray(a) ? a : []
-          const y = Array.isArray(b) ? b : []
-          return x.length === y.length && x.every((v, i) => v === y[i])
-        }
-        const prevById = new Map(merged.map(c => [c.id, c]))
-        const changed = xpPayload.filter(x => {
-          const prev = prevById.get(x.id)
-          if (!prev) return true
-          return (prev.xp_monthly || 0) !== x.xp_monthly
-              || (prev.xp_total   || 0) !== x.xp_total
-              || (prev.xp_level   || 1) !== x.xp_level
-              || !sameIds(prev.earned_ids, x.earned_ids)
-              || !sameIds(prev.monthly_earned_ids, x.monthly_earned_ids)
-        })
-        if (changed.length) {
-          try {
-            console.log('[syncFresh] Writing XP to DB:', changed.length, 'of', xpPayload.length, 'clients')
-            await DB.batchUpdateXP(changed)
-          } catch (err) {
-            console.error('[syncFresh] batchUpdateXP failed:', err)
-          }
-        }
+        await writeXPFrom(merged)
       } catch (err) {
         console.warn('[syncFresh] failed:', err)
       }
@@ -556,7 +583,7 @@ export function AppProvider({ children }) {
     syncFresh()  // run immediately so DB is up-to-date right on login
     const interval = setInterval(syncFresh, 120000)
     return () => clearInterval(interval)
-  }, [auth.isLoggedIn, auth.role])
+  }, [auth.isLoggedIn, auth.role, loading])
 
   // ── Client: periodically re-read XP from DB (admin writes there every 2 min) ──
   // Ensures clients see up-to-date ranking without any self-computation.
