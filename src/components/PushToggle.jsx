@@ -3,7 +3,7 @@ import { Box, Typography, Switch, Paper } from '@mui/material'
 import NotificationsActiveIcon from '@mui/icons-material/NotificationsActive'
 import { useApp } from '../context/AppContext'
 import { C } from '../theme'
-import { getPushState, getExistingSubscription, subscribeToPush, unsubscribeFromPush } from '../lib/push'
+import { getPushState, getExistingSubscription, subscribeToPush, unsubscribeFromPush, isStandalone } from '../lib/push'
 
 /**
  * Phone-notification opt-in.
@@ -22,9 +22,19 @@ export default function PushToggle({ card = false }) {
   const [busy,  setBusy]  = useState(false)
   const [msg,   setMsg]   = useState(null)
 
+  const [diag, setDiag] = useState('')
+
   useEffect(() => {
     setState(getPushState())
     getExistingSubscription().then(sub => setOn(!!sub))
+    // Which capability is actually missing — so an "unsupported" report can be
+    // diagnosed from a screenshot instead of a round of guessing.
+    setDiag([
+      'serviceWorker' in navigator ? 'sw' : 'no-sw',
+      'PushManager'   in window    ? 'pm' : 'no-pm',
+      'Notification'  in window    ? 'n'  : 'no-n',
+      isStandalone() ? 'standalone' : 'browser',
+    ].join(' '))
   }, [])
 
   async function toggle(next) {
@@ -41,10 +51,12 @@ export default function PushToggle({ card = false }) {
     setBusy(false)
   }
 
-  if (state === 'unsupported') return null
-
+  // Never disappear silently. A missing card is indistinguishable from a stale
+  // bundle or a broken build, and on iOS the interesting cases (no Home Screen
+  // install, pre-16.4 Safari) are exactly the ones worth explaining.
   const hint = state === 'needs-install' ? t('pushNeedsInstall')
     : state === 'denied'                 ? t('pushDeniedHint')
+    : state === 'unsupported'            ? `${t('pushUnsupported')} (${diag})`
     : msg
 
   const body = (
@@ -59,7 +71,7 @@ export default function PushToggle({ card = false }) {
         <Switch
           size="small"
           checked={on}
-          disabled={busy || state === 'denied' || state === 'needs-install'}
+          disabled={busy || state === 'denied' || state === 'needs-install' || state === 'unsupported'}
           onChange={e => toggle(e.target.checked)}
           sx={{
             '& .MuiSwitch-switchBase.Mui-checked': { color: C.primary },

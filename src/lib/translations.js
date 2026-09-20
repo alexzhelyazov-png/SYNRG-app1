@@ -457,6 +457,7 @@ export const T = {
     pushEnabling:       'Включване…',
     pushEnabled:        'Готово — ще получаваш известия на този телефон.',
     pushFailed:         'Не успях да включа известията. Опитай пак.',
+    pushUnsupported:    'Това устройство/браузър не поддържа известия.',
     dismissLbl:         '×',
     noReminders:        'Няма активни напомняния',
 
@@ -1533,6 +1534,7 @@ export const T = {
     pushEnabling:       'Enabling…',
     pushEnabled:        'Done — this phone will receive notifications.',
     pushFailed:         'Could not enable notifications. Please try again.',
+    pushUnsupported:    'This device/browser does not support notifications.',
     dismissLbl:         '×',
     noReminders:        'No active reminders',
 
