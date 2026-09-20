@@ -50,6 +50,17 @@ async function loadSubs(clientIds: string[]): Promise<Sub[]> {
   return res.json();
 }
 
+/** Every coach/admin account. `notifications` is a shared staff feed with no
+ *  per-recipient column, so anything from it goes to all of them. */
+async function loadStaffIds(): Promise<string[]> {
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/clients?select=id&is_coach=eq.true&is_archived=is.false`,
+    { headers: sbHeaders() },
+  );
+  if (!res.ok) throw new Error(`loadStaffIds failed: ${await res.text()}`);
+  return (await res.json() as Array<{ id: string }>).map(r => r.id);
+}
+
 async function dropSub(id: string) {
   await fetch(`${SUPABASE_URL}/rest/v1/push_subscriptions?id=eq.${id}`, {
     method: "DELETE", headers: { ...sbHeaders(), Prefer: "return=minimal" },
@@ -87,8 +98,14 @@ Deno.serve(async (req) => {
 
   try {
     const b = await req.json();
-    const clientIds: string[] = b.client_ids || (b.client_id ? [b.client_id] : []);
-    if (!clientIds.length) return new Response(JSON.stringify({ error: "client_ids required" }), { status: 400 });
+    const clientIds: string[] = b.audience === "staff"
+      ? await loadStaffIds()
+      : (b.client_ids || (b.client_id ? [b.client_id] : []));
+    if (!clientIds.length) {
+      return new Response(JSON.stringify({ ok: true, devices: 0, sent: 0, gone: 0, failed: 0, note: "no recipients" }), {
+        headers: { "Content-Type": "application/json" },
+      });
+    }
     if (!b.title) return new Response(JSON.stringify({ error: "title required" }), { status: 400 });
 
     const subs = await loadSubs(clientIds);
