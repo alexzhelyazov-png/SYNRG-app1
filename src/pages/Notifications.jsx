@@ -9,6 +9,7 @@ import EventAvailableIcon from '@mui/icons-material/EventAvailable'
 import SchoolIcon from '@mui/icons-material/School'
 import { useApp } from '../context/AppContext'
 import { C, EASE } from '../theme'
+import PushToggle from '../components/PushToggle'
 
 const ACTION_ICONS = {
   task:            AssignmentIcon,
@@ -42,6 +43,10 @@ export default function Notifications() {
         <NotificationsNoneIcon sx={{ fontSize: '28px', color: C.purple }} />
         <Typography variant="h2">{t('navNotifications')}</Typography>
       </Box>
+
+      {/* Opting this device in. Lives here because it's the one notifications
+          surface both staff and clients can actually reach. */}
+      <PushToggle card />
 
       {notifications.length === 0 ? (
         <Paper sx={{
