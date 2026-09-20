@@ -29,7 +29,7 @@ import {
   fmt1, avgArr, sameDateStr,
 } from '../lib/utils'
 import { computeXPRanking, computeTotalXP, computeMonthlyXP, computeLevel, evaluateBadges, evaluateMonthlyBadgesForMonth, getCurrentMonthKey } from '../lib/gamification'
-import { isAdmin as isAdminUser, isFullAdmin } from './../lib/bookingUtils'
+import { isAdmin as isAdminUser, isFullAdmin, ADMIN_NAMES } from './../lib/bookingUtils'
 import { applyColors } from '../theme'
 
 const AppContext = createContext(null)
@@ -1075,11 +1075,20 @@ export function AppProvider({ children }) {
     setLastNotifSeen(now)
     localStorage.setItem('synrg_last_notif_seen', now)
   }
+  // Same routing the push trigger applies, so the bell and the phone agree:
+  // managers see every row; a coach sees the rows addressed to them by name.
+  // Rows with no target_coach (registrations, wall activity) are manager-only.
+  const visibleNotifications = useMemo(() => {
+    if (!auth.isLoggedIn || auth.role !== 'coach') return []
+    if (ADMIN_NAMES.includes(auth.name)) return notifications
+    return notifications.filter(n => n.target_coach && n.target_coach === auth.name)
+  }, [notifications, auth])
+
   const unreadNotifCount = useMemo(() => {
     if (!auth.isLoggedIn || auth.role !== 'coach') return 0
-    if (!lastNotifSeen) return notifications.filter(n => n.from_coach !== auth.name).length
-    return notifications.filter(n => n.from_coach !== auth.name && n.created_at > lastNotifSeen).length
-  }, [notifications, auth, lastNotifSeen])
+    if (!lastNotifSeen) return visibleNotifications.filter(n => n.from_coach !== auth.name).length
+    return visibleNotifications.filter(n => n.from_coach !== auth.name && n.created_at > lastNotifSeen).length
+  }, [visibleNotifications, auth, lastNotifSeen])
 
   // ── Unread feed count ─────────────────────────────────────────
   const feedKey = auth.id ? `synrg_lastSeenFeed_${auth.id}` : 'synrg_lastSeenFeed'
@@ -1918,7 +1927,7 @@ export function AppProvider({ children }) {
     // Snackbar
     snackbar, showSnackbar, closeSnackbar,
     // Notifications
-    notifications, unreadNotifCount, markNotifsRead, pollNotifications,
+    notifications: visibleNotifications, unreadNotifCount, markNotifsRead, pollNotifications,
     // Workout
     exName, setExName,
     exScheme, setExScheme,

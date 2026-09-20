@@ -105,7 +105,7 @@ export function BookingProvider({ children }) {
       // Notify coaches/admins about the booking
       const slot = slots.find(s => s.id === slotId)
       const timeInfo = slot ? `${slot.slot_date} ${slot.start_time?.slice(0, 5)}` : ''
-      DB.insertNotification(auth.name, auth.name, 'booking', `${auth.name} си записа час: ${timeInfo}`)
+      DB.insertNotification(auth.name, auth.name, 'booking', `${auth.name} си записа час: ${timeInfo}`, slot?.coach_name || null)
       DB.notifyBookingChange('booking', auth.name, slot?.slot_date || '', slot?.start_time?.slice(0, 5) || '')
       return { ok: true }
     } catch (e) {
@@ -131,7 +131,7 @@ export function BookingProvider({ children }) {
       }
       await Promise.all([loadSlots(), loadMyBookings(auth.id), loadMyPlan(auth.id)])
       const timeInfo = slot ? `${slot.slot_date} ${slot.start_time?.slice(0, 5)}` : ''
-      DB.insertNotification(auth.name, auth.name, 'cancel', `${auth.name} отмени час: ${timeInfo}`)
+      DB.insertNotification(auth.name, auth.name, 'cancel', `${auth.name} отмени час: ${timeInfo}`, slot?.coach_name || null)
       DB.notifyBookingChange('cancel', auth.name, slot?.slot_date || '', slot?.start_time?.slice(0, 5) || '')
       return { ok: true }
     } catch (e) {
@@ -389,10 +389,12 @@ export function BookingProvider({ children }) {
       await loadSlots()
       await loadSlotBookings([slotId])
       const slot = slots.find(s => s.id === slotId)
+      const adminTimeInfo = slot ? `${slot.slot_date} ${slot.start_time?.slice(0, 5)}` : ''
+      DB.insertNotification(auth.name, clientName, 'booking', `${clientName} е записан за час: ${adminTimeInfo}`, slot?.coach_name || null)
       DB.notifyBookingChange('booking', clientName, slot?.slot_date || '', slot?.start_time?.slice(0, 5) || '')
       return { ok: true }
     } catch (e) { return { error: e.message } }
-  }, [loadSlots, loadSlotBookings, slots])
+  }, [auth, loadSlots, loadSlotBookings, slots])
 
   // ── Admin: manually remove client from slot ───────────────
   const adminRemoveFromSlot = useCallback(async (slotId, clientId, returnCredit = true) => {
@@ -405,12 +407,14 @@ export function BookingProvider({ children }) {
       if (result?.error) return { error: result.error }
       const slot = slots.find(s => s.id === slotId)
       const booking = slotBookings[slotId]?.find(b => b.client_id === clientId)
+      const adminTimeInfo = slot ? `${slot.slot_date} ${slot.start_time?.slice(0, 5)}` : ''
+      DB.insertNotification(auth.name, booking?.client_name || 'Клиент', 'cancel', `${booking?.client_name || 'Клиент'} е отписан от час: ${adminTimeInfo}`, slot?.coach_name || null)
       DB.notifyBookingChange('cancel', booking?.client_name || 'Клиент', slot?.slot_date || '', slot?.start_time?.slice(0, 5) || '')
       await loadSlots()
       await loadSlotBookings([slotId])
       return { ok: true }
     } catch (e) { return { error: e.message } }
-  }, [loadSlots, loadSlotBookings, slots, slotBookings])
+  }, [auth, loadSlots, loadSlotBookings, slots, slotBookings])
 
   return (
     <BookingCtx.Provider value={{

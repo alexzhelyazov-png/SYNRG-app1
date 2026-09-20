@@ -229,13 +229,16 @@ export const DB = {
   },
 
   // ── Notifications (Supabase only, optional table) ─────────
-  async insertNotification(fromCoach, clientName, actionType, content) {
+  // `targetCoach` routes the notification: a row naming a coach reaches that
+  // coach and the managers; a row without one is a manager-only concern
+  // (registrations, wall activity). The push trigger on this table reads it.
+  async insertNotification(fromCoach, clientName, actionType, content, targetCoach = null) {
     if (!isUsingSupabase) return
     try {
       await sbFetch(sbUrl('notifications'), {
         method: 'POST',
         headers: sbHeaders({ 'Prefer': 'return=minimal' }),
-        body: JSON.stringify({ from_coach: fromCoach, client_name: clientName, action_type: actionType, content }),
+        body: JSON.stringify({ from_coach: fromCoach, client_name: clientName, action_type: actionType, content, target_coach: targetCoach }),
       })
     } catch { /* table may not exist yet */ }
   },

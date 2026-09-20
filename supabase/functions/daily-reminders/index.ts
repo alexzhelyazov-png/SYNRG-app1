@@ -21,6 +21,26 @@ const CORS_HEADERS = {
 };
 
 const BREVO_API = "https://api.brevo.com/v3";
+const PUSH_TOKEN = Deno.env.get("REPORT_EMAIL_TOKEN") || "";
+
+/** Fire a phone notification at one client. Never throws: a push problem must
+ *  not abort the reminder run or block the email that follows it. */
+async function sendPush(supabaseUrl: string, clientId: string, title: string, body: string, tag: string) {
+  if (!PUSH_TOKEN || !clientId) return false;
+  try {
+    const res = await fetch(`${supabaseUrl}/functions/v1/send-push`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${PUSH_TOKEN}` },
+      body: JSON.stringify({ client_id: clientId, title, body, url: "/app/", tag }),
+    });
+    if (!res.ok) { console.warn("sendPush failed:", res.status, await res.text()); return false; }
+    const j = await res.json();
+    return (j?.sent || 0) > 0;
+  } catch (e) {
+    console.warn("sendPush threw:", String(e).slice(0, 200));
+    return false;
+  }
+}
 const SENDER = { name: "SYNRG Beyond Fitness", email: "info@synrg-beyondfitness.com" };
 
 async function sendEmail(brevoKey: string, to: { email: string; name?: string }, subject: string, html: string) {
@@ -88,6 +108,8 @@ Deno.serve(async (req) => {
     const results = {
       expiry_reminders: 0,
       training_reminders: 0,
+      expiry_pushes: 0,
+      training_pushes: 0,
       program_warned_7d: 0,
       program_warned_1d: 0,
       program_expired: 0,
@@ -112,12 +134,21 @@ Deno.serve(async (req) => {
         { headers: sbHeaders }
       );
       const clients = await clientRes.json();
-      if (!clients?.[0]?.email) continue;
+      const client = clients?.[0];
+      if (!client) continue;
 
-      const client = clients[0];
       const fmtDate = new Date(expiryDate + "T00:00:00").toLocaleDateString("bg-BG", {
         day: "numeric", month: "long", year: "numeric",
       });
+
+      // Push first, and independently of email — plenty of accounts have no
+      // address on file, and those clients should still get the reminder.
+      if (await sendPush(supabaseUrl, plan.client_id,
+        "Планът ти изтича скоро",
+        `Планът ти в SYNRG изтича на ${fmtDate}.`,
+        `expiry-${plan.client_id}-${expiryDate}`)) results.expiry_pushes++;
+
+      if (!client.email) continue;
 
       const r = await renderReminder(supabaseUrl, serviceKey, "reminder_expiry_3d",
         { name: client.name, fmtDate },
@@ -159,10 +190,17 @@ Deno.serve(async (req) => {
           { headers: sbHeaders }
         );
         const clients = await clientRes.json();
-        if (!clients?.[0]?.email) continue;
+        const client = clients?.[0];
+        if (!client) continue;
 
-        const client = clients[0];
         const timeStr = slot.start_time?.slice(0, 5) || "";
+
+        if (await sendPush(supabaseUrl, booking.client_id,
+          "Утре имаш тренировка",
+          `Тренировка утре в ${timeStr} — SYNRG Studio.`,
+          `training-${booking.client_id}-${slot.id}`)) results.training_pushes++;
+
+        if (!client.email) continue;
 
         const r = await renderReminder(supabaseUrl, serviceKey, "reminder_training",
           { name: client.name, timeStr },
