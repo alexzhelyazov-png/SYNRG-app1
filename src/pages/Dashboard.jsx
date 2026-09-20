@@ -17,6 +17,7 @@ import { useApp } from '../context/AppContext'
 import { useBooking } from '../context/BookingContext'
 import { WORKOUT_CATEGORIES } from '../lib/constants'
 import { C, EASE } from '../theme'
+import { getPushState, getExistingSubscription, subscribeToPush, unsubscribeFromPush } from '../lib/push'
 import FoodTracker from './FoodTracker'
 import WeightTracker from './WeightTracker'
 import { todayDate, fmt1, parseDate, inputToDate } from '../lib/utils'
@@ -29,9 +30,41 @@ import { hasModule, hasAnyModule } from '../lib/modules'
 
 // ─── Reminder banners (client) ───────────────────────────────────
 function ReminderBanners() {
-  const { client, t, setView, dismissReaction, updateReminderSettings } = useApp()
+  const { client, auth, t, setView, dismissReaction, updateReminderSettings } = useApp()
   const [localDismissed, setLocalDismissed] = useState({})
   const [settingsOpen,   setSettingsOpen]   = useState(false)
+
+  // Phone notifications. Staff-only for now — a broken permission prompt is
+  // expensive to undo (on iOS a denial is only recoverable from OS settings),
+  // so coaches shake it out before it reaches the client base. To open it to
+  // everyone, drop `pushBeta` from the `pushState !== 'unsupported'` check.
+  const pushBeta = auth.role === 'coach' || auth.role === 'admin'
+  const [pushState, setPushState] = useState('default')
+  const [pushOn,    setPushOn]    = useState(false)
+  const [pushBusy,  setPushBusy]  = useState(false)
+  const [pushMsg,   setPushMsg]   = useState(null)
+
+  useEffect(() => {
+    if (!pushBeta) return
+    setPushState(getPushState())
+    getExistingSubscription().then(sub => setPushOn(!!sub))
+  }, [pushBeta])
+
+  async function togglePush(on) {
+    setPushBusy(true); setPushMsg(null)
+    if (on) {
+      // Bind to the LOGGED-IN account, not `client` — a coach viewing someone
+      // else's tracker must not point their own phone at that client's feed.
+      const r = await subscribeToPush(auth.id)
+      setPushState(getPushState())
+      if (r.ok) { setPushOn(true);  setPushMsg(t('pushEnabled')) }
+      else      { setPushOn(false); setPushMsg(r.reason === 'denied' ? null : t('pushFailed')) }
+    } else {
+      await unsubscribeFromPush()
+      setPushOn(false)
+    }
+    setPushBusy(false)
+  }
 
   const allReminders = computeReminders(client)
   const visible = allReminders.filter(r => !localDismissed[r.id])
@@ -169,6 +202,30 @@ function ReminderBanners() {
 
       <Collapse in={settingsOpen}>
         <Paper sx={{ p: 2, mt: 1, border: `1px solid ${C.border}` }}>
+          {pushBeta && pushState !== 'unsupported' && (
+            <Box sx={{ pb: 1, mb: 1, borderBottom: `1px solid ${C.border}` }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', py: 0.75 }}>
+                <Typography sx={{ fontSize: '13.5px', fontWeight: 700 }}>{t('pushToggleLbl')}</Typography>
+                <Switch
+                  size="small"
+                  checked={pushOn}
+                  disabled={pushBusy || pushState === 'denied' || pushState === 'needs-install'}
+                  onChange={e => togglePush(e.target.checked)}
+                  sx={{
+                    '& .MuiSwitch-switchBase.Mui-checked': { color: C.primary },
+                    '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': { background: C.primary },
+                  }}
+                />
+              </Box>
+              {(pushState === 'needs-install' || pushState === 'denied' || pushMsg) && (
+                <Typography sx={{ fontSize: '11.5px', color: C.muted, lineHeight: 1.5 }}>
+                  {pushState === 'needs-install' ? t('pushNeedsInstall')
+                    : pushState === 'denied'     ? t('pushDeniedHint')
+                    : pushMsg}
+                </Typography>
+              )}
+            </Box>
+          )}
           {[
             ['protein',  t('proteinReminderLbl')],
             ['weight',   t('weightReminderLbl')],

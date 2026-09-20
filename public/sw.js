@@ -1,7 +1,7 @@
 // Bumped on every deploy to force-refresh PWA caches.
 // When this string changes, SW activates fresh, deletes old caches,
 // and serves the latest JS bundle on next request.
-const CACHE = 'synrg-v52-2026-08-25';
+const CACHE = 'synrg-v53-2026-09-20';
 const BASE = '/app/';
 const ASSETS = [BASE, BASE + 'index.html'];
 
@@ -57,4 +57,47 @@ self.addEventListener('fetch', e => {
 // Allow page to send 'SKIP_WAITING' to activate new SW immediately
 self.addEventListener('message', e => {
   if (e.data === 'SKIP_WAITING') self.skipWaiting();
+});
+
+// ── Web Push ───────────────────────────────────────────────────
+// Payload shape: { title, body, tag, url, icon }
+// A push with no/!JSON payload still shows a generic notification rather than
+// nothing — Chrome penalises (and eventually revokes) silent pushes.
+self.addEventListener('push', e => {
+  let d = {};
+  try { d = e.data ? e.data.json() : {}; } catch { d = { body: e.data && e.data.text() }; }
+  const title = d.title || 'SYNRG';
+  e.waitUntil(self.registration.showNotification(title, {
+    body:  d.body || '',
+    tag:   d.tag  || 'synrg',
+    icon:  d.icon || BASE + 'icon-192.png',
+    badge: BASE + 'icon-192.png',
+    data:  { url: d.url || BASE },
+    renotify: !!d.tag,
+  }));
+});
+
+// Focus an already-open tab instead of piling up new ones.
+self.addEventListener('notificationclick', e => {
+  e.notification.close();
+  const target = (e.notification.data && e.notification.data.url) || BASE;
+  e.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
+      for (const c of list) {
+        if (c.url.includes(BASE) && 'focus' in c) {
+          if ('navigate' in c && !c.url.endsWith(target)) c.navigate(target).catch(() => {});
+          return c.focus();
+        }
+      }
+      return self.clients.openWindow(target);
+    })
+  );
+});
+
+// Chrome can rotate a subscription; re-register so we don't go silently dead.
+self.addEventListener('pushsubscriptionchange', e => {
+  e.waitUntil(
+    self.clients.matchAll({ includeUncontrolled: true })
+      .then(list => list.forEach(c => c.postMessage({ type: 'PUSH_RESUBSCRIBE' })))
+  );
 });

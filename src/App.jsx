@@ -9,6 +9,8 @@ import { BookingProvider }     from './context/BookingContext'
 import { C, EASE, makeTheme }  from './theme'
 import { isAdmin }             from './lib/bookingUtils'
 import { hasModule }           from './lib/modules'
+import { isStandalone, platformLabel } from './lib/push'
+import { DB }                 from './lib/db'
 import {
   evaluateBadges, evaluateMonthlyBadgesForMonth, getCurrentMonthKey,
   ALLTIME_BADGES, MONTHLY_BADGES, PR_EXERCISES, getCurrentPRs,
@@ -50,7 +52,6 @@ import ConfirmDeleteModal from './components/ConfirmDeleteModal'
 import MonthlyCheckIn     from './components/MonthlyCheckIn'
 import WelcomeTour        from './components/WelcomeTour'
 
-const isStandalone = window.navigator.standalone || window.matchMedia('(display-mode: standalone)').matches
 
 function LoadingScreen({ t }) {
   return (
@@ -273,6 +274,16 @@ function AppShell() {
     if (coachClientMode) window.scrollTo({ top: 0, behavior: 'smooth' })
   }, [coachClientMode])
 
+  // ── How is the app actually opened? ───────────────────────────
+  // Push on iOS only exists for a web app launched from the Home Screen, so
+  // the install rate is the ceiling on how many iPhone users can ever be
+  // reached. Nothing measured that — record it per session (trackEvent is
+  // rate-limited to once per browser session per event).
+  useEffect(() => {
+    if (loading || !auth.isLoggedIn || !auth.id) return
+    DB.trackEvent(auth.id, isStandalone() ? 'open_standalone' : 'open_browser', platformLabel())
+  }, [loading, auth.isLoggedIn, auth.id])
+
   // ── Warm the split chunks once the app is idle ────────────────
   // Code-splitting keeps start-up small, but it moves the download to the
   // moment of the click. On an admin session the data requests are still in
@@ -437,7 +448,7 @@ function AppShell() {
 function AppContent() {
   const theme            = useTheme()
   const isMobile         = useMediaQuery(theme.breakpoints.down('sm'))
-  const showSiteHeader   = !isStandalone && !isMobile
+  const showSiteHeader   = !isStandalone() && !isMobile
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
