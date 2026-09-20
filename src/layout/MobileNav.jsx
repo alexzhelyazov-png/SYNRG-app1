@@ -143,6 +143,12 @@ function NavAction({ value, Icon, label, isSelected, onClick, badge, badgeColor,
           color: `${labelColor} !important`,
           opacity: '1 !important',
           transition: `color 0.2s ${EASE.standard}`,
+          // A two-word label wrapping makes this one item taller than the rest
+          // and knocks the whole bar out of alignment. Clip instead of wrap.
+          whiteSpace: 'nowrap',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          maxWidth: '100%',
         },
         minWidth: 0, px: 0.25,
       }}
@@ -234,7 +240,7 @@ export default function MobileNav() {
             <NavAction
               value="__mytracker__"
               Icon={TrendingUpIcon}
-              label={t('myTrackerTitle')}
+              label={t('navMyTracker')}
               isSelected={view === 'dashboard' && viewingCoach === auth.name}
               badge={0}
               isLocked={false}

@@ -116,16 +116,20 @@ export default function MobileHeader() {
             </Box>
 
             <Box sx={{ minWidth: 0 }}>
-              <Typography sx={{ fontWeight: 700, fontSize: '15px', lineHeight: 1.2, color: C.text }}>
+              <Typography noWrap sx={{ fontWeight: 700, fontSize: '15px', lineHeight: 1.2, color: C.text }}>
                 {auth.name}
               </Typography>
               {auth.role === 'coach' && client?.name ? (
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                  <Typography variant="overline" sx={{ color: C.text, lineHeight: 1 }}>
+                // The selected client's name is free text and can be very long —
+                // several accounts are literally an email address. Without the
+                // minWidth:0 / noWrap pair it pushes this row past the action
+                // icons and slides underneath them.
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, minWidth: 0 }}>
+                  <Typography variant="overline" sx={{ color: C.text, lineHeight: 1, flexShrink: 0 }}>
                     {t('coachRole')}
                   </Typography>
-                  <Typography variant="overline" sx={{ color: C.muted, lineHeight: 1 }}>·</Typography>
-                  <Typography variant="overline" sx={{ color: C.muted, lineHeight: 1 }}>
+                  <Typography variant="overline" sx={{ color: C.muted, lineHeight: 1, flexShrink: 0 }}>·</Typography>
+                  <Typography variant="overline" noWrap sx={{ color: C.muted, lineHeight: 1, minWidth: 0 }}>
                     {client.name}
                   </Typography>
                 </Box>
