@@ -14,6 +14,7 @@ import WaterDropIcon from '@mui/icons-material/WaterDrop'
 import AssignmentIcon from '@mui/icons-material/Assignment'
 import FitnessCenterIcon from '@mui/icons-material/FitnessCenter'
 import MenuBookIcon from '@mui/icons-material/MenuBook'
+import LockOutlinedIcon from '@mui/icons-material/LockOutlined'
 import { useApp } from '../context/AppContext'
 import { useBooking } from '../context/BookingContext'
 import { WORKOUT_CATEGORIES } from '../lib/constants'
@@ -1922,6 +1923,7 @@ export function ClientSchedule() {
   const [loaded,      setLoaded]      = useState(false)
   const [dayOffset,   setDayOffset]   = useState(0) // first day offset from today
   const [confirmSlot, setConfirmSlot] = useState(null) // slot pending free-pass confirmation
+  const [lockedSlotId, setLockedSlotId] = useState(null) // slot whose lock reason is expanded (touch)
 
   useEffect(() => {
     if (!auth.id) return
@@ -2219,6 +2221,32 @@ export function ClientSchedule() {
                               }}>
                               {t('bookBtn')}
                             </Button>
+                          ) : bookCheck.locked ? (
+                            // Keep a real button — this is the one refusal the
+                            // client can actually act on, unlike "past" or "too
+                            // late". Tooltip covers desktop hover; the tap
+                            // reveals the same text inline for touch, where
+                            // hover doesn't exist.
+                            <Box>
+                              <Tooltip title={bookCheck.reason} enterTouchDelay={0} arrow>
+                                <Button size="small" fullWidth variant="contained"
+                                  onClick={() => setLockedSlotId(prev => prev === slot.id ? null : slot.id)}
+                                  startIcon={<LockOutlinedIcon sx={{ fontSize: '13px !important' }} />}
+                                  sx={{
+                                    fontSize: '11px', py: 0.5, fontWeight: 700, borderRadius: '8px',
+                                    background: 'rgba(248,113,113,0.12)', color: '#F87171',
+                                    border: '1px solid rgba(248,113,113,0.35)',
+                                    '&:hover': { background: 'rgba(248,113,113,0.2)' },
+                                  }}>
+                                  {t('bookBtn')}
+                                </Button>
+                              </Tooltip>
+                              {lockedSlotId === slot.id && (
+                                <Typography sx={{ fontSize: '10px', color: '#F87171', lineHeight: 1.35, mt: 0.5 }}>
+                                  {bookCheck.reason}
+                                </Typography>
+                              )}
+                            </Box>
                           ) : (
                             <Typography sx={{ fontSize: '10px', color: C.muted, fontStyle: 'italic', lineHeight: 1.3 }}>
                               {bookCheck.reason}

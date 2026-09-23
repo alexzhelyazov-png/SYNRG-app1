@@ -105,8 +105,12 @@ export function canClientBook(slot, plan, myBookings = []) {
   // Payment gate — mirrors book_slot's check server-side. Without it the UI
   // shows a normal, enabled button that the server then silently refuses, so
   // the client just sees "nothing happens" with no idea why.
+  //
+  // `locked` marks this apart from the other refusals: it's the only one the
+  // client can actually do something about, so the UI keeps a real (padlocked)
+  // button instead of the same grey italic line used for "past" or "too late".
   if (!plan.is_paid && (plan.sessions_used || 0) >= 1)
-    return { ok: false, reason: 'Планът не е платен. Плащането става на място при треньора.' }
+    return { ok: false, locked: true, reason: 'Планът не е платен. Плащането става на място при треньора.' }
 
   if (plan.plan_type !== 'unlimited' && creditsRemaining(plan) <= 0)
     return { ok: false, reason: 'Нямате оставащи кредити' }

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import {
-  Box, Typography, Paper, Button, Chip, CircularProgress, Divider, Alert,
+  Box, Typography, Paper, Button, Chip, CircularProgress, Divider, Alert, Tooltip,
   Dialog, DialogTitle, DialogContent, DialogActions,
 } from '@mui/material'
 import CalendarMonthIcon    from '@mui/icons-material/CalendarMonth'
@@ -10,6 +10,7 @@ import PeopleIcon           from '@mui/icons-material/People'
 import EventAvailableIcon   from '@mui/icons-material/EventAvailable'
 import CreditCardIcon       from '@mui/icons-material/CreditCard'
 import CheckCircleIcon      from '@mui/icons-material/CheckCircle'
+import LockOutlinedIcon from '@mui/icons-material/LockOutlined'
 import { useApp }           from '../context/AppContext'
 import { useBooking }       from '../context/BookingContext'
 import NoPlanBanner         from '../components/NoPlanBanner'
@@ -256,6 +257,23 @@ function SlotRow({ slot, plan, myBookings, onBook, onCancel, busy, t, lang }) {
             }}>
             {busy ? <CircularProgress size={14} sx={{ color: '#0f1c11' }} /> : t('bookBtn')}
           </Button>
+        ) : bookCheck.locked ? (
+          // Padlocked, not removed — the client can clear this one themselves.
+          // Clicking surfaces the reason via the row's existing error line,
+          // which also covers touch where there's no hover.
+          <Tooltip title={bookCheck.reason} enterTouchDelay={0} arrow>
+            <Button size="small" variant="contained"
+              onClick={() => setActionErr(bookCheck.reason)}
+              startIcon={<LockOutlinedIcon sx={{ fontSize: '14px !important' }} />}
+              sx={{
+                background: 'rgba(248,113,113,0.12)', color: '#F87171', fontWeight: 700,
+                fontSize: '12px', py: 0.75, px: 1.5, borderRadius: '10px',
+                border: '1px solid rgba(248,113,113,0.35)',
+                '&:hover': { background: 'rgba(248,113,113,0.2)' },
+              }}>
+              {t('bookBtn')}
+            </Button>
+          </Tooltip>
         ) : (
           <Chip label={bookCheck.reason || t('unavailableLabel')} size="small"
             sx={{ fontSize: '10px', maxWidth: 120, height: 'auto',
