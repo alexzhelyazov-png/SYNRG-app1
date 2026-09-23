@@ -2195,14 +2195,23 @@ export function ClientSchedule() {
                                 ✓ {t('bookedLabel')}
                               </Typography>
                               {cancelCheck.ok && (
+                                // Inverse of the Book button rather than a red
+                                // warning: cancelling in good time is a normal,
+                                // allowed action, not a destructive one. A late
+                                // cancel does cost them, so that one keeps a
+                                // warning tint.
                                 <Button size="small" fullWidth disabled={bookingBusy}
                                   onClick={() => handleCancelClick(slot)}
                                   sx={{
                                     fontSize: '10px', py: 0.4,
-                                    border: `1px solid ${cancelCheck.lateCancel ? 'rgba(248,113,113,0.6)' : 'rgba(248,113,113,0.3)'}`,
-                                    color: '#F87171',
+                                    border: `1px solid ${cancelCheck.lateCancel ? 'rgba(248,113,113,0.6)' : C.primary}`,
+                                    color: cancelCheck.lateCancel ? '#F87171' : C.primary,
+                                    background: 'transparent',
                                     borderRadius: '8px',
-                                    '&:hover': { border: '1px solid #F87171', background: 'rgba(248,113,113,0.08)' },
+                                    fontWeight: 700,
+                                    '&:hover': cancelCheck.lateCancel
+                                      ? { border: '1px solid #F87171', background: 'rgba(248,113,113,0.08)' }
+                                      : { border: `1px solid ${C.primary}`, background: 'rgba(196,233,191,0.12)' },
                                     '&.Mui-disabled': { opacity: 0.5 },
                                   }}>
                                   {t('cancelBookingBtn')}

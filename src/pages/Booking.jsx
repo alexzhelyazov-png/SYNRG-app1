@@ -207,11 +207,16 @@ function SlotRow({ slot, plan, myBookings, onBook, onCancel, busy, t, lang }) {
               </Typography>
             </Box>
             {cancelCheck.ok ? (
+              // Inverse of the Book button, matching the Dashboard cards —
+              // an in-time cancel is a normal action. Only a late cancel,
+              // which costs them, keeps the warning tint.
               <Button size="small" variant="outlined" disabled={busy} onClick={handleCancelClick}
-                sx={{ fontSize: '10px', py: 0.25, px: 1,
-                  borderColor: cancelCheck.lateCancel ? '#F87171' : C.border,
-                  color: cancelCheck.lateCancel ? '#F87171' : C.muted,
-                  '&:hover': { borderColor: '#F87171', color: '#F87171' },
+                sx={{ fontSize: '10px', py: 0.25, px: 1, fontWeight: 700,
+                  borderColor: cancelCheck.lateCancel ? '#F87171' : C.primary,
+                  color: cancelCheck.lateCancel ? '#F87171' : C.primary,
+                  '&:hover': cancelCheck.lateCancel
+                    ? { borderColor: '#F87171', color: '#F87171', background: 'rgba(248,113,113,0.08)' }
+                    : { borderColor: C.primary, background: 'rgba(196,233,191,0.12)' },
                   minWidth: 0, lineHeight: 1.5 }}>
                 {t('cancelBookingBtn')}
               </Button>
