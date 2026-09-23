@@ -245,8 +245,12 @@ function SlotDialog({ open, onClose, onSave, coaches, t }) {
 }
 
 // ── Activate/manage plan dialog ──────────────────────────────
-function PlanDialog({ open, onClose, onActivate, onExtend, onAdjust, onTogglePaid, client, plan, t }) {
-  const [mode,          setMode]         = useState('activate') // 'activate' | 'extend' | 'adjust'
+function PlanDialog({ open, onClose, onActivate, onExtend, onAdjust, onMarkPaid, client, plan, t }) {
+  // No mode selected by default when a plan already exists — the dialog opens
+  // on the paid/unpaid status alone, not a pre-filled "create new plan" form
+  // sitting redundantly underneath it. A brand-new client (no plan yet) has
+  // only one thing to do here, so that one skips straight to the form.
+  const [mode,          setMode]         = useState(plan ? null : 'activate') // null | 'activate' | 'extend' | 'adjust'
   const [planType,      setPlanType]     = useState('')
   const [validFrom,     setValidFrom]    = useState(isoToday())
   const [validTo,       setValidTo]      = useState(() => isoDatePlusDays(30))
@@ -259,12 +263,13 @@ function PlanDialog({ open, onClose, onActivate, onExtend, onAdjust, onTogglePai
       ? plan.price
       : (DEFAULT_PRICES[plan?.plan_type] ?? DEFAULT_PRICES['8'])
   )
-  // Unpaid by default on a fresh plan — payment happens in cash at the 2nd
-  // session, not at activation. An editing session (plan already exists)
-  // still reflects its real is_paid value.
-  const [isPaid,        setIsPaid]       = useState(plan?.is_paid ?? false)
+  // Paid-at-creation checkbox — only meaningful while setting up a NEW plan,
+  // before there's a row to mark paid on. Payment normally happens in cash at
+  // the 2nd session, so this defaults unchecked.
+  const [isPaid,        setIsPaid]       = useState(false)
   const [startCredits,  setStartCredits] = useState('')
   const [saving,        setSaving]       = useState(false)
+  const [marking,       setMarking]      = useState(false)
 
   // When planType changes, reset startCredits and update default price.
   // Never fall to 0 — an unselected type shows the 8-session tariff as a floor.
@@ -287,6 +292,13 @@ function PlanDialog({ open, onClose, onActivate, onExtend, onAdjust, onTogglePai
     }
   }, [plan])
 
+  async function handleMarkPaid() {
+    if (!plan || marking || !onMarkPaid) return
+    setMarking(true)
+    await onMarkPaid(plan)
+    setMarking(false)
+  }
+
   async function handleSave() {
     setSaving(true)
     // Price can never be 0 — fall back to the plan's tariff. This is what feeds
@@ -303,17 +315,9 @@ function PlanDialog({ open, onClose, onActivate, onExtend, onAdjust, onTogglePai
     } else if (mode === 'adjust') {
       res = await onAdjust(plan.id, Number(credUsed))
     }
-    // Toggling paid on an existing plan ALSO writes the price — otherwise a plan
-    // activated with price 0 would flip to paid but add 0 to revenue.
-    if (plan && onTogglePaid && (plan.is_paid !== isPaid || Number(plan.price) !== safePrice)) {
-      await onTogglePaid(plan.id, isPaid, safePrice)
-    }
     setSaving(false)
     if (!res?.error) onClose()
   }
-
-  // Allow save when plan exists and paid-status OR price changed (no new planType needed)
-  const paidChanged = plan && (plan.is_paid !== isPaid || Number(plan.price || 0) !== Number(price || 0))
 
   const inputSx = {
     '& .MuiInputBase-input':           { color: C.text },
@@ -329,6 +333,41 @@ function PlanDialog({ open, onClose, onActivate, onExtend, onAdjust, onTogglePai
         {t('planFor')}: {client?.name}
       </DialogTitle>
       <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: '4px !important' }}>
+
+        {/* Current plan + paid status — the primary thing this dialog is for */}
+        {plan ? (
+          <Box sx={{
+            p: 1.5, borderRadius: '10px', background: 'rgba(255,255,255,0.04)',
+            border: `1px solid ${C.border}`,
+          }}>
+            <Typography sx={{ fontSize: '12px', color: C.muted, mb: 1 }}>
+              {t('hasActivePlan')}: {planLabel(plan.plan_type, t)}
+              {plan.plan_type !== 'unlimited' && ` · ${creditsRemaining(plan)}/${plan.credits_total}`}
+              {' · '}{t('validUntil')}: {fmtValidTo(plan)}
+            </Typography>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1.5, flexWrap: 'wrap' }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, px: 1, py: 0.25, borderRadius: '100px',
+                background: plan.is_paid ? 'rgba(74,222,128,0.1)' : 'rgba(248,113,113,0.1)',
+                border: `1px solid ${plan.is_paid ? 'rgba(74,222,128,0.25)' : 'rgba(248,113,113,0.25)'}` }}>
+                <Box sx={{ width: 6, height: 6, borderRadius: '50%', background: plan.is_paid ? C.primary : '#F87171' }} />
+                <Typography sx={{ fontSize: '11px', fontWeight: 700, color: plan.is_paid ? C.primary : '#F87171' }}>
+                  {plan.is_paid ? t('paidLbl') : t('unpaidLbl')}
+                </Typography>
+              </Box>
+              {!plan.is_paid && onMarkPaid && (
+                <Button size="small" onClick={handleMarkPaid} disabled={marking}
+                  sx={{ background: C.primary, color: '#0f1c11', fontWeight: 700, fontSize: '12px',
+                    px: 1.5, py: 0.4, borderRadius: '8px', textTransform: 'none',
+                    '&:hover': { background: C.primaryHover } }}>
+                  {marking ? '…' : (t('markPaidBtn') || 'Отбележи платено')}
+                </Button>
+              )}
+            </Box>
+          </Box>
+        ) : (
+          <Typography sx={{ fontSize: '12px', color: '#F87171', fontWeight: 700 }}>{t('hasNoPlan')}</Typography>
+        )}
+
         {/* Mode buttons */}
         <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
           {[
@@ -349,27 +388,8 @@ function PlanDialog({ open, onClose, onActivate, onExtend, onAdjust, onTogglePai
           ))}
         </Box>
 
-        {/* Current plan info */}
-        {plan && (
-          <Box sx={{
-            p: 1.5, borderRadius: '10px', background: 'rgba(255,255,255,0.04)',
-            border: `1px solid ${C.border}`,
-          }}>
-            <Typography sx={{ fontSize: '12px', color: C.muted }}>
-              {t('hasActivePlan')}: {planLabel(plan.plan_type, t)}
-              {plan.plan_type !== 'unlimited' && ` · ${creditsRemaining(plan)}/${plan.credits_total}`}
-              {' · '}{t('validUntil')}: {fmtValidTo(plan)}
-            </Typography>
-            <FormControlLabel
-              control={<Checkbox checked={isPaid} onChange={e => setIsPaid(e.target.checked)}
-                sx={{ color: C.primary, '&.Mui-checked': { color: C.primary }, p: 0.5 }} />}
-              label={isPaid ? t('markedPaid') : t('markedUnpaid')}
-              sx={{ '& .MuiTypography-root': { fontSize: '12px', color: isPaid ? C.purple : '#FB923C', fontWeight: 700 }, mt: 0.5 }}
-            />
-          </Box>
-        )}
-
-        {/* Activate mode */}
+        {/* Activate mode — full create form, only when explicitly chosen (or
+            there's nothing else to show because there's no plan yet) */}
         {mode === 'activate' && (
           <>
             <FormControl fullWidth size="small">
@@ -425,10 +445,20 @@ function PlanDialog({ open, onClose, onActivate, onExtend, onAdjust, onTogglePai
             <TextField label={t('validUntil')} type="date" size="small"
               value={validTo} onChange={e => setValidTo(e.target.value)}
               sx={inputSx} InputLabelProps={{ shrink: true }} />
+
+            {/* Module access — reviewed at plan setup, not on every extend/adjust */}
+            {client && (
+              <Box sx={{ p: 1.5, borderRadius: '10px', background: 'rgba(255,255,255,0.04)', border: `1px solid ${C.border}` }}>
+                <Typography sx={{ fontSize: '11px', color: C.muted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.7px', mb: 1 }}>
+                  {t('editModules')}
+                </Typography>
+                <ClientModuleEditor clientId={client.id} currentModules={client.modules} t={t} lang="bg" />
+              </Box>
+            )}
           </>
         )}
 
-        {/* Extend mode */}
+        {/* Extend mode — just the date, nothing else */}
         {mode === 'extend' && plan && (
           <TextField label={t('extendTo')} type="date" size="small"
             value={extendTo} onChange={e => setExtendTo(e.target.value)}
@@ -447,23 +477,16 @@ function PlanDialog({ open, onClose, onActivate, onExtend, onAdjust, onTogglePai
             </Typography>
           </>
         )}
-        {/* Module access */}
-        {client && (
-          <Box sx={{ p: 1.5, borderRadius: '10px', background: 'rgba(255,255,255,0.04)', border: `1px solid ${C.border}` }}>
-            <Typography sx={{ fontSize: '11px', color: C.muted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.7px', mb: 1 }}>
-              {t('editModules')}
-            </Typography>
-            <ClientModuleEditor clientId={client.id} currentModules={client.modules} t={t} lang="bg" />
-          </Box>
-        )}
 
       </DialogContent>
       <DialogActions sx={{ px: 3, pb: 2 }}>
         <Button onClick={onClose} sx={{ color: C.muted }}>{t('cancelBtn')}</Button>
-        <Button variant="contained" onClick={handleSave} disabled={saving || (mode === 'activate' && !planType && !paidChanged)}
-          sx={{ background: C.primary, color: '#0f1c11', fontWeight: 700 }}>
-          {saving ? <CircularProgress size={16} /> : t('saveBtn')}
-        </Button>
+        {mode && (
+          <Button variant="contained" onClick={handleSave} disabled={saving || (mode === 'activate' && !planType)}
+            sx={{ background: C.primary, color: '#0f1c11', fontWeight: 700 }}>
+            {saving ? <CircularProgress size={16} /> : t('saveBtn')}
+          </Button>
+        )}
       </DialogActions>
     </Dialog>
   )
@@ -1258,15 +1281,6 @@ function PlansTab({ t }) {
     showSnackbar(t('creditsAdjustedMsg'))
     return { ok: true }
   }
-  async function handleTogglePaid(planId, newValue, price) {
-    // Persist the price alongside the paid flag so revenue is never lost when a
-    // plan flips to paid. Coerce a missing/zero price to its tariff default.
-    const patch = { is_paid: newValue }
-    const p = Number(price)
-    if (Number.isFinite(p) && p > 0) patch.price = p
-    await DB.update('client_plans', planId, patch)
-    await loadAllPlans()
-  }
 
   const filtered = realClients.filter(c =>
     !c.is_archived && (!search || c.name.toLowerCase().includes(search.toLowerCase()))
@@ -1315,7 +1329,7 @@ function PlansTab({ t }) {
           onActivate={handleActivate}
           onExtend={handleExtend}
           onAdjust={handleAdjust}
-          onTogglePaid={handleTogglePaid}
+          onMarkPaid={(plan) => markPlanPaidShared(plan, planDlg.client, auth, loadAllPlans, showSnackbar, t)}
           client={planDlg.client}
           plan={planDlg.plan}
           t={t}
@@ -1633,15 +1647,6 @@ function ClientsTab({ t }) {
     showSnackbar(t('deactivatePlanMsg'))
   }
 
-  async function handleTogglePaid(planId, newValue, price) {
-    // Persist price with the paid flag so revenue is never lost (see other tab).
-    const patch = { is_paid: newValue }
-    const p = Number(price)
-    if (Number.isFinite(p) && p > 0) patch.price = p
-    await DB.update('client_plans', planId, patch)
-    await loadAllPlans()
-    showSnackbar(newValue ? t('markedPaid') : t('markedUnpaid'))
-  }
 
   function handleDelete(client) {
     setConfirmDelete({ id: client.id, name: client.name })
@@ -1744,7 +1749,7 @@ function ClientsTab({ t }) {
           onActivate={handleActivate}
           onExtend={async (planId, date) => { const r = await extendPlan(planId, date); if (r?.error) { showSnackbar('Грешка: ' + r.error); return r } showSnackbar(t('planExtendedMsg')); return { ok: true } }}
           onAdjust={async (planId, credits) => { const r = await adjustCredits(planId, credits); if (r?.error) { showSnackbar('Грешка: ' + r.error); return r } showSnackbar(t('creditsAdjustedMsg')); return { ok: true } }}
-          onTogglePaid={handleTogglePaid}
+          onMarkPaid={(plan) => markPlanPaidShared(plan, planDlg.client, auth, loadAllPlans, showSnackbar, t)}
           client={planDlg.client} plan={planDlg.plan} t={t} />
       )}
 
@@ -2274,7 +2279,7 @@ function CoachesTab({ t }) {
 
 // ── Dashboard Tab ────────────────────────────────────────────
 function DashboardTab({ t, lang, goTo }) {
-  const { realClients, showSnackbar, setConfirmDelete, updateClientModules, setClientArchived } = useApp()
+  const { realClients, showSnackbar, setConfirmDelete, updateClientModules, setClientArchived, auth } = useApp()
   const { allPlans, loadAllPlans, activatePlan, extendPlan, adjustCredits } = useBooking()
   const [loaded,       setLoaded]       = useState(false)
   const [planDlg,      setPlanDlg]      = useState(null)
@@ -2341,15 +2346,6 @@ function DashboardTab({ t, lang, goTo }) {
     if (res?.error) { showSnackbar(t('errGeneric') + ': ' + res.error); return res }
     showSnackbar(t('creditsAdjustedMsg'))
     return { ok: true }
-  }
-  async function handleTogglePaid(planId, newValue, price) {
-    // Persist the price alongside the paid flag so revenue is never lost when a
-    // plan flips to paid. Coerce a missing/zero price to its tariff default.
-    const patch = { is_paid: newValue }
-    const p = Number(price)
-    if (Number.isFinite(p) && p > 0) patch.price = p
-    await DB.update('client_plans', planId, patch)
-    await loadAllPlans()
   }
 
   const isFreeReg  = c => {
@@ -2582,7 +2578,8 @@ function DashboardTab({ t, lang, goTo }) {
       {planDlg && (
         <PlanDialog open={!!planDlg} onClose={() => setPlanDlg(null)}
           onActivate={handleActivate} onExtend={handleExtend}
-          onAdjust={handleAdjust} onTogglePaid={handleTogglePaid}
+          onAdjust={handleAdjust}
+          onMarkPaid={(plan) => markPlanPaidShared(plan, planDlg.client, auth, loadAllPlans, showSnackbar, t)}
           client={planDlg.client} plan={planDlg.plan} t={t} />
       )}
 

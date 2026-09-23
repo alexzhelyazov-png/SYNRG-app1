@@ -26,7 +26,7 @@ import { todayDate, fmt1, parseDate, inputToDate } from '../lib/utils'
 import { computeReminders } from '../lib/reminders'
 import {
   creditsRemaining, effectiveValidTo, isoToday, isoDatePlusDays, daysUntilExpiry, fmtValidTo,
-  groupByDate, dayLabel, fmtTime, canClientBook, canClientCancel, isPlanActive,
+  groupByDate, dayLabel, fmtTime, canClientBook, canClientCancel, isPlanActive, planLabel,
 } from '../lib/bookingUtils'
 import { hasModule, hasAnyModule } from '../lib/modules'
 
@@ -1390,6 +1390,28 @@ function DashboardClient({ isCoachView = false }) {
           </Typography>
         </Box>
       </Box>
+
+      {/* ── Plan status: type, paid/unpaid, remaining credits ── */}
+      {myPlan && (
+        <Box sx={{
+          mb: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          flexWrap: 'wrap', gap: 1, px: 1.75, py: 1.25, borderRadius: '12px',
+          background: 'rgba(255,255,255,0.03)', border: `1px solid ${C.border}`,
+        }}>
+          <Typography sx={{ fontSize: '13px', color: C.text }}>
+            {t('hasActivePlan') || 'Активен план'}: <strong>{planLabel(myPlan.plan_type, t)}</strong>
+            {myPlan.plan_type !== 'unlimited' && ` · ${credits} ${t('creditsLeft') || 'оставащи'}`}
+          </Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, px: 1, py: 0.25, borderRadius: '100px',
+            background: myPlan.is_paid ? 'rgba(74,222,128,0.1)' : 'rgba(248,113,113,0.1)',
+            border: `1px solid ${myPlan.is_paid ? 'rgba(74,222,128,0.25)' : 'rgba(248,113,113,0.25)'}` }}>
+            <Box sx={{ width: 6, height: 6, borderRadius: '50%', background: myPlan.is_paid ? C.primary : '#F87171' }} />
+            <Typography sx={{ fontSize: '11px', fontWeight: 700, color: myPlan.is_paid ? C.primary : '#F87171' }}>
+              {myPlan.is_paid ? (t('paidLbl') || 'Платен') : (t('unpaidLbl') || 'Неплатен')}
+            </Typography>
+          </Box>
+        </Box>
+      )}
 
       {/* ── SYNRG ONLINE upgrade banner (free users only) ── */}
       {isFreeUser && (
