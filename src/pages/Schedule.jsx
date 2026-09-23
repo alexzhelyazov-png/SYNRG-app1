@@ -312,7 +312,10 @@ function EditSlotDialog({ open, onClose, onSave, slot, coaches, bookings = [], o
 }
 
 // ── Add Client to Slot Dialog ──────────────────────────────────
-function AddClientDialog({ open, onClose, onAdd, slot, realClients, t }) {
+function AddClientDialog({ open, onClose, onAdd, slot, realClients: allClients, t }) {
+  // Archived clients (lapsed 6+ months, etc.) have no path to a valid plan —
+  // don't offer them here, that's how a stale account ends up in a slot.
+  const realClients = allClients.filter(c => !c.is_archived)
   const [selId,     setSelId]     = useState('')
   const [useCredit, setUseCredit] = useState(true)
   const [loading,   setLoading]   = useState(false)
