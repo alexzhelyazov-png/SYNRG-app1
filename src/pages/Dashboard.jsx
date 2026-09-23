@@ -1358,39 +1358,47 @@ function DashboardClient({ isCoachView = false }) {
         </Box>
         {/* Studio manager quick-contact — the fastest way to a real person
             when something needs a human (payment, a plan question, a
-            schedule issue). Replaces the runstreak card in this slot. */}
+            schedule issue). Replaces the runstreak card in this slot.
+            The photo is served from this app's own public/ (BASE_URL), not
+            the marketing site's /images/ — a relative hop out of /app/ broke
+            on mobile, and that 3.3 MB original was absurd for a 48px avatar. */}
         <Box sx={{
           display: 'flex', flexDirection: 'column', alignItems: 'center',
-          px: 1.25, py: 1, borderRadius: '14px',
+          px: 1.75, py: 1.5, borderRadius: '16px',
           background: 'rgba(255,255,255,0.03)',
           border: `1px solid ${C.border}`,
-          minWidth: 72, flexShrink: 0,
+          minWidth: 104, flexShrink: 0,
         }}>
           <Box
             component="img"
-            src="../images/kari.jpg"
+            src={`${import.meta.env.BASE_URL}elina.jpg`}
             alt="Елина — студио мениджър"
-            onError={e => { e.target.style.display = 'none' }}
-            sx={{ width: 38, height: 38, borderRadius: '50%', objectFit: 'cover', mb: 0.5, border: `1px solid ${C.border}` }}
+            sx={{ width: 56, height: 56, borderRadius: '50%', objectFit: 'cover', mb: 0.75, border: `1px solid ${C.border}` }}
           />
           <Typography sx={{
-            fontSize: '9px', fontWeight: 700, color: C.muted,
-            textTransform: 'uppercase', letterSpacing: '0.3px', mb: 0.5,
+            fontSize: '11px', fontWeight: 700, color: C.text,
+            letterSpacing: '0.2px', lineHeight: 1.2,
           }}>
             Елина
+          </Typography>
+          <Typography sx={{
+            fontSize: '8.5px', fontWeight: 600, color: C.muted,
+            textTransform: 'uppercase', letterSpacing: '0.4px', mb: 0.75,
+          }}>
+            {t('studioManagerLbl') || 'Студио мениджър'}
           </Typography>
           <Button
             component="a"
             href="viber://chat?number=%2B359877842924"
             size="small"
             sx={{
-              fontSize: '9.5px', fontWeight: 700, minWidth: 0, px: 1.25, py: 0.3,
+              fontSize: '11px', fontWeight: 700, minWidth: 0, px: 1.75, py: 0.5,
               borderRadius: '100px', background: C.primary, color: '#0f1c11',
-              textTransform: 'none', lineHeight: 1.4,
+              textTransform: 'none', lineHeight: 1.4, whiteSpace: 'nowrap',
               '&:hover': { background: C.primaryHover },
             }}
           >
-            Свържи се
+            {t('contactBtn') || 'Свържи се'}
           </Button>
         </Box>
       </Box>
