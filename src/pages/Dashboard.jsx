@@ -1381,7 +1381,7 @@ function DashboardClient({ isCoachView = false }) {
           </Typography>
           <Button
             component="a"
-            href="tel:+359877842924"
+            href="viber://chat?number=%2B359877842924"
             size="small"
             sx={{
               fontSize: '9.5px', fontWeight: 700, minWidth: 0, px: 1.25, py: 0.3,
