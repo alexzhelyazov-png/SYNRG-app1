@@ -31,10 +31,18 @@ export function effectiveValidTo(plan) {
   return plan.extended_to || plan.valid_to
 }
 
+// Whether the SUBSCRIPTION itself is still valid — status + date only.
+// Deliberately does NOT look at credits: a client who books ahead and burns
+// through an 8-pack in two weeks still has a real, paid, date-valid plan —
+// they're just out of sessions until it renews. Conflating "no credits left"
+// with "plan expired" here used to dump those clients into the Admin
+// "Изтекъл" bucket, into expired-looking stats, and behind a misleading
+// "no plan" banner on the booking screen — all wrong, they're still a
+// customer. The actual booking gate has its own, separate credits check
+// (see canBookSlot below) — that one still correctly refuses a booking with
+// 0 credits left, so nothing about the real block changes.
 export function isPlanActive(plan) {
   if (!plan || plan.status !== 'active') return false
-  // Credits exhausted = plan expired (except unlimited)
-  if (plan.plan_type !== 'unlimited' && (plan.credits_used || 0) >= (plan.credits_total || 0)) return false
   const validTo = effectiveValidTo(plan)
   if (!validTo) return false
   const today = new Date()

@@ -469,8 +469,33 @@ function PlanDialog({ open, onClose, onActivate, onExtend, onAdjust, onTogglePai
   )
 }
 
+// One tap from wherever a full admin is looking at a client — this dialog,
+// the Клиенти coach screen, or the plan-edit checkbox all end up here so the
+// three don't drift (same fields, same notification). Callers already gate
+// entry to full admins (Admin.jsx is route-gated; the coach-screen button
+// checks isFullAdmin directly), so this trusts its caller rather than
+// re-checking auth.
+async function markPlanPaidShared(plan, client, auth, loadAllPlans, showSnackbar, t) {
+  if (!plan) return
+  try {
+    await DB.update('client_plans', plan.id, {
+      is_paid: true,
+      paid_at: new Date().toISOString(),
+      paid_by: auth.name,
+    })
+    await DB.insertNotification(
+      auth.name, client.name, 'payment',
+      `${auth.name} отбеляза ${client.name} като платил ${plan.price} €`
+    )
+    await loadAllPlans()
+    showSnackbar(t('markedPaidMsg') || 'Отбелязано като платено')
+  } catch {
+    showSnackbar(t('errServer') || 'Грешка — опитай пак', 'error')
+  }
+}
+
 // ── Client Info Dialog (popup) ─────────────────────────────────
-function ClientInfoDialog({ open, onClose, client, plan, allClientPlans, workouts, t }) {
+function ClientInfoDialog({ open, onClose, client, plan, allClientPlans, workouts, t, onMarkPaid }) {
   const history = (allClientPlans || []).filter(p => p.id !== plan?.id)
   const [upcomingBookings, setUpcomingBookings] = useState([])
   const [pastBookings,    setPastBookings]    = useState([])
@@ -539,6 +564,20 @@ function ClientInfoDialog({ open, onClose, client, plan, allClientPlans, workout
                   </Box>
                 </Box>
               </Box>
+              {!plan.is_paid && onMarkPaid && (
+                <Button
+                  size="small"
+                  fullWidth
+                  onClick={() => onMarkPaid(plan, client)}
+                  sx={{
+                    mt: 1, background: C.primary, color: '#0f1c11', fontWeight: 700, fontSize: '12.5px',
+                    py: 0.6, borderRadius: '8px', textTransform: 'none',
+                    '&:hover': { background: C.primaryHover },
+                  }}
+                >
+                  {t('markPaidBtn') || 'Отбележи платено'}
+                </Button>
+              )}
             </>
           ) : (
             <Typography sx={{ fontSize: '12px', color: '#F87171', fontWeight: 700 }}>{t('hasNoPlan')}</Typography>
@@ -1186,7 +1225,7 @@ function BroadcastDialog({ open, onClose, clients, allPlans, t, singleClient }) 
 
 // ── Plans Tab ────────────────────────────────────────────────
 function PlansTab({ t }) {
-  const { realClients, showSnackbar } = useApp()
+  const { realClients, showSnackbar, auth } = useApp()
   const { allPlans, loadAllPlans, activatePlan, extendPlan, adjustCredits } = useBooking()
   const [search,      setSearch]      = useState('')
   const [planDlg,     setPlanDlg]     = useState(null) // { client, plan }
@@ -1265,7 +1304,8 @@ function PlansTab({ t }) {
       {infoDlg && (
         <ClientInfoDialog open={!!infoDlg} onClose={() => setInfoDlg(null)}
           client={infoDlg.client} plan={infoDlg.plan}
-          allClientPlans={infoDlg.allClientPlans} workouts={infoDlg.workouts} t={t} />
+          allClientPlans={infoDlg.allClientPlans} workouts={infoDlg.workouts} t={t}
+          onMarkPaid={(plan, client) => markPlanPaidShared(plan, client, auth, loadAllPlans, showSnackbar, t)} />
       )}
 
       {planDlg && (
@@ -1510,7 +1550,7 @@ function ClientModuleEditor({ clientId, currentModules, t, lang }) {
 }
 
 function ClientsTab({ t }) {
-  const { realClients, showSnackbar, lang, setConfirmDelete, setClientArchived } = useApp()
+  const { realClients, showSnackbar, lang, setConfirmDelete, setClientArchived, auth } = useApp()
   const { allPlans, loadAllPlans, activatePlan, extendPlan, adjustCredits, deactivatePlan } = useBooking()
   const [planDlg, setPlanDlg]   = useState(null)
   const [quickExt, setQuickExt] = useState(null) // { client, plan }
@@ -1695,7 +1735,8 @@ function ClientsTab({ t }) {
       {infoDlg && (
         <ClientInfoDialog open={!!infoDlg} onClose={() => setInfoDlg(null)}
           client={infoDlg.client} plan={infoDlg.plan}
-          allClientPlans={infoDlg.allClientPlans} workouts={infoDlg.workouts} t={t} />
+          allClientPlans={infoDlg.allClientPlans} workouts={infoDlg.workouts} t={t}
+          onMarkPaid={(plan, client) => markPlanPaidShared(plan, client, auth, loadAllPlans, showSnackbar, t)} />
       )}
 
       {planDlg && (
