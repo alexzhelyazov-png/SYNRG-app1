@@ -1356,38 +1356,42 @@ function DashboardClient({ isCoachView = false }) {
           <Typography variant="h2" sx={{ mb: 0.5 }}>{title}</Typography>
           <Typography sx={{ color: C.muted, fontSize: '14px' }}>{t('yourProgress')}</Typography>
         </Box>
+        {/* Studio manager quick-contact — the fastest way to a real person
+            when something needs a human (payment, a plan question, a
+            schedule issue). Replaces the runstreak card in this slot. */}
         <Box sx={{
           display: 'flex', flexDirection: 'column', alignItems: 'center',
-          px: 1.5, py: 1, borderRadius: '14px',
-          background: streak > 0
-            ? 'linear-gradient(135deg, rgba(255,180,0,0.12) 0%, rgba(255,100,0,0.08) 100%)'
-            : 'rgba(255,255,255,0.03)',
-          border: streak > 0
-            ? '1px solid rgba(255,160,0,0.3)'
-            : `1px solid ${C.border}`,
-          minWidth: 56, flexShrink: 0,
+          px: 1.25, py: 1, borderRadius: '14px',
+          background: 'rgba(255,255,255,0.03)',
+          border: `1px solid ${C.border}`,
+          minWidth: 72, flexShrink: 0,
         }}>
+          <Box
+            component="img"
+            src="../images/kari.jpg"
+            alt="Елина — студио мениджър"
+            onError={e => { e.target.style.display = 'none' }}
+            sx={{ width: 38, height: 38, borderRadius: '50%', objectFit: 'cover', mb: 0.5, border: `1px solid ${C.border}` }}
+          />
           <Typography sx={{
-            fontSize: '9px', fontWeight: 700,
-            color: streak > 0 ? 'rgba(255,180,0,0.6)' : C.muted,
-            textTransform: 'uppercase', letterSpacing: '0.5px', mb: 0.25,
+            fontSize: '9px', fontWeight: 700, color: C.muted,
+            textTransform: 'uppercase', letterSpacing: '0.3px', mb: 0.5,
           }}>
-            Runstreak
+            Елина
           </Typography>
-          <Typography sx={{
-            fontSize: '22px', fontWeight: 900, lineHeight: 1,
-            color: streak > 0 ? '#FFB300' : C.muted,
-            fontFamily: "'MontBlanc', sans-serif",
-          }}>
-            {streak}
-          </Typography>
-          <Typography sx={{
-            fontSize: '8px', fontWeight: 700,
-            color: streak > 0 ? 'rgba(255,180,0,0.6)' : C.muted,
-            textTransform: 'uppercase', letterSpacing: '0.4px', mt: 0.25,
-          }}>
-            {streak === 1 ? 'ден подред' : 'дни подред'}
-          </Typography>
+          <Button
+            component="a"
+            href="tel:+359877842924"
+            size="small"
+            sx={{
+              fontSize: '9.5px', fontWeight: 700, minWidth: 0, px: 1.25, py: 0.3,
+              borderRadius: '100px', background: C.primary, color: '#0f1c11',
+              textTransform: 'none', lineHeight: 1.4,
+              '&:hover': { background: C.primaryHover },
+            }}
+          >
+            Свържи се
+          </Button>
         </Box>
       </Box>
 
