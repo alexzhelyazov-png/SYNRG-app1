@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import ClientWorkout from './ClientWorkout'
 import { Box, Typography, TextField, Button, Chip, Paper, Switch, Collapse, Tabs, Tab, IconButton, Tooltip, Dialog, DialogTitle, DialogContent, DialogActions } from '@mui/material'
 import MyInvoicesSection from '../components/MyInvoicesSection'
+import { DB } from '../lib/db'
 import ArrowBackIcon from '@mui/icons-material/ArrowBack'
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline'
 import EditIcon from '@mui/icons-material/Edit'
@@ -16,6 +17,7 @@ import MenuBookIcon from '@mui/icons-material/MenuBook'
 import { useApp } from '../context/AppContext'
 import { useBooking } from '../context/BookingContext'
 import { WORKOUT_CATEGORIES } from '../lib/constants'
+import { isFullAdmin } from '../lib/bookingUtils'
 import { C, EASE } from '../theme'
 import PushToggle from '../components/PushToggle'
 import FoodTracker from './FoodTracker'
@@ -458,7 +460,7 @@ function MiniBarChart({ data, width = 200, height = 48, color = C.purple, showVa
 
 export function ClientDetail() {
   const {
-    client, auth, t, lang, weeklyRate, setView,
+    client, auth, t, lang, weeklyRate, setView, showSnackbar,
     setCoachClientMode, updateClientTargets, saveWorkoutDraft,
     exName, setExName, exScheme, setExScheme, exWeight, setExWeight,
     workoutCategory, setWorkoutCategory,
@@ -475,6 +477,7 @@ export function ClientDetail() {
   const [editCredits, setEditCredits] = useState(null)   // credits_used value or null
   const [editValidTo, setEditValidTo] = useState(null)   // date string or null
   const [editingWorkout, setEditingWorkout] = useState(null) // { id, items: [...] } or null
+  const [markingPaid, setMarkingPaid] = useState(false)
   const isMobile = window.innerWidth < 640
   const isCoach = auth.role === 'coach' || auth.role === 'admin'
 
@@ -482,6 +485,36 @@ export function ClientDetail() {
 
   // ── Profile tab data ──
   const plan    = (allPlans || []).find(p => p.client_id === client.id && p.status === 'active')
+
+  // One tap, right where the coach already is to log the workout — no trip to
+  // Admin. Records who/when, and notifies managers instead of a Discord post
+  // that's easy to forget.
+  async function markPlanPaid() {
+    // Only a full admin marks a plan paid — a floor coach could otherwise
+    // collect the cash and tap this themselves, unseen. The client's own
+    // incentive to reach out (blocked from booking until it's marked) is
+    // what makes this trustworthy, and that only holds if the coach on shift
+    // has no way to close the loop on their own.
+    if (!plan || markingPaid || !isFullAdmin(auth)) return
+    setMarkingPaid(true)
+    try {
+      await DB.update('client_plans', plan.id, {
+        is_paid: true,
+        paid_at: new Date().toISOString(),
+        paid_by: auth.name,
+      })
+      await DB.insertNotification(
+        auth.name, client.name, 'payment',
+        `${auth.name} отбеляза ${client.name} като платил ${plan.price} €`
+      )
+      await loadAllPlans()
+      showSnackbar(t('markedPaidMsg') || 'Отбелязано като платено')
+    } catch {
+      showSnackbar(t('errServer') || 'Грешка — опитай пак', 'error')
+    } finally {
+      setMarkingPaid(false)
+    }
+  }
   const remCred = plan ? creditsRemaining(plan) : null
   const today   = isoToday()
 
@@ -540,6 +573,34 @@ export function ClientDetail() {
             {weeklyRate !== null ? `${weeklyRate > 0 ? '+' : ''}${fmt1(weeklyRate)} ${t('kgWeek')}` : '—'}
           </Typography>
         </Box>
+
+        {isCoach && plan && !plan.is_paid && (
+          <Box sx={{
+            mt: 1.5, display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            gap: 1.5, flexWrap: 'wrap', background: 'rgba(248,113,113,0.1)',
+            border: '1px solid rgba(248,113,113,0.25)', borderRadius: '12px', px: 1.75, py: 1.25,
+          }}>
+            <Typography sx={{ fontSize: '13px', fontWeight: 700, color: '#F87171' }}>
+              {t('unpaidPlanLbl') || 'Неплатено'} · {plan.price} €
+            </Typography>
+            {/* Only a full admin can clear this — a floor coach sees the flag
+                (so they can point the client to Viber) but can't act on it. */}
+            {isFullAdmin(auth) && (
+              <Button
+                size="small"
+                onClick={markPlanPaid}
+                disabled={markingPaid}
+                sx={{
+                  background: C.primary, color: '#0f1c11', fontWeight: 700, fontSize: '12.5px',
+                  px: 1.5, py: 0.5, borderRadius: '8px', textTransform: 'none',
+                  '&:hover': { background: C.primaryHover },
+                }}
+              >
+                {markingPaid ? '…' : (t('markPaidBtn') || 'Отбележи платено')}
+              </Button>
+            )}
+          </Box>
+        )}
       </Box>
 
       {/* ── 2 Tabs ── */}

@@ -17,7 +17,7 @@ import BoltIcon           from '@mui/icons-material/Bolt'
 import { useApp }         from '../context/AppContext'
 import { useBooking }     from '../context/BookingContext'
 import { C }              from '../theme'
-import { isAdmin, fmtTime, occupancyStr, isoToday, isPlanActive } from '../lib/bookingUtils'
+import { isAdmin, isFullAdmin, fmtTime, occupancyStr, isoToday, isPlanActive } from '../lib/bookingUtils'
 
 // ── Constants ──────────────────────────────────────────────────
 const HOURS       = [9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]
@@ -316,19 +316,21 @@ function AddClientDialog({ open, onClose, onAdd, slot, realClients: allClients, 
   // Archived clients (lapsed 6+ months, etc.) have no path to a valid plan —
   // don't offer them here, that's how a stale account ends up in a slot.
   const realClients = allClients.filter(c => !c.is_archived)
-  const [selId,     setSelId]     = useState('')
-  const [useCredit, setUseCredit] = useState(true)
-  const [loading,   setLoading]   = useState(false)
-  const [err,       setErr]       = useState('')
+  const { auth } = useApp()
+  const [selId,         setSelId]         = useState('')
+  const [useCredit,     setUseCredit]     = useState(true)
+  const [overrideUnpaid, setOverrideUnpaid] = useState(false)
+  const [loading,       setLoading]       = useState(false)
+  const [err,           setErr]           = useState('')
 
   async function handleAdd() {
     if (!selId) return
     setLoading(true); setErr('')
     const client = realClients.find(c => c.id === selId)
-    const res = await onAdd(slot.id, selId, client.name, useCredit)
+    const res = await onAdd(slot.id, selId, client.name, useCredit, overrideUnpaid)
     setLoading(false)
     if (res?.error) { setErr(res.error); return }
-    onClose(); setSelId(''); setUseCredit(true)
+    onClose(); setSelId(''); setUseCredit(true); setOverrideUnpaid(false)
   }
 
   return (
@@ -354,6 +356,14 @@ function AddClientDialog({ open, onClose, onAdd, slot, realClients: allClients, 
             {t('useCredit')}
           </label>
         </Box>
+        {isFullAdmin(auth) && (
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 1 }}>
+            <input type="checkbox" id="overrideUnpaid" checked={overrideUnpaid} onChange={e => setOverrideUnpaid(e.target.checked)} />
+            <label htmlFor="overrideUnpaid" style={{ fontSize: '13px', color: C.muted, cursor: 'pointer' }}>
+              {t('overrideUnpaidLbl') || 'Пропусни блокировката за неплатен план'}
+            </label>
+          </Box>
+        )}
         {err && <Typography sx={{ fontSize: '12px', color: '#F87171', mt: 1 }}>{err}</Typography>}
       </DialogContent>
       <DialogActions sx={{ px: 3, pb: 2 }}>
@@ -594,8 +604,8 @@ export default function Schedule() {
     await refreshView()
   }
 
-  async function handleAddClient(slotId, clientId, clientName, useCredit) {
-    const res = await adminAddToSlot(slotId, clientId, clientName, useCredit)
+  async function handleAddClient(slotId, clientId, clientName, useCredit, overrideUnpaid) {
+    const res = await adminAddToSlot(slotId, clientId, clientName, useCredit, overrideUnpaid)
     if (!res?.error) showSnackbar(`${clientName} добавен в часа`)
     return res
   }

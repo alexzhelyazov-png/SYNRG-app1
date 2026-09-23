@@ -377,13 +377,14 @@ export function BookingProvider({ children }) {
   }, [allPlans, loadAllPlans, updateClientModules])
 
   // ── Admin: manually add client to slot ────────────────────
-  const adminAddToSlot = useCallback(async (slotId, clientId, clientName, useCredit = false) => {
+  const adminAddToSlot = useCallback(async (slotId, clientId, clientName, useCredit = false, overrideUnpaid = false) => {
     try {
       const result = await DB.callRpc('admin_book_slot', {
-        p_slot_id:     slotId,
-        p_client_id:   clientId,
-        p_client_name: clientName,
-        p_use_credit:  useCredit,
+        p_slot_id:          slotId,
+        p_client_id:        clientId,
+        p_client_name:      clientName,
+        p_use_credit:       useCredit,
+        p_override_unpaid:  overrideUnpaid,
       })
       if (result?.error) return { error: result.error }
       await loadSlots()

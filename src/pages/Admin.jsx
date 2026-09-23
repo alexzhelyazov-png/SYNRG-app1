@@ -259,7 +259,10 @@ function PlanDialog({ open, onClose, onActivate, onExtend, onAdjust, onTogglePai
       ? plan.price
       : (DEFAULT_PRICES[plan?.plan_type] ?? DEFAULT_PRICES['8'])
   )
-  const [isPaid,        setIsPaid]       = useState(plan?.is_paid ?? true)
+  // Unpaid by default on a fresh plan — payment happens in cash at the 2nd
+  // session, not at activation. An editing session (plan already exists)
+  // still reflects its real is_paid value.
+  const [isPaid,        setIsPaid]       = useState(plan?.is_paid ?? false)
   const [startCredits,  setStartCredits] = useState('')
   const [saving,        setSaving]       = useState(false)
 
@@ -833,8 +836,8 @@ function AdminScheduleTab({ t, lang }) {
     showSnackbar(t('slotDeletedMsg'))
   }
 
-  async function handleAddClient(slotId, clientId, clientName, useCredit) {
-    const res = await adminAddToSlot(slotId, clientId, clientName, useCredit)
+  async function handleAddClient(slotId, clientId, clientName, useCredit, overrideUnpaid) {
+    const res = await adminAddToSlot(slotId, clientId, clientName, useCredit, overrideUnpaid)
     if (!res?.error) {
       showSnackbar(`${clientName} записан`)
       await loadSlotBookings([slotId])
@@ -1002,18 +1005,20 @@ function AddClientDialog({ open, onClose, onAdd, slot, realClients: allClients, 
   // Archived clients (lapsed 6+ months, etc.) have no path to a valid plan —
   // don't offer them here, that's how a stale account ends up in a slot.
   const realClients = allClients.filter(c => !c.is_archived)
+  const { auth } = useApp()
   const [selId, setSelId] = useState('')
   const [useCredit, setUseCredit] = useState(true)
+  const [overrideUnpaid, setOverrideUnpaid] = useState(false)
   const [loading, setLoading] = useState(false)
   const [err, setErr] = useState('')
   async function handleAdd() {
     if (!selId) return
     setLoading(true); setErr('')
     const client = realClients.find(c => c.id === selId)
-    const res = await onAdd(slot.id, selId, client.name, useCredit)
+    const res = await onAdd(slot.id, selId, client.name, useCredit, overrideUnpaid)
     setLoading(false)
     if (res?.error) { setErr(res.error); return }
-    onClose(); setSelId(''); setUseCredit(true)
+    onClose(); setSelId(''); setUseCredit(true); setOverrideUnpaid(false)
   }
   return (
     <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth
@@ -1032,6 +1037,14 @@ function AddClientDialog({ open, onClose, onAdd, slot, realClients: allClients, 
           <input type="checkbox" id="uc2" checked={useCredit} onChange={e => setUseCredit(e.target.checked)} />
           <label htmlFor="uc2" style={{ fontSize: '13px', color: C.muted, cursor: 'pointer' }}>{t('useCredit')}</label>
         </Box>
+        {isFullAdmin(auth) && (
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 1 }}>
+            <input type="checkbox" id="overrideUnpaid2" checked={overrideUnpaid} onChange={e => setOverrideUnpaid(e.target.checked)} />
+            <label htmlFor="overrideUnpaid2" style={{ fontSize: '13px', color: C.muted, cursor: 'pointer' }}>
+              {t('overrideUnpaidLbl') || 'Пропусни блокировката за неплатен план'}
+            </label>
+          </Box>
+        )}
         {err && <Typography sx={{ fontSize: '12px', color: '#F87171', mt: 1 }}>{err}</Typography>}
       </DialogContent>
       <DialogActions sx={{ px: 3, pb: 2 }}>
