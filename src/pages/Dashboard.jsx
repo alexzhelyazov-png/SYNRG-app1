@@ -2174,14 +2174,15 @@ export function ClientSchedule() {
                             {slot.coach_name}
                           </Typography>
 
-                          {/* Places badge */}
+                          {/* Places badge — same neutral style whether full or
+                              not; a full slot isn't an error state, just info. */}
                           <Box sx={{
                             display: 'inline-block', px: 0.75, py: '2px', mb: 1,
                             borderRadius: '6px',
-                            background: isFull ? 'rgba(248,113,113,0.12)' : 'rgba(255,255,255,0.06)',
-                            border: `1px solid ${isFull ? 'rgba(248,113,113,0.35)' : C.border}`,
+                            background: 'rgba(255,255,255,0.06)',
+                            border: `1px solid ${C.border}`,
                           }}>
-                            <Typography sx={{ fontSize: '10px', fontWeight: 700, color: isFull ? '#F87171' : C.muted }}>
+                            <Typography sx={{ fontSize: '10px', fontWeight: 700, color: C.muted }}>
                               {isFull
                                 ? (lang === 'bg' ? 'Запълнен' : 'Full')
                                 : (lang === 'bg' ? `${freeCount} св. места` : `${freeCount} free`)}
