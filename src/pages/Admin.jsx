@@ -38,6 +38,7 @@ import AdminMessagesTab      from './AdminMessagesTab'
 import AdminAttentionTab     from './AdminAttentionTab'
 import { useBooking }        from '../context/BookingContext'
 import { C }                 from '../theme'
+import { NutritionPlanBuilderDialog } from './AdminNutritionPlan'
 import { DB }                from '../lib/db'
 import { MODULE_DEFS, MODULE_PRESETS, ADMIN_MANAGEABLE_MODULES, REMOTE_MODULES, FREE_MODULES } from '../lib/modules'
 import {
@@ -392,6 +393,21 @@ function PlanDialog({ open, onClose, onActivate, onExtend, onAdjust, onMarkPaid,
             there's nothing else to show because there's no plan yet) */}
         {mode === 'activate' && (
           <>
+            {/* A short period on a client who already has a plan on file is
+                almost always meant to be a free grace extension, not a new
+                paid sale — this is exactly the mistake that inflated Finance
+                revenue (full price charged for a 7-9 day top-up). Nudge
+                towards "Удължи" instead of silently letting it slide. */}
+            {plan && (new Date(validTo) - new Date(validFrom)) / 86400000 < 14 && (
+              <Box sx={{ p: 1.5, borderRadius: '10px', background: 'rgba(251,146,60,0.1)', border: '1px solid rgba(251,146,60,0.3)' }}>
+                <Typography sx={{ fontSize: '12px', fontWeight: 700, color: '#FB923C' }}>
+                  Това прилича на удължение, не нов план
+                </Typography>
+                <Typography sx={{ fontSize: '11px', color: C.muted, mt: 0.5 }}>
+                  Ако клиентът не плаща отново, а просто получава няколко дни отгоре — затвори това и ползвай бутона "{t('extendPlanBtn')}" горе. Активирането тук ще запише {price || 0}€ като нов приход.
+                </Typography>
+              </Box>
+            )}
             <FormControl fullWidth size="small">
               <InputLabel sx={{ color: C.muted }}>{t('selectPlanType')}</InputLabel>
               <Select value={planType} onChange={e => setPlanType(e.target.value)} label={t('selectPlanType')}
@@ -522,6 +538,7 @@ function ClientInfoDialog({ open, onClose, client, plan, allClientPlans, workout
   const history = (allClientPlans || []).filter(p => p.id !== plan?.id)
   const [upcomingBookings, setUpcomingBookings] = useState([])
   const [pastBookings,    setPastBookings]    = useState([])
+  const [nutriOpen, setNutriOpen] = useState(false)
 
   useEffect(() => {
     if (open && client?.id) {
@@ -685,9 +702,16 @@ function ClientInfoDialog({ open, onClose, client, plan, allClientPlans, workout
         </Box>
 
       </DialogContent>
-      <DialogActions sx={{ px: 3, pb: 2 }}>
+      <DialogActions sx={{ px: 3, pb: 2, gap: 1 }}>
+        <Button onClick={() => setNutriOpen(true)}
+          sx={{ color: C.primary, border: `1px solid ${C.primaryA20}`, borderRadius: '100px',
+            px: 2, fontWeight: 700, fontSize: '13px', textTransform: 'none' }}>
+          Хранителен план
+        </Button>
+        <Box sx={{ flex: 1 }} />
         <Button onClick={onClose} sx={{ color: C.muted }}>{t('cancelBtn') || 'Затвори'}</Button>
       </DialogActions>
+      <NutritionPlanBuilderDialog open={nutriOpen} onClose={() => setNutriOpen(false)} client={client} />
     </Dialog>
   )
 }
@@ -698,10 +722,12 @@ function ClientPlanRow({ client, plan, onOpen, onManage, onDelete, onArchive, on
   const credits  = plan ? creditsRemaining(plan) : null
   const isLow    = plan && plan.plan_type !== 'unlimited' && credits !== null && credits <= 2
   const isPaid   = plan?.is_paid
-  // An expired plan with credits left can be revived by just pushing its end
-  // date out — no need to activate a new 0-lv plan just to unlock what's left.
+  // Any expired plan can be revived by just pushing its end date out — no
+  // credits-left or plan-type restriction. Without this, admins had no extend
+  // option for unlimited plans or exhausted-credit plans and were forced to
+  // hit "Activate" instead, which silently created a brand-new full-price
+  // "sale" for what was really a free grace extension (inflated Finance revenue).
   const canQuickExtend = !!onQuickExtend && plan && !active
-    && plan.plan_type !== 'unlimited' && credits > 0
 
   return (
     <Box sx={{
@@ -762,7 +788,11 @@ function ClientPlanRow({ client, plan, onOpen, onManage, onDelete, onArchive, on
       {/* Actions */}
       <Box sx={{ display: 'flex', gap: 0.25, flexShrink: 0 }}>
         {canQuickExtend && (
-          <Tooltip title={lang === 'en' ? `Extend — ${credits} credits left` : `Удължи — остават ${credits} кредита`} arrow>
+          <Tooltip title={
+            plan.plan_type === 'unlimited'
+              ? (lang === 'en' ? 'Extend — no charge' : 'Удължи — без такса')
+              : (lang === 'en' ? `Extend — ${credits} credits left` : `Удължи — остават ${credits} кредита`)
+          } arrow>
             <IconButton size="small" onClick={e => { e.stopPropagation(); onQuickExtend(client, plan) }}
               sx={{ color: '#c4e9bf', '&:hover': { color: C.primary, background: 'rgba(196,233,191,0.12)' } }}>
               <CalendarMonthIcon sx={{ fontSize: 14 }} />
@@ -828,7 +858,9 @@ function QuickExtendDialog({ open, client, plan, onClose, onExtend, t, lang }) {
       <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: '4px !important' }}>
         <Box sx={{ p: 1.5, borderRadius: '10px', background: 'rgba(196,233,191,0.08)', border: '1px solid rgba(196,233,191,0.25)' }}>
           <Typography sx={{ fontSize: '13px', fontWeight: 800, color: '#c4e9bf' }}>
-            {lang === 'en' ? `${credits} credits left` : `Остават ${credits} кредита`}
+            {plan?.plan_type === 'unlimited'
+              ? (lang === 'en' ? 'Unlimited plan' : 'Неограничен план')
+              : (lang === 'en' ? `${credits} credits left` : `Остават ${credits} кредита`)}
           </Typography>
           <Typography sx={{ fontSize: '11px', color: C.muted, mt: 0.5 }}>
             {lang === 'en'
@@ -1794,9 +1826,12 @@ function AnalyticsTab({ t }) {
     return m === 12 ? `${y + 1}-01-01` : `${y}-${String(m + 1).padStart(2, '0')}-01`
   })()
 
+  // Bucket revenue by the date the payment was actually recorded (created_at),
+  // not valid_from — a plan paid in August for a September period must count
+  // as August revenue, or prepayments silently leak into next month's total.
   const monthPlans = allPlans.filter(p => {
     if (!p.is_paid) return false
-    const d = (p.valid_from || p.created_at || '').slice(0, 10)
+    const d = (p.created_at || p.valid_from || '').slice(0, 10)
     return d >= monthStart && d < nextMonth
   })
   const monthExpenses = expenses.filter(e => {

@@ -1188,6 +1188,19 @@ export function AppProvider({ children }) {
       : c))
   }
 
+  // Admin/coach writing a nutrition plan FOR a client (Kari's plan builder) —
+  // same shape as saveNutritionPlan but explicitly id-targeted, since there's
+  // no logged-in auth.id to fall back on for the person being edited.
+  async function adminSaveNutritionPlan(clientId, mode, profile = null) {
+    if (!clientId) return
+    const patch = { nutrition_mode: mode }
+    if (profile) patch.nutrition_profile = profile
+    await DB.update('clients', clientId, patch)
+    setClients(prev => prev.map(c => c.id === clientId
+      ? { ...c, nutritionMode: mode, ...(profile ? { nutritionProfile: profile } : {}) }
+      : c))
+  }
+
   async function addMealToClient(clientId, meal) {
     if (isTrackerReadOnly) return
     const tmpId = 'tmp_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7)
@@ -1964,7 +1977,7 @@ export function AppProvider({ children }) {
     handleRegisterClient,
     logout,
     updateClient, updateClientTargets, updateWaterTarget,
-    startChallenge, dismissChallenge, savePhone, saveNutritionPlan,
+    startChallenge, dismissChallenge, savePhone, saveNutritionPlan, adminSaveNutritionPlan,
     loadRanking,
     addMealToClient, deleteMealFromClient,
     saveWorkoutToClient,

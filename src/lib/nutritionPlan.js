@@ -97,6 +97,13 @@ export const MEAL_SLOTS = [
   { key: 'dinner',    labelBg: 'Вечеря',  share: 0.35, categories: ['main', 'side'] },
 ]
 
+// Two meals — breakfast skipped (the usual reason someone wants 2/day),
+// so the day's calories split across lunch and dinner only.
+const MEAL_SLOTS_2 = [
+  { key: 'lunch',  labelBg: 'Обяд',   share: 0.45, categories: ['main'] },
+  { key: 'dinner', labelBg: 'Вечеря', share: 0.55, categories: ['main', 'side'] },
+]
+
 // Above this, three plates can't hold the day without portions no one will
 // actually eat — add an afternoon snack and re-share.
 const FOUR_MEAL_KCAL = 2600
@@ -107,7 +114,13 @@ const MEAL_SLOTS_4 = [
   { key: 'dinner',    labelBg: 'Вечеря',   share: 0.30, categories: ['main', 'side'] },
 ]
 
-function slotsFor(kcal) {
+// forceCount: Kari can pin 3 or 4 meals explicitly instead of letting kcal
+// decide — a client's eating rhythm (shift work, kids' school schedule) is
+// hers to know, not something the calorie math should override.
+function slotsFor(kcal, forceCount) {
+  if (forceCount === 2) return MEAL_SLOTS_2
+  if (forceCount === 3) return MEAL_SLOTS
+  if (forceCount === 4) return MEAL_SLOTS_4
   return kcal >= FOUR_MEAL_KCAL ? MEAL_SLOTS_4 : MEAL_SLOTS
 }
 
@@ -234,13 +247,29 @@ function scoreOption(opt, targets) {
        + stretch * 0.5
 }
 
+// A recipe is excluded if any of its ingredient names (or its own name)
+// contains one of the exclude terms — case/diacritic-insensitive substring
+// match, which is enough for "риба", "гъби", "кашкавал" etc.
+function normalize(s) {
+  return String(s || '').toLowerCase()
+}
+function recipeMatchesExclude(recipe, excludeTerms) {
+  if (!excludeTerms || !excludeTerms.length) return false
+  const haystack = normalize(
+    recipe.name + ' ' + (recipe.ingredients || []).map(i => i.name).join(' ')
+  )
+  return excludeTerms.some(term => term && haystack.includes(normalize(term)))
+}
+
 // seedKey: anything stable per client+day. shuffle: bump to reroll.
-export function buildDayMenu(targets, seedKey = '', shuffle = 0) {
+// excludeTerms: food/ingredient words to keep out of every slot (admin
+// "храни, които не яде" field, or a parsed refine instruction).
+export function buildDayMenu(targets, seedKey = '', shuffle = 0, excludeTerms = [], forceMealCount = null) {
   if (!targets) return []
   const rand = mulberry32(hashString(`${seedKey}|${shuffle}`))
   const used = new Set()
 
-  return slotsFor(targets.kcal).map(slot => {
+  return slotsFor(targets.kcal, forceMealCount).map(slot => {
     const slotTargets = {
       kcal:    Math.round(targets.kcal    * slot.share),
       protein: Math.round(targets.protein * slot.share),
@@ -251,7 +280,8 @@ export function buildDayMenu(targets, seedKey = '', shuffle = 0) {
     const proteinTarget = slotTargets.protein
 
     const candidates = RECIPES
-      .filter(r => slot.categories.includes(r.category) && !used.has(r.id))
+      .filter(r => slot.categories.includes(r.category) && !used.has(r.id)
+        && !recipeMatchesExclude(r, excludeTerms))
       .map(r => scaleRecipe(r, kcalTarget, slot.key))
       .filter(Boolean)
       .map(opt => ({ ...opt, score: scoreOption(opt, slotTargets) }))
@@ -277,4 +307,52 @@ export function formatFactor(factor) {
   const glyph = frac === 0.25 ? '¼' : frac === 0.5 ? '½' : frac === 0.75 ? '¾' : ''
   if (!glyph) return String(whole)
   return whole === 0 ? glyph : `${whole}${glyph}`
+}
+
+// ── Admin "Хранителен план" builder (Кари) ─────────────────────────
+// Overriding the calorie target never touches protein — it's tied to body
+// weight, not to how aggressive the cut is. Fat keeps its 30%-of-kcal /
+// 0.6g-per-kg floor rule, carbs take whatever is left, exactly like
+// calcNutritionTargets itself.
+export function applyKcalOverride(targets, newKcal, weightKg) {
+  if (!targets || !newKcal || newKcal <= 0) return targets
+  const kcal    = Math.round(newKcal)
+  const protein = targets.protein
+  const w       = Number(weightKg) || 0
+  const fat     = Math.max(Math.round(w * 0.6), Math.round((kcal * 0.30) / 9))
+  const carbs   = Math.max(0, Math.round((kcal - protein * 4 - fat * 9) / 4))
+  return { ...targets, kcal, fat, carbs }
+}
+
+// Deterministic, no-AI parser for Kari's refine box. Only acts on patterns
+// it recognises with confidence; anything else is left alone and surfaced
+// back to her as "not understood" rather than guessed at.
+//   "намали калориите на 1600" / "калориен таргет 1600" / "1600 ккал"
+//     → { kcalTarget: 1600 }
+//   "без риба", "изключи гъби", "не яде кашкавал"
+//     → { excludeAdd: ['риба'] }
+export function parseInstruction(text) {
+  const result = { kcalTarget: null, excludeAdd: [], understood: [] }
+  if (!text) return result
+  const lower = text.toLowerCase()
+
+  const kcalMatches = [...lower.matchAll(/(\d{3,4})\s*(ккал|kcal|калории)?/g)]
+    .map(m => Number(m[1]))
+    .filter(n => n >= 800 && n <= 5000)
+  if (kcalMatches.length && /калор|ккал|kcal|таргет/.test(lower)) {
+    result.kcalTarget = kcalMatches[kcalMatches.length - 1]
+    result.understood.push(`нов калориен таргет: ${result.kcalTarget} ккал`)
+  }
+
+  const excludeRe = /(?:без|изключи|премахни|не яде|не обича|не иска)\s+([а-яa-z\s]{2,20}?)(?:[,.;]|$)/g
+  let m
+  while ((m = excludeRe.exec(lower))) {
+    const term = m[1].trim().split(/\s+/)[0]
+    if (term && term.length > 2) {
+      result.excludeAdd.push(term)
+      result.understood.push(`изключена храна: ${term}`)
+    }
+  }
+
+  return result
 }
