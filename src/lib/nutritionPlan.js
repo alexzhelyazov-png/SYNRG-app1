@@ -93,14 +93,14 @@ export function isProfileComplete(p) {
 // Three meals by default. Percentages are of the daily kcal target.
 export const MEAL_SLOTS = [
   { key: 'breakfast', labelBg: 'Закуска', share: 0.27, categories: ['breakfast'] },
-  { key: 'lunch',     labelBg: 'Обяд',    share: 0.38, categories: ['main'] },
+  { key: 'lunch',     labelBg: 'Обяд',    share: 0.38, categories: ['main', 'side'] },
   { key: 'dinner',    labelBg: 'Вечеря',  share: 0.35, categories: ['main', 'side'] },
 ]
 
 // Two meals — breakfast skipped (the usual reason someone wants 2/day),
 // so the day's calories split across lunch and dinner only.
 const MEAL_SLOTS_2 = [
-  { key: 'lunch',  labelBg: 'Обяд',   share: 0.45, categories: ['main'] },
+  { key: 'lunch',  labelBg: 'Обяд',   share: 0.45, categories: ['main', 'side'] },
   { key: 'dinner', labelBg: 'Вечеря', share: 0.55, categories: ['main', 'side'] },
 ]
 
@@ -109,10 +109,17 @@ const MEAL_SLOTS_2 = [
 const FOUR_MEAL_KCAL = 2600
 const MEAL_SLOTS_4 = [
   { key: 'breakfast', labelBg: 'Закуска',  share: 0.25, categories: ['breakfast'] },
-  { key: 'lunch',     labelBg: 'Обяд',     share: 0.33, categories: ['main'] },
+  { key: 'lunch',     labelBg: 'Обяд',     share: 0.33, categories: ['main', 'side'] },
   { key: 'snack',     labelBg: 'Следобед', share: 0.12, categories: ['snack', 'breakfast'] },
   { key: 'dinner',    labelBg: 'Вечеря',   share: 0.30, categories: ['main', 'side'] },
 ]
+
+// Lunch/dinner-type slots are the only ones a soup option makes sense in —
+// never breakfast or the afternoon snack.
+const SOUP_ELIGIBLE_SLOTS = new Set(['lunch', 'dinner'])
+function isSoup(recipe) {
+  return recipe.category === 'side' && recipe.name.includes('упа')
+}
 
 // forceCount: Kari can pin 3 or 4 meals explicitly instead of letting kcal
 // decide — a client's eating rhythm (shift work, kids' school schedule) is
@@ -185,7 +192,10 @@ function scaleRecipe(recipe, kcalTarget, slotKey) {
 
   if (recipeMode(recipe) === 'per100') {
     // Batch recipe: pick how much of the pot to serve instead of scaling it.
-    const [minG, maxG] = SERVING_RANGE[slotKey] || SERVING_RANGE.lunch
+    // Soups run low-calorie-density (meat broth, not oil) — a hearty bowl as
+    // a full meal is legitimately a bigger portion than a rice/potato side,
+    // so it gets its own wider range instead of SERVING_RANGE's 250-450g.
+    const [minG, maxG] = isSoup(recipe) ? [300, 900] : (SERVING_RANGE[slotKey] || SERVING_RANGE.lunch)
     const wanted = (kcalTarget / recipe.kcal) * 100
     if (wanted < minG * 0.8 || wanted > maxG * 1.25) return null
     // Round to 25 g — nobody weighs a stew to the gram.
@@ -269,7 +279,8 @@ export function buildDayMenu(targets, seedKey = '', shuffle = 0, excludeTerms = 
   const rand = mulberry32(hashString(`${seedKey}|${shuffle}`))
   const used = new Set()
 
-  return slotsFor(targets.kcal, forceMealCount).map(slot => {
+  const slots = slotsFor(targets.kcal, forceMealCount)
+  const results = slots.map(slot => {
     const slotTargets = {
       kcal:    Math.round(targets.kcal    * slot.share),
       protein: Math.round(targets.protein * slot.share),
@@ -296,8 +307,36 @@ export function buildDayMenu(targets, seedKey = '', shuffle = 0, excludeTerms = 
     const options = pool.slice(0, OPTIONS_PER_MEAL)
     options.forEach(o => used.add(o.recipe.id))
 
-    return { ...slot, kcalTarget, proteinTarget, options }
+    return { ...slot, kcalTarget, proteinTarget, slotTargets, options }
   })
+
+  // Guarantee a soup choice somewhere across lunch/dinner — not forced into
+  // every slot, just makes sure the day has one available if it scores
+  // reasonably close to that slot's own calories (same scoring the other
+  // options went through, so it's never a calorie outlier next to them).
+  const hasSoupAlready = results.some(r =>
+    SOUP_ELIGIBLE_SLOTS.has(r.key) && r.options.some(o => isSoup(o.recipe)))
+  if (!hasSoupAlready) {
+    let bestFit = null
+    for (const r of results) {
+      if (!SOUP_ELIGIBLE_SLOTS.has(r.key) || !r.options.length) continue
+      const soupOpt = RECIPES
+        .filter(rec => isSoup(rec) && !recipeMatchesExclude(rec, excludeTerms))
+        .map(rec => scaleRecipe(rec, r.kcalTarget, r.key))
+        .filter(Boolean)
+        .map(opt => ({ ...opt, score: scoreOption(opt, r.slotTargets) }))
+        .sort((a, b) => a.score - b.score)[0]
+      if (soupOpt && (!bestFit || soupOpt.score < bestFit.soupOpt.score)) {
+        bestFit = { slotResult: r, soupOpt }
+      }
+    }
+    if (bestFit) {
+      const { slotResult, soupOpt } = bestFit
+      slotResult.options = [...slotResult.options.slice(0, OPTIONS_PER_MEAL - 1), soupOpt]
+    }
+  }
+
+  return results.map(({ slotTargets, ...r }) => r)
 }
 
 // "1", "1½", "0¾" — portion multipliers read as fractions, not decimals.
