@@ -1826,12 +1826,14 @@ function AnalyticsTab({ t }) {
     return m === 12 ? `${y + 1}-01-01` : `${y}-${String(m + 1).padStart(2, '0')}-01`
   })()
 
-  // Bucket revenue by the date the payment was actually recorded (created_at),
-  // not valid_from — a plan paid in August for a September period must count
-  // as August revenue, or prepayments silently leak into next month's total.
+  // Bucket revenue by the date the payment was actually recorded. paid_at is
+  // set at the moment a plan is marked paid, which is the true payment date;
+  // created_at is only a fallback for plans marked paid at creation (no
+  // separate paid_at), e.g. a plan created Sep 28 but not paid until Oct 3
+  // must count as October revenue, not September.
   const monthPlans = allPlans.filter(p => {
     if (!p.is_paid) return false
-    const d = (p.created_at || p.valid_from || '').slice(0, 10)
+    const d = (p.paid_at || p.created_at || p.valid_from || '').slice(0, 10)
     return d >= monthStart && d < nextMonth
   })
   const monthExpenses = expenses.filter(e => {

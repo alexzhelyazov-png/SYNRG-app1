@@ -125,44 +125,109 @@ export function NutritionPlanBuilderDialog({ open, onClose, client }) {
   }
 
   function handlePrint() {
+    if (!generated) return
     const w = window.open('', '_blank')
     if (!w) return
-    const rows = chosen.map(m => `
+    const t = generated.targets
+
+    // Fresh veg/herb garnish ("на вкус", no grams) collapses into one
+    // generic unlimited line instead of listing it like a measured product —
+    // it shouldn't compete visually with the things that are actually
+    // portioned. Seasoning stays as its own line (still useful to know it's
+    // there), it's just not relabeled.
+    const VEG_WORDS = /зеленчук|домат|краставиц|марул|чушк|лук|морков|целина|магданоз|копър|зеле|спанак|тиквич|патладжан|праз/i
+    function isFreeVeg(ing) {
+      return ing.grams == null && ing.unit === 'на вкус' && VEG_WORDS.test(ing.name)
+    }
+    function renderIngredients(ingredients) {
+      const list = ingredients || []
+      const veg = list.some(isFreeVeg)
+      const rest = list.filter(ing => !isFreeVeg(ing))
+      const lines = rest.map(ing => `<div class="ing"><span>${ing.name}</span><span>${ing.grams != null ? `${ing.grams} ${ing.unit || 'г'}` : (ing.unit || '')}</span></div>`)
+      if (veg) lines.push('<div class="ing veg"><span>Зеленчуци</span><span>неограничени</span></div>')
+      return lines.join('')
+    }
+
+    // Batch recipes (whole-pot stews, yахнии) are where raw per-pot
+    // quantities next to a per-serving kcal number read as nonsense — "600г
+    // пилешко = 518 ккал" looks like a mistake even though it's just 1/4 of
+    // the pot. Not explaining the whole recipe either — just the portion
+    // weight plus the one line that actually hides calories (how much fat
+    // went in the whole tray/pot, whether the mince should be fresh-ground).
+    const FAT_RE   = /олио|мазнина|зехтин/i
+    const MINCE_RE = /кайма/i
+    function batchNote(recipe) {
+      const fat = (recipe.ingredients || []).find(ing => FAT_RE.test(ing.name))
+      const hasMince = (recipe.ingredients || []).some(ing => MINCE_RE.test(ing.name))
+      const bits = []
+      if (hasMince) bits.push('каймата да е смляна от вас')
+      if (fat) bits.push(`за цялата тава/тенджера: ${fat.unit || ''} мазнина`)
+      return bits.length ? `(При приготвяне — ${bits.join(', ')}.)` : ''
+    }
+
+    // Every option already lands near the slot's own kcal target (that's
+    // what the scoring picked them for), so print all 2-3 as a numbered
+    // choice instead of the one Kari happened to have selected — the
+    // client picks a different one each day without needing a new plan.
+    const rows = generated.menu.map(meal => `
       <div class="meal">
-        <div class="mealHead"><span>${m.labelBg}</span><span class="kcal">${m.opt.kcal} ккал</span></div>
-        <div class="ingredients">
-          ${(m.opt.ingredients || []).map(ing => `<div class="ing"><span>${ing.name}</span><span>${ing.grams != null ? `${ing.grams} ${ing.unit || 'г'}` : (ing.unit || '')}</span></div>`).join('')}
-        </div>
+        <div class="mealHead"><span>${meal.labelBg}</span><span class="kcal">~${meal.kcalTarget} ккал</span></div>
+        ${meal.options.map((opt, i) => {
+          if (opt.isCombo) return `
+            <div class="option">
+              <div class="optHead"><span class="num">${i + 1}</span><span class="name">${opt.soupServing.label} ${opt.soupServing.grams}г + ${opt.proteinServing.grams}г ${opt.proteinServing.label}</span><span class="kcal">${opt.kcal} ккал</span></div>
+              ${opt.fatNote ? `<div class="tip">${opt.fatNote}</div>` : ''}
+            </div>`
+          return `
+            <div class="option">
+              <div class="optHead"><span class="num">${i + 1}</span><span class="name">${opt.recipe.name}</span><span class="kcal">${opt.kcal} ккал</span></div>
+              ${opt.isBatch ? `
+                <div class="portion">Порция: ~${opt.grams}г</div>
+                ${batchNote(opt.recipe) ? `<div class="tip">${batchNote(opt.recipe)}</div>` : ''}
+              ` : `<div class="ingredients">${renderIngredients(opt.ingredients)}</div>`}
+            </div>`
+        }).join('')}
       </div>`).join('')
+
     w.document.write(`<!DOCTYPE html><html lang="bg"><head><meta charset="UTF-8">
       <title>Хранителен план · ${client?.name || ''}</title>
       <style>
         @page { size: A4; margin: 18mm 16mm; }
         * { box-sizing: border-box; }
-        body { font-family: 'Helvetica Neue', Arial, sans-serif; color: #141814; margin: 0; }
-        .header { display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 2px solid #141814; padding-bottom: 10px; margin-bottom: 18px; }
-        .brand { font-weight: 800; font-size: 20px; letter-spacing: -0.5px; }
-        .sub { font-size: 11px; color: #666; }
-        h1 { font-size: 16px; margin: 0 0 2px; }
-        .meta { font-size: 11px; color: #555; margin-bottom: 18px; }
-        .targets { display: flex; gap: 14px; margin-bottom: 20px; }
-        .tcard { flex: 1; border: 1px solid #ddd; border-radius: 8px; padding: 8px 10px; text-align: center; }
-        .tcard b { display: block; font-size: 15px; }
-        .tcard span { font-size: 10px; color: #777; text-transform: uppercase; }
-        .meal { margin-bottom: 14px; page-break-inside: avoid; }
-        .mealHead { display: flex; justify-content: space-between; font-weight: 700; font-size: 13px; border-bottom: 1px solid #ccc; padding-bottom: 4px; margin-bottom: 6px; }
-        .mealHead .kcal { color: #666; font-weight: 400; }
-        .ing { display: flex; justify-content: space-between; font-size: 12px; padding: 2px 0; color: #333; }
-        .buffer { margin-top: 10px; font-size: 11px; color: #777; border-top: 1px dashed #ccc; padding-top: 8px; }
-        .footer { margin-top: 24px; font-size: 10px; color: #999; }
+        body { font-family: 'Helvetica Neue', Arial, sans-serif; color: #1c231d; margin: 0; background: #fff; }
+        .header { display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 3px solid #c4e9bf; padding-bottom: 10px; margin-bottom: 18px; }
+        .brand { font-weight: 800; font-size: 20px; letter-spacing: -0.5px; color: #1c231d; }
+        .sub { font-size: 11px; color: #8a9a8f; }
+        h1 { font-size: 16px; margin: 0 0 2px; color: #1c231d; }
+        .meta { font-size: 11px; color: #6b7566; margin-bottom: 18px; }
+        .targets { display: flex; gap: 10px; margin-bottom: 22px; }
+        .tcard { flex: 1; background: #f4f7f3; border-radius: 10px; padding: 10px 12px; text-align: center; }
+        .tcard b { display: block; font-size: 16px; color: #1c231d; }
+        .tcard span { font-size: 10px; color: #6b7566; text-transform: uppercase; letter-spacing: 0.3px; }
+        .meal { margin-bottom: 16px; page-break-inside: avoid; background: #fbfbfa; border-radius: 12px; border: 1px solid #ebebe8; overflow: hidden; }
+        .mealHead { display: flex; justify-content: space-between; align-items: center; font-weight: 700; font-size: 13px; background: #c4e9bf; color: #0f2e18; padding: 8px 14px; }
+        .mealHead .kcal { font-weight: 600; opacity: 0.75; }
+        .option { padding: 10px 14px; border-top: 1px solid #ebebe8; }
+        .optHead { display: flex; align-items: baseline; gap: 8px; font-size: 12.5px; margin-bottom: 4px; }
+        .optHead .num { width: 16px; height: 16px; border-radius: 50%; background: #1c231d; color: #fff; font-size: 10px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
+        .optHead .name { font-weight: 700; color: #1c231d; flex: 1; }
+        .optHead .kcal { color: #6b7566; font-weight: 400; }
+        .ing { display: flex; justify-content: space-between; font-size: 11.5px; padding: 2px 0 2px 24px; color: #3a423c; font-weight: 600; }
+        .ing span:last-child { color: #6b7566; font-weight: 400; }
+        .ing.veg { color: #4a7a52; font-style: italic; }
+        .ing.veg span:last-child { color: #4a7a52; font-style: italic; }
+        .portion { font-size: 11.5px; font-weight: 700; color: #1c231d; padding-left: 24px; margin-bottom: 3px; }
+        .tip { font-size: 11px; color: #4a7a52; padding-left: 24px; margin-bottom: 3px; }
+        .buffer { margin-top: 10px; font-size: 11px; color: #4a7a52; background: #eef7ec; border-radius: 8px; padding: 9px 12px; }
+        .footer { margin-top: 24px; font-size: 10px; color: #aab0a6; }
       </style></head><body>
       <div class="header"><div class="brand">SYNRG</div><div class="sub">Хранителен план · изготвен от д-р Желязова</div></div>
       <h1>${client?.name || ''}</h1>
-      <div class="meta">Дневна цел: ${generated?.targets.kcal || ''} ккал</div>
+      <div class="meta">Дневна цел: ${t.kcal} ккал · избери по едно хранене от всеки списък</div>
       <div class="targets">
-        <div class="tcard"><b>${totals.protein}г</b><span>протеин</span></div>
-        <div class="tcard"><b>${totals.fat}г</b><span>мазнини</span></div>
-        <div class="tcard"><b>${totals.carbs}г</b><span>въглехидрати</span></div>
+        <div class="tcard"><b>${t.protein}г</b><span>протеин</span></div>
+        <div class="tcard"><b>${t.fat}г</b><span>мазнини</span></div>
+        <div class="tcard"><b>${t.carbs}г</b><span>въглехидрати</span></div>
       </div>
       ${rows}
       <div class="buffer">Останалите ~${buffer} ккал от деня са твои — прецени сам/а с какво да ги допълниш.</div>
@@ -289,9 +354,21 @@ export function NutritionPlanBuilderDialog({ open, onClose, client }) {
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                           <Box sx={{ width: 12, height: 12, borderRadius: '50%', flexShrink: 0,
                             background: sel ? C.primary : 'transparent', border: `1px solid ${sel ? C.primary : C.muted}` }} />
-                          <Typography sx={{ fontSize: '12px', color: sel ? C.text : C.muted }}>
-                            {opt.recipe.name}{opt.mode === 'portion' && opt.factor !== 1 ? ` (${formatFactor(opt.factor)}x)` : ''}
-                          </Typography>
+                          <Box>
+                            <Typography sx={{ fontSize: '12px', color: sel ? C.text : C.muted }}>
+                              {opt.isCombo
+                                ? `${opt.soupServing.label} ${opt.soupServing.grams}г + ${opt.proteinServing.grams}г ${opt.proteinServing.label}`
+                                : `${opt.recipe.name}${opt.mode === 'portion' && opt.factor !== 1 ? ` (${formatFactor(opt.factor)}x)` : ''}`}
+                            </Typography>
+                            {opt.isCombo && opt.fatNote && (
+                              <Typography sx={{ fontSize: '10px', color: C.muted }}>{opt.fatNote}</Typography>
+                            )}
+                            {opt.isBatch && (
+                              <Typography sx={{ fontSize: '10px', color: '#FB923C' }}>
+                                Рецепта за цяла тенджера — сервира се {opt.grams}г от нея, не суровите количества по-долу
+                              </Typography>
+                            )}
+                          </Box>
                         </Box>
                         <Typography sx={{ fontSize: '11px', color: C.muted, whiteSpace: 'nowrap' }}>{opt.kcal} ккал</Typography>
                       </Box>
