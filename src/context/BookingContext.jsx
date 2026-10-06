@@ -287,6 +287,8 @@ export function BookingProvider({ children }) {
         activated_by:  auth.name,
         price:         Number(price) || 0,
         is_paid:       !!isPaid,
+        paid_at:       isPaid ? new Date().toISOString() : null,
+        paid_by:       isPaid ? auth.name : null,
       })
       // Auto-enable ALL studio modules when activating a plan. Studio access,
       // booking ("запази час"), tracking, etc. must ALWAYS be granted by default

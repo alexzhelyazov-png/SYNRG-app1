@@ -9,7 +9,7 @@ const PLAN_LABELS = { '8': 'FLEX', '12': 'PROGRESS', 'unlimited': 'PLUS' }
 const PLAN_COLORS = { '8': C.logan, '12': C.primary, 'unlimited': '#c4e9bf' }
 
 export default function SubscriptionsTab({ t, lang }) {
-  const { realClients, showSnackbar, updateClientModules } = useApp()
+  const { realClients, showSnackbar, updateClientModules, auth } = useApp()
   const [allPlans, setAllPlans] = useState([])
   const [loading, setLoading] = useState(true)
   const [programPurchases, setProgramPurchases] = useState([])
@@ -177,7 +177,14 @@ export default function SubscriptionsTab({ t, lang }) {
   }
 
   async function handleTogglePaid(planId, currentValue) {
-    await DB.update('client_plans', planId, { is_paid: !currentValue })
+    // paid_at is what Finance buckets revenue by (see AnalyticsTab) — it must
+    // be set here too, not just in the dedicated "mark paid" flow, or a plan
+    // toggled paid days after it was created silently falls back to
+    // created_at and counts as revenue in the wrong month.
+    const patch = !currentValue
+      ? { is_paid: true, paid_at: new Date().toISOString(), paid_by: auth.name }
+      : { is_paid: false, paid_at: null, paid_by: null }
+    await DB.update('client_plans', planId, patch)
     reload()
   }
 
