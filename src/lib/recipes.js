@@ -664,7 +664,7 @@ const RECIPES = [
     prepTime: 15,
     ingredients: [
       { name: 'Тортила (60г)',                  grams: 60,  unit: 'г (1 бр.)' },
-      { name: 'Пилешко филе (сварено)',         grams: 120, unit: 'г' },
+      { name: 'Пилешко филе (на грил)',         grams: 120, unit: 'г' },
       { name: 'Крема сирене',                   grams: 50,  unit: 'г' },
       { name: 'Печени чушки',                   grams: 6,   unit: 'г' },
       { name: 'Царевица',                       grams: 13,  unit: 'г' },

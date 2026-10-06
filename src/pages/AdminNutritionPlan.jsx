@@ -23,6 +23,24 @@ import {
   STEP_BANDS, GOALS, SEXES, formatFactor,
 } from '../lib/nutritionPlan'
 
+// Batch recipes (whole-pot stews, yахнии) are where raw per-pot quantities
+// next to a per-serving kcal number read as nonsense — "600г пилешко = 518
+// ккал" looks like a mistake even though it's just 1/4 of the pot. Not
+// explaining the whole recipe either — just the portion weight plus the one
+// line that actually hides calories (how much fat went in the whole
+// tray/pot, whether the mince should be fresh-ground). Shared between the
+// admin preview and the printed PDF so the two never say different things.
+const FAT_RE   = /олио|мазнина|зехтин/i
+const MINCE_RE = /кайма/i
+function batchNote(recipe) {
+  const fat = (recipe.ingredients || []).find(ing => FAT_RE.test(ing.name))
+  const hasMince = (recipe.ingredients || []).some(ing => MINCE_RE.test(ing.name))
+  const bits = []
+  if (hasMince) bits.push('каймата да е смляна от вас')
+  if (fat) bits.push(`за цялата тава/тенджера: ${fat.unit || ''} мазнина`)
+  return bits.length ? `При приготвяне — ${bits.join(', ')}.` : ''
+}
+
 const inputSx = {
   '& .MuiInputBase-input':              { color: C.text, fontSize: '13px' },
   '& .MuiOutlinedInput-notchedOutline': { borderColor: C.border },
@@ -146,23 +164,6 @@ export function NutritionPlanBuilderDialog({ open, onClose, client }) {
       const lines = rest.map(ing => `<div class="ing"><span>${ing.name}</span><span>${ing.grams != null ? `${ing.grams} ${ing.unit || 'г'}` : (ing.unit || '')}</span></div>`)
       if (veg) lines.push('<div class="ing veg"><span>Зеленчуци</span><span>неограничени</span></div>')
       return lines.join('')
-    }
-
-    // Batch recipes (whole-pot stews, yахнии) are where raw per-pot
-    // quantities next to a per-serving kcal number read as nonsense — "600г
-    // пилешко = 518 ккал" looks like a mistake even though it's just 1/4 of
-    // the pot. Not explaining the whole recipe either — just the portion
-    // weight plus the one line that actually hides calories (how much fat
-    // went in the whole tray/pot, whether the mince should be fresh-ground).
-    const FAT_RE   = /олио|мазнина|зехтин/i
-    const MINCE_RE = /кайма/i
-    function batchNote(recipe) {
-      const fat = (recipe.ingredients || []).find(ing => FAT_RE.test(ing.name))
-      const hasMince = (recipe.ingredients || []).some(ing => MINCE_RE.test(ing.name))
-      const bits = []
-      if (hasMince) bits.push('каймата да е смляна от вас')
-      if (fat) bits.push(`за цялата тава/тенджера: ${fat.unit || ''} мазнина`)
-      return bits.length ? `(При приготвяне — ${bits.join(', ')}.)` : ''
     }
 
     // Every option already lands near the slot's own kcal target (that's
@@ -365,7 +366,7 @@ export function NutritionPlanBuilderDialog({ open, onClose, client }) {
                             )}
                             {opt.isBatch && (
                               <Typography sx={{ fontSize: '10px', color: '#FB923C' }}>
-                                Рецепта за цяла тенджера — сервира се {opt.grams}г от нея, не суровите количества по-долу
+                                Порция: ~{opt.grams}г от цялата тава/тенджера. {batchNote(opt.recipe)}
                               </Typography>
                             )}
                           </Box>
