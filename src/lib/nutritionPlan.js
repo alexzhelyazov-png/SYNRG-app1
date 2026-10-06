@@ -132,6 +132,11 @@ function slotsFor(kcal, forceCount) {
 }
 
 const OPTIONS_PER_MEAL = 3
+// Flat kcal held back from every generated day, on top of the daily target —
+// room for a treat/alcohol/whatever, without the plan having to name it.
+// Same for every meal-count mode (2/3/4) — it's subtracted once, before the
+// day is split into slots.
+const DAILY_BUFFER_KCAL = 250
 // How far a recipe may be scaled and still be a believable plate.
 const MIN_FACTOR = 0.65
 const MAX_FACTOR = 1.9
@@ -279,13 +284,25 @@ export function buildDayMenu(targets, seedKey = '', shuffle = 0, excludeTerms = 
   const rand = mulberry32(hashString(`${seedKey}|${shuffle}`))
   const used = new Set()
 
-  const slots = slotsFor(targets.kcal, forceMealCount)
+  // Meals are planned to the daily target minus a flat buffer, never the
+  // whole thing — so there's always real headroom left for a treat instead
+  // of relying on leftover rounding slack to happen to be there.
+  const mealKcal = Math.max(0, targets.kcal - DAILY_BUFFER_KCAL)
+  const frac = targets.kcal > 0 ? mealKcal / targets.kcal : 1
+  const mealTargets = {
+    kcal:    mealKcal,
+    protein: Math.round(targets.protein * frac),
+    carbs:   Math.round(targets.carbs   * frac),
+    fat:     Math.round(targets.fat     * frac),
+  }
+
+  const slots = slotsFor(mealTargets.kcal, forceMealCount)
   const results = slots.map(slot => {
     const slotTargets = {
-      kcal:    Math.round(targets.kcal    * slot.share),
-      protein: Math.round(targets.protein * slot.share),
-      carbs:   Math.round(targets.carbs   * slot.share),
-      fat:     Math.round(targets.fat     * slot.share),
+      kcal:    Math.round(mealTargets.kcal    * slot.share),
+      protein: Math.round(mealTargets.protein * slot.share),
+      carbs:   Math.round(mealTargets.carbs   * slot.share),
+      fat:     Math.round(mealTargets.fat     * slot.share),
     }
     const kcalTarget    = slotTargets.kcal
     const proteinTarget = slotTargets.protein
