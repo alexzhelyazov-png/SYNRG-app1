@@ -121,6 +121,52 @@ function isSoup(recipe) {
   return recipe.category === 'side' && recipe.name.includes('упа')
 }
 
+// Lunch/dinner's 3 standard options are a fixed, curated set of "clean"
+// combos — soup+protein, fish+salad, bread+eggs+cheese — never a single
+// written recipe whose own balance might skew heavily one way (a potato
+// pancake alone can't carry a meal's protein target; a bowl of soup alone
+// is too thin to carry its kcal). Stews (манджи) are listed separately
+// below the 3 — see the `stews` field buildDayMenu attaches to each slot.
+// Recipes tagged isLunchCore are the fixed non-soup members of that set;
+// soup+protein is built fresh per soup recipe (see buildSoupCombo).
+const LEAN_PROTEIN_PER100 = { kcal: 165, protein: 31, carbs: 0, fat: 3.6 }
+
+// Soup sized to ~40% of the slot (a full bowl scaled to the whole target
+// isn't a realistic serving), the rest as plain lean protein — generic on
+// purpose, chicken/turkey/white fish all land close enough at this range
+// that it's the client's own preference, not a specific recipe match.
+function buildSoupCombo(soupRecipe, slotTargets, slotKey) {
+  const soupKcalTarget = Math.round(slotTargets.kcal * 0.4)
+  const soupOpt = scaleRecipe(soupRecipe, soupKcalTarget, slotKey)
+  if (!soupOpt) return null
+  const proteinKcalTarget = Math.max(100, slotTargets.kcal - soupOpt.kcal)
+  const proteinGrams = Math.round((proteinKcalTarget / LEAN_PROTEIN_PER100.kcal) * 100 / 25) * 25
+  const proteinPer = proteinGrams / 100
+  const proteinTotals = {
+    kcal:    Math.round(LEAN_PROTEIN_PER100.kcal    * proteinPer),
+    protein: Math.round(LEAN_PROTEIN_PER100.protein * proteinPer),
+    carbs:   Math.round(LEAN_PROTEIN_PER100.carbs   * proteinPer),
+    fat:     Math.round(LEAN_PROTEIN_PER100.fat     * proteinPer),
+  }
+  const totals = {
+    kcal:    soupOpt.kcal    + proteinTotals.kcal,
+    protein: soupOpt.protein + proteinTotals.protein,
+    carbs:   soupOpt.carbs   + proteinTotals.carbs,
+    fat:     soupOpt.fat     + proteinTotals.fat,
+  }
+  const hasFatIng = (soupOpt.recipe.ingredients || []).some(ing => /олио|мазнина|зехтин|масло/i.test(ing.name))
+  return {
+    recipe: { id: `soup-${soupOpt.recipe.id}`, name: 'Супа + протеин', category: 'combo' },
+    mode: 'combo', isCombo: true, isSoupCombo: true,
+    parts: [
+      { label: 'Супа', grams: soupOpt.grams },
+      { label: 'пилешко филе / телешко / бяла риба', grams: proteinGrams },
+    ],
+    fatNote: hasFatIng ? 'При приготвяне на супата за цялата тенджера — максимум 2 с.л. мазнина.' : null,
+    ...totals,
+  }
+}
+
 // forceCount: Kari can pin 3 or 4 meals explicitly instead of letting kcal
 // decide — a client's eating rhythm (shift work, kids' school schedule) is
 // hers to know, not something the calorie math should override.
@@ -307,15 +353,57 @@ export function buildDayMenu(targets, seedKey = '', shuffle = 0, excludeTerms = 
     const kcalTarget    = slotTargets.kcal
     const proteinTarget = slotTargets.protein
 
+    if (SOUP_ELIGIBLE_SLOTS.has(slot.key)) {
+      // Lunch/dinner: a fixed set of clean combos (isLunchCore recipes,
+      // e.g. "Риба и салата", "Принцеси с яйца и сирене") plus soup+protein
+      // (one combo per soup recipe) — see the comment above LEAN_PROTEIN_PER100.
+      // Stews are a separate list below, not among these; every stew that
+      // fits gets its own person-specific grams.
+      const coreOptions = RECIPES
+        .filter(r => r.isLunchCore && !recipeMatchesExclude(r, excludeTerms))
+        .map(r => scaleRecipe(r, kcalTarget, slot.key))
+        .filter(Boolean)
+
+      // Exactly one soup combo competes for a slot, not one per soup recipe
+      // -- otherwise several soups scoring well would crowd out the other
+      // combo types instead of sharing the 3 spots with them. A seeded pick
+      // among the top few fits still varies which soup shows up.
+      const soupPool = RECIPES
+        .filter(r => isSoup(r) && !recipeMatchesExclude(r, excludeTerms))
+        .map(r => buildSoupCombo(r, slotTargets, slot.key))
+        .filter(Boolean)
+        .map(c => ({ ...c, score: scoreOption(c, slotTargets) }))
+        .sort((a, b) => a.score - b.score)
+      const soupShortlist = soupPool.slice(0, 3)
+      const bestSoup = soupShortlist.length ? soupShortlist[Math.floor(rand() * soupShortlist.length)] : null
+
+      const options = [...(bestSoup ? [bestSoup] : []), ...coreOptions].slice(0, OPTIONS_PER_MEAL)
+
+      // Манджа = every other dish in Рецепти -> Основни (all 'main' recipes
+      // except the fixed combo types already shown above), each scaled to
+      // this person's own numbers for this slot — not sampled down, the
+      // full list, listed below the 3 options rather than among them.
+      const stews = RECIPES
+        .filter(r => r.category === 'main' && !r.isLunchCore && !recipeMatchesExclude(r, excludeTerms))
+        .map(r => scaleRecipe(r, kcalTarget, slot.key))
+        .filter(Boolean)
+        .map(o => ({ name: o.recipe.name, grams: o.grams, kcal: o.kcal }))
+
+      return { ...slot, kcalTarget, proteinTarget, slotTargets, options, stews }
+    }
+
+    // Breakfast gets a fixed curated set too (isBreakfastCore); the
+    // afternoon snack slot keeps picking from the wider snack/breakfast
+    // pool as before — it was never the complaint, only lunch mains were.
     const candidates = RECIPES
       .filter(r => slot.categories.includes(r.category) && !used.has(r.id)
+        && (slot.key !== 'breakfast' || r.isBreakfastCore)
         && !recipeMatchesExclude(r, excludeTerms))
       .map(r => scaleRecipe(r, kcalTarget, slot.key))
       .filter(Boolean)
       .map(opt => ({ ...opt, score: scoreOption(opt, slotTargets) }))
       .sort((a, b) => a.score - b.score)
 
-    // Take the best-fitting pool, shuffle it with the seed, keep 3.
     const pool = candidates.slice(0, POOL_SIZE)
     for (let i = pool.length - 1; i > 0; i--) {
       const j = Math.floor(rand() * (i + 1))
@@ -327,66 +415,23 @@ export function buildDayMenu(targets, seedKey = '', shuffle = 0, excludeTerms = 
     return { ...slot, kcalTarget, proteinTarget, slotTargets, options }
   })
 
-  // Guarantee a soup choice somewhere across lunch/dinner — not forced into
-  // every slot, just makes sure the day has one available. A whole bowl of
-  // soup scaled up to the full slot target isn't a realistic serving, so
-  // it's paired with a plain lean protein side instead ("Супа 400г + 150г
-  // пилешко филе/телешко/бяла риба") — generic on purpose, since at this
-  // gram range any of the three is close enough in macros that the client's
-  // own preference should decide, not a specific recipe match.
-  const SOUP_SHARE = 0.4
-  const LEAN_PROTEIN_PER100 = { kcal: 165, protein: 31, carbs: 0, fat: 3.6 }
-  const isSoupOption = o => isSoup(o.recipe) || o.isCombo
-  const hasSoupAlready = results.some(r => SOUP_ELIGIBLE_SLOTS.has(r.key) && r.options.some(isSoupOption))
+  // Guarantee a soup choice somewhere across lunch/dinner -- not forced into
+  // every slot, just makes sure the day has one available. The seeded
+  // shuffle above already includes soup+protein in the scored pool, but
+  // isn't guaranteed to land it in the top 3; this is the fallback.
+  const hasSoupAlready = results.some(r => SOUP_ELIGIBLE_SLOTS.has(r.key) && r.options.some(o => o.isSoupCombo))
   if (!hasSoupAlready) {
     let bestFit = null
     for (const r of results) {
       if (!SOUP_ELIGIBLE_SLOTS.has(r.key) || !r.options.length) continue
-
-      const soupKcalTarget = Math.round(r.kcalTarget * SOUP_SHARE)
-      const soupOpt = RECIPES
+      const best = RECIPES
         .filter(rec => isSoup(rec) && !recipeMatchesExclude(rec, excludeTerms))
-        .map(rec => scaleRecipe(rec, soupKcalTarget, r.key))
+        .map(rec => buildSoupCombo(rec, r.slotTargets, r.key))
         .filter(Boolean)
-        .map(opt => ({ ...opt, score: scoreOption(opt, { ...r.slotTargets, kcal: soupKcalTarget }) }))
+        .map(c => ({ ...c, score: scoreOption(c, r.slotTargets) }))
         .sort((a, b) => a.score - b.score)[0]
-      if (!soupOpt) continue
-
-      // Remaining calories as plain lean protein, rounded to 25g — no recipe
-      // lookup needed, chicken/turkey/white fish all land close to this.
-      const proteinKcalTarget = Math.max(100, r.kcalTarget - soupOpt.kcal)
-      const proteinGrams = Math.round((proteinKcalTarget / LEAN_PROTEIN_PER100.kcal) * 100 / 25) * 25
-      const proteinPer = proteinGrams / 100
-      const proteinTotals = {
-        kcal:    Math.round(LEAN_PROTEIN_PER100.kcal    * proteinPer),
-        protein: Math.round(LEAN_PROTEIN_PER100.protein * proteinPer),
-        carbs:   Math.round(LEAN_PROTEIN_PER100.carbs   * proteinPer),
-        fat:     Math.round(LEAN_PROTEIN_PER100.fat     * proteinPer),
-      }
-
-      const comboTotals = {
-        kcal:    soupOpt.kcal    + proteinTotals.kcal,
-        protein: soupOpt.protein + proteinTotals.protein,
-        carbs:   soupOpt.carbs   + proteinTotals.carbs,
-        fat:     soupOpt.fat     + proteinTotals.fat,
-      }
-      const fatIng = (soupOpt.recipe.ingredients || []).find(ing => /олио|мазнина|зехтин/i.test(ing.name))
-      // comboTotals already owns `protein` (the macro, in grams) — the
-      // serving-info objects need their own names so the spread below
-      // doesn't silently clobber one with the other.
-      const combo = {
-        recipe: { id: `combo-${soupOpt.recipe.id}`, name: 'Супа + протеин', category: 'combo' },
-        mode: 'combo',
-        isCombo: true,
-        soupServing:    { grams: soupOpt.grams, label: 'Супа' },
-        proteinServing: { grams: proteinGrams, label: 'пилешко филе / телешко / бяла риба' },
-        fatNote: fatIng ? `При приготвяне на супата за цялата тенджера: ${fatIng.unit || ''} мазнина.` : null,
-        ...comboTotals,
-        score: scoreOption(comboTotals, r.slotTargets),
-      }
-      if (!bestFit || combo.score < bestFit.combo.score) {
-        bestFit = { slotResult: r, combo }
-      }
+      if (!best) continue
+      if (!bestFit || best.score < bestFit.combo.score) bestFit = { slotResult: r, combo: best }
     }
     if (bestFit) {
       const { slotResult, combo } = bestFit

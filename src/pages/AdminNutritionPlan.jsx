@@ -27,17 +27,18 @@ import {
 // next to a per-serving kcal number read as nonsense — "600г пилешко = 518
 // ккал" looks like a mistake even though it's just 1/4 of the pot. Not
 // explaining the whole recipe either — just the portion weight plus the one
-// line that actually hides calories (how much fat went in the whole
-// tray/pot, whether the mince should be fresh-ground). Shared between the
-// admin preview and the printed PDF so the two never say different things.
-const FAT_RE   = /олио|мазнина|зехтин/i
+// line that actually hides calories. The fat amount is always the same fixed
+// cap rather than each recipe's own figure — one rule to remember instead of
+// a different number per dish. Shared between the admin preview and the
+// printed PDF so the two never say different things.
+const FAT_RE   = /олио|мазнина|зехтин|масло/i
 const MINCE_RE = /кайма/i
 function batchNote(recipe) {
-  const fat = (recipe.ingredients || []).find(ing => FAT_RE.test(ing.name))
+  const hasFat = (recipe.ingredients || []).some(ing => FAT_RE.test(ing.name))
   const hasMince = (recipe.ingredients || []).some(ing => MINCE_RE.test(ing.name))
   const bits = []
   if (hasMince) bits.push('каймата да е смляна от вас')
-  if (fat) bits.push(`за цялата тава/тенджера: ${fat.unit || ''} мазнина`)
+  if (hasFat) bits.push('за цялата тава/тенджера — максимум 2 с.л. мазнина')
   return bits.length ? `При приготвяне — ${bits.join(', ')}.` : ''
 }
 
@@ -69,6 +70,21 @@ export function NutritionPlanBuilderDialog({ open, onClose, client }) {
   const [instruction, setInstruction] = useState('')
   const [instrFeedback, setInstrFeedback] = useState('')
   const [saving, setSaving] = useState(false)
+  // Tasks outside the menu itself (weigh-ins, habit checks...) — each has a
+  // free-text task and an "Очакван резултат" Kari fills in per client, not
+  // something the calorie engine can infer.
+  const [tasks, setTasks] = useState(() => [
+    { task: 'Измерване на тегло и записване в приложението всеки ден, за да се наблюдава средно аритметично и водна задръжка.', result: '' },
+  ])
+  function addTask() {
+    setTasks(t => [...t, { task: '', result: '' }])
+  }
+  function updateTask(i, field, value) {
+    setTasks(t => t.map((row, idx) => idx === i ? { ...row, [field]: value } : row))
+  }
+  function removeTask(i) {
+    setTasks(t => t.filter((_, idx) => idx !== i))
+  }
 
   const canGenerate = profile.age && profile.height && profile.weight
 
@@ -136,6 +152,7 @@ export function NutritionPlanBuilderDialog({ open, onClose, client }) {
       kariGenerated: true,
       kariMenu: chosen.map(m => ({ key: m.key, labelBg: m.labelBg, opt: m.opt })),
       kariTargets: generated.targets,
+      kariTasks: tasks.filter(t => t.task.trim()),
     }
     await adminSaveNutritionPlan(client.id, 'menu', planProfile)
     setSaving(false)
@@ -176,7 +193,7 @@ export function NutritionPlanBuilderDialog({ open, onClose, client }) {
         ${meal.options.map((opt, i) => {
           if (opt.isCombo) return `
             <div class="option">
-              <div class="optHead"><span class="num">${i + 1}</span><span class="name">${opt.soupServing.label} ${opt.soupServing.grams}г + ${opt.proteinServing.grams}г ${opt.proteinServing.label}</span><span class="kcal">${opt.kcal} ккал</span></div>
+              <div class="optHead"><span class="num">${i + 1}</span><span class="name">${opt.parts.map(p => `${p.grams}г ${p.label}`).join(' + ')}${opt.freeVeg ? ' + зеленчуци (неограничени)' : ''}</span><span class="kcal">${opt.kcal} ккал</span></div>
               ${opt.fatNote ? `<div class="tip">${opt.fatNote}</div>` : ''}
             </div>`
           return `
@@ -188,6 +205,25 @@ export function NutritionPlanBuilderDialog({ open, onClose, client }) {
               ` : `<div class="ingredients">${renderIngredients(opt.ingredients)}</div>`}
             </div>`
         }).join('')}
+      </div>`).join('')
+
+    // Манджа comes after the whole day (Закуска, Обяд, Вечеря), not under
+    // each meal — one section per meal that has stews, grouped together.
+    const stewSections = generated.menu
+      .filter(meal => meal.stews && meal.stews.length)
+      .map(meal => `
+        <div class="meal stews">
+          <div class="mealHead light"><span>Манджа — за ${meal.labelBg.toLowerCase()}</span></div>
+          <div class="option stews">
+            ${meal.stews.map(s => `<div class="ing"><span>${s.name}</span><span>${s.grams}г, сготвено</span></div>`).join('')}
+            <div class="tip">При приготвяне — за цялата тава/тенджера максимум 2 с.л. мазнина.</div>
+          </div>
+        </div>`).join('')
+
+    const taskRows = tasks.filter(x => x.task.trim()).map(x => `
+      <div class="task">
+        <div class="taskText">${x.task}</div>
+        <div class="taskResult"><b>Очакван резултат:</b> ${x.result.trim() || '—'}</div>
       </div>`).join('')
 
     w.document.write(`<!DOCTYPE html><html lang="bg"><head><meta charset="UTF-8">
@@ -208,7 +244,11 @@ export function NutritionPlanBuilderDialog({ open, onClose, client }) {
         .meal { margin-bottom: 16px; page-break-inside: avoid; background: #fbfbfa; border-radius: 12px; border: 1px solid #ebebe8; overflow: hidden; }
         .mealHead { display: flex; justify-content: space-between; align-items: center; font-weight: 700; font-size: 13px; background: #c4e9bf; color: #0f2e18; padding: 8px 14px; }
         .mealHead .kcal { font-weight: 600; opacity: 0.75; }
+        .mealHead.light { background: #f0f0ee; color: #4a4f46; }
+        .sectionLabel { font-size: 11px; font-weight: 800; color: #6b7566; text-transform: uppercase; letter-spacing: 0.5px; margin: 20px 0 10px; }
         .option { padding: 10px 14px; border-top: 1px solid #ebebe8; }
+        .option.stews { background: #f7f7f5; }
+        .option.stews .name { font-weight: 700; color: #6b7566; font-size: 11.5px; }
         .optHead { display: flex; align-items: baseline; gap: 8px; font-size: 12.5px; margin-bottom: 4px; }
         .optHead .num { width: 16px; height: 16px; border-radius: 50%; background: #1c231d; color: #fff; font-size: 10px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
         .optHead .name { font-weight: 700; color: #1c231d; flex: 1; }
@@ -220,6 +260,11 @@ export function NutritionPlanBuilderDialog({ open, onClose, client }) {
         .portion { font-size: 11.5px; font-weight: 700; color: #1c231d; padding-left: 24px; margin-bottom: 3px; }
         .tip { font-size: 11px; color: #4a7a52; padding-left: 24px; margin-bottom: 3px; }
         .buffer { margin-top: 10px; font-size: 11px; color: #4a7a52; background: #eef7ec; border-radius: 8px; padding: 9px 12px; }
+        .task { background: #fbfbfa; border: 1px solid #ebebe8; border-radius: 10px; padding: 10px 14px; margin-bottom: 8px; }
+        .taskText { font-size: 12px; color: #1c231d; font-weight: 600; margin-bottom: 4px; }
+        .taskResult { font-size: 11px; color: #6b7566; }
+        .taskResult b { color: #4a4f46; }
+        .note { margin-top: 8px; font-size: 10.5px; color: #8a9a8f; font-style: italic; }
         .footer { margin-top: 24px; font-size: 10px; color: #aab0a6; }
       </style></head><body>
       <div class="header"><div class="brand">SYNRG</div><div class="sub">Хранителен план · изготвен от д-р Желязова</div></div>
@@ -231,7 +276,10 @@ export function NutritionPlanBuilderDialog({ open, onClose, client }) {
         <div class="tcard"><b>${t.carbs}г</b><span>въглехидрати</span></div>
       </div>
       ${rows}
+      ${stewSections ? `<div class="sectionLabel">Манджа — ако предпочиташ готвено ястие</div>${stewSections}` : ''}
+      ${taskRows ? `<div class="sectionLabel">Задачи</div>${taskRows}` : ''}
       <div class="buffer">Останалите ~${buffer} ккал от деня са твои — прецени сам/а с какво да ги допълниш.</div>
+      <div class="note">Всяко хранене може да се замени с друго по твой избор, стига да е на същата калорийна стойност.</div>
       <div class="footer">SYNRG Beyond Fitness · Варна</div>
       <script>window.onload = () => window.print()</script>
       </body></html>`)
@@ -358,7 +406,7 @@ export function NutritionPlanBuilderDialog({ open, onClose, client }) {
                           <Box>
                             <Typography sx={{ fontSize: '12px', color: sel ? C.text : C.muted }}>
                               {opt.isCombo
-                                ? `${opt.soupServing.label} ${opt.soupServing.grams}г + ${opt.proteinServing.grams}г ${opt.proteinServing.label}`
+                                ? `${opt.parts.map(p => `${p.grams}г ${p.label}`).join(' + ')}${opt.freeVeg ? ' + зеленчуци' : ''}`
                                 : `${opt.recipe.name}${opt.mode === 'portion' && opt.factor !== 1 ? ` (${formatFactor(opt.factor)}x)` : ''}`}
                             </Typography>
                             {opt.isCombo && opt.fatNote && (
@@ -378,11 +426,37 @@ export function NutritionPlanBuilderDialog({ open, onClose, client }) {
                 </Box>
               ))}
 
+              {generated.menu.some(m => m.stews && m.stews.length > 0) && (
+                <Box sx={{ mb: 1.5 }}>
+                  <Typography sx={{ fontSize: '10px', fontWeight: 800, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.5px', mb: 0.75 }}>
+                    Манджа — ако предпочиташ готвено ястие
+                  </Typography>
+                  {generated.menu.filter(m => m.stews && m.stews.length > 0).map(meal => (
+                    <Box key={meal.key} sx={{ mt: 0.75, p: '8px 10px', borderRadius: '8px', background: 'rgba(255,255,255,0.02)', border: `1px dashed ${C.border}` }}>
+                      <Typography sx={{ fontSize: '10px', color: C.muted, fontWeight: 700, mb: 0.5 }}>
+                        За {meal.labelBg.toLowerCase()}
+                      </Typography>
+                      {meal.stews.map(s => (
+                        <Typography key={s.name} sx={{ fontSize: '11px', color: C.muted, display: 'flex', justifyContent: 'space-between' }}>
+                          <span>{s.name}</span><span>{s.grams}г, сготвено</span>
+                        </Typography>
+                      ))}
+                      <Typography sx={{ fontSize: '10px', color: '#FB923C', mt: 0.5 }}>
+                        При приготвяне — за цялата тава/тенджера максимум 2 с.л. мазнина.
+                      </Typography>
+                    </Box>
+                  ))}
+                </Box>
+              )}
+
               <Box sx={{ mt: 1, p: '8px 10px', background: 'rgba(255,184,122,0.08)', border: '1px solid rgba(255,184,122,0.25)', borderRadius: '8px' }}>
                 <Typography sx={{ fontSize: '11px', color: '#FFB87A' }}>
                   ~{buffer} ккал свободен буфер остават в деня при избраните варианти
                 </Typography>
               </Box>
+              <Typography sx={{ fontSize: '10.5px', color: C.muted, fontStyle: 'italic', mt: 0.75 }}>
+                Всяко хранене може да се замени с друго по избор, стига да е на същата калорийна стойност.
+              </Typography>
             </Box>
 
             <Box sx={{ p: 1.5, borderRadius: '14px', background: 'rgba(255,255,255,0.03)', border: `1px solid ${C.border}` }}>
@@ -403,6 +477,32 @@ export function NutritionPlanBuilderDialog({ open, onClose, client }) {
               {instrFeedback && (
                 <Typography sx={{ fontSize: '11px', color: C.muted, mt: 0.75 }}>{instrFeedback}</Typography>
               )}
+            </Box>
+
+            <Box sx={{ p: 1.5, borderRadius: '14px', background: 'rgba(255,255,255,0.03)', border: `1px solid ${C.border}` }}>
+              <Typography sx={{ fontSize: '10px', fontWeight: 800, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.7px', mb: 1 }}>
+                Задачи
+              </Typography>
+              {tasks.map((row, i) => (
+                <Box key={i} sx={{ display: 'flex', gap: 0.75, mb: 1, alignItems: 'flex-start' }}>
+                  <Box sx={{ flex: 1 }}>
+                    <TextField size="small" fullWidth multiline minRows={2} placeholder="Задача"
+                      value={row.task} onChange={e => updateTask(i, 'task', e.target.value)}
+                      sx={{ ...inputSx, mb: 0.5 }} />
+                    <TextField size="small" fullWidth placeholder="Очакван резултат"
+                      value={row.result} onChange={e => updateTask(i, 'result', e.target.value)}
+                      sx={inputSx} />
+                  </Box>
+                  <IconButton size="small" onClick={() => removeTask(i)} sx={{ color: C.muted, mt: 0.5 }}>
+                    <CloseIcon fontSize="small" />
+                  </IconButton>
+                </Box>
+              ))}
+              <Button onClick={addTask}
+                sx={{ color: C.purple, border: '1px solid rgba(200,197,255,0.3)', borderRadius: '8px',
+                  px: 2, py: 0.5, fontWeight: 700, fontSize: '12px', textTransform: 'none' }}>
+                + Добави задача
+              </Button>
             </Box>
           </>
         )}
