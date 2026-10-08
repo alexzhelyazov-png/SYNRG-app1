@@ -3486,20 +3486,20 @@ export default function Admin() {
 
   // ── Section definitions ───────────────────────────────────
   const SECTIONS = [
-    { key: 'dashboard', label: 'Табло' },
-    { key: 'clients',   label: 'Клиенти' },
-    ...(fullAdmin ? [{ key: 'finance', label: 'Финанси' }] : []),
-    { key: 'content',   label: 'Съдържание' },
+    { key: 'dashboard', label: t('adminDashboard')      || 'Табло' },
+    { key: 'clients',   label: t('adminClientsSection') || 'Клиенти' },
+    ...(fullAdmin ? [{ key: 'finance', label: t('adminFinanceSection') || 'Финанси' }] : []),
+    { key: 'content',   label: t('adminContentSection') || 'Съдържание' },
   ]
 
   const SUB_TABS = {
     clients: [
       { key: 'clients',       label: t('clientsMgmt')     || 'Клиенти' },
-      { key: 'attention',     label: 'Нужда от внимание' },
-      { key: 'online',        label: 'Онлайн' },
-      { key: 'online_access', label: 'Онлайн достъп' },
+      { key: 'attention',     label: t('attentionTab')    || 'Нужда от внимание' },
+      { key: 'online',        label: t('onlineTab')       || 'Онлайн' },
+      { key: 'online_access', label: t('onlineAccessTab') || 'Онлайн достъп' },
       { key: 'challenge',     label: 'Challenge' },
-      { key: 'messages',      label: 'Съобщения' },
+      { key: 'messages',      label: t('messagesTab')     || 'Съобщения' },
       { key: 'coaches',       label: t('coachesTab')      || 'Треньори' },
       { key: 'subscriptions', label: t('subscriptionsTab')|| 'Абонаменти' },
     ],

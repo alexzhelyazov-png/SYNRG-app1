@@ -299,8 +299,15 @@ export function BookingProvider({ children }) {
       if (!targetClient) targetClient = await DB.getClient(clientId)
       const currentModules = targetClient?.modules || []
       const merged = [...new Set([...currentModules, ...ADMIN_MANAGEABLE_MODULES])]
-      if (merged.length !== currentModules.length || !merged.every(m => currentModules.includes(m))) {
-        await DB.update('clients', clientId, { modules: merged })
+      const modulesChanged = merged.length !== currentModules.length || !merged.every(m => currentModules.includes(m))
+      // A client archived while lapsed (hygiene sweep) must come back into view
+      // the moment they're a paying client again — otherwise they silently
+      // disappear from admin client lists and ranking despite an active plan.
+      if (modulesChanged || targetClient?.is_archived) {
+        await DB.update('clients', clientId, {
+          ...(modulesChanged ? { modules: merged } : {}),
+          ...(targetClient?.is_archived ? { is_archived: false } : {}),
+        })
       }
       // Send plan activation email
       if (targetClient?.email) {
