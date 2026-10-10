@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { DndContext, closestCenter, PointerSensor, TouchSensor, useSensor, useSensors } from '@dnd-kit/core'
 import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
@@ -7,6 +7,7 @@ import { Box, Typography, TextField, Button, Chip, Paper, Switch, Collapse, Tabs
 import MyInvoicesSection from '../components/MyInvoicesSection'
 import { DB } from '../lib/db'
 import ArrowBackIcon from '@mui/icons-material/ArrowBack'
+import ArrowForwardIcon from '@mui/icons-material/ArrowForward'
 import DragIndicatorIcon from '@mui/icons-material/DragIndicator'
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline'
 import EditIcon from '@mui/icons-material/Edit'
@@ -624,6 +625,14 @@ export function ClientDetail() {
 
   const [tab, setTab] = useState(0)
   const [subView, setSubView] = useState(null) // 'weight' | null
+  // Scrolled into view after loading a suggestion card, so the coach lands
+  // straight on the editable list instead of having to scroll for it.
+  const exerciseListRef = useRef(null)
+  // Which page of 4 past workouts "Предложи от последните тренировки" shows —
+  // reset whenever the category changes so switching tabs doesn't leave the
+  // coach paged into a category's older history by accident.
+  const [suggestionPage, setSuggestionPage] = useState(0)
+  useEffect(() => { setSuggestionPage(0) }, [workoutCategory])
   // Manual single-exercise entry is the LESS common path now that "Предложи
   // от последните тренировки" + inline editing cover most sessions — collapsed
   // behind a toggle instead of always taking up screen space.
@@ -881,16 +890,38 @@ export function ClientDetail() {
                 предна/задна, но днес е цяло тяло) — гледаме историята на
                 РЕАЛНО избраната сега категория, не предполагаем сплит. */}
             {(() => {
-              const sameCategoryWorkouts = (client.workouts || []).filter(w => w.category === workoutCategory).slice(0, 4)
-              if (!sameCategoryWorkouts.length) return null
+              const allCategoryWorkouts = (client.workouts || []).filter(w => w.category === workoutCategory)
+              if (!allCategoryWorkouts.length) return null
+              const pageStart = suggestionPage * 4
+              const pageWorkouts = allCategoryWorkouts.slice(pageStart, pageStart + 4)
+              const hasOlder = pageStart + 4 < allCategoryWorkouts.length
+              const hasNewer = suggestionPage > 0
               return (
                 <Box sx={{ mb: 2 }}>
-                  <Typography sx={{ fontSize: '11px', color: C.muted, mb: 0.6, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.8px' }}>
-                    Предложи от последните тренировки
-                  </Typography>
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 0.6 }}>
+                    <Typography sx={{ fontSize: '11px', color: C.muted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.8px' }}>
+                      Предложи от последните тренировки
+                    </Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                      <IconButton size="small" disabled={!hasNewer} onClick={() => setSuggestionPage(p => p - 1)}
+                        sx={{ color: C.muted, p: 0.25, '&.Mui-disabled': { color: 'rgba(255,255,255,0.08)' } }}>
+                        <ArrowBackIcon sx={{ fontSize: 16 }} />
+                      </IconButton>
+                      <IconButton size="small" disabled={!hasOlder} onClick={() => setSuggestionPage(p => p + 1)}
+                        data-testid="suggestions-older-btn"
+                        sx={{ color: C.muted, p: 0.25, '&.Mui-disabled': { color: 'rgba(255,255,255,0.08)' } }}>
+                        <ArrowForwardIcon sx={{ fontSize: 16 }} />
+                      </IconButton>
+                    </Box>
+                  </Box>
                   <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
-                    {sameCategoryWorkouts.map(w => (
-                      <Box key={w.id} onClick={() => setCurrentWorkout((w.items || []).map(it => ({ ...it })))} sx={{
+                    {pageWorkouts.map(w => (
+                      <Box key={w.id} onClick={() => {
+                        setCurrentWorkout((w.items || []).map(it => ({ ...it })))
+                        // The list only renders once currentWorkout is non-empty, so wait
+                        // a tick for that render before scrolling to it.
+                        setTimeout(() => exerciseListRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50)
+                      }} sx={{
                         p: 1.25, borderRadius: '10px', cursor: 'pointer',
                         background: 'rgba(255,255,255,0.04)', border: `1px solid ${C.border}`,
                         '&:hover': { background: 'rgba(255,255,255,0.07)' },
@@ -1052,7 +1083,7 @@ export function ClientDetail() {
 
             {/* Current exercises list — drag the handle to reorder */}
             {currentWorkout.length > 0 && (
-              <Box sx={{ background: 'rgba(0,0,0,0.3)', border: `1px solid ${C.border}`, borderRadius: '14px', p: 1.75, mb: 2 }}>
+              <Box ref={exerciseListRef} sx={{ background: 'rgba(0,0,0,0.3)', border: `1px solid ${C.border}`, borderRadius: '14px', p: 1.75, mb: 2, scrollMarginTop: '12px' }}>
                 <Typography sx={{ fontSize: '11px', color: C.muted, mb: 1.25, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.7px' }}>
                   {t(workoutCategory)} · {currentWorkout.length} {t('exercisesLbl')}
                 </Typography>
@@ -1118,9 +1149,11 @@ export function ClientDetail() {
                       {isCoach && (
                         <>
                           <IconButton size="small" onClick={() => setEditingWorkout(editingWorkout?.id === w.id ? null : { id: w.id, date: w.date, category: w.category || '', items: w.items.map(ex => ({ ...ex })) })}
-                            sx={{ color: editingWorkout?.id === w.id ? C.primary : C.muted }}><EditIcon sx={{ fontSize: 14 }} /></IconButton>
+                            sx={{ color: editingWorkout?.id === w.id ? C.primary : C.muted, ml: 1 }}><EditIcon sx={{ fontSize: 14 }} /></IconButton>
+                          {/* Pushed to the far side of the row (not right next to Edit) —
+                              a fat-finger tap here permanently deletes a logged workout. */}
                           <IconButton size="small" onClick={() => deleteWorkout(w.id)}
-                            sx={{ color: C.muted, '&:hover': { color: '#F87171' } }}><DeleteOutlineIcon sx={{ fontSize: 14 }} /></IconButton>
+                            sx={{ color: C.muted, ml: 2.5, '&:hover': { color: '#F87171' } }}><DeleteOutlineIcon sx={{ fontSize: 14 }} /></IconButton>
                         </>
                       )}
                     </Box>
