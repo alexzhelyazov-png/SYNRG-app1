@@ -567,7 +567,12 @@ function MiniBarChart({ data, width = 200, height = 48, color = C.purple, showVa
 // ─── One draggable row in the current-workout editor ────────────
 // Only the handle (DragIndicatorIcon) has drag listeners attached — the row
 // itself stays a normal flex container so its TextFields remain tappable.
-function SortableExerciseRow({ id, index, ex, isMobile, isLast, onUpdateField, onDelete }) {
+// Two lines per row (name on its own line, scheme/weight below) so the name
+// field — the one coaches actually need to read — isn't squeezed to a few
+// characters on a phone. The drag handle sits at the far LEFT and delete at
+// the far RIGHT, as far apart as the row allows, so a reorder attempt can't
+// land on delete by mistake.
+function SortableExerciseRow({ id, index, ex, isLast, onUpdateField, onDelete }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id })
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -576,30 +581,29 @@ function SortableExerciseRow({ id, index, ex, isMobile, isLast, onUpdateField, o
   }
   return (
     <Box ref={setNodeRef} style={style} sx={{
-      display: 'grid',
-      gridTemplateColumns: isMobile ? '16px 1fr 70px 60px auto' : '20px 1fr 90px 70px auto',
-      gap: 0.75, py: 0.75,
+      py: 0.75,
       borderBottom: !isLast ? `1px solid ${C.border}` : 'none',
-      alignItems: 'center',
       background: isDragging ? 'rgba(255,255,255,0.04)' : 'transparent',
     }}>
-      <Typography sx={{ fontSize: '12px', color: C.muted, fontWeight: 700 }}>{index + 1}.</Typography>
-      <TextField size="small" value={ex.exercise} onChange={e => onUpdateField('exercise', e.target.value)}
-        variant="standard" sx={{ '& input': { fontSize: '14px', fontWeight: 600 } }} />
-      <TextField size="small" value={ex.scheme} onChange={e => onUpdateField('scheme', e.target.value)}
-        variant="standard" sx={{ '& input': { fontSize: '13px', color: C.muted } }} />
-      <TextField size="small" value={ex.weight} onChange={e => onUpdateField('weight', e.target.value)}
-        variant="standard" sx={{ '& input': { fontSize: '13px', color: C.muted } }} />
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.25 }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
         <IconButton size="small" {...attributes} {...listeners}
-          sx={{ color: C.muted, p: 0.25, cursor: 'grab', touchAction: 'none' }}>
+          sx={{ color: C.muted, p: 0.25, flexShrink: 0, cursor: 'grab', touchAction: 'none' }}>
           <DragIndicatorIcon sx={{ fontSize: 18 }} />
         </IconButton>
+        <Typography sx={{ fontSize: '12px', color: C.muted, fontWeight: 700, flexShrink: 0 }}>{index + 1}.</Typography>
+        <TextField size="small" value={ex.exercise} onChange={e => onUpdateField('exercise', e.target.value)}
+          variant="standard" fullWidth sx={{ '& input': { fontSize: '14px', fontWeight: 600 } }} />
         <Button
           size="small"
           onClick={onDelete}
-          sx={{ minWidth: 'auto', background: C.dangerSoft, color: C.danger, border: '1px solid rgba(255,107,157,0.2)', borderRadius: '10px', px: 1.25, py: '4px', fontSize: '13px' }}
+          sx={{ minWidth: 'auto', flexShrink: 0, background: C.dangerSoft, color: C.danger, border: '1px solid rgba(255,107,157,0.2)', borderRadius: '10px', px: 1.25, py: '4px', fontSize: '13px' }}
         >×</Button>
+      </Box>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5, pl: '44px' }}>
+        <TextField size="small" value={ex.scheme} onChange={e => onUpdateField('scheme', e.target.value)}
+          variant="standard" placeholder="4x8" sx={{ width: '80px', '& input': { fontSize: '13px', color: C.muted } }} />
+        <TextField size="small" value={ex.weight} onChange={e => onUpdateField('weight', e.target.value)}
+          variant="standard" placeholder="кг" sx={{ width: '70px', '& input': { fontSize: '13px', color: C.muted } }} />
       </Box>
     </Box>
   )
@@ -1063,7 +1067,7 @@ export function ClientDetail() {
                   <SortableContext items={currentWorkout.map((_, i) => i)} strategy={verticalListSortingStrategy}>
                     {currentWorkout.map((ex, i) => (
                       <SortableExerciseRow
-                        key={i} id={i} index={i} ex={ex} isMobile={isMobile} isLast={i === currentWorkout.length - 1}
+                        key={i} id={i} index={i} ex={ex} isLast={i === currentWorkout.length - 1}
                         onUpdateField={(field, value) => setCurrentWorkout(prev => prev.map((item, j) => j === i ? { ...item, [field]: value } : item))}
                         onDelete={() => setCurrentWorkout(prev => prev.filter((_, j) => j !== i))}
                       />
