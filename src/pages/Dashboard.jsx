@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react'
+import { DndContext, closestCenter, PointerSensor, TouchSensor, useSensor, useSensors } from '@dnd-kit/core'
+import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import ClientWorkout from './ClientWorkout'
 import { Box, Typography, TextField, Button, Chip, Paper, Switch, Collapse, Tabs, Tab, IconButton, Tooltip, Dialog, DialogTitle, DialogContent, DialogActions } from '@mui/material'
 import MyInvoicesSection from '../components/MyInvoicesSection'
 import { DB } from '../lib/db'
 import ArrowBackIcon from '@mui/icons-material/ArrowBack'
-import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward'
-import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward'
+import DragIndicatorIcon from '@mui/icons-material/DragIndicator'
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline'
 import EditIcon from '@mui/icons-material/Edit'
 import CheckIcon from '@mui/icons-material/Check'
@@ -562,6 +564,47 @@ function MiniBarChart({ data, width = 200, height = 48, color = C.purple, showVa
   )
 }
 
+// ─── One draggable row in the current-workout editor ────────────
+// Only the handle (DragIndicatorIcon) has drag listeners attached — the row
+// itself stays a normal flex container so its TextFields remain tappable.
+function SortableExerciseRow({ id, index, ex, isMobile, isLast, onUpdateField, onDelete }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id })
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  }
+  return (
+    <Box ref={setNodeRef} style={style} sx={{
+      display: 'grid',
+      gridTemplateColumns: isMobile ? '16px 1fr 70px 60px auto' : '20px 1fr 90px 70px auto',
+      gap: 0.75, py: 0.75,
+      borderBottom: !isLast ? `1px solid ${C.border}` : 'none',
+      alignItems: 'center',
+      background: isDragging ? 'rgba(255,255,255,0.04)' : 'transparent',
+    }}>
+      <Typography sx={{ fontSize: '12px', color: C.muted, fontWeight: 700 }}>{index + 1}.</Typography>
+      <TextField size="small" value={ex.exercise} onChange={e => onUpdateField('exercise', e.target.value)}
+        variant="standard" sx={{ '& input': { fontSize: '14px', fontWeight: 600 } }} />
+      <TextField size="small" value={ex.scheme} onChange={e => onUpdateField('scheme', e.target.value)}
+        variant="standard" sx={{ '& input': { fontSize: '13px', color: C.muted } }} />
+      <TextField size="small" value={ex.weight} onChange={e => onUpdateField('weight', e.target.value)}
+        variant="standard" sx={{ '& input': { fontSize: '13px', color: C.muted } }} />
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.25 }}>
+        <IconButton size="small" {...attributes} {...listeners}
+          sx={{ color: C.muted, p: 0.25, cursor: 'grab', touchAction: 'none' }}>
+          <DragIndicatorIcon sx={{ fontSize: 18 }} />
+        </IconButton>
+        <Button
+          size="small"
+          onClick={onDelete}
+          sx={{ minWidth: 'auto', background: C.dangerSoft, color: C.danger, border: '1px solid rgba(255,107,157,0.2)', borderRadius: '10px', px: 1.25, py: '4px', fontSize: '13px' }}
+        >×</Button>
+      </Box>
+    </Box>
+  )
+}
+
 export function ClientDetail() {
   const {
     client, auth, t, lang, weeklyRate, setView, showSnackbar,
@@ -581,6 +624,13 @@ export function ClientDetail() {
   // от последните тренировки" + inline editing cover most sessions — collapsed
   // behind a toggle instead of always taking up screen space.
   const [showManualEntry, setShowManualEntry] = useState(false)
+  // Drag only starts from the row's handle (not the whole row, which also
+  // holds editable text fields) — an 8px move/150ms hold threshold stops a
+  // tap-to-edit on mobile from being misread as a drag.
+  const exerciseDndSensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 150, tolerance: 8 } }),
+  )
   const [editingTargets, setEditingTargets] = useState(null) // { cal, prot }
   const [mealDayDlg, setMealDayDlg] = useState(null) // date string DD.MM.YYYY or null
   const [editCredits, setEditCredits] = useState(null)   // credits_used value or null
@@ -996,54 +1046,30 @@ export function ClientDetail() {
             </>
             )}
 
-            {/* Current exercises list */}
+            {/* Current exercises list — drag the handle to reorder */}
             {currentWorkout.length > 0 && (
               <Box sx={{ background: 'rgba(0,0,0,0.3)', border: `1px solid ${C.border}`, borderRadius: '14px', p: 1.75, mb: 2 }}>
                 <Typography sx={{ fontSize: '11px', color: C.muted, mb: 1.25, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.7px' }}>
                   {t(workoutCategory)} · {currentWorkout.length} {t('exercisesLbl')}
                 </Typography>
-                {currentWorkout.map((ex, i) => {
-                  const updateField = (field, value) => setCurrentWorkout(prev => prev.map((item, j) => j === i ? { ...item, [field]: value } : item))
-                  const moveBy = (delta) => setCurrentWorkout(prev => {
-                    const target = i + delta
-                    if (target < 0 || target >= prev.length) return prev
-                    const next = [...prev]
-                    ;[next[i], next[target]] = [next[target], next[i]]
-                    return next
-                  })
-                  return (
-                    <Box key={i} sx={{
-                      display: 'grid',
-                      gridTemplateColumns: isMobile ? '16px 1fr 70px 60px auto' : '20px 1fr 90px 70px auto',
-                      gap: 0.75, py: 0.75,
-                      borderBottom: i < currentWorkout.length - 1 ? `1px solid ${C.border}` : 'none',
-                      alignItems: 'center',
-                    }}>
-                      <Typography sx={{ fontSize: '12px', color: C.muted, fontWeight: 700 }}>{i + 1}.</Typography>
-                      <TextField size="small" value={ex.exercise} onChange={e => updateField('exercise', e.target.value)}
-                        variant="standard" sx={{ '& input': { fontSize: '14px', fontWeight: 600 } }} />
-                      <TextField size="small" value={ex.scheme} onChange={e => updateField('scheme', e.target.value)}
-                        variant="standard" sx={{ '& input': { fontSize: '13px', color: C.muted } }} />
-                      <TextField size="small" value={ex.weight} onChange={e => updateField('weight', e.target.value)}
-                        variant="standard" sx={{ '& input': { fontSize: '13px', color: C.muted } }} />
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.25 }}>
-                        <IconButton size="small" disabled={i === 0} onClick={() => moveBy(-1)}
-                          sx={{ color: C.muted, p: 0.25, '&.Mui-disabled': { color: 'rgba(255,255,255,0.08)' } }}>
-                          <ArrowUpwardIcon sx={{ fontSize: 15 }} />
-                        </IconButton>
-                        <IconButton size="small" disabled={i === currentWorkout.length - 1} onClick={() => moveBy(1)}
-                          sx={{ color: C.muted, p: 0.25, '&.Mui-disabled': { color: 'rgba(255,255,255,0.08)' } }}>
-                          <ArrowDownwardIcon sx={{ fontSize: 15 }} />
-                        </IconButton>
-                        <Button
-                          size="small"
-                          onClick={() => setCurrentWorkout(prev => prev.filter((_, j) => j !== i))}
-                          sx={{ minWidth: 'auto', background: C.dangerSoft, color: C.danger, border: '1px solid rgba(255,107,157,0.2)', borderRadius: '10px', px: 1.25, py: '4px', fontSize: '13px' }}
-                        >×</Button>
-                      </Box>
-                    </Box>
-                  )
-                })}
+                <DndContext
+                  sensors={exerciseDndSensors}
+                  collisionDetection={closestCenter}
+                  onDragEnd={({ active, over }) => {
+                    if (!over || active.id === over.id) return
+                    setCurrentWorkout(prev => arrayMove(prev, active.id, over.id))
+                  }}
+                >
+                  <SortableContext items={currentWorkout.map((_, i) => i)} strategy={verticalListSortingStrategy}>
+                    {currentWorkout.map((ex, i) => (
+                      <SortableExerciseRow
+                        key={i} id={i} index={i} ex={ex} isMobile={isMobile} isLast={i === currentWorkout.length - 1}
+                        onUpdateField={(field, value) => setCurrentWorkout(prev => prev.map((item, j) => j === i ? { ...item, [field]: value } : item))}
+                        onDelete={() => setCurrentWorkout(prev => prev.filter((_, j) => j !== i))}
+                      />
+                    ))}
+                  </SortableContext>
+                </DndContext>
                 <Button
                   size="small"
                   data-testid="add-exercise-row"
