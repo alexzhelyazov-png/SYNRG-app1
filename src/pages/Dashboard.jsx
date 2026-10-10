@@ -4,6 +4,8 @@ import { Box, Typography, TextField, Button, Chip, Paper, Switch, Collapse, Tabs
 import MyInvoicesSection from '../components/MyInvoicesSection'
 import { DB } from '../lib/db'
 import ArrowBackIcon from '@mui/icons-material/ArrowBack'
+import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward'
+import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward'
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline'
 import EditIcon from '@mui/icons-material/Edit'
 import CheckIcon from '@mui/icons-material/Check'
@@ -1002,28 +1004,55 @@ export function ClientDetail() {
                 </Typography>
                 {currentWorkout.map((ex, i) => {
                   const updateField = (field, value) => setCurrentWorkout(prev => prev.map((item, j) => j === i ? { ...item, [field]: value } : item))
+                  const moveBy = (delta) => setCurrentWorkout(prev => {
+                    const target = i + delta
+                    if (target < 0 || target >= prev.length) return prev
+                    const next = [...prev]
+                    ;[next[i], next[target]] = [next[target], next[i]]
+                    return next
+                  })
                   return (
                     <Box key={i} sx={{
                       display: 'grid',
-                      gridTemplateColumns: isMobile ? '1fr 70px 60px auto' : '1fr 90px 70px auto',
+                      gridTemplateColumns: isMobile ? '16px 1fr 70px 60px auto' : '20px 1fr 90px 70px auto',
                       gap: 0.75, py: 0.75,
                       borderBottom: i < currentWorkout.length - 1 ? `1px solid ${C.border}` : 'none',
                       alignItems: 'center',
                     }}>
+                      <Typography sx={{ fontSize: '12px', color: C.muted, fontWeight: 700 }}>{i + 1}.</Typography>
                       <TextField size="small" value={ex.exercise} onChange={e => updateField('exercise', e.target.value)}
                         variant="standard" sx={{ '& input': { fontSize: '14px', fontWeight: 600 } }} />
                       <TextField size="small" value={ex.scheme} onChange={e => updateField('scheme', e.target.value)}
                         variant="standard" sx={{ '& input': { fontSize: '13px', color: C.muted } }} />
                       <TextField size="small" value={ex.weight} onChange={e => updateField('weight', e.target.value)}
                         variant="standard" sx={{ '& input': { fontSize: '13px', color: C.muted } }} />
-                      <Button
-                        size="small"
-                        onClick={() => setCurrentWorkout(prev => prev.filter((_, j) => j !== i))}
-                        sx={{ minWidth: 'auto', background: C.dangerSoft, color: C.danger, border: '1px solid rgba(255,107,157,0.2)', borderRadius: '10px', px: 1.25, py: '4px', fontSize: '13px' }}
-                      >×</Button>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.25 }}>
+                        <IconButton size="small" disabled={i === 0} onClick={() => moveBy(-1)}
+                          sx={{ color: C.muted, p: 0.25, '&.Mui-disabled': { color: 'rgba(255,255,255,0.08)' } }}>
+                          <ArrowUpwardIcon sx={{ fontSize: 15 }} />
+                        </IconButton>
+                        <IconButton size="small" disabled={i === currentWorkout.length - 1} onClick={() => moveBy(1)}
+                          sx={{ color: C.muted, p: 0.25, '&.Mui-disabled': { color: 'rgba(255,255,255,0.08)' } }}>
+                          <ArrowDownwardIcon sx={{ fontSize: 15 }} />
+                        </IconButton>
+                        <Button
+                          size="small"
+                          onClick={() => setCurrentWorkout(prev => prev.filter((_, j) => j !== i))}
+                          sx={{ minWidth: 'auto', background: C.dangerSoft, color: C.danger, border: '1px solid rgba(255,107,157,0.2)', borderRadius: '10px', px: 1.25, py: '4px', fontSize: '13px' }}
+                        >×</Button>
+                      </Box>
                     </Box>
                   )
                 })}
+                <Button
+                  size="small"
+                  data-testid="add-exercise-row"
+                  onClick={() => setCurrentWorkout(prev => [...prev, { exercise: '', scheme: '', weight: '' }])}
+                  sx={{
+                    mt: 1, color: C.muted, fontSize: '12.5px', fontWeight: 700, textTransform: 'none',
+                    '&:hover': { color: C.text, background: 'rgba(255,255,255,0.04)' },
+                  }}
+                >+ {t('addRowBtn') || 'Добави упражнение'}</Button>
               </Box>
             )}
 
