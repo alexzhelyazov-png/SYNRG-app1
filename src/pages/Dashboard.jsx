@@ -229,7 +229,7 @@ function DashboardCoach() {
     saveWorkoutDraft, restoreWorkoutDraft, setWorkoutDate,
     setActiveSlotClients, setActiveSessionDate,
   } = useApp()
-  const { slots, slotBookings, loadSlots, loadSlotBookings } = useBooking()
+  const { slots, slotBookings, loadSlots, loadSlotBookingsBatch } = useBooking()
 
   const [subTab, setSubTab] = useState('today') // 'today' | 'next'
   const [loaded, setLoaded] = useState(false)
@@ -237,10 +237,20 @@ function DashboardCoach() {
   useEffect(() => {
     let cancelled = false
     ;(async () => {
-      const fetched = await loadSlots(isoToday(), isoDatePlusDays(30))
-      const mine = (fetched || []).filter(s => s.coach_name === auth.name)
-      if (mine.length) await loadSlotBookings(mine.map(s => s.id))
-      if (!cancelled) setLoaded(true)
+      try {
+        const fetched = await loadSlots(isoToday(), isoDatePlusDays(30))
+        const mine = (fetched || []).filter(s => s.coach_name === auth.name)
+        // Batched (one request, chunked) instead of one-request-per-slot —
+        // the old per-slot loop stretched this to ~a minute on mobile
+        // networks for a coach with ~20-30 slots in the 30-day window.
+        // Also covered by this effect's own try/catch so a transient
+        // network error never leaves the screen stuck on "…" forever.
+        if (mine.length) await loadSlotBookingsBatch(mine.map(s => s.id))
+      } catch (e) {
+        console.error('[DashboardCoach] failed to load sessions:', e)
+      } finally {
+        if (!cancelled) setLoaded(true)
+      }
     })()
     return () => { cancelled = true }
   // eslint-disable-next-line react-hooks/exhaustive-deps

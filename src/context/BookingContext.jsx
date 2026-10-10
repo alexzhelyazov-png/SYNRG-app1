@@ -43,6 +43,17 @@ export function BookingProvider({ children }) {
     return result
   }, [])
 
+  // Same as loadSlotBookings but ONE batched request instead of N sequential
+  // ones — for views that need many slots' bookings at once (coach "Днес"/
+  // "Следваща смяна"), where the per-slot loop above stretched to ~a minute
+  // on mobile networks.
+  const loadSlotBookingsBatch = useCallback(async (slotIds) => {
+    if (!slotIds || !slotIds.length) return {}
+    const result = await DB.getSlotBookingsForSlots(slotIds)
+    setSlotBookings(prev => ({ ...prev, ...result }))
+    return result
+  }, [])
+
   // ── Load a client's own bookings ──────────────────────────
   const loadMyBookings = useCallback(async (clientId) => {
     if (!clientId) return []
@@ -431,7 +442,7 @@ export function BookingProvider({ children }) {
       // State
       slots, slotBookings, myBookings, myPlan, allPlans, bookingBusy,
       // Loaders
-      loadSlots, loadSlotBookings, loadMyBookings, loadMyPlan, loadAllPlans,
+      loadSlots, loadSlotBookings, loadSlotBookingsBatch, loadMyBookings, loadMyPlan, loadAllPlans,
       refreshClientView,
       // Client actions
       bookSlot, cancelBookingForSlot, cancelBookingForClient,

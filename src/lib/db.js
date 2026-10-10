@@ -345,6 +345,32 @@ export const DB = {
     return all.filter(b => b.slot_id === slotId && b.status === 'active')
   },
 
+  // Same data as looping getSlotBookings per id, but ONE request (chunked at
+  // ID_BATCH_SIZE) instead of N sequential round-trips — a coach's "Днес"/
+  // "Следваща смяна" view was fetching bookings for ~20-30 slots one at a
+  // time, which stretched to ~a minute on mobile networks.
+  async getSlotBookingsForSlots(slotIds) {
+    if (!slotIds || !slotIds.length) return {}
+    const grouped = {}
+    if (isUsingSupabase) {
+      const batches = []
+      for (let i = 0; i < slotIds.length; i += ID_BATCH_SIZE) batches.push(slotIds.slice(i, i + ID_BATCH_SIZE))
+      const results = await Promise.all(batches.map(ids => sbFetchSafe(
+        sbUrl('slot_bookings', `?select=*&status=eq.active&slot_id=in.(${ids.join(',')})&order=booked_at.asc`),
+        { headers: sbHeaders() }
+      )))
+      for (const data of results) {
+        for (const b of (data || [])) (grouped[b.slot_id] ||= []).push(b)
+      }
+      return grouped
+    }
+    const all = await LS.selectAll('slot_bookings')
+    for (const b of all) {
+      if (slotIds.includes(b.slot_id) && b.status === 'active') (grouped[b.slot_id] ||= []).push(b)
+    }
+    return grouped
+  },
+
   // ── Booking: a client's active bookings ─────────────────────
   async getClientBookings(clientId) {
     if (isUsingSupabase) {
