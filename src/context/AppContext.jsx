@@ -72,6 +72,11 @@ export function AppProvider({ children }) {
   const [coachClientMode, setCoachClientMode] = useState(false) // true after coach explicitly clicks a client
   const [pendingProgressTab, setPendingProgressTab] = useState(null) // deep-link to a Progress sub-tab
   const [pendingProgramOpen, setPendingProgramOpen] = useState(null) // deep-link: program slug to auto-open in Programs view
+  // Quick-switch between clients booked in the same session slot (set when a
+  // coach opens a client from "Днес"/"Следваща смяна"; empty when opened from
+  // the full "Клиенти" roster, which has no slot context).
+  const [activeSlotClients, setActiveSlotClients] = useState([]) // [{ id, name }]
+  const [activeSessionDate, setActiveSessionDate] = useState(null) // YYYY-MM-DD of the slot being worked
 
   // ── Snackbar ─────────────────────────────────────────────────
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' })
@@ -171,16 +176,23 @@ export function AppProvider({ children }) {
       // own slim list on open (DB.getRankingRows).
       const clientsQuery = isClientRole ? `&id=eq.${sessionAuth.id}` : ''
 
+      // For coach/admin, the per-client history tables (meals/workouts/weights/
+      // steps/water) are skipped here and left empty — syncFresh (below) fetches
+      // and merges the exact same data in the background right after this
+      // resolves, via the SAME queries. That keeps `loading` from blocking the
+      // whole UI behind ~37 pages of meals; the roster/schedule/client-picker
+      // render instantly and history fills in a few seconds later. Client-role
+      // sessions are unaffected — theirs is a single cheap per-id query.
       const [rawCoaches, rawClients, meals, workouts, weights, tasks, taskComments, reactions, stepsRaw, postsRaw, rawSynrgHabits, rawPostReactions, rawPostComments, pastBookingsAll, waterRaw] = await Promise.all([
         DB.selectAll('coaches'),
         DB.selectAll('clients', clientsQuery),
-        DB.selectAll('meals', mealQuery),
-        DB.selectAll('workouts', workoutQuery).catch(() => []),
-        DB.selectAll('weight_logs', weightQuery).catch(() => []),
+        isClientRole ? DB.selectAll('meals', mealQuery) : Promise.resolve([]),
+        isClientRole ? DB.selectAll('workouts', workoutQuery).catch(() => []) : Promise.resolve([]),
+        isClientRole ? DB.selectAll('weight_logs', weightQuery).catch(() => []) : Promise.resolve([]),
         DB.selectAll('tasks').catch(() => []),
         DB.selectAll('task_comments').catch(() => []),
         DB.selectAll('reactions').catch(() => []),
-        DB.selectAll('steps_logs', stepsQuery).catch(() => []),
+        isClientRole ? DB.selectAll('steps_logs', stepsQuery).catch(() => []) : Promise.resolve([]),
         // CRITICAL: community_posts & post_comments need explicit limits — PostgREST
         // defaults cap at 1000 rows, which silently truncates Христиан's April entries
         // and causes m_community_* badges to appear missing in admin's XP computation.
@@ -191,7 +203,7 @@ export function AppProvider({ children }) {
         // Completed slot_bookings — needed so gamification counts booked sessions
         // alongside manually-logged workout-tracker entries.
         DB.getAllPastBookings().catch(() => []),
-        DB.selectAll('water_logs', waterQuery).catch(() => []),
+        isClientRole ? DB.selectAll('water_logs', waterQuery).catch(() => []) : Promise.resolve([]),
       ])
 
       // Note: password fields no longer loaded into client state — auth handled via auth-login Edge Function
@@ -327,7 +339,10 @@ export function AppProvider({ children }) {
       setPostReactions(rawPostReactions || [])
       setPostComments(rawPostComments || [])
       setSynrgHabits((rawSynrgHabits || []).sort((a, b) => a.sort_order - b.sort_order))
-      if (!isClientRole) lastFullLoadRef.current = Date.now()
+      // lastFullLoadRef is set by syncFresh once IT has actually fetched the
+      // full per-client history — loadAll no longer does that for coach/admin,
+      // so marking it "full" here would make syncFresh's reuse-check skip the
+      // real fetch and write zeroed-out XP for every client. See syncFresh below.
     } catch(e) {
       console.error('loadAll error:', JSON.stringify(e), e?.message)
       setLoadError(`${e?.name || 'Error'}: ${e?.message || JSON.stringify(e)}`)
@@ -419,14 +434,20 @@ export function AppProvider({ children }) {
       // Compute XP for every client and write back only what changed.
       // Shared by both paths: the normal periodic sync and the start-up
       // pass that reuses loadAll's freshly-loaded data.
-      async function writeXPFrom(merged) {
-          // Compute XP for all non-coach clients from fresh merged data.
+      // `studioIds` scopes this to clients with an active studio plan — freemium
+      // leads (the vast majority of the `clients` table) are never relevant to
+      // a coach and were previously recomputed/written on every cycle too,
+      // which is both the main cost and the main risk (thousands of spurious
+      // "changed" rows masking the handful that actually matter).
+      async function writeXPFrom(merged, studioIds) {
+          const studioIdSet = new Set(studioIds || [])
+          // Compute XP for all non-coach STUDIO clients from fresh merged data.
           // Must enrich with community data (posts/comments) — XP system uses these
           // for m_community_* badges; without them admin computes lower XP than client.
           const curFeed     = feedPostsRef.current || []
           const curComments = postCommentsRef.current || []
           const curMonthKey = getCurrentMonthKey()
-          const xpPayload = merged.filter(c => !c.is_coach && c.id).map(c => {
+          const xpPayload = merged.filter(c => !c.is_coach && c.id && studioIdSet.has(c.id)).map(c => {
             const enriched = {
               ...c,
               communityPosts:    curFeed.filter(p => p.author_name === c.name),
@@ -492,6 +513,11 @@ export function AppProvider({ children }) {
       }
     async function syncFresh() {
       try {
+        // Only clients with an active studio plan are ever shown to a coach or
+        // scored for Класация — freemium leads (the bulk of the `clients`
+        // table) are excluded up front rather than fetched-and-filtered.
+        const studioIds = await DB.getActiveStudioClientIds().catch(() => [])
+
         // loadAll() just pulled exactly this data — for an admin that is ~37
         // pages of meals plus everything else. Running the same queries again
         // seconds later doubled the start-up traffic to 116 requests and left
@@ -500,19 +526,18 @@ export function AppProvider({ children }) {
         // refetches normally after that.
         const REUSE_MS = 90000
         if (Date.now() - lastFullLoadRef.current < REUSE_MS && (clientsRef.current || []).length) {
-          writeXPFrom(clientsRef.current)
+          writeXPFrom(clientsRef.current, studioIds)
           return
         }
-        const twoYearsAgo = new Date(Date.now() - 730 * 86400000).toISOString().slice(0, 10)
-        // CRITICAL: queries MUST match initial loadAll() limits exactly — otherwise
-        // periodic sync returns fewer rows than initial load (PostgREST defaults to
-        // max 1000 rows) and SHRINKS the admin's dataset on refresh, silently
-        // dropping clients' meals/weights/steps → incorrect XP computation.
+        // Scoped to the studio roster (client_id=in.(...)) instead of a 2-year
+        // date window across every client — ~75-150 ids vs. thousands of rows,
+        // and it's full history (not date-capped) for the people who matter,
+        // which badges like weight-loss-from-peak need to stay accurate.
         const [freshMeals, freshWeights, freshSteps, freshWorkouts, freshPosts, freshComments, freshBookings, freshWater] = await Promise.all([
-          DB.selectAll('meals',        `&order=id.desc&created_at=gte.${twoYearsAgo}&limit=100000`),
-          DB.selectAll('weight_logs',  `&order=id.desc&created_at=gte.${twoYearsAgo}&limit=20000`).catch(() => []),
-          DB.selectAll('steps_logs',   `&order=id.desc&created_at=gte.${twoYearsAgo}&limit=20000`).catch(() => []),
-          DB.selectAll('workouts',     `&order=id.desc&created_at=gte.${twoYearsAgo}&limit=50000`).catch(() => null),
+          DB.selectAllForClientIds('meals',       studioIds, '&order=id.desc'),
+          DB.selectAllForClientIds('weight_logs', studioIds, '&order=id.desc').catch(() => []),
+          DB.selectAllForClientIds('steps_logs',  studioIds, '&order=id.desc').catch(() => []),
+          DB.selectAllForClientIds('workouts',    studioIds, '&order=id.desc').catch(() => null),
           // Community posts/comments affect m_community_* badges → must be refreshed
           // with explicit limits. Using order=created_at.desc ensures newest entries
           // are never dropped if total exceeds the limit.
@@ -520,7 +545,7 @@ export function AppProvider({ children }) {
           DB.selectAll('post_comments',   '&order=created_at.desc&limit=100000').catch(() => null),
           // Slot bookings for all clients — needed so XP computation counts booked sessions
           DB.getAllPastBookings().catch(() => []),
-          DB.selectAll('water_logs',   `&order=id.desc&created_at=gte.${twoYearsAgo}&limit=20000`).catch(() => []),
+          DB.selectAllForClientIds('water_logs', studioIds, '&order=id.desc').catch(() => []),
         ])
         // Push fresh community data into state + refs so XP computation below uses it
         if (freshPosts) {
@@ -575,7 +600,12 @@ export function AppProvider({ children }) {
           }
         })
 
-        await writeXPFrom(merged)
+        // Mark the full per-client history as freshly loaded — this is what
+        // the REUSE_MS check above guards, so the next call (or another coach
+        // tab's syncFresh) doesn't skip straight to writeXPFrom with stale/empty
+        // data before a real fetch has ever completed.
+        lastFullLoadRef.current = Date.now()
+        await writeXPFrom(merged, studioIds)
       } catch (err) {
         console.warn('[syncFresh] failed:', err)
       }
@@ -1950,6 +1980,8 @@ export function AppProvider({ children }) {
     workoutDate, setWorkoutDate,
     selCoach, setSelCoach,
     saveWorkoutDraft, restoreWorkoutDraft,
+    activeSlotClients, setActiveSlotClients,
+    activeSessionDate, setActiveSessionDate,
     // Food
     foodDate, setFoodDate,
     foodModalOpen, setFoodModalOpen,

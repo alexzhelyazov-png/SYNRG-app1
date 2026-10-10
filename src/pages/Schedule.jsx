@@ -389,7 +389,7 @@ function hexRgba(hex, a) {
 function SlotCell({ slot, adminMode, onEdit, onDelete, onAddClient, onRemoveClient, bookings = [] }) {
   const [hover,        setHover]        = useState(false)
   const [confirmDel,   setConfirmDel]   = useState(false)
-  const { auth, realClients, setSelIdx, setCoachClientMode } = useApp()
+  const { auth, realClients, setSelIdx, setCoachClientMode, setActiveSlotClients, setActiveSessionDate } = useApp()
   const color    = coachColor(slot.coach_name)
   const base     = color.txt
   const capacity = Math.min(slot.capacity || 3, 6)
@@ -399,7 +399,14 @@ function SlotCell({ slot, adminMode, onEdit, onDelete, onAddClient, onRemoveClie
   function openClient(booking) {
     if (auth.role === 'client') return
     const idx = realClients.findIndex(c => c.id === booking.client_id)
-    if (idx >= 0) { setSelIdx(idx); setCoachClientMode(true) }
+    if (idx >= 0) {
+      setSelIdx(idx)
+      // Opened from the admin Schedule grid, not "Днес"/"Следваща смяна" — no
+      // stale quick-switch siblings from a previous session-view visit.
+      setActiveSlotClients([])
+      setActiveSessionDate(null)
+      setCoachClientMode(true)
+    }
   }
 
   const [showActions, setShowActions] = useState(false)

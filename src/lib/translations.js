@@ -55,6 +55,7 @@ export const T = {
 
     // ── Navigation ───────────────────────────────────
     navDashboard:       'Днес',
+    navClients:         'Клиенти',
     navProgress:        'Класация',
     navFood:            'Хранителен тракер',
     navWeight:          'Тегло',
@@ -84,6 +85,10 @@ export const T = {
     // ── Sidebar / Coaches ─────────────────────────────
     clientsHeader:      'Клиенти',
     coachesHeader:      'Треньори',
+    sessionsToday:      'Днес',
+    sessionsNextShift:  'Следваща смяна',
+    noSessionsToday:    'Нямаш часове днес.',
+    noUpcomingShift:    'Няма предстояща смяна с резервации.',
     deleteClientTip:    'Изтрий клиент',
     top5Label:          'Топ 5 · 30 дни',
     myTrackerTitle:     'Моят тракер',
@@ -104,6 +109,7 @@ export const T = {
     // ── Dashboard — Coach ─────────────────────────────
     workout:            'Тренировка',
     exerciseLbl:        'Упражнение',
+    addManually:        'ръчно',
     setsReps:           'Серии × Повт.',
     kgLbl:              'Кг',
     exPlaceholder:      'напр. Клек, Bench press...',
@@ -1146,6 +1152,7 @@ export const T = {
 
     // ── Navigation ───────────────────────────────────
     navDashboard:       'Today',
+    navClients:         'Clients',
     navProgress:        'Ranking',
     navFood:            'Food Tracker',
     navWeight:          'Weight',
@@ -1175,6 +1182,10 @@ export const T = {
     // ── Sidebar / Coaches ─────────────────────────────
     clientsHeader:      'Clients',
     coachesHeader:      'Coaches',
+    sessionsToday:      'Today',
+    sessionsNextShift:  'Next shift',
+    noSessionsToday:    'No sessions today.',
+    noUpcomingShift:    'No upcoming shift with bookings.',
     deleteClientTip:    'Delete client',
     top5Label:          'Top 5 · 30 days',
     myTrackerTitle:     'My tracker',
@@ -1195,6 +1206,7 @@ export const T = {
     // ── Dashboard — Coach ─────────────────────────────
     workout:            'Workout',
     exerciseLbl:        'Exercise',
+    addManually:        'manually',
     setsReps:           'Sets × Reps',
     kgLbl:              'kg',
     exPlaceholder:      'e.g. Squat, Bench press...',

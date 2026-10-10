@@ -19,15 +19,15 @@ import useClientTier          from '../hooks/useClientTier'
 
 // Build role-specific nav item list (module-aware for clients)
 function getNavItems(auth, admin, isOnlineClient = false, isLead = false) {
-  // Coach/admin nav — Съобщения sits right after График so client messages
-  // are one tap away on the phone too (pink unread badge, same as sidebar).
+  // Coach/admin nav — Съобщения lives in the header icon instead (pink unread
+  // badge, same as sidebar), so it's dropped here to cut clutter.
   // Задачи и Рецепти live INSIDE "Моят тракер" (Dashboard action buttons),
   // not in the bottom bar — keeps it uncluttered (owner request 2026-07-08).
   if (auth.role !== 'client') {
     const items = [
       { view: 'dashboard',        Icon: DashboardIcon,         labelKey: 'navDashboard' },
+      { view: 'clients',          Icon: PersonIcon,            labelKey: 'navClients'   },
       { view: 'schedule',         Icon: CalendarMonthIcon,     labelKey: 'navSchedule'  },
-      { view: 'coach_chat_admin', Icon: ChatBubbleOutlineIcon, labelKey: 'navMessages'  },
       { view: 'ranking',          Icon: LeaderboardIcon,       labelKey: 'navRanking'   },
     ]
     if (admin) items.push({ view: 'admin', Icon: AdminPanelSettingsIcon, labelKey: 'navAdmin' })

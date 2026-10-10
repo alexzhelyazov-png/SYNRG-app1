@@ -205,9 +205,27 @@ const LS = {
 
 const impl = isUsingSupabase ? SB : LS
 
+// Fetch rows for a bounded set of client ids, batched to stay well under
+// PostgREST/proxy URL-length limits (~150 uuids/request is safe). Used to
+// scope per-client history tables (meals/workouts/weights/steps/water) to
+// just the studio-active roster instead of every client ever created.
+const ID_BATCH_SIZE = 150
+async function sbFetchForClientIds(table, clientIds, extra = '') {
+  if (!clientIds.length) return []
+  const batches = []
+  for (let i = 0; i < clientIds.length; i += ID_BATCH_SIZE) batches.push(clientIds.slice(i, i + ID_BATCH_SIZE))
+  const results = await Promise.all(
+    batches.map(ids => sbFetchPaginated(table, `&client_id=in.(${ids.join(',')})${extra}`))
+  )
+  return results.flat()
+}
+
 // ── Public API ───────────────────────────────────────────────
 export const DB = {
   selectAll:  (table, extra)        => impl.selectAll(table, extra),
+  selectAllForClientIds: (table, clientIds, extra) => isUsingSupabase
+    ? sbFetchForClientIds(table, clientIds, extra)
+    : impl.selectAll(table, extra).then(all => all.filter(r => clientIds.includes(r.client_id))),
   getRankingRows: ()                => impl.getRankingRows(),
   getMyXP:    (clientId)            => impl.getMyXP(clientId),
   insert:     (table, row)          => impl.insert(table, row),
@@ -514,6 +532,22 @@ export const DB = {
     }
     const all = await LS.selectAll('client_plans')
     return all.sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))
+  },
+
+  // ── Studio-active client ids — only these clients' meals/weights/steps/
+  // workouts/XP matter to a coach. `client_plans` is tiny (one row per active
+  // plan) vs. the full `clients` table (thousands of freemium leads), so this
+  // is cheap even though it runs on every coach/admin load.
+  async getActiveStudioClientIds() {
+    if (!isUsingSupabase) {
+      const all = await LS.selectAll('client_plans')
+      return [...new Set(all.filter(p => p.status === 'active').map(p => p.client_id))]
+    }
+    // No explicit &select= here — sbFetchPaginated already prepends its own
+    // (default '*' for this table, since it's not in SAFE_SELECTS); adding a
+    // second select= param produces a duplicate-param URL.
+    const rows = await sbFetchPaginated('client_plans', '&status=eq.active&limit=100000')
+    return [...new Set((rows || []).map(p => p.client_id))]
   },
 
   // ── Call Supabase RPC (with localStorage fallback) ───────────

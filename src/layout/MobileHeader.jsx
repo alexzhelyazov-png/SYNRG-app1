@@ -19,7 +19,7 @@ import { useApp } from '../context/AppContext'
 import { useBooking } from '../context/BookingContext'
 import { DB } from '../lib/db'
 import { hasModule } from '../lib/modules'
-import { creditsRemaining, daysUntilExpiry, fmtValidTo, isAdmin as isAdminUser } from '../lib/bookingUtils'
+import { creditsRemaining, daysUntilExpiry, fmtValidTo } from '../lib/bookingUtils'
 import { C, EASE } from '../theme'
 import SynrgLogo from './SynrgLogo'
 
@@ -40,8 +40,9 @@ function getSiteLinks(t) {
 export default function MobileHeader() {
   const { auth, logout, client, lang, setLang, setView, coachClientMode, setCoachClientMode, setViewingCoach, unreadNotifCount, unreadCoachMsgCount, t, saveWorkoutDraft } = useApp()
   const hasCoachChat = auth.role === 'client' && hasModule(auth.modules, 'synrg_method')
-  // Non-admin coach (e.g. Ицко) gets a shortcut icon to the messages tab
-  const isNonAdminCoach = auth.role === 'coach' && !isAdminUser(auth)
+  // All staff (coach or admin) get a shortcut icon to messages — same as Sidebar's isStaff.
+  // This replaces the bottom-nav "Съобщения" tab, which was removed to cut clutter.
+  const isStaffChat = auth.role === 'coach' || auth.role === 'admin'
   const { myPlan } = useBooking()
   const [siteMenuOpen, setSiteMenuOpen] = useState(false)
   const [showProfile, setShowProfile] = useState(false)
@@ -144,8 +145,8 @@ export default function MobileHeader() {
             </Box>
           </Box>
 
-          {/* ── Coach chat (SYNRG Метод clients + non-admin coaches) ──────── */}
-          {(hasCoachChat || isNonAdminCoach) && (
+          {/* ── Coach chat (SYNRG Метод clients + all staff) ──────── */}
+          {(hasCoachChat || isStaffChat) && (
             <IconButton
               onClick={() => setView(hasCoachChat ? 'coach_chat' : 'coach_chat_admin')}
               size="small"

@@ -36,6 +36,7 @@ function getNavItems(auth, admin, isOnlineClient = false, isLead = false) {
   if (auth.role !== 'client') {
     const coachItems = [
       { view: 'dashboard', labelKey: 'navDashboard', Icon: DashboardIcon },
+      { view: 'clients',   labelKey: 'navClients',   Icon: PeopleIcon },
       { view: 'schedule',  labelKey: 'navSchedule',  Icon: CalendarMonthIcon },
     ]
     if (admin) coachItems.push({ view: 'admin', labelKey: 'navAdmin', Icon: AdminPanelSettingsIcon })

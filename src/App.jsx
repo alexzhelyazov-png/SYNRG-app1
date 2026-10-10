@@ -24,7 +24,7 @@ import MobileHeader   from './layout/MobileHeader'
 import MobileNav      from './layout/MobileNav'
 
 import Auth           from './pages/Auth'
-import Dashboard, { ClientDetail, ClientSchedule } from './pages/Dashboard'
+import Dashboard, { ClientDetail, ClientSchedule, CoachClients } from './pages/Dashboard'
 import FoodTracker    from './pages/FoodTracker'
 import WeightTracker  from './pages/WeightTracker'
 import Progress, { BadgeUnlockedToast, LevelUpCelebration } from './pages/Progress'
@@ -382,6 +382,7 @@ function AppShell() {
                       ? <LeadHome />
                       : <Dashboard />
                 )}
+                {view === 'clients'   && (auth.role === 'coach' || auth.role === 'admin') && <CoachClients />}
                 {view === 'progress'  && (auth.role !== 'client' || hasModule(auth.modules, 'nutrition_tracking') || hasModule(auth.modules, 'weight_tracking')) && <Progress />}
                 {view === 'food'      && (auth.role !== 'client' || hasModule(auth.modules, 'nutrition_tracking')) && <FoodTracker />}
                 {view === 'weight'    && (auth.role !== 'client' || hasModule(auth.modules, 'weight_tracking'))    && <WeightTracker />}

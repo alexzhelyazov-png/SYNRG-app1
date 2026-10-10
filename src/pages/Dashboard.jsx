@@ -30,6 +30,7 @@ import {
   groupByDate, dayLabel, fmtTime, canClientBook, canClientCancel, isPlanActive, planLabel,
 } from '../lib/bookingUtils'
 import { hasModule, hasAnyModule } from '../lib/modules'
+import { matchMainLift, suggestNextStep, findLastPerformance } from '../lib/workoutProgression'
 
 // ─── Reminder banners (client) ───────────────────────────────────
 function ReminderBanners() {
@@ -209,52 +210,99 @@ function ReminderBanners() {
 }
 
 
-// ─── Today's schedule (shown at top of coach dashboard) ──────────
-function TodayScheduleCard() {
-  const { auth } = useApp()
-  const { slots, slotBookings } = useBooking()
-  const todayStr = new Date().toISOString().slice(0, 10)
-  const todaySlots = (slots || [])
-    .filter(s => s.slot_date === todayStr && s.status !== 'cancelled' && s.coach_name === auth.name)
-    .sort((a, b) => (a.start_time || '').localeCompare(b.start_time || ''))
+// ─── Persisted recent client IDs (survives remounts) ─────────────
+let _recentClientIds = []
 
-  if (todaySlots.length === 0) return null
+// ─── Coach dashboard: "Днес" / "Следваща смяна" session groups ──
+// The full client list used to live here too — moved to its own
+// "Клиенти" bottom-nav tab (CoachClients below) so switching between
+// clients mid-session doesn't require detouring through this view.
+//
+// Replaces the old plain TodayScheduleCard: slots are grouped by hour and
+// each booked client is a tappable row that opens their workout directly
+// (today's date, or — from "Следваща смяна" — the date of that future visit),
+// with a quick-switch strip of up to 3 sibling clients from the same slot.
+function DashboardCoach() {
+  const {
+    t, auth, realClients, client,
+    setSelIdx, setCoachClientMode, setViewingCoach, setShowClientMenu,
+    saveWorkoutDraft, restoreWorkoutDraft, setWorkoutDate,
+    setActiveSlotClients, setActiveSessionDate,
+  } = useApp()
+  const { slots, slotBookings, loadSlots, loadSlotBookings } = useBooking()
 
-  return (
-    <Paper sx={{
-      p: 2, mb: 2.5,
-      border: `1px solid ${C.border}`,
-      borderRadius: '16px',
-      animation: `fadeInUp 0.22s ${EASE.decelerate} both`,
-    }}>
-      <Typography variant="h3" sx={{ mb: 1.25 }}>Today's Schedule</Typography>
-      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75 }}>
-        {todaySlots.map((s, i) => {
+  const [subTab, setSubTab] = useState('today') // 'today' | 'next'
+  const [loaded, setLoaded] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      const fetched = await loadSlots(isoToday(), isoDatePlusDays(30))
+      const mine = (fetched || []).filter(s => s.coach_name === auth.name)
+      if (mine.length) await loadSlotBookings(mine.map(s => s.id))
+      if (!cancelled) setLoaded(true)
+    })()
+    return () => { cancelled = true }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [auth.name])
+
+  const today = isoToday()
+  const mySlots = (slots || []).filter(s => s.coach_name === auth.name)
+  const todaySlots = mySlots.filter(s => s.slot_date === today).sort((a, b) => (a.start_time || '').localeCompare(b.start_time || ''))
+
+  const nextShiftDate = mySlots
+    .filter(s => s.slot_date > today && s.booked_count > 0)
+    .map(s => s.slot_date)
+    .sort()[0] || null
+  const nextShiftSlots = nextShiftDate
+    ? mySlots.filter(s => s.slot_date === nextShiftDate).sort((a, b) => (a.start_time || '').localeCompare(b.start_time || ''))
+    : []
+
+  const openSessionClient = (slot, booking, slotRoster) => {
+    const ri = realClients.findIndex(c => c.id === booking.client_id)
+    if (ri < 0) return
+    if (client?.id) saveWorkoutDraft(client.id)
+    setSelIdx(ri)
+    restoreWorkoutDraft(booking.client_id)
+    setWorkoutDate(slot.slot_date) // overrides any stale date left over from a draft
+    setActiveSlotClients(slotRoster.slice(0, 3))
+    setActiveSessionDate(slot.slot_date)
+    setViewingCoach(null)
+    setCoachClientMode(true)
+    setShowClientMenu(false)
+  }
+
+  const renderSlotGroup = (slotList) => {
+    if (!slotList.length) return null
+    return (
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+        {slotList.map(s => {
           const bookings = slotBookings[s.id] || []
+          const roster = bookings.map(b => ({ id: b.client_id, name: b.client_name }))
           return (
-            <Box key={s.id || i} sx={{
-              py: 0.75, px: 1.25,
-              background: s.booked_count > 0 ? C.accentSoft : 'rgba(255,255,255,0.03)',
-              border: `1px solid ${s.booked_count > 0 ? C.primaryA20 : C.border}`,
-              borderRadius: '10px',
+            <Box key={s.id} sx={{
+              py: 1, px: 1.25, borderRadius: '12px',
+              background: bookings.length > 0 ? C.accentSoft : 'rgba(255,255,255,0.03)',
+              border: `1px solid ${bookings.length > 0 ? C.primaryA20 : C.border}`,
             }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                <Typography sx={{
-                  fontSize: '13.5px', fontWeight: 700, color: C.text,
-                  minWidth: '50px', fontFamily: "'MontBlanc', sans-serif",
-                }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: bookings.length ? 0.5 : 0 }}>
+                <Typography sx={{ fontSize: '13.5px', fontWeight: 700, color: C.text, minWidth: '50px', fontFamily: "'MontBlanc', sans-serif" }}>
                   {(s.start_time || '').slice(0, 5)}
                 </Typography>
-                <Typography sx={{ fontSize: '12px', fontWeight: 700, color: s.booked_count > 0 ? C.text : C.muted }}>
+                <Typography sx={{ fontSize: '12px', fontWeight: 700, color: bookings.length > 0 ? C.text : C.muted }}>
                   {s.booked_count}/{s.capacity}
                 </Typography>
               </Box>
               {bookings.length > 0 && (
-                <Box sx={{ mt: 0.4, pl: '58px' }}>
-                  {bookings.map((b, j) => (
-                    <Typography key={j} sx={{ fontSize: '12px', color: C.text, lineHeight: 1.5 }}>
-                      {b.client_name}
-                    </Typography>
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: '4px', pl: '58px' }}>
+                  {bookings.map(b => (
+                    <Box key={b.id} data-testid="session-client-row" onClick={() => openSessionClient(s, b, roster)} sx={{
+                      display: 'flex', alignItems: 'center', gap: 1, py: 0.5, px: 0.75,
+                      borderRadius: '8px', cursor: 'pointer',
+                      '&:hover': { background: 'rgba(255,255,255,0.06)' },
+                    }}>
+                      <Typography sx={{ fontSize: '13px', color: C.text, fontWeight: 600 }}>{b.client_name}</Typography>
+                    </Box>
                   ))}
                 </Box>
               )}
@@ -262,19 +310,62 @@ function TodayScheduleCard() {
           )
         })}
       </Box>
+    )
+  }
+
+  return (
+    <Paper sx={{ p: 2, mb: 2.5, border: `1px solid ${C.border}`, borderRadius: '16px', animation: `fadeInUp 0.22s ${EASE.decelerate} both` }}>
+      <Box sx={{ display: 'flex', gap: 0.75, mb: 1.5 }}>
+        {[
+          { key: 'today', label: t('sessionsToday') || 'Днес' },
+          { key: 'next',  label: t('sessionsNextShift') || 'Следваща смяна' },
+        ].map(({ key, label }) => {
+          const active = subTab === key
+          return (
+            <Chip key={key} label={label} onClick={() => setSubTab(key)} sx={{
+              background: active ? C.primary : 'rgba(255,255,255,0.04)',
+              color: active ? '#0A2E0F' : C.text,
+              border: `1px solid ${active ? C.primary : C.border}`,
+              fontWeight: active ? 800 : 500, fontSize: '13px', cursor: 'pointer',
+              '& .MuiChip-label': { px: 1.5 },
+            }} />
+          )
+        })}
+      </Box>
+
+      {!loaded && (
+        <Typography sx={{ fontSize: '13px', color: C.muted, textAlign: 'center', py: 2 }}>…</Typography>
+      )}
+
+      {loaded && subTab === 'today' && (
+        todaySlots.length
+          ? renderSlotGroup(todaySlots)
+          : <Typography sx={{ fontSize: '13px', color: C.muted, textAlign: 'center', py: 2 }}>{t('noSessionsToday') || 'Нямаш часове днес.'}</Typography>
+      )}
+
+      {loaded && subTab === 'next' && (
+        nextShiftSlots.length
+          ? (
+            <>
+              <Typography sx={{ fontSize: '12px', color: C.muted, mb: 1 }}>
+                {dayLabel(nextShiftDate)} · {nextShiftDate}
+              </Typography>
+              {renderSlotGroup(nextShiftSlots)}
+            </>
+          )
+          : <Typography sx={{ fontSize: '13px', color: C.muted, textAlign: 'center', py: 2 }}>{t('noUpcomingShift') || 'Няма предстояща смяна с резервации.'}</Typography>
+      )}
     </Paper>
   )
 }
 
-// ─── Persisted recent client IDs (survives remounts) ─────────────
-let _recentClientIds = []
-
-// ─── Coach dashboard (schedule + client list) ───────────────────
-function DashboardCoach() {
+// ─── Coach "Клиенти" tab (full client list + quick switch) ───────
+export function CoachClients() {
   const {
     t, visibleClients, realClients, actualIdx, setSelIdx, client,
     setCoachClientMode, setShowClientMenu, setViewingCoach,
     setConfirmDelete, saveWorkoutDraft, restoreWorkoutDraft,
+    setActiveSlotClients, setActiveSessionDate,
   } = useApp()
 
   const [recentIds, setRecentIds] = useState(_recentClientIds)
@@ -288,6 +379,9 @@ function DashboardCoach() {
     setRecentIds(updated)
     setSelIdx(ri)
     restoreWorkoutDraft(clientId)
+    // Opened from the full roster, not a session slot — no quick-switch siblings.
+    setActiveSlotClients([])
+    setActiveSessionDate(null)
     setViewingCoach(null)
     setCoachClientMode(true)
     setShowClientMenu(false)
@@ -311,79 +405,76 @@ function DashboardCoach() {
   })
 
   return (
-    <>
-      <TodayScheduleCard />
-      <Paper sx={{ p: 2, mb: 2.5, border: `1px solid ${C.border}`, borderRadius: '16px', animation: `fadeInUp 0.24s ${EASE.decelerate} 0.04s both` }}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.25 }}>
-          <Typography variant="h3">{t('clientsHeader')}</Typography>
-          <Typography sx={{ fontSize: '12px', color: C.muted }}>{studioClients.length} {t('ofClients')}</Typography>
-        </Box>
-        {studioClients.length > 5 && (
-          <TextField
-            fullWidth size="small"
-            placeholder={t('searchClientPh')}
-            value={clientSearch}
-            onChange={e => setClientSearch(e.target.value)}
-            sx={{ mb: 1.25,
-              '& .MuiInputBase-input': { fontSize: '13px', py: '8px' },
-              '& .MuiOutlinedInput-notchedOutline': { borderColor: C.border },
-            }}
-          />
-        )}
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-          {sortedClients.map((c, i) => {
-            const ri = realClients.findIndex(x => x.name === c.name)
-            const isSel = actualIdx === ri
-            return (
-              <Box key={c.name} onClick={() => selectClient(ri, c.id)} sx={{
-                display: 'flex', alignItems: 'center', gap: '12px',
-                py: 1.2, px: 1.5, borderRadius: '12px', cursor: 'pointer',
-                background: isSel
-                  ? 'linear-gradient(135deg, rgba(170,169,205,0.14) 0%, rgba(170,169,205,0.08) 100%)'
-                  : 'rgba(255,255,255,0.04)',
-                border: `1px solid ${isSel ? 'rgba(170,169,205,0.3)' : 'rgba(255,255,255,0.06)'}`,
-                transition: `all 0.18s ${EASE.standard}`,
-                animation: `fadeInUp 0.2s ${EASE.standard} both`,
-                animationDelay: `${i * 0.04}s`,
-                '&:hover': { background: isSel ? 'rgba(170,169,205,0.16)' : 'rgba(255,255,255,0.07)' },
+    <Paper sx={{ p: 2, mb: 2.5, border: `1px solid ${C.border}`, borderRadius: '16px', animation: `fadeInUp 0.24s ${EASE.decelerate} 0.04s both` }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.25 }}>
+        <Typography variant="h3">{t('clientsHeader')}</Typography>
+        <Typography sx={{ fontSize: '12px', color: C.muted }}>{studioClients.length} {t('ofClients')}</Typography>
+      </Box>
+      {studioClients.length > 5 && (
+        <TextField
+          fullWidth size="small"
+          placeholder={t('searchClientPh')}
+          value={clientSearch}
+          onChange={e => setClientSearch(e.target.value)}
+          sx={{ mb: 1.25,
+            '& .MuiInputBase-input': { fontSize: '13px', py: '8px' },
+            '& .MuiOutlinedInput-notchedOutline': { borderColor: C.border },
+          }}
+        />
+      )}
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+        {sortedClients.map((c, i) => {
+          const ri = realClients.findIndex(x => x.name === c.name)
+          const isSel = actualIdx === ri
+          return (
+            <Box key={c.name} onClick={() => selectClient(ri, c.id)} sx={{
+              display: 'flex', alignItems: 'center', gap: '12px',
+              py: 1.2, px: 1.5, borderRadius: '12px', cursor: 'pointer',
+              background: isSel
+                ? 'linear-gradient(135deg, rgba(170,169,205,0.14) 0%, rgba(170,169,205,0.08) 100%)'
+                : 'rgba(255,255,255,0.04)',
+              border: `1px solid ${isSel ? 'rgba(170,169,205,0.3)' : 'rgba(255,255,255,0.06)'}`,
+              transition: `all 0.18s ${EASE.standard}`,
+              animation: `fadeInUp 0.2s ${EASE.standard} both`,
+              animationDelay: `${i * 0.04}s`,
+              '&:hover': { background: isSel ? 'rgba(170,169,205,0.16)' : 'rgba(255,255,255,0.07)' },
+            }}>
+              <Box sx={{
+                width: 36, height: 36, borderRadius: '50%',
+                background: isSel ? C.primaryContainer : 'rgba(255,255,255,0.08)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: '15px', fontWeight: 800, color: isSel ? C.purple : C.muted, flexShrink: 0,
               }}>
-                <Box sx={{
-                  width: 36, height: 36, borderRadius: '50%',
-                  background: isSel ? C.primaryContainer : 'rgba(255,255,255,0.08)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: '15px', fontWeight: 800, color: isSel ? C.purple : C.muted, flexShrink: 0,
-                }}>
-                  {c.name.charAt(0).toUpperCase()}
-                </Box>
-                <Box sx={{ flex: 1, minWidth: 0 }}>
-                  <Typography sx={{ fontWeight: 700, fontSize: '14px', color: isSel ? C.purple : C.text, lineHeight: 1.3 }}>
-                    {c.name}
-                  </Typography>
-                  <Typography sx={{ fontSize: '12px', color: C.muted, mt: 0.2 }}>
-                    {c.calorieTarget} kcal · {c.proteinTarget}{t('gUnit')} {t('proteinShortLbl')}
-                  </Typography>
-                </Box>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flexShrink: 0 }}>
-                  {isSel && <Box sx={{ fontSize: '16px', color: C.purple }}>✓</Box>}
-                  <Tooltip title={t('deleteClientBtn')} arrow>
-                    <IconButton size="small"
-                      onClick={e => { e.stopPropagation(); setConfirmDelete({ id: c.id, name: c.name }) }}
-                      sx={{ color: C.muted, opacity: 0.5, '&:hover': { color: '#F87171', opacity: 1 } }}>
-                      <DeleteOutlineIcon sx={{ fontSize: 16 }} />
-                    </IconButton>
-                  </Tooltip>
-                </Box>
+                {c.name.charAt(0).toUpperCase()}
               </Box>
-            )
-          })}
-          {studioClients.length === 0 && (
-            <Typography sx={{ fontSize: '13px', color: C.muted, textAlign: 'center', py: 2 }}>
-              {t('noClients')}
-            </Typography>
-          )}
-        </Box>
-      </Paper>
-    </>
+              <Box sx={{ flex: 1, minWidth: 0 }}>
+                <Typography sx={{ fontWeight: 700, fontSize: '14px', color: isSel ? C.purple : C.text, lineHeight: 1.3 }}>
+                  {c.name}
+                </Typography>
+                <Typography sx={{ fontSize: '12px', color: C.muted, mt: 0.2 }}>
+                  {c.calorieTarget} kcal · {c.proteinTarget}{t('gUnit')} {t('proteinShortLbl')}
+                </Typography>
+              </Box>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flexShrink: 0 }}>
+                {isSel && <Box sx={{ fontSize: '16px', color: C.purple }}>✓</Box>}
+                <Tooltip title={t('deleteClientBtn')} arrow>
+                  <IconButton size="small"
+                    onClick={e => { e.stopPropagation(); setConfirmDelete({ id: c.id, name: c.name }) }}
+                    sx={{ color: C.muted, opacity: 0.5, '&:hover': { color: '#F87171', opacity: 1 } }}>
+                    <DeleteOutlineIcon sx={{ fontSize: 16 }} />
+                  </IconButton>
+                </Tooltip>
+              </Box>
+            </Box>
+          )
+        })}
+        {studioClients.length === 0 && (
+          <Typography sx={{ fontSize: '13px', color: C.muted, textAlign: 'center', py: 2 }}>
+            {t('noClients')}
+          </Typography>
+        )}
+      </Box>
+    </Paper>
   )
 }
 
@@ -462,17 +553,22 @@ function MiniBarChart({ data, width = 200, height = 48, color = C.purple, showVa
 export function ClientDetail() {
   const {
     client, auth, t, lang, weeklyRate, setView, showSnackbar,
-    setCoachClientMode, updateClientTargets, saveWorkoutDraft,
+    setCoachClientMode, updateClientTargets, saveWorkoutDraft, restoreWorkoutDraft,
     exName, setExName, exScheme, setExScheme, exWeight, setExWeight,
     workoutCategory, setWorkoutCategory,
     currentWorkout, setCurrentWorkout,
     workoutDate, setWorkoutDate,
     addExercise, saveWorkout, deleteWorkout, updateWorkout,
+    realClients, setSelIdx, activeSlotClients, activeSessionDate,
   } = useApp()
   const { allPlans, loadAllPlans, slots, slotBookings, extendPlan, adjustCredits } = useBooking()
 
   const [tab, setTab] = useState(0)
   const [subView, setSubView] = useState(null) // 'weight' | null
+  // Manual single-exercise entry is the LESS common path now that "Предложи
+  // от последните тренировки" + inline editing cover most sessions — collapsed
+  // behind a toggle instead of always taking up screen space.
+  const [showManualEntry, setShowManualEntry] = useState(false)
   const [editingTargets, setEditingTargets] = useState(null) // { cal, prot }
   const [mealDayDlg, setMealDayDlg] = useState(null) // date string DD.MM.YYYY or null
   const [editCredits, setEditCredits] = useState(null)   // credits_used value or null
@@ -553,6 +649,20 @@ export function ClientDetail() {
     )
   }
 
+  // Switch to a sibling client booked in the same session slot — keeps each
+  // client's draft (exercises typed so far) separate via save/restore, and
+  // forces the workout date to the slot's date rather than whatever the
+  // sibling's last-used draft date happened to be.
+  function switchSlotClient(targetId) {
+    if (targetId === client?.id) return
+    const ri = realClients.findIndex(c => c.id === targetId)
+    if (ri < 0) return
+    if (client?.id) saveWorkoutDraft(client.id)
+    setSelIdx(ri)
+    restoreWorkoutDraft(targetId)
+    if (activeSessionDate) setWorkoutDate(activeSessionDate)
+  }
+
   return (
     <>
       {/* ── Header: Back + Name + Weekly Rate ── */}
@@ -565,6 +675,30 @@ export function ClientDetail() {
         >
           Back
         </Button>
+
+        {/* Quick-switch: up to 3 clients booked in the same session slot */}
+        {activeSlotClients.length > 1 && (
+          <Box sx={{ display: 'flex', gap: 0.75, mb: 1.25, flexWrap: 'wrap' }}>
+            {activeSlotClients.map(c => {
+              const isActive = c.id === client?.id
+              return (
+                <Chip
+                  key={c.id}
+                  label={c.name}
+                  onClick={() => switchSlotClient(c.id)}
+                  sx={{
+                    background: isActive ? C.primary : 'rgba(255,255,255,0.06)',
+                    color: isActive ? '#0A2E0F' : C.text,
+                    border: `1px solid ${isActive ? C.primary : C.border}`,
+                    fontWeight: isActive ? 800 : 600, fontSize: '13px', cursor: 'pointer',
+                    '& .MuiChip-label': { px: 1.25 },
+                  }}
+                />
+              )
+            })}
+          </Box>
+        )}
+
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
           <Typography variant="h2">{client.name || '—'}</Typography>
           <Typography sx={{
@@ -574,6 +708,11 @@ export function ClientDetail() {
             {weeklyRate !== null ? `${weeklyRate > 0 ? '+' : ''}${fmt1(weeklyRate)} ${t('kgWeek')}` : '—'}
           </Typography>
         </Box>
+        {activeSessionDate && (
+          <Typography sx={{ fontSize: '12.5px', color: C.muted, mt: 0.4 }}>
+            {dayLabel(activeSessionDate)} · {activeSessionDate}
+          </Typography>
+        )}
 
         {isCoach && plan && !plan.is_paid && (
           <Box sx={{
@@ -670,6 +809,60 @@ export function ClientDetail() {
               })}
             </Box>
 
+            {/* Предложи от последните тренировки от тази категория — коприра
+                цяла минала тренировка в текущия draft за редакция. Полезно
+                точно когато клиентът не е на фиксиран сплит (напр. обикновено
+                предна/задна, но днес е цяло тяло) — гледаме историята на
+                РЕАЛНО избраната сега категория, не предполагаем сплит. */}
+            {(() => {
+              const sameCategoryWorkouts = (client.workouts || []).filter(w => w.category === workoutCategory).slice(0, 4)
+              if (!sameCategoryWorkouts.length) return null
+              return (
+                <Box sx={{ mb: 2 }}>
+                  <Typography sx={{ fontSize: '11px', color: C.muted, mb: 0.6, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.8px' }}>
+                    Предложи от последните тренировки
+                  </Typography>
+                  <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
+                    {sameCategoryWorkouts.map(w => (
+                      <Box key={w.id} onClick={() => setCurrentWorkout((w.items || []).map(it => ({ ...it })))} sx={{
+                        p: 1.25, borderRadius: '10px', cursor: 'pointer',
+                        background: 'rgba(255,255,255,0.04)', border: `1px solid ${C.border}`,
+                        '&:hover': { background: 'rgba(255,255,255,0.07)' },
+                      }}>
+                        <Typography sx={{ fontSize: '12px', fontWeight: 700, color: C.text, mb: 0.5 }}>{w.date}</Typography>
+                        {(w.items || []).filter(it => it.exercise).length ? (
+                          (w.items || []).filter(it => it.exercise).map((it, idx) => (
+                            <Typography key={idx} sx={{ fontSize: '12px', color: C.muted, lineHeight: 1.6 }}>
+                              {idx + 1}. {it.exercise}
+                            </Typography>
+                          ))
+                        ) : (
+                          <Typography sx={{ fontSize: '12px', color: C.muted }}>—</Typography>
+                        )}
+                      </Box>
+                    ))}
+                  </Box>
+                </Box>
+              )
+            })()}
+
+            {/* Manual entry — collapsed by default; "Предложи от последните
+                тренировки" above + inline editing on the list below cover the
+                common case, so this is a fallback, not the primary flow. */}
+            {!showManualEntry ? (
+              <Button
+                onClick={() => setShowManualEntry(true)}
+                fullWidth
+                sx={{
+                  mb: 2, py: 1, fontSize: '13.5px', fontWeight: 700, textTransform: 'none',
+                  color: C.muted, border: `1px dashed ${C.border}`, borderRadius: '12px',
+                  '&:hover': { background: 'rgba(255,255,255,0.04)', color: C.text },
+                }}
+              >
+                + {t('workout')} ({t('addManually') || 'ръчно'})
+              </Button>
+            ) : (
+            <>
             {/* Exercise name */}
             <Box sx={{ mb: 1.25 }}>
               <Typography sx={{ fontSize: '11px', color: C.muted, mb: 0.6, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.8px' }}>
@@ -683,6 +876,51 @@ export function ClientDetail() {
                 onKeyDown={e => e.key === 'Enter' && addExercise()}
                 inputProps={{ style: { fontSize: '15px', padding: '12px 14px' } }}
               />
+              {/* Прогресия с малка стъпка — само за разпознати основни
+                  упражнения (клек/тяга/бг клек/набирания/л.о./лежанка/
+                  раменна преса), и само когато последното изпълнение се
+                  парсва чисто. Никога не гадае число. */}
+              {(() => {
+                if (!matchMainLift(exName)) return null
+                const last = findLastPerformance(client.workouts, exName)
+                const suggestion = last ? suggestNextStep(last.scheme, last.weight) : null
+                if (!last) {
+                  return (
+                    <Typography sx={{ fontSize: '12px', color: C.muted, mt: 0.75 }}>
+                      Няма предишна история за това упражнение.
+                    </Typography>
+                  )
+                }
+                if (!suggestion) {
+                  return (
+                    <Typography sx={{ fontSize: '12px', color: C.muted, mt: 0.75 }}>
+                      Последно ({last.date}): {last.scheme} · {last.weight} кг
+                    </Typography>
+                  )
+                }
+                return (
+                  <Box sx={{
+                    mt: 0.75, p: 1, borderRadius: '10px',
+                    background: C.accentSoft, border: `1px solid ${C.primaryA20}`,
+                    display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap',
+                  }}>
+                    <Typography sx={{ fontSize: '12px', color: C.muted }}>
+                      Последно ({last.date}): {last.scheme} · {last.weight} кг → Предложение: {suggestion.scheme} · {suggestion.weight} кг
+                    </Typography>
+                    <Button
+                      size="small"
+                      onClick={() => { setExScheme(suggestion.scheme); setExWeight(suggestion.weight) }}
+                      sx={{
+                        ml: 'auto', background: C.primary, color: '#0A2E0F', fontWeight: 700,
+                        fontSize: '12px', px: 1.25, py: 0.25, borderRadius: '8px', textTransform: 'none',
+                        '&:hover': { background: C.primaryHover },
+                      }}
+                    >
+                      Приеми целта
+                    </Button>
+                  </Box>
+                )
+              })()}
             </Box>
 
             {/* Scheme quick-select */}
@@ -743,6 +981,8 @@ export function ClientDetail() {
               variant="contained" color="primary" onClick={addExercise} fullWidth
               sx={{ py: 1.5, fontSize: '15px', fontWeight: 700, mb: 0.5 }}
             >+ {t('exerciseLbl')}</Button>
+            </>
+            )}
 
             {/* Current exercises list */}
             {currentWorkout.length > 0 && (
@@ -750,24 +990,30 @@ export function ClientDetail() {
                 <Typography sx={{ fontSize: '11px', color: C.muted, mb: 1.25, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.7px' }}>
                   {t(workoutCategory)} · {currentWorkout.length} {t('exercisesLbl')}
                 </Typography>
-                {currentWorkout.map((ex, i) => (
-                  <Box key={i} sx={{
-                    display: 'grid',
-                    gridTemplateColumns: isMobile ? '1fr 80px auto' : '1fr 110px 80px auto',
-                    gap: 1, py: 1.1,
-                    borderBottom: i < currentWorkout.length - 1 ? `1px solid ${C.border}` : 'none',
-                    alignItems: 'center',
-                  }}>
-                    <Typography sx={{ fontWeight: 600, fontSize: '14.5px' }}>{ex.exercise}</Typography>
-                    <Typography sx={{ color: C.muted, fontSize: '13.5px' }}>{ex.scheme}</Typography>
-                    <Typography sx={{ color: C.muted, fontSize: '13.5px' }}>{ex.weight} {t('kgUnit')}</Typography>
-                    <Button
-                      size="small"
-                      onClick={() => setCurrentWorkout(prev => prev.filter((_, j) => j !== i))}
-                      sx={{ minWidth: 'auto', background: C.dangerSoft, color: C.danger, border: '1px solid rgba(255,107,157,0.2)', borderRadius: '10px', px: 1.25, py: '4px', fontSize: '13px' }}
-                    >×</Button>
-                  </Box>
-                ))}
+                {currentWorkout.map((ex, i) => {
+                  const updateField = (field, value) => setCurrentWorkout(prev => prev.map((item, j) => j === i ? { ...item, [field]: value } : item))
+                  return (
+                    <Box key={i} sx={{
+                      display: 'grid',
+                      gridTemplateColumns: isMobile ? '1fr 70px 60px auto' : '1fr 90px 70px auto',
+                      gap: 0.75, py: 0.75,
+                      borderBottom: i < currentWorkout.length - 1 ? `1px solid ${C.border}` : 'none',
+                      alignItems: 'center',
+                    }}>
+                      <TextField size="small" value={ex.exercise} onChange={e => updateField('exercise', e.target.value)}
+                        variant="standard" sx={{ '& input': { fontSize: '14px', fontWeight: 600 } }} />
+                      <TextField size="small" value={ex.scheme} onChange={e => updateField('scheme', e.target.value)}
+                        variant="standard" sx={{ '& input': { fontSize: '13px', color: C.muted } }} />
+                      <TextField size="small" value={ex.weight} onChange={e => updateField('weight', e.target.value)}
+                        variant="standard" sx={{ '& input': { fontSize: '13px', color: C.muted } }} />
+                      <Button
+                        size="small"
+                        onClick={() => setCurrentWorkout(prev => prev.filter((_, j) => j !== i))}
+                        sx={{ minWidth: 'auto', background: C.dangerSoft, color: C.danger, border: '1px solid rgba(255,107,157,0.2)', borderRadius: '10px', px: 1.25, py: '4px', fontSize: '13px' }}
+                      >×</Button>
+                    </Box>
+                  )
+                })}
               </Box>
             )}
 
