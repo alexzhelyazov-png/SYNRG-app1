@@ -218,9 +218,14 @@ function TargetsCard({ targets, selectedTotals }) {
 // ─── One meal option ──────────────────────────────────────────────
 function MealOption({ opt, selected, onSelect }) {
   const [open, setOpen] = useState(false)
-  const portionLabel = opt.mode === 'portion'
-    ? `${formatFactor(opt.factor)} порция · ${opt.grams} г`
-    : `${opt.grams} г порция`
+  // Combo (soup + protein) has no single portion size — it's two separate
+  // grams amounts, individually broken out under "Продукти" — so the header
+  // shows their sum instead of the undefined `opt.grams` a plain recipe has.
+  const portionLabel = opt.isCombo
+    ? `${(opt.parts || []).reduce((sum, p) => sum + (p.grams || 0), 0)} г общо`
+    : opt.mode === 'portion'
+      ? `${formatFactor(opt.factor)} порция · ${opt.grams} г`
+      : `${opt.grams} г порция`
 
   return (
     <Box sx={{
@@ -272,14 +277,33 @@ function MealOption({ opt, selected, onSelect }) {
               Рецептата е за цяла тенджера — продуктите са за всичкото. Ти изяждаш {opt.grams} г от него.
             </Typography>
           )}
-          {opt.ingredients.map((ing, i) => (
-            <Box key={i} sx={{ display: 'flex', justifyContent: 'space-between', gap: 1, py: 0.35 }}>
-              <Typography sx={{ fontSize: '12.5px', color: C.text, opacity: 0.85 }}>{ing.name}</Typography>
-              <Typography sx={{ fontSize: '12.5px', color: C.muted, flexShrink: 0 }}>
-                {ing.grams != null ? `${ing.grams} ${ing.unit || 'г'}` : ing.unit}
-              </Typography>
-            </Box>
-          ))}
+          {/* Combo options (buildSoupCombo: soup + a generic protein) describe
+              themselves as `parts`, not a flat `ingredients` list — there's no
+              single recipe to list ingredients FOR. */}
+          {opt.isCombo ? (
+            <>
+              {(opt.parts || []).map((part, i) => (
+                <Box key={i} sx={{ display: 'flex', justifyContent: 'space-between', gap: 1, py: 0.35 }}>
+                  <Typography sx={{ fontSize: '12.5px', color: C.text, opacity: 0.85 }}>{part.label}</Typography>
+                  <Typography sx={{ fontSize: '12.5px', color: C.muted, flexShrink: 0 }}>{part.grams} г</Typography>
+                </Box>
+              ))}
+              {opt.fatNote && (
+                <Typography sx={{ fontSize: '11px', color: '#FFD070', mt: 0.75, lineHeight: 1.45 }}>
+                  {opt.fatNote}
+                </Typography>
+              )}
+            </>
+          ) : (
+            (opt.ingredients || []).map((ing, i) => (
+              <Box key={i} sx={{ display: 'flex', justifyContent: 'space-between', gap: 1, py: 0.35 }}>
+                <Typography sx={{ fontSize: '12.5px', color: C.text, opacity: 0.85 }}>{ing.name}</Typography>
+                <Typography sx={{ fontSize: '12.5px', color: C.muted, flexShrink: 0 }}>
+                  {ing.grams != null ? `${ing.grams} ${ing.unit || 'г'}` : ing.unit}
+                </Typography>
+              </Box>
+            ))
+          )}
           <Typography sx={{ fontSize: '11px', color: C.muted, opacity: 0.65, mt: 0.75 }}>
             {opt.kcal} kcal · {opt.protein} г протеин · {opt.carbs} г въглехидрати · {opt.fat} г мазнини
           </Typography>
