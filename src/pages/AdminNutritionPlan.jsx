@@ -74,7 +74,8 @@ export function NutritionPlanBuilderDialog({ open, onClose, client }) {
   // free-text task and an "Очакван резултат" Kari fills in per client, not
   // something the calorie engine can infer.
   const [tasks, setTasks] = useState(() => [
-    { task: 'Измерване на тегло и записване в приложението всеки ден, за да се наблюдава средно аритметично и водна задръжка.', result: '' },
+    { task: 'Измерване на тегло и записване в приложението всеки ден, за да се наблюдава средно аритметично и водна задръжка.',
+      result: 'Ясна тенденция на теглото през седмицата, без изкривяване от дневните колебания (вода, храносмилане).' },
   ])
   function addTask() {
     setTasks(t => [...t, { task: '', result: '' }])
@@ -174,11 +175,23 @@ export function NutritionPlanBuilderDialog({ open, onClose, client }) {
     function isFreeVeg(ing) {
       return ing.grams == null && ing.unit === 'на вкус' && VEG_WORDS.test(ing.name)
     }
+    // Eggs read by the piece, not the gram — "~3 бр." tells Kari's client
+    // what to crack, "150г" makes them reach for a scale. 50г/egg matches
+    // the convention already used across the recipe DB.
+    const EGG_RE = /^Яйц/
+    function eggCount(grams) {
+      return Math.max(1, Math.round(grams / 50))
+    }
     function renderIngredients(ingredients) {
       const list = ingredients || []
       const veg = list.some(isFreeVeg)
       const rest = list.filter(ing => !isFreeVeg(ing))
-      const lines = rest.map(ing => `<div class="ing"><span>${ing.name}</span><span>${ing.grams != null ? `${ing.grams} ${ing.unit || 'г'}` : (ing.unit || '')}</span></div>`)
+      const lines = rest.map(ing => {
+        const value = ing.grams == null
+          ? (ing.unit || '')
+          : EGG_RE.test(ing.name) ? `~${eggCount(ing.grams)} бр.` : `${ing.grams} ${ing.unit || 'г'}`
+        return `<div class="ing"><span>${ing.name}</span><span>${value}</span></div>`
+      })
       if (veg) lines.push('<div class="ing veg"><span>Зеленчуци</span><span>неограничени</span></div>')
       return lines.join('')
     }

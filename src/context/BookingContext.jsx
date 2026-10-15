@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useCallback } from 'react'
 import { DB } from '../lib/db'
-import { isoToday, isoDatePlusDays } from '../lib/bookingUtils'
+import { isoToday, isoDatePlusDays, PLAN_CONFIGS } from '../lib/bookingUtils'
 import { ADMIN_MANAGEABLE_MODULES, FREE_MODULES } from '../lib/modules'
 import { useApp } from './AppContext'
 
@@ -263,7 +263,7 @@ export function BookingProvider({ children }) {
   // ── Admin: activate plan for client ──────────────────────
   const activatePlan = useCallback(async (clientId, planType, validFrom, price = 0, startCredits = null, isPaid = false, validTo = null) => {
     try {
-      const baseTotal = planType === '8' ? 8 : planType === '12' ? 12 : null
+      const baseTotal = PLAN_CONFIGS[planType]?.credits ?? null
       const from = validFrom || isoToday()
       let to = validTo
       if (!to) { const toDate = new Date(from + 'T00:00:00'); toDate.setDate(toDate.getDate() + 30); to = toDate.toISOString().slice(0, 10) }

@@ -29,14 +29,22 @@ async function sbFetch(url, options) {
   return res.json()
 }
 
-// Safe fetch — returns null instead of throwing (for optional tables)
-async function sbFetchSafe(url, options) {
+// Safe fetch — returns null instead of throwing (for optional tables).
+// Retries once after a flaky network blip/transient error so a dropped
+// request doesn't silently render as "no data" (e.g. empty workout history).
+async function sbFetchSafe(url, options, _retried = false) {
   try {
     const res = await fetch(url, options)
-    if (!res.ok) return null
+    if (!res.ok) {
+      if (!_retried) { await new Promise(r => setTimeout(r, 500)); return sbFetchSafe(url, options, true) }
+      return null
+    }
     if (res.status === 204) return null
     return res.json()
-  } catch { return null }
+  } catch {
+    if (!_retried) { await new Promise(r => setTimeout(r, 500)); return sbFetchSafe(url, options, true) }
+    return null
+  }
 }
 
 // Paginated select — bypasses PostgREST's server-side max-rows cap by fetching

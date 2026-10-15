@@ -266,11 +266,26 @@ function scaleRecipe(recipe, kcalTarget, slotKey) {
     }
   }
 
+  // Some dishes get a tighter scaling ceiling than the global 1.9x when
+  // even that reads wrong for the dish (recipe.maxFactor).
+  const maxFactor = recipe.maxFactor || MAX_FACTOR
   const raw = kcalTarget / recipe.kcal
-  if (raw < MIN_FACTOR || raw > MAX_FACTOR) return null
+  if (raw < MIN_FACTOR || raw > maxFactor) return null
   // Round to a quarter portion — "1½ порции" reads better than "1.37".
-  const factor = Math.round(raw * 4) / 4
-  if (factor < MIN_FACTOR || factor > MAX_FACTOR) return null
+  let factor = Math.round(raw * 4) / 4
+  if (factor < MIN_FACTOR || factor > maxFactor) return null
+  // A few dishes stay kcal-eligible for bigger targets than they can
+  // actually look like on a plate (a shakshuka at kcal-fit scaling is 4
+  // eggs and most of a can of tomatoes) — recipe.maxGrams clamps the
+  // portion down instead of matching the target exactly, so it still shows
+  // up as a believable option rather than disappearing outright.
+  if (recipe.maxGrams) {
+    const capFactor = recipe.maxGrams / recipePortionGrams(recipe)
+    if (factor > capFactor) {
+      factor = Math.max(MIN_FACTOR, Math.round(capFactor * 4) / 4)
+      if (factor < MIN_FACTOR) return null
+    }
+  }
 
   const ingredients = recipe.ingredients.map(ing => ({
     name:  ing.name,

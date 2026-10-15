@@ -172,7 +172,7 @@ const RECIPES = [
   {
     id: 7,
     name: 'Шакшука',
-    category: 'main',
+    category: 'main', maxGrams: 650,
     image: 'https://gotvach.bg/files/1200x800/qicashakshuka.webp',
     // 1 порция. bb-team: яйца 143/12.56P/9.51F, домати конс. 20/0.88P/3.9C/0.2F,
     // чушка 26/1.3P/5.3C/0.3F, лук 40/1.1P/9.3C, зехтин 884/100F

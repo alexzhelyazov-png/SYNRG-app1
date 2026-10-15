@@ -2,7 +2,7 @@ import { useEffect, useState, useMemo } from 'react'
 import {
   Box, Typography, Paper, Button, Chip, Divider, IconButton, Tooltip,
   Dialog, DialogTitle, DialogContent, DialogActions, TextField,
-  MenuItem, Select, FormControl, InputLabel, CircularProgress,
+  MenuItem, Select, FormControl, InputLabel, ListSubheader, CircularProgress,
   Tab, Tabs, Alert, Collapse, useMediaQuery,
   Checkbox, FormControlLabel,
   RadioGroup, Radio, FormLabel, LinearProgress,
@@ -45,11 +45,14 @@ import {
   isoToday, isoDatePlusDays, groupByDate, dayLabel, fmtTime,
   occupancyStr, planLabel, fmtValidTo, isPlanActive, creditsRemaining,
   daysUntilExpiry, effectiveValidTo, isFullAdmin,
+  PLAN_CONFIGS, LEGACY_PLAN_TYPES, NEW_PLAN_TYPES,
 } from '../lib/bookingUtils'
 import { parseDate } from '../lib/utils'
 
-const PLAN_TYPES = ['8', '12', 'unlimited']
-const DEFAULT_PRICES = { '8': 154, '12': 179, 'unlimited': 202 }
+const DEFAULT_PRICES = {
+  '8': 154, '12': 179, 'unlimited': 202,
+  '4': 110, '8_new': 190, '12_new': 270,
+}
 const WEEKDAY_KEYS = [1, 2, 3, 4, 5, 6, 0] // Mon–Sun display order
 
 // ── Branded email HTML builder ────────────────────────────────
@@ -414,7 +417,10 @@ function PlanDialog({ open, onClose, onActivate, onExtend, onAdjust, onMarkPaid,
                 displayEmpty
                 sx={{ color: planType ? C.text : C.muted, '.MuiOutlinedInput-notchedOutline': { borderColor: C.border } }}>
                 <MenuItem value="" disabled><em>{t('selectPlanType')}</em></MenuItem>
-                {PLAN_TYPES.map(pt => <MenuItem key={pt} value={pt}>{planLabel(pt, t)}</MenuItem>)}
+                <ListSubheader sx={{ color: C.purple, fontWeight: 700, lineHeight: '28px' }}>{t('newPackagesGroup') || 'Нови пакети'}</ListSubheader>
+                {NEW_PLAN_TYPES.map(pt => <MenuItem key={pt} value={pt}>{planLabel(pt, t)}</MenuItem>)}
+                <ListSubheader sx={{ color: C.muted, fontWeight: 700, lineHeight: '28px' }}>{t('legacyPackagesGroup') || 'Стари пакети – само активни клиенти'}</ListSubheader>
+                {LEGACY_PLAN_TYPES.map(pt => <MenuItem key={pt} value={pt}>{planLabel(pt, t)}</MenuItem>)}
               </Select>
             </FormControl>
             <TextField label={t('validFromLbl')} type="date" size="small"
@@ -436,7 +442,7 @@ function PlanDialog({ open, onClose, onActivate, onExtend, onAdjust, onMarkPaid,
             </Box>
             {/* Migration override: remaining sessions from old platform */}
             {planType && planType !== 'unlimited' && (() => {
-              const total = planType === '8' ? 8 : 12
+              const total = PLAN_CONFIGS[planType]?.credits ?? 12
               const remaining = startCredits !== '' ? Number(startCredits) : total
               return (
                 <Box sx={{ p: 1.5, borderRadius: '12px', background: 'rgba(255,255,255,0.04)', border: `1px solid ${C.border}` }}>
@@ -538,21 +544,26 @@ function ClientInfoDialog({ open, onClose, client, plan, allClientPlans, workout
   const history = (allClientPlans || []).filter(p => p.id !== plan?.id)
   const [upcomingBookings, setUpcomingBookings] = useState([])
   const [pastBookings,    setPastBookings]    = useState([])
+  const [bookingsLoading, setBookingsLoading] = useState(false)
+  const [reloadTick, setReloadTick] = useState(0)
   const [nutriOpen, setNutriOpen] = useState(false)
 
   useEffect(() => {
     if (open && client?.id) {
-      DB.getClientUpcomingBookings(client.id).then(data => {
-        setUpcomingBookings((data || []).filter(b => b.slots))
-      })
-      DB.getClientPastBookings(client.id).then(data => {
-        setPastBookings(data || [])
+      setBookingsLoading(true)
+      Promise.all([
+        DB.getClientUpcomingBookings(client.id),
+        DB.getClientPastBookings(client.id),
+      ]).then(([upcoming, past]) => {
+        setUpcomingBookings((upcoming || []).filter(b => b.slots))
+        setPastBookings(past || [])
+        setBookingsLoading(false)
       })
     } else {
       setUpcomingBookings([])
       setPastBookings([])
     }
-  }, [open, client?.id])
+  }, [open, client?.id, reloadTick])
 
   const infoRow = (label, value, color) => (
     <Box sx={{ display: 'flex', justifyContent: 'space-between', py: 0.5 }}>
@@ -659,7 +670,9 @@ function ClientInfoDialog({ open, onClose, client, plan, allClientPlans, workout
               <Typography sx={{ fontSize: '10px', fontWeight: 800, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.7px', mb: 0.75, mt: 1 }}>
                 {t('workoutHistory')} ({pastBookings.length})
               </Typography>
-              {pastBookings.length > 0 ? (
+              {bookingsLoading ? (
+                <Typography sx={{ fontSize: '11px', color: C.muted }}>{t('loading') || 'Зарежда се...'}</Typography>
+              ) : pastBookings.length > 0 ? (
                 <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
                   {pastBookings.slice(0, 30).map((b, i) => (
                     <Chip key={b.id || i}
@@ -673,7 +686,14 @@ function ClientInfoDialog({ open, onClose, client, plan, allClientPlans, workout
                   )}
                 </Box>
               ) : (
-                <Typography sx={{ fontSize: '11px', color: C.muted }}>{t('noWorkoutsYet') || 'Няма записани тренировки'}</Typography>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Typography sx={{ fontSize: '11px', color: C.muted }}>{t('noWorkoutsYet') || 'Няма записани тренировки'}</Typography>
+                  <Typography
+                    onClick={() => setReloadTick(n => n + 1)}
+                    sx={{ fontSize: '11px', color: C.primary, cursor: 'pointer', fontWeight: 700, textDecoration: 'underline' }}>
+                    {t('retry') || 'Презареди'}
+                  </Typography>
+                </Box>
               )}
             </Box>
           )

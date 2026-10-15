@@ -11,10 +11,19 @@ export function isFullAdmin(auth) {
 }
 
 // ── Plan configs ─────────────────────────────────────────────
+// Legacy tiers (pre-2026-10 pricing) — kept exactly as-is, only ever
+// assignable at renewal to clients who already have them.
+export const LEGACY_PLAN_TYPES = ['8', '12', 'unlimited']
+// Current public pricing — offered to new clients.
+export const NEW_PLAN_TYPES = ['4', '8_new', '12_new']
+
 export const PLAN_CONFIGS = {
-  '8':        { label: '8 тренировки',  credits: 8,   unlimited: false },
-  '12':       { label: '12 тренировки', credits: 12,  unlimited: false },
-  'unlimited':{ label: 'Unlimited',     credits: null, unlimited: true  },
+  '8':        { label: '8 тренировки',      credits: 8,   unlimited: false },
+  '12':       { label: '12 тренировки',     credits: 12,  unlimited: false },
+  'unlimited':{ label: 'Unlimited',         credits: null, unlimited: true  },
+  '4':        { label: '4 тренировки',      credits: 4,   unlimited: false },
+  '8_new':    { label: '8 тренировки (нов)',  credits: 8,   unlimited: false },
+  '12_new':   { label: '12 тренировки (нов)', credits: 12,  unlimited: false },
 }
 
 export function planLabel(planType, t) {

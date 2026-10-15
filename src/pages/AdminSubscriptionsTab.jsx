@@ -5,8 +5,14 @@ import { C } from '../theme'
 import { DB } from '../lib/db'
 import { FREE_MODULES } from '../lib/modules'
 
-const PLAN_LABELS = { '8': 'FLEX', '12': 'PROGRESS', 'unlimited': 'PLUS' }
-const PLAN_COLORS = { '8': C.logan, '12': C.primary, 'unlimited': '#c4e9bf' }
+const PLAN_LABELS = {
+  '8': 'FLEX', '12': 'PROGRESS', 'unlimited': 'PLUS',
+  '4': '4 посещения', '8_new': '8 посещения (нов)', '12_new': '12 посещения (нов)',
+}
+const PLAN_COLORS = {
+  '8': C.logan, '12': C.primary, 'unlimited': '#c4e9bf',
+  '4': C.logan, '8_new': C.primary, '12_new': '#c4e9bf',
+}
 
 export default function SubscriptionsTab({ t, lang }) {
   const { realClients, showSnackbar, updateClientModules, auth } = useApp()

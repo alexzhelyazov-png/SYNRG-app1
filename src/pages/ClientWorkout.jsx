@@ -5,7 +5,7 @@ import EditIcon from '@mui/icons-material/Edit'
 import { useApp } from '../context/AppContext'
 import { WORKOUT_CATEGORIES } from '../lib/constants'
 import { C, EASE } from '../theme'
-import { todayDate } from '../lib/utils'
+import { todayDate, parseDate } from '../lib/utils'
 
 export default function ClientWorkout() {
   const {
@@ -18,6 +18,14 @@ export default function ClientWorkout() {
 
   const [editingWorkout, setEditingWorkout] = useState(null)
   const isCoach = auth.role === 'coach' || auth.role === 'admin'
+
+  // Coach preps workouts ahead of time; a client shouldn't see a prepared
+  // workout until its day has fully passed, or they start doing it on their
+  // own before the coach has walked them through it in person. Coaches
+  // still see everything (they need to manage what they've prepared).
+  const visibleWorkouts = (client.workouts || []).filter(
+    w => isCoach || parseDate(w.date) < parseDate(todayDate())
+  )
 
   const isMobile = window.innerWidth < 640
 
@@ -180,10 +188,10 @@ export default function ClientWorkout() {
       </Paper>
 
       {/* Workout history */}
-      {(client.workouts || []).length > 0 && (
+      {visibleWorkouts.length > 0 && (
         <Box sx={{ mt: 3 }}>
           <Typography variant="h3" sx={{ mb: 1.5, px: 0.5 }}>{t('workoutHistory')}</Typography>
-          {client.workouts.map((w, i) => (
+          {visibleWorkouts.map((w, i) => (
             <Paper key={w.id || i} sx={{ mb: 1.5, p: 2, border: `1px solid ${C.border}`, borderRadius: '14px' }}>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1, alignItems: 'center', flexWrap: 'wrap', gap: 1 }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
