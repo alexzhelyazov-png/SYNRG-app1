@@ -99,11 +99,12 @@ export function AppProvider({ children }) {
   const [workoutCategory, setWorkoutCategory] = useState('Предна верига')
   const [currentWorkout,  setCurrentWorkout]  = useState([])
   const [workoutDate,     setWorkoutDate]     = useState(dateToInput(todayDate()))
+  const [workoutNotes,    setWorkoutNotes]    = useState('')
   const [selCoach,        setSelCoach]        = useState('')
   const workoutDraftsRef = useRef({})  // { [clientId]: { exercises, category, date, exName, exScheme, exWeight } }
   // Keep refs in sync with latest state so saveWorkoutDraft always reads fresh values
-  const workoutStateRef = useRef({ currentWorkout: [], exName: '', exScheme: '', exWeight: '', workoutCategory: 'Предна верига', workoutDate: '' })
-  workoutStateRef.current = { currentWorkout, exName, exScheme, exWeight, workoutCategory, workoutDate }
+  const workoutStateRef = useRef({ currentWorkout: [], exName: '', exScheme: '', exWeight: '', workoutCategory: 'Предна верига', workoutDate: '', workoutNotes: '' })
+  workoutStateRef.current = { currentWorkout, exName, exScheme, exWeight, workoutCategory, workoutDate, workoutNotes }
 
   // ── Food state ────────────────────────────────────────────────
   const [foodDate,      setFoodDate]      = useState(dateToInput(todayDate()))
@@ -264,7 +265,7 @@ export function AppProvider({ children }) {
         ],
         workouts: workouts.filter(w => w.client_id === c.id)
           .sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))
-          .map(w => ({ id: w.id, date: w.date, coach: w.coach, category: w.category, items: w.items || [] })),
+          .map(w => ({ id: w.id, date: w.date, coach: w.coach, category: w.category, items: w.items || [], notes: w.notes || '' })),
         // Completed calendar bookings — used by gamification to count training sessions.
         // Kept separate from workouts (which have exercises/items) to avoid UI side-effects.
         bookedSessions: pastBookingsAll.filter(b => b.clientId === c.id),
@@ -594,7 +595,7 @@ export function AppProvider({ children }) {
             ...(freshWorkouts ? {
               workouts: freshWorkouts.filter(w => w.client_id === c.id)
                 .sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))
-                .map(w => ({ id: w.id, date: w.date, coach: w.coach, category: w.category, items: w.items || [] })),
+                .map(w => ({ id: w.id, date: w.date, coach: w.coach, category: w.category, items: w.items || [], notes: w.notes || '' })),
             } : {}),
             bookedSessions: freshBookings.filter(b => b.clientId === c.id),
           }
@@ -1352,7 +1353,7 @@ export function AppProvider({ children }) {
     try {
       const data = await DB.insert('workouts', {
         client_id: clientId, date: workout.date, coach: workout.coach,
-        category: workout.category, items: workout.items,
+        category: workout.category, items: workout.items, notes: workout.notes || null,
       })
       // Replace tmp id with real DB id
       if (data?.id) {
@@ -1694,6 +1695,7 @@ export function AppProvider({ children }) {
       workoutDraftsRef.current[clientId] = {
         exercises: [...s.currentWorkout], category: s.workoutCategory,
         date: s.workoutDate, exName: s.exName, exScheme: s.exScheme, exWeight: s.exWeight,
+        notes: s.workoutNotes,
       }
     }
   }
@@ -1707,12 +1709,14 @@ export function AppProvider({ children }) {
       setExName(draft.exName || '')
       setExScheme(draft.exScheme || '')
       setExWeight(draft.exWeight || '')
+      setWorkoutNotes(draft.notes || '')
       delete workoutDraftsRef.current[clientId]
     } else {
       setCurrentWorkout([])
       setExName(''); setExScheme(''); setExWeight('')
       setWorkoutCategory('Предна верига')
       setWorkoutDate(dateToInput(todayDate()))
+      setWorkoutNotes('')
     }
   }
 
@@ -1724,8 +1728,10 @@ export function AppProvider({ children }) {
       coach:    auth.name,
       category: workoutCategory,
       items:    currentWorkout,
+      notes:    workoutNotes.trim(),
     })
     setCurrentWorkout([])
+    setWorkoutNotes('')
     showSnackbar(t('workoutSavedMsg'))
   }
 
@@ -1978,6 +1984,7 @@ export function AppProvider({ children }) {
     workoutCategory, setWorkoutCategory,
     currentWorkout, setCurrentWorkout,
     workoutDate, setWorkoutDate,
+    workoutNotes, setWorkoutNotes,
     selCoach, setSelCoach,
     saveWorkoutDraft, restoreWorkoutDraft,
     activeSlotClients, setActiveSlotClients,

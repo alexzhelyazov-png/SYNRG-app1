@@ -618,6 +618,7 @@ export function ClientDetail() {
     workoutCategory, setWorkoutCategory,
     currentWorkout, setCurrentWorkout,
     workoutDate, setWorkoutDate,
+    workoutNotes, setWorkoutNotes,
     addExercise, saveWorkout, deleteWorkout, updateWorkout,
     realClients, setSelIdx, activeSlotClients, activeSessionDate,
   } = useApp()
@@ -1117,6 +1118,15 @@ export function ClientDetail() {
               </Box>
             )}
 
+            {/* Notes — visible to whichever coach runs the client's next session */}
+            <TextField
+              fullWidth multiline minRows={2}
+              placeholder={t('workoutNotesPlaceholder') || 'Бележки към тренировката (напр. болка в рамото, по-леко тегло)...'}
+              value={workoutNotes}
+              onChange={e => setWorkoutNotes(e.target.value)}
+              sx={{ mb: 1.5, '& .MuiInputBase-input': { fontSize: '13px' } }}
+            />
+
             {/* Save button */}
             <Button
               variant="contained" fullWidth disabled={!currentWorkout.length} onClick={saveWorkout}
@@ -1148,7 +1158,7 @@ export function ClientDetail() {
                       <Typography sx={{ color: C.muted, fontSize: '12px' }}>{w.coach || '—'}</Typography>
                       {isCoach && (
                         <>
-                          <IconButton size="small" onClick={() => setEditingWorkout(editingWorkout?.id === w.id ? null : { id: w.id, date: w.date, category: w.category || '', items: w.items.map(ex => ({ ...ex })) })}
+                          <IconButton size="small" onClick={() => setEditingWorkout(editingWorkout?.id === w.id ? null : { id: w.id, date: w.date, category: w.category || '', items: w.items.map(ex => ({ ...ex })), notes: w.notes || '' })}
                             sx={{ color: editingWorkout?.id === w.id ? C.primary : C.muted, ml: 1 }}><EditIcon sx={{ fontSize: 14 }} /></IconButton>
                           {/* Pushed to the far side of the row (not right next to Edit) —
                               a fat-finger tap here permanently deletes a logged workout. */}
@@ -1197,21 +1207,36 @@ export function ClientDetail() {
                       ))}
                       <Button size="small" onClick={() => setEditingWorkout({ ...editingWorkout, items: [...editingWorkout.items, { exercise: '', scheme: '', weight: '' }] })}
                         sx={{ fontSize: '12px', color: C.primary, mt: 0.5 }}>+ {t('addExerciseBtn') || 'Упражнение'}</Button>
+                      <TextField
+                        fullWidth multiline minRows={2} size="small"
+                        placeholder={t('workoutNotesPlaceholder') || 'Бележки към тренировката...'}
+                        value={editingWorkout.notes || ''}
+                        onChange={e => setEditingWorkout({ ...editingWorkout, notes: e.target.value })}
+                        sx={{ mt: 1, '& .MuiInputBase-input': { fontSize: '12px' } }}
+                      />
                       <Box sx={{ display: 'flex', gap: 1, mt: 1 }}>
-                        <Button size="small" variant="contained" onClick={() => { updateWorkout(editingWorkout.id, editingWorkout.items.filter(ex => ex.exercise.trim()), { date: editingWorkout.date, category: editingWorkout.category }); setEditingWorkout(null) }}
+                        <Button size="small" variant="contained" onClick={() => { updateWorkout(editingWorkout.id, editingWorkout.items.filter(ex => ex.exercise.trim()), { date: editingWorkout.date, category: editingWorkout.category, notes: (editingWorkout.notes || '').trim() }); setEditingWorkout(null) }}
                           sx={{ fontSize: '12px', fontWeight: 700, background: C.primary, color: C.primaryOn }}>{t('saveBtn') || 'Запази'}</Button>
                         <Button size="small" onClick={() => setEditingWorkout(null)}
                           sx={{ fontSize: '12px', color: C.muted }}>{t('cancelBtn') || 'Откажи'}</Button>
                       </Box>
                     </>
                   ) : (
-                    (w.items || []).map((ex, j) => (
-                      <Box key={j} sx={{ display: 'grid', gridTemplateColumns: '1fr 90px 60px', gap: 1, py: 0.6, borderBottom: j < w.items.length - 1 ? `1px solid ${C.border}` : 'none' }}>
-                        <Typography sx={{ color: C.text, fontWeight: 600, fontSize: '13px' }}>{ex.exercise}</Typography>
-                        <Typography sx={{ color: C.muted, fontSize: '12.5px' }}>{ex.scheme}</Typography>
-                        <Typography sx={{ color: C.muted, fontSize: '12.5px', textAlign: 'right' }}>{ex.weight} {t('kgUnit')}</Typography>
-                      </Box>
-                    ))
+                    <>
+                      {(w.items || []).map((ex, j) => (
+                        <Box key={j} sx={{ display: 'grid', gridTemplateColumns: '1fr 90px 60px', gap: 1, py: 0.6, borderBottom: j < w.items.length - 1 ? `1px solid ${C.border}` : 'none' }}>
+                          <Typography sx={{ color: C.text, fontWeight: 600, fontSize: '13px' }}>{ex.exercise}</Typography>
+                          <Typography sx={{ color: C.muted, fontSize: '12.5px' }}>{ex.scheme}</Typography>
+                          <Typography sx={{ color: C.muted, fontSize: '12.5px', textAlign: 'right' }}>{ex.weight} {t('kgUnit')}</Typography>
+                        </Box>
+                      ))}
+                      {w.notes && (
+                        <Box sx={{ mt: 1, p: 1, borderRadius: '8px', background: 'rgba(200,197,255,0.06)', border: `1px solid ${C.purpleSoft}` }}>
+                          <Typography sx={{ fontSize: '11px', color: C.purple, fontWeight: 700, mb: 0.25 }}>{t('workoutNotesLbl') || 'Бележка'}</Typography>
+                          <Typography sx={{ fontSize: '12.5px', color: C.muted, fontStyle: 'italic', whiteSpace: 'pre-wrap' }}>{w.notes}</Typography>
+                        </Box>
+                      )}
+                    </>
                   )}
                 </Paper>
               ))}

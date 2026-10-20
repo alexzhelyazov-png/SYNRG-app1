@@ -20,7 +20,11 @@ import { C }              from '../theme'
 import { isAdmin, isFullAdmin, fmtTime, occupancyStr, isoToday, isPlanActive } from '../lib/bookingUtils'
 
 // ── Constants ──────────────────────────────────────────────────
-const HOURS       = [9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]
+const HOURS       = [8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]
+// Only these coaches currently take studio shifts — keeps the picker short
+// in the shift dialogs without touching the full `coaches` list used
+// elsewhere in the app (messages, admin, etc.)
+const SCHEDULABLE_COACHES = ['Елина', 'Ицко', 'Coach Momchil', 'Coach Valentin']
 const WEEKDAYS_BG = ['Нед', 'Пон', 'Вт', 'Ср', 'Чет', 'Пет', 'Съб']
 const WEEKDAYS_EN = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
@@ -34,9 +38,12 @@ const SLOT_COLORS = [
   { bg: 'rgba(255,220,122,0.18)', bd: 'rgba(255,220,122,0.40)', txt: '#FFDC7A' }, // yellow
 ]
 const FIXED_COACH_COLORS = {
-  'Ицко':  { bg: 'rgba(200,197,255,0.18)', bd: 'rgba(200,197,255,0.40)', txt: '#C8C5FF' }, // purple
-  'Елина': { bg: 'rgba(196,233,191,0.18)', bd: 'rgba(196,233,191,0.40)', txt: '#C4E9BF' }, // green
-  'Никола':{ bg: 'rgba(255,220,122,0.18)', bd: 'rgba(255,220,122,0.40)', txt: '#FFDC7A' }, // yellow
+  'Ицко':           { bg: 'rgba(200,197,255,0.18)', bd: 'rgba(200,197,255,0.40)', txt: '#C8C5FF' }, // purple
+  'Елина':          { bg: 'rgba(196,233,191,0.18)', bd: 'rgba(196,233,191,0.40)', txt: '#C4E9BF' }, // green
+  'Никола':         { bg: 'rgba(255,220,122,0.18)', bd: 'rgba(255,220,122,0.40)', txt: '#FFDC7A' }, // yellow
+  'Coach Momchil':  { bg: 'rgba(122,200,255,0.18)', bd: 'rgba(122,200,255,0.40)', txt: '#7AC8FF' }, // blue
+  'Coach Valentin': { bg: 'rgba(255,135,145,0.18)', bd: 'rgba(255,135,145,0.40)', txt: '#FF8791' }, // red/pink
+  'Coach Teodora':  { bg: 'rgba(255,184,122,0.18)', bd: 'rgba(255,184,122,0.40)', txt: '#FFB87A' }, // orange
 }
 function coachColor(name) {
   if (!name) return SLOT_COLORS[0]
@@ -132,7 +139,7 @@ function QuickShiftDialog({ open, onClose, onSave, coaches, defaultDate, t }) {
             <InputLabel sx={{ color: C.muted }}>{t('toLbl')}</InputLabel>
             <Select value={toH} onChange={e => setToH(Number(e.target.value))} label={t('toLbl')}
               sx={{ color: C.text, '.MuiOutlinedInput-notchedOutline': { borderColor: C.border } }}>
-              {[...HOURS.slice(1), 20].map(h => <MenuItem key={h} value={h}>{p2(h)}:00</MenuItem>)}
+              {HOURS.slice(1).map(h => <MenuItem key={h} value={h}>{p2(h)}:00</MenuItem>)}
             </Select>
           </FormControl>
         </Box>
@@ -502,7 +509,11 @@ function SlotCell({ slot, adminMode, onEdit, onDelete, onAddClient, onRemoveClie
 
 // ── Main Schedule Page ─────────────────────────────────────────
 export default function Schedule() {
-  const { auth, coaches, realClients, t, lang, showSnackbar } = useApp()
+  const { auth, coaches: allCoaches, realClients, t, lang, showSnackbar } = useApp()
+  const coaches = useMemo(
+    () => allCoaches.filter(c => SCHEDULABLE_COACHES.includes(c.name)),
+    [allCoaches]
+  )
   const {
     slots, slotBookings,
     loadSlots, loadSlotBookings,
