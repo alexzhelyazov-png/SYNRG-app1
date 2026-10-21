@@ -23,13 +23,16 @@ export default function SubscriptionsTab({ t, lang }) {
   const [pendingReviews, setPendingReviews] = useState([])
   const [planFilter, setPlanFilter] = useState('all') // all | active | unpaid | recent | duplicates
 
-  // Last time anything actually happened on this plan — payment, refund, or
-  // any other update — not just when the row was first created. Sorting and
-  // the "X ago" badge both use this, so marking a plan paid (even days after
-  // it was created) brings it to the top instead of staying buried under its
-  // stale creation date.
+  // Last FINANCIAL event on this plan — paid or refunded — not just when the
+  // row was first created. Sorting and the "X ago" badge both use this, so
+  // marking a plan paid (even days after it was created) brings it to the
+  // top instead of staying buried under its stale creation date.
+  // Deliberately excludes `updated_at`: that column also gets touched by
+  // unrelated things (e.g. credits_used ticking down on a session check-in),
+  // which made an old, long-unpaid plan jump to the top just because someone
+  // trained — "recent activity" has to mean money, not any DB write.
   const lastActivity = (p) =>
-    [p.paid_at, p.refunded_at, p.updated_at, p.created_at]
+    [p.paid_at, p.refunded_at, p.created_at]
       .filter(Boolean)
       .reduce((max, d) => Math.max(max, new Date(d).getTime()), 0)
 
