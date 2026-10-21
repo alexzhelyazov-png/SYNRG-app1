@@ -21,6 +21,17 @@ export default function SubscriptionsTab({ t, lang }) {
   const [programPurchases, setProgramPurchases] = useState([])
   const [invoices, setInvoices] = useState([])
   const [pendingReviews, setPendingReviews] = useState([])
+  const [planFilter, setPlanFilter] = useState('all') // all | active | unpaid | recent | duplicates
+
+  // Last time anything actually happened on this plan — payment, refund, or
+  // any other update — not just when the row was first created. Sorting and
+  // the "X ago" badge both use this, so marking a plan paid (even days after
+  // it was created) brings it to the top instead of staying buried under its
+  // stale creation date.
+  const lastActivity = (p) =>
+    [p.paid_at, p.refunded_at, p.updated_at, p.created_at]
+      .filter(Boolean)
+      .reduce((max, d) => Math.max(max, new Date(d).getTime()), 0)
 
   const reload = useCallback(() => {
     Promise.all([
@@ -29,7 +40,7 @@ export default function SubscriptionsTab({ t, lang }) {
       DB.selectAll('invoices', '&order=invoice_number.desc&limit=200').catch(() => []),
       DB.selectAll('program_reviews', '&status=eq.pending&order=created_at.desc&limit=50').catch(() => []),
     ]).then(([plans, purchases, invs, reviews]) => {
-      setAllPlans(plans.sort((a, b) => (b.created_at || '').localeCompare(a.created_at || '')))
+      setAllPlans(plans.sort((a, b) => lastActivity(b) - lastActivity(a)))
       setProgramPurchases(purchases.sort((a, b) => (b.purchased_at || b.created_at || '').localeCompare(a.purchased_at || a.created_at || '')))
       setInvoices(invs)
       setPendingReviews(reviews || [])
@@ -183,6 +194,24 @@ export default function SubscriptionsTab({ t, lang }) {
   }
 
   async function handleTogglePaid(planId, currentValue) {
+    // Guard against the exact mistake that double-counted real revenue twice
+    // in production (Мария Славкова, Християн Роев): marking a SECOND plan
+    // paid for the same client within a short window, when it's really the
+    // same cash handover. Doesn't block it — some clients genuinely buy twice
+    // same day — just makes the admin confirm.
+    if (!currentValue) {
+      const plan = allPlans.find(p => p.id === planId)
+      const recentOther = plan && allPlans.find(p =>
+        p.id !== planId && p.client_id === plan.client_id && p.is_paid && p.paid_at &&
+        (Date.now() - new Date(p.paid_at).getTime()) < 24 * 60 * 60 * 1000
+      )
+      if (recentOther) {
+        const msg = lang === 'en'
+          ? `${getName(plan.client_id)} already has another plan marked paid in the last 24h. Mark this one as paid too?`
+          : `${getName(plan.client_id)} вече има друг план, маркиран платен през последните 24ч. Да маркирам и този като платен?`
+        if (!window.confirm(msg)) return
+      }
+    }
     // paid_at is what Finance buckets revenue by (see AnalyticsTab) — it must
     // be set here too, not just in the dedicated "mark paid" flow, or a plan
     // toggled paid days after it was created silently falls back to
@@ -203,6 +232,24 @@ export default function SubscriptionsTab({ t, lang }) {
   const duplicateClientIds = Object.entries(clientPlanCount)
     .filter(([, count]) => count > 1)
     .map(([id]) => id)
+
+  const RECENT_MS = 24 * 60 * 60 * 1000
+  const isRecentlyPaid = (p) => p.is_paid && p.paid_at && (Date.now() - new Date(p.paid_at).getTime()) < RECENT_MS
+
+  const FILTERS = [
+    { key: 'all',        label: lang === 'en' ? 'All'            : 'Всички' },
+    { key: 'active',      label: lang === 'en' ? 'Active'         : 'Активни' },
+    { key: 'unpaid',      label: lang === 'en' ? 'Unpaid'         : 'Неплатени' },
+    { key: 'recent',      label: lang === 'en' ? 'Recently paid'  : 'Наскоро платени' },
+    { key: 'duplicates',  label: lang === 'en' ? 'Duplicates'     : 'Дубликати' },
+  ]
+  const visiblePlans = allPlans.filter(p => {
+    if (planFilter === 'active')     return p.status === 'active'
+    if (planFilter === 'unpaid')     return p.status === 'active' && !p.is_paid
+    if (planFilter === 'recent')     return isRecentlyPaid(p)
+    if (planFilter === 'duplicates') return duplicateClientIds.includes(p.client_id) && p.status === 'active'
+    return true
+  })
 
   if (loading) return <Typography sx={{ color: C.muted, py: 4, textAlign: 'center' }}>...</Typography>
 
@@ -391,11 +438,25 @@ export default function SubscriptionsTab({ t, lang }) {
 
       {/* All plans */}
       <Typography sx={{ fontSize: '11px', fontWeight: 700, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.8px', mb: 1.5 }}>
-        {lang === 'en' ? `All subscriptions (${allPlans.length})` : `Всички абонаменти (${allPlans.length})`}
+        {lang === 'en' ? `All subscriptions (${visiblePlans.length})` : `Всички абонаменти (${visiblePlans.length})`}
       </Typography>
 
+      <Box sx={{ display: 'flex', gap: 0.75, mb: 1.5, flexWrap: 'wrap' }}>
+        {FILTERS.map(f => (
+          <Box key={f.key} onClick={() => setPlanFilter(f.key)} sx={{
+            px: 1.25, py: 0.5, borderRadius: '100px', cursor: 'pointer', fontSize: '12px', fontWeight: 700,
+            background: planFilter === f.key ? C.primary : 'transparent',
+            color:      planFilter === f.key ? C.primaryOn || '#0f1c11' : C.muted,
+            border:     `1px solid ${planFilter === f.key ? C.primary : C.border}`,
+            '&:hover':  planFilter === f.key ? {} : { borderColor: C.logan },
+          }}>
+            {f.label}
+          </Box>
+        ))}
+      </Box>
+
       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75 }}>
-        {allPlans.map(p => {
+        {visiblePlans.map(p => {
           const isActive = p.status === 'active'
           const isDuplicate = duplicateClientIds.includes(p.client_id) && isActive
           const remaining = p.plan_type === 'unlimited' ? null : p.credits_total - p.credits_used
@@ -437,26 +498,43 @@ export default function SubscriptionsTab({ t, lang }) {
                 }
               </Typography>
 
-              {/* Paid - clickable toggle */}
-              <Tooltip title={lang === 'en' ? 'Toggle paid status' : 'Смени статус платено'} arrow>
-                <Box onClick={() => handleTogglePaid(p.id, p.is_paid)} sx={{
-                  fontSize: '10px', fontWeight: 700, px: 0.75, py: 0.15, borderRadius: '4px', cursor: 'pointer',
-                  background: p.is_paid ? 'rgba(74,222,128,0.12)' : 'rgba(224,82,82,0.12)',
-                  color: p.is_paid ? '#4ade80' : '#e05252',
-                  '&:hover': { opacity: 0.7 },
-                }}>
-                  {p.is_paid ? (lang === 'en' ? 'PAID' : 'ПЛ.') : (lang === 'en' ? 'UNPAID' : 'НЕПЛ.')}
-                </Box>
-              </Tooltip>
+              {/* Paid status — only toggleable on an active plan. A replaced/
+                  expired plan's paid status is frozen: this is exactly how an
+                  already-superseded plan got re-marked paid by mistake and
+                  double-counted a renewal payment (Мария Славкова, Християн
+                  Роев incidents). To correct an old plan, use its own
+                  Refund/manage dialog instead of this quick toggle. */}
+              {isActive ? (
+                <Tooltip title={lang === 'en' ? 'Toggle paid status' : 'Смени статус платено'} arrow>
+                  <Box onClick={() => handleTogglePaid(p.id, p.is_paid)} sx={{
+                    fontSize: '10px', fontWeight: 700, px: 0.75, py: 0.15, borderRadius: '4px', cursor: 'pointer',
+                    background: p.is_paid ? 'rgba(74,222,128,0.12)' : 'rgba(224,82,82,0.12)',
+                    color: p.is_paid ? '#4ade80' : '#e05252',
+                    '&:hover': { opacity: 0.7 },
+                  }}>
+                    {p.is_paid ? (lang === 'en' ? 'PAID' : 'ПЛ.') : (lang === 'en' ? 'UNPAID' : 'НЕПЛ.')}
+                  </Box>
+                </Tooltip>
+              ) : (
+                <Tooltip title={lang === 'en' ? 'Locked — plan is no longer active' : 'Заключено — планът вече не е активен'} arrow>
+                  <Box sx={{
+                    fontSize: '10px', fontWeight: 700, px: 0.75, py: 0.15, borderRadius: '4px',
+                    background: p.is_paid ? 'rgba(74,222,128,0.08)' : 'rgba(224,82,82,0.08)',
+                    color: p.is_paid ? 'rgba(74,222,128,0.6)' : 'rgba(224,82,82,0.6)',
+                  }}>
+                    {p.is_paid ? (lang === 'en' ? 'PAID' : 'ПЛ.') : (lang === 'en' ? 'UNPAID' : 'НЕПЛ.')}
+                  </Box>
+                </Tooltip>
+              )}
 
               {/* Date */}
               <Typography sx={{ fontSize: '11px', color: C.muted, whiteSpace: 'nowrap' }}>
                 {formatDate(p.valid_from)}
               </Typography>
 
-              {/* Time since */}
+              {/* Time since last activity (payment, refund, etc.) — not creation */}
               <Typography sx={{ fontSize: '10px', color: C.muted, whiteSpace: 'nowrap', minWidth: 35 }}>
-                {timeSince(p.created_at)}
+                {timeSince(lastActivity(p))}
               </Typography>
 
               {/* Actions */}

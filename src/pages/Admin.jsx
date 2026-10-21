@@ -249,17 +249,19 @@ function SlotDialog({ open, onClose, onSave, coaches, t }) {
 }
 
 // ── Activate/manage plan dialog ──────────────────────────────
-function PlanDialog({ open, onClose, onActivate, onExtend, onAdjust, onMarkPaid, client, plan, t }) {
+function PlanDialog({ open, onClose, onActivate, onExtend, onAdjust, onMarkPaid, onRefund, client, plan, t }) {
   // No mode selected by default when a plan already exists — the dialog opens
   // on the paid/unpaid status alone, not a pre-filled "create new plan" form
   // sitting redundantly underneath it. A brand-new client (no plan yet) has
   // only one thing to do here, so that one skips straight to the form.
-  const [mode,          setMode]         = useState(plan ? null : 'activate') // null | 'activate' | 'extend' | 'adjust'
+  const [mode,          setMode]         = useState(plan ? null : 'activate') // null | 'activate' | 'extend' | 'adjust' | 'refund'
   const [planType,      setPlanType]     = useState('')
   const [validFrom,     setValidFrom]    = useState(isoToday())
   const [validTo,       setValidTo]      = useState(() => isoDatePlusDays(30))
   const [extendTo,      setExtendTo]     = useState('')
   const [credUsed,      setCredUsed]     = useState(plan?.credits_used ?? 0)
+  const [refundAmount,  setRefundAmount] = useState(plan?.price ?? 0)
+  const [refundReason,  setRefundReason] = useState('')
   // Price never defaults to 0: existing plan's price if >0, else the tariff for
   // its type, else the 8-session tariff. Keeps revenue from silently going 0.
   const [price,         setPrice]        = useState(
@@ -271,6 +273,10 @@ function PlanDialog({ open, onClose, onActivate, onExtend, onAdjust, onMarkPaid,
   // before there's a row to mark paid on. Payment normally happens in cash at
   // the 2nd session, so this defaults unchecked.
   const [isPaid,        setIsPaid]       = useState(false)
+  // Settle an unpaid OLD plan in the SAME step as renewing it, instead of a
+  // separate click elsewhere later (the split is what caused two "paid" rows
+  // for one real payment — see activatePlan's markOldPlanPaid).
+  const [markOldPaid,   setMarkOldPaid]  = useState(false)
   const [startCredits,  setStartCredits] = useState('')
   const [saving,        setSaving]       = useState(false)
   const [marking,       setMarking]      = useState(false)
@@ -313,11 +319,13 @@ function PlanDialog({ open, onClose, onActivate, onExtend, onAdjust, onMarkPaid,
     let res
     if (mode === 'activate' && planType) {
       const sc = startCredits !== '' ? Number(startCredits) : null
-      res = await onActivate(client.id, planType, validFrom, safePrice, sc, isPaid, validTo)
+      res = await onActivate(client.id, planType, validFrom, safePrice, sc, isPaid, validTo, markOldPaid)
     } else if (mode === 'extend') {
       res = await onExtend(plan.id, extendTo)
     } else if (mode === 'adjust') {
       res = await onAdjust(plan.id, Number(credUsed))
+    } else if (mode === 'refund') {
+      res = await onRefund(plan.id, Number(refundAmount), refundReason)
     }
     setSaving(false)
     if (!res?.error) onClose()
@@ -378,6 +386,7 @@ function PlanDialog({ open, onClose, onActivate, onExtend, onAdjust, onMarkPaid,
             { key: 'activate', label: t('activatePlanBtn') },
             ...(plan ? [{ key: 'extend', label: t('extendPlanBtn') }] : []),
             ...(plan && plan.plan_type !== 'unlimited' ? [{ key: 'adjust', label: t('adjustCreditsBtn') }] : []),
+            ...(plan && plan.is_paid ? [{ key: 'refund', label: t('refundPlanBtn') || 'Възстанови сума' }] : []),
           ].map(({ key, label }) => (
             <Box key={key} onClick={() => setMode(key)} sx={{
               px: 2, py: 0.75, borderRadius: '100px', cursor: 'pointer', fontSize: '12px', fontWeight: 700,
@@ -440,6 +449,17 @@ function PlanDialog({ open, onClose, onActivate, onExtend, onAdjust, onMarkPaid,
                 sx={{ '& .MuiTypography-root': { fontSize: '12px', color: isPaid ? C.purple : C.muted, fontWeight: 700 }, mt: 0.5 }}
               />
             </Box>
+            {/* Renewal settling an unpaid old plan — one deliberate checkbox
+                instead of a separate click somewhere else later (that split
+                is how the same cash payment ended up counted twice). */}
+            {plan && !plan.is_paid && (
+              <FormControlLabel
+                control={<Checkbox checked={markOldPaid} onChange={e => setMarkOldPaid(e.target.checked)}
+                  sx={{ color: '#F87171', '&.Mui-checked': { color: '#F87171' }, p: 0.5 }} />}
+                label={(t('markOldPlanPaidLbl') || 'Старият план ({price} €) също не е платен — маркирай и него като платен').replace('{price}', plan.price)}
+                sx={{ '& .MuiTypography-root': { fontSize: '12px', color: markOldPaid ? '#F87171' : C.muted, fontWeight: 700 }, mt: 0.5 }}
+              />
+            )}
             {/* Migration override: remaining sessions from old platform */}
             {planType && planType !== 'unlimited' && (() => {
               const total = PLAN_CONFIGS[planType]?.credits ?? 12
@@ -500,13 +520,34 @@ function PlanDialog({ open, onClose, onActivate, onExtend, onAdjust, onMarkPaid,
           </>
         )}
 
+        {/* Refund — ends the plan WITHOUT deleting it, so Finance keeps an
+            accurate record of what cash actually stayed (price - refund). */}
+        {mode === 'refund' && plan && (
+          <>
+            <Typography sx={{ fontSize: '12px', color: C.muted }}>
+              {t('refundHintLbl')} {plan.price} €. {t('refundHintLbl2')}
+            </Typography>
+            <TextField label={t('refundAmountLbl') || 'Върната сума (€)'} type="number" size="small"
+              value={refundAmount} onChange={e => setRefundAmount(e.target.value)}
+              inputProps={{ min: 0, max: plan.price, step: 1 }}
+              sx={inputSx} />
+            <TextField label={t('refundReasonLbl') || 'Причина (по избор)'} size="small"
+              value={refundReason} onChange={e => setRefundReason(e.target.value)}
+              sx={inputSx} />
+            <Typography sx={{ fontSize: '12px', color: C.primary, fontWeight: 700 }}>
+              {t('refundNetLbl') || 'Остава като приход'}: {Math.max(0, Number(plan.price) - (Number(refundAmount) || 0))} €
+            </Typography>
+          </>
+        )}
+
       </DialogContent>
       <DialogActions sx={{ px: 3, pb: 2 }}>
         <Button onClick={onClose} sx={{ color: C.muted }}>{t('cancelBtn')}</Button>
         {mode && (
-          <Button variant="contained" onClick={handleSave} disabled={saving || (mode === 'activate' && !planType)}
-            sx={{ background: C.primary, color: '#0f1c11', fontWeight: 700 }}>
-            {saving ? <CircularProgress size={16} /> : t('saveBtn')}
+          <Button variant="contained" onClick={handleSave}
+            disabled={saving || (mode === 'activate' && !planType) || (mode === 'refund' && Number(refundAmount) <= 0)}
+            sx={{ background: mode === 'refund' ? '#F87171' : C.primary, color: mode === 'refund' ? '#fff' : '#0f1c11', fontWeight: 700 }}>
+            {saving ? <CircularProgress size={16} /> : (mode === 'refund' ? (t('refundBtn') || 'Възстанови сума') : t('saveBtn'))}
           </Button>
         )}
       </DialogActions>
@@ -523,6 +564,17 @@ function PlanDialog({ open, onClose, onActivate, onExtend, onAdjust, onMarkPaid,
 async function markPlanPaidShared(plan, client, auth, loadAllPlans, showSnackbar, t) {
   if (!plan) return
   try {
+    // Same guard as the Абонаменти quick-toggle: catch marking a SECOND plan
+    // paid for this client within a short window (the exact pattern that
+    // double-counted one real payment as two in production).
+    const siblings = await DB.findWhere('client_plans', 'client_id', plan.client_id).catch(() => [])
+    const recentOther = siblings.find(p =>
+      p.id !== plan.id && p.is_paid && p.paid_at &&
+      (Date.now() - new Date(p.paid_at).getTime()) < 24 * 60 * 60 * 1000
+    )
+    if (recentOther && !window.confirm(
+      `${client?.name || 'Клиентът'} вече има друг план, маркиран платен през последните 24ч. Да маркирам и този като платен?`
+    )) return
     await DB.update('client_plans', plan.id, {
       is_paid: true,
       paid_at: new Date().toISOString(),
@@ -1301,7 +1353,7 @@ function BroadcastDialog({ open, onClose, clients, allPlans, t, singleClient }) 
 // ── Plans Tab ────────────────────────────────────────────────
 function PlansTab({ t }) {
   const { realClients, showSnackbar, auth } = useApp()
-  const { allPlans, loadAllPlans, activatePlan, extendPlan, adjustCredits } = useBooking()
+  const { allPlans, loadAllPlans, activatePlan, extendPlan, adjustCredits, refundPlan } = useBooking()
   const [search,      setSearch]      = useState('')
   const [planDlg,     setPlanDlg]     = useState(null) // { client, plan }
   const [loaded,      setLoaded]      = useState(false)
@@ -1315,8 +1367,8 @@ function PlansTab({ t }) {
     return allPlans.find(p => p.client_id === clientId && p.status === 'active') || null
   }
 
-  async function handleActivate(clientId, planType, from, price, startCredits, isPaid, validTo) {
-    const res = await activatePlan(clientId, planType, from, price, startCredits, isPaid, validTo)
+  async function handleActivate(clientId, planType, from, price, startCredits, isPaid, validTo, markOldPaid) {
+    const res = await activatePlan(clientId, planType, from, price, startCredits, isPaid, validTo, markOldPaid)
     if (res?.error) { showSnackbar('Грешка: ' + res.error); return res }
     showSnackbar(t('planActivatedMsg'))
     return { ok: true }
@@ -1325,6 +1377,12 @@ function PlansTab({ t }) {
     const res = await extendPlan(planId, date)
     if (res?.error) { showSnackbar('Грешка: ' + res.error); return res }
     showSnackbar(t('planExtendedMsg'))
+    return { ok: true }
+  }
+  async function handleRefund(planId, amount, reason) {
+    const res = await refundPlan(planId, amount, reason)
+    if (res?.error) { showSnackbar('Грешка: ' + res.error); return res }
+    showSnackbar(t('refundedMsg') || 'Възстановено')
     return { ok: true }
   }
   async function handleAdjust(planId, credits) {
@@ -1381,6 +1439,7 @@ function PlansTab({ t }) {
           onActivate={handleActivate}
           onExtend={handleExtend}
           onAdjust={handleAdjust}
+          onRefund={handleRefund}
           onMarkPaid={(plan) => markPlanPaidShared(plan, planDlg.client, auth, loadAllPlans, showSnackbar, t)}
           client={planDlg.client}
           plan={planDlg.plan}
@@ -1617,7 +1676,7 @@ function ClientModuleEditor({ clientId, currentModules, t, lang }) {
 
 function ClientsTab({ t }) {
   const { realClients, showSnackbar, lang, setConfirmDelete, setClientArchived, auth } = useApp()
-  const { allPlans, loadAllPlans, activatePlan, extendPlan, adjustCredits, deactivatePlan } = useBooking()
+  const { allPlans, loadAllPlans, activatePlan, extendPlan, adjustCredits, deactivatePlan, refundPlan } = useBooking()
   const [planDlg, setPlanDlg]   = useState(null)
   const [quickExt, setQuickExt] = useState(null) // { client, plan }
   const [loaded, setLoaded]     = useState(false)
@@ -1686,8 +1745,8 @@ function ClientsTab({ t }) {
     }
   }
 
-  async function handleActivate(clientId, planType, from, price, startCredits, isPaid, validTo) {
-    const res = await activatePlan(clientId, planType, from, price, startCredits, isPaid, validTo)
+  async function handleActivate(clientId, planType, from, price, startCredits, isPaid, validTo, markOldPaid) {
+    const res = await activatePlan(clientId, planType, from, price, startCredits, isPaid, validTo, markOldPaid)
     if (res?.error) { showSnackbar('Грешка: ' + res.error); return res }
     showSnackbar(t('planActivatedMsg'))
     return { ok: true }
@@ -1697,6 +1756,13 @@ function ClientsTab({ t }) {
     const res = await deactivatePlan(planId)
     if (res?.error) { showSnackbar('Грешка: ' + res.error); return }
     showSnackbar(t('deactivatePlanMsg'))
+  }
+
+  async function handleRefund(planId, amount, reason) {
+    const res = await refundPlan(planId, amount, reason)
+    if (res?.error) { showSnackbar('Грешка: ' + res.error); return res }
+    showSnackbar(t('refundedMsg') || 'Възстановено')
+    return { ok: true }
   }
 
 
@@ -1801,6 +1867,7 @@ function ClientsTab({ t }) {
           onActivate={handleActivate}
           onExtend={async (planId, date) => { const r = await extendPlan(planId, date); if (r?.error) { showSnackbar('Грешка: ' + r.error); return r } showSnackbar(t('planExtendedMsg')); return { ok: true } }}
           onAdjust={async (planId, credits) => { const r = await adjustCredits(planId, credits); if (r?.error) { showSnackbar('Грешка: ' + r.error); return r } showSnackbar(t('creditsAdjustedMsg')); return { ok: true } }}
+          onRefund={handleRefund}
           onMarkPaid={(plan) => markPlanPaidShared(plan, planDlg.client, auth, loadAllPlans, showSnackbar, t)}
           client={planDlg.client} plan={planDlg.plan} t={t} />
       )}
@@ -1861,7 +1928,9 @@ function AnalyticsTab({ t }) {
     return d >= monthStart && d < nextMonth
   })
 
-  const revenue = monthPlans.reduce((sum, p) => sum + (Number(p.price) || 0), 0)
+  // Net of any refund — a partially refunded plan (e.g. 154 paid, 115
+  // refunded after 2 sessions) must count the 39 kept, not the full price.
+  const revenue = monthPlans.reduce((sum, p) => sum + (Number(p.price) || 0) - (Number(p.refund_amount) || 0), 0)
   const expTotal = monthExpenses.reduce((sum, e) => sum + (Number(e.amount) || 0), 0)
   const profit = revenue - expTotal
 
@@ -2337,7 +2406,7 @@ function CoachesTab({ t }) {
 // ── Dashboard Tab ────────────────────────────────────────────
 function DashboardTab({ t, lang, goTo }) {
   const { realClients, showSnackbar, setConfirmDelete, updateClientModules, setClientArchived, auth } = useApp()
-  const { allPlans, loadAllPlans, activatePlan, extendPlan, adjustCredits } = useBooking()
+  const { allPlans, loadAllPlans, activatePlan, extendPlan, adjustCredits, refundPlan } = useBooking()
   const [loaded,       setLoaded]       = useState(false)
   const [planDlg,      setPlanDlg]      = useState(null)
   const [broadcastDlg, setBroadcastDlg] = useState(null) // null | 'free' | { singleClient }
@@ -2385,8 +2454,8 @@ function DashboardTab({ t, lang, goTo }) {
     await updateClientModules(client.id, studioModules)
     setPlanDlg({ client: { ...client, modules: studioModules }, plan: null })
   }
-  async function handleActivate(clientId, planType, from, price, startCredits, isPaid) {
-    const res = await activatePlan(clientId, planType, from, price, startCredits, isPaid)
+  async function handleActivate(clientId, planType, from, price, startCredits, isPaid, validTo, markOldPaid) {
+    const res = await activatePlan(clientId, planType, from, price, startCredits, isPaid, validTo, markOldPaid)
     if (res?.error) { showSnackbar(t('errGeneric') + ': ' + res.error); return res }
     showSnackbar(t('planActivatedMsg'))
     return { ok: true }
@@ -2401,6 +2470,12 @@ function DashboardTab({ t, lang, goTo }) {
     const res = await adjustCredits(planId, credits)
     if (res?.error) { showSnackbar(t('errGeneric') + ': ' + res.error); return res }
     showSnackbar(t('creditsAdjustedMsg'))
+    return { ok: true }
+  }
+  async function handleRefund(planId, amount, reason) {
+    const res = await refundPlan(planId, amount, reason)
+    if (res?.error) { showSnackbar(t('errGeneric') + ': ' + res.error); return res }
+    showSnackbar(t('refundedMsg') || 'Възстановено')
     return { ok: true }
   }
 
@@ -2635,6 +2710,7 @@ function DashboardTab({ t, lang, goTo }) {
         <PlanDialog open={!!planDlg} onClose={() => setPlanDlg(null)}
           onActivate={handleActivate} onExtend={handleExtend}
           onAdjust={handleAdjust}
+          onRefund={handleRefund}
           onMarkPaid={(plan) => markPlanPaidShared(plan, planDlg.client, auth, loadAllPlans, showSnackbar, t)}
           client={planDlg.client} plan={planDlg.plan} t={t} />
       )}

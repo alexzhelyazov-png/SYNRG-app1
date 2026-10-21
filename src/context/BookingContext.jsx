@@ -261,7 +261,7 @@ export function BookingProvider({ children }) {
   }, [loadSlots])
 
   // ── Admin: activate plan for client ──────────────────────
-  const activatePlan = useCallback(async (clientId, planType, validFrom, price = 0, startCredits = null, isPaid = false, validTo = null) => {
+  const activatePlan = useCallback(async (clientId, planType, validFrom, price = 0, startCredits = null, isPaid = false, validTo = null, markOldPlanPaid = false) => {
     try {
       const baseTotal = PLAN_CONFIGS[planType]?.credits ?? null
       const from = validFrom || isoToday()
@@ -277,8 +277,31 @@ export function BookingProvider({ children }) {
           && existing.plan_type !== 'unlimited' && existing.credits_total != null) {
         carryover = Math.max(0, (existing.credits_total || 0) - (existing.credits_used || 0))
       }
+      // Guard: the old plan was ALREADY marked paid very recently and this
+      // new one is ALSO being created pre-paid — almost always the same cash
+      // handover counted twice, not two separate payments. Checked BEFORE any
+      // write so a cancel here leaves the old plan untouched.
+      if (isPaid && existing?.is_paid && existing.paid_at &&
+          (Date.now() - new Date(existing.paid_at).getTime()) < 24 * 60 * 60 * 1000) {
+        const ok = window.confirm(
+          'Старият план на този клиент вече е маркиран платен през последните 24ч. ' +
+          'Сигурен ли си, че това е ОТДЕЛНО плащане, а не същото пренесено по грешка?'
+        )
+        if (!ok) return { error: 'cancelled' }
+      }
       if (existing) {
-        await DB.update('client_plans', existing.id, { status: 'expired' })
+        // markOldPlanPaid lets the admin settle an unpaid old plan in the SAME
+        // step as the renewal, instead of two disconnected actions across two
+        // screens — that split is what produced two separate "paid" rows for
+        // what was really one cash handover (seen live with Мария Славкова /
+        // Християн Роев). Only ever applies here, never silently elsewhere.
+        const expirePatch = { status: 'expired' }
+        if (markOldPlanPaid && !existing.is_paid) {
+          expirePatch.is_paid = true
+          expirePatch.paid_at = new Date().toISOString()
+          expirePatch.paid_by = auth.name
+        }
+        await DB.update('client_plans', existing.id, expirePatch)
       }
       // Compute final credits_total / credits_used:
       //   - If admin set startCredits explicitly: total stays at baseTotal, used = total - startCredits.
@@ -396,6 +419,31 @@ export function BookingProvider({ children }) {
     } catch (e) { return { error: e.message } }
   }, [allPlans, loadAllPlans, updateClientModules])
 
+  // ── Admin: refund plan (partial or full) ──────────────────
+  // Keeps the plan row (and its price) in place so Finance still sees the
+  // net amount actually kept — unlike deleting the client, which erased the
+  // whole payment record, portion-kept-as-revenue included.
+  const refundPlan = useCallback(async (planId, refundAmount, reason = '') => {
+    try {
+      const plan = allPlans.find(p => p.id === planId)
+      await DB.update('client_plans', planId, {
+        status:        'refunded',
+        refund_amount: Math.max(0, Number(refundAmount) || 0),
+        refunded_at:   new Date().toISOString(),
+        ...(reason ? { notes: reason } : {}),
+        updated_at:    new Date().toISOString(),
+      })
+      if (plan?.client_id) {
+        const other = await DB.getClientActivePlan(plan.client_id)
+        if (!other) {
+          await updateClientModules(plan.client_id, [...FREE_MODULES])
+        }
+      }
+      await loadAllPlans()
+      return { ok: true }
+    } catch (e) { return { error: e.message } }
+  }, [allPlans, loadAllPlans, updateClientModules])
+
   // ── Admin: manually add client to slot ────────────────────
   const adminAddToSlot = useCallback(async (slotId, clientId, clientName, useCredit = false, overrideUnpaid = false) => {
     try {
@@ -449,7 +497,7 @@ export function BookingProvider({ children }) {
       // Admin slot actions
       createSlot, createRecurringSlots, createShiftSlots, updateSlot, deleteSlot,
       // Admin plan actions
-      activatePlan, extendPlan, adjustCredits, deactivatePlan,
+      activatePlan, extendPlan, adjustCredits, deactivatePlan, refundPlan,
       // Admin booking management
       adminAddToSlot, adminRemoveFromSlot,
     }}>
