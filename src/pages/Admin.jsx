@@ -405,6 +405,24 @@ function PlanDialog({ open, onClose, onActivate, onExtend, onAdjust, onMarkPaid,
             there's nothing else to show because there's no plan yet) */}
         {mode === 'activate' && (
           <>
+            {/* The actual mechanism behind the Християн Роев / Мария Славкова
+                duplicate-row incidents: the client already has an UNPAID plan
+                on file, and instead of just confirming that payment (the
+                "Отбележи платено" button already sitting at the top of this
+                dialog), a second full "Активирай план" gets submitted —
+                inserting a brand new row and leaving the first one stranded
+                expired-but-untouched. Steer away from that before the form
+                below ever gets filled in. */}
+            {plan && !plan.is_paid && (
+              <Box sx={{ p: 1.5, borderRadius: '10px', background: 'rgba(255,107,157,0.1)', border: '1px solid rgba(255,107,157,0.3)' }}>
+                <Typography sx={{ fontSize: '12px', fontWeight: 700, color: '#FF6B9D' }}>
+                  Клиентът вече има неплатен план — вероятно просто плаща сега
+                </Typography>
+                <Typography sx={{ fontSize: '11px', color: C.muted, mt: 0.5 }}>
+                  Ако той/тя не купува нов период, а само плаща за текущия — затвори това и натисни "{t('markPaidBtn') || 'Отбележи платено'}" горе. Активиране тук създава ВТОРИ отделен план и старият остава изоставен неплатен.
+                </Typography>
+              </Box>
+            )}
             {/* A short period on a client who already has a plan on file is
                 almost always meant to be a free grace extension, not a new
                 paid sale — this is exactly the mistake that inflated Finance

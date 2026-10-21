@@ -277,6 +277,21 @@ export function BookingProvider({ children }) {
           && existing.plan_type !== 'unlimited' && existing.credits_total != null) {
         carryover = Math.max(0, (existing.credits_total || 0) - (existing.credits_used || 0))
       }
+      // Guard: the client already has a plan created within the last few
+      // hours and this activation would expire it and insert ANOTHER one.
+      // This is the exact mechanism behind the Християн Роев duplicate-row
+      // incident — an admin re-ran "Активирай план" shortly after the first
+      // one instead of using "Отбележи платено" on the existing unpaid row.
+      // Checked regardless of paid status, before any write.
+      if (existing?.created_at &&
+          (Date.now() - new Date(existing.created_at).getTime()) < 3 * 60 * 60 * 1000) {
+        const ok = window.confirm(
+          'Този клиент вече има план, създаден през последните няколко часа. ' +
+          'Ако просто плаща сега за същия план, затвори това и ползвай "Отбележи платено" — ' +
+          'активиране тук ще създаде ВТОРИ отделен план. Продължи само ако наистина е нов период.'
+        )
+        if (!ok) return { error: 'cancelled' }
+      }
       // Guard: the old plan was ALREADY marked paid very recently and this
       // new one is ALSO being created pre-paid — almost always the same cash
       // handover counted twice, not two separate payments. Checked BEFORE any

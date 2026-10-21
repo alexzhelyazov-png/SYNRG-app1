@@ -165,16 +165,6 @@ export default function SubscriptionsTab({ t, lang }) {
     return new Date(d).toLocaleDateString('bg-BG', { day: '2-digit', month: '2-digit', year: 'numeric' })
   }
 
-  const timeSince = (d) => {
-    if (!d) return ''
-    const diff = Date.now() - new Date(d).getTime()
-    const mins = Math.floor(diff / 60000)
-    if (mins < 60) return `${mins} ${lang === 'en' ? 'min ago' : 'мин'}`
-    const hrs = Math.floor(mins / 60)
-    if (hrs < 24) return `${hrs} ${lang === 'en' ? 'hr ago' : 'ч'}`
-    const days = Math.floor(hrs / 24)
-    return `${days} ${lang === 'en' ? 'd ago' : 'д'}`
-  }
 
   async function handleDeactivate(planId) {
     const plan = allPlans.find(p => p.id === planId)
@@ -535,9 +525,10 @@ export default function SubscriptionsTab({ t, lang }) {
                 {formatDate(p.valid_from)}
               </Typography>
 
-              {/* Time since last activity (payment, refund, etc.) — not creation */}
-              <Typography sx={{ fontSize: '10px', color: C.muted, whiteSpace: 'nowrap', minWidth: 35 }}>
-                {timeSince(lastActivity(p))}
+              {/* Price — net of any refund, so a partially refunded plan shows
+                  what it actually kept, not the original charge */}
+              <Typography sx={{ fontSize: '11px', fontWeight: 700, color: C.text, whiteSpace: 'nowrap', minWidth: 45, textAlign: 'right' }}>
+                {(Number(p.price) || 0) - (Number(p.refund_amount) || 0)} €
               </Typography>
 
               {/* Actions */}
