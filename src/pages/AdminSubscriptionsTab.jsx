@@ -539,28 +539,6 @@ export default function SubscriptionsTab({ t, lang }) {
                   </Box>
                 </Tooltip>
               )}
-              {/* Quiet correction link for the opposite mistake — marked paid
-                  by accident. Deliberately less prominent than "Маркирай
-                  платено": this undoes an error, it isn't a normal daily
-                  action, and shouldn't tempt a fat-finger the way a solid
-                  button would. */}
-              {isActive && p.is_paid && (
-                <Tooltip title={lang === 'en' ? 'Undo — mark as unpaid' : 'Отмени — отбележи неплатено'} arrow>
-                  <Box component="button" onClick={() => {
-                    if (window.confirm(lang === 'en'
-                      ? `Mark ${getName(p.client_id)}'s plan as unpaid again?`
-                      : `Да отбележа ли плана на ${getName(p.client_id)} отново като неплатен?`
-                    )) handleTogglePaid(p.id, p.is_paid)
-                  }} sx={{
-                    fontSize: '10px', fontWeight: 600, color: C.muted, cursor: 'pointer',
-                    background: 'transparent', border: 'none', textDecoration: 'underline',
-                    mr: 1, whiteSpace: 'nowrap', fontFamily: 'inherit',
-                    '&:hover': { color: C.text },
-                  }}>
-                    {lang === 'en' ? 'Mark unpaid' : 'Отбележи неплатено'}
-                  </Box>
-                </Tooltip>
-              )}
               <Tooltip title={lang === 'en' ? 'Delete' : 'Изтрий'} arrow>
                 <IconButton size="small" onClick={() => {
                   // A paid, never-refunded plan carries real revenue — hard
