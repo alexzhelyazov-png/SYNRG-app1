@@ -3629,13 +3629,9 @@ export default function Admin() {
   const SUB_TABS = {
     clients: [
       { key: 'clients',       label: t('clientsMgmt')     || 'Клиенти' },
-      { key: 'attention',     label: t('attentionTab')    || 'Нужда от внимание' },
-      { key: 'online',        label: t('onlineTab')       || 'Онлайн' },
-      { key: 'online_access', label: t('onlineAccessTab') || 'Онлайн достъп' },
-      { key: 'challenge',     label: 'Challenge' },
-      { key: 'messages',      label: t('messagesTab')     || 'Съобщения' },
-      { key: 'coaches',       label: t('coachesTab')      || 'Треньори' },
       { key: 'subscriptions', label: t('subscriptionsTab')|| 'Абонаменти' },
+      { key: 'attention',     label: t('attentionTab')    || 'Нужда от внимание' },
+      { key: 'coaches',       label: t('coachesTab')      || 'Треньори' },
     ],
     finance: [
       { key: 'analytics', label: t('analyticsTab') || 'Аналитика' },
