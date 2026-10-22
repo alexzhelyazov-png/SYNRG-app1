@@ -562,10 +562,17 @@ export default function SubscriptionsTab({ t, lang }) {
               )}
               <Tooltip title={lang === 'en' ? 'Delete' : 'Изтрий'} arrow>
                 <IconButton size="small" onClick={() => {
-                  if (window.confirm(lang === 'en'
-                    ? `Delete plan for ${getName(p.client_id)}?`
-                    : `Изтрий план на ${getName(p.client_id)}?`
-                  )) handleDelete(p.id)
+                  // A paid, never-refunded plan carries real revenue — hard
+                  // deleting the row erases it from Finance with no trace,
+                  // no different from the "Изтрий клиент" hazard fixed
+                  // earlier. Point towards Refund instead when that applies.
+                  const net = (Number(p.price) || 0) - (Number(p.refund_amount) || 0)
+                  const msg = (p.is_paid && net > 0)
+                    ? (lang === 'en'
+                        ? `${getName(p.client_id)}'s plan is marked paid (${net} €) and was never refunded — deleting it will erase that amount from Finance with no record. If the client left, use "Refund" on the plan instead. Delete anyway?`
+                        : `Планът на ${getName(p.client_id)} е маркиран платен (${net} €) и никога не е възстановяван — изтриването ще заличи тази сума от Финанси безследно. Ако клиентът е напуснал, ползвай "Възстанови сума" на плана вместо това. Все пак ли да изтрия?`)
+                    : (lang === 'en' ? `Delete plan for ${getName(p.client_id)}?` : `Изтрий план на ${getName(p.client_id)}?`)
+                  if (window.confirm(msg)) handleDelete(p.id)
                 }}
                   sx={{ color: '#e05252', p: 0.4, fontSize: '14px' }}>
                   &#x2715;
