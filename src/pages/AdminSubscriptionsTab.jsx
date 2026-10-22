@@ -227,16 +227,17 @@ export default function SubscriptionsTab({ t, lang }) {
     .filter(([, count]) => count > 1)
     .map(([id]) => id)
 
-  // Two states, not five: what's live (default), and what needs a follow-up
-  // call (unpaid). Everything else — expired, refunded — is history, tucked
-  // under its own toggle below instead of competing for attention here.
+  // Two states, not five — and mutually exclusive, not overlapping: a client
+  // showing up under both "Активни" and "Неплатени" read as a duplicate bug,
+  // not a filtered subset. So "Активни" = paid, "Неплатени" = unpaid; between
+  // the two tabs every active plan appears exactly once.
   const FILTERS = [
-    { key: 'active', label: lang === 'en' ? 'Active' : 'Активни' },
+    { key: 'active', label: lang === 'en' ? 'Paid' : 'Платени' },
     { key: 'unpaid', label: lang === 'en' ? 'Unpaid'  : 'Неплатени' },
   ]
   const visiblePlans = planFilter === 'unpaid'
     ? activePlans.filter(p => !p.is_paid)
-    : activePlans
+    : activePlans.filter(p => p.is_paid)
   const historyPlans = allPlans.filter(p => p.status !== 'active')
 
   if (loading) return <Typography sx={{ color: C.muted, py: 4, textAlign: 'center' }}>...</Typography>
@@ -431,7 +432,9 @@ export default function SubscriptionsTab({ t, lang }) {
 
       <Box sx={{ display: 'flex', gap: 0.75, mb: 1.5, flexWrap: 'wrap' }}>
         {FILTERS.map(f => {
-          const count = f.key === 'unpaid' ? activePlans.filter(p => !p.is_paid).length : activePlans.length
+          const count = f.key === 'unpaid'
+            ? activePlans.filter(p => !p.is_paid).length
+            : activePlans.filter(p => p.is_paid).length
           return (
             <Box key={f.key} onClick={() => setPlanFilter(f.key)} sx={{
               px: 1.25, py: 0.5, borderRadius: '100px', cursor: 'pointer', fontSize: '12px', fontWeight: 700,
