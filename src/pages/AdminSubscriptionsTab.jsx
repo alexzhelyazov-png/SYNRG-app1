@@ -3,7 +3,6 @@ import { Box, Typography, IconButton, Tooltip } from '@mui/material'
 import { useApp } from '../context/AppContext'
 import { C } from '../theme'
 import { DB } from '../lib/db'
-import { FREE_MODULES } from '../lib/modules'
 
 const PLAN_LABELS = {
   '8': 'FLEX', '12': 'PROGRESS', 'unlimited': 'PLUS',
@@ -15,7 +14,7 @@ const PLAN_COLORS = {
 }
 
 export default function SubscriptionsTab({ t, lang }) {
-  const { realClients, showSnackbar, updateClientModules, auth } = useApp()
+  const { realClients, showSnackbar, auth } = useApp()
   const [allPlans, setAllPlans] = useState([])
   const [loading, setLoading] = useState(true)
   const [programPurchases, setProgramPurchases] = useState([])
@@ -166,20 +165,6 @@ export default function SubscriptionsTab({ t, lang }) {
     return new Date(d).toLocaleDateString('bg-BG', { day: '2-digit', month: '2-digit', year: 'numeric' })
   }
 
-
-  async function handleDeactivate(planId) {
-    const plan = allPlans.find(p => p.id === planId)
-    await DB.update('client_plans', planId, { status: 'expired' })
-    // If client has no other active plan, drop them down to the freemium view.
-    if (plan?.client_id) {
-      const other = await DB.getClientActivePlan(plan.client_id)
-      if (!other) {
-        try { await updateClientModules(plan.client_id, [...FREE_MODULES]) } catch { /* non-fatal */ }
-      }
-    }
-    showSnackbar(lang === 'en' ? 'Plan deactivated' : 'Планът е деактивиран')
-    reload()
-  }
 
   async function handleDelete(planId) {
     await DB.deleteById('client_plans', planId)
@@ -516,34 +501,19 @@ export default function SubscriptionsTab({ t, lang }) {
                 }
               </Typography>
 
-              {/* Paid status — only toggleable on an active plan. A replaced/
-                  expired plan's paid status is frozen: this is exactly how an
-                  already-superseded plan got re-marked paid by mistake and
-                  double-counted a renewal payment (Мария Славкова, Християн
-                  Роев incidents). To correct an old plan, use its own
-                  Refund/manage dialog instead of this quick toggle. */}
-              {isActive ? (
-                <Tooltip title={lang === 'en' ? 'Toggle paid status' : 'Смени статус платено'} arrow>
-                  <Box onClick={() => handleTogglePaid(p.id, p.is_paid)} sx={{
-                    fontSize: '10px', fontWeight: 700, px: 0.75, py: 0.15, borderRadius: '4px', cursor: 'pointer',
-                    background: p.is_paid ? 'rgba(74,222,128,0.12)' : 'rgba(224,82,82,0.12)',
-                    color: p.is_paid ? '#4ade80' : '#e05252',
-                    '&:hover': { opacity: 0.7 },
-                  }}>
-                    {p.is_paid ? (lang === 'en' ? 'PAID' : 'ПЛ.') : (lang === 'en' ? 'UNPAID' : 'НЕПЛ.')}
-                  </Box>
-                </Tooltip>
-              ) : (
-                <Tooltip title={lang === 'en' ? 'Locked — plan is no longer active' : 'Заключено — планът вече не е активен'} arrow>
-                  <Box sx={{
-                    fontSize: '10px', fontWeight: 700, px: 0.75, py: 0.15, borderRadius: '4px',
-                    background: p.is_paid ? 'rgba(74,222,128,0.08)' : 'rgba(224,82,82,0.08)',
-                    color: p.is_paid ? 'rgba(74,222,128,0.6)' : 'rgba(224,82,82,0.6)',
-                  }}>
-                    {p.is_paid ? (lang === 'en' ? 'PAID' : 'ПЛ.') : (lang === 'en' ? 'UNPAID' : 'НЕПЛ.')}
-                  </Box>
-                </Tooltip>
-              )}
+              {/* Paid status — plain display now, not a click target itself.
+                  The action lives in the dedicated "Маркирай платено" button
+                  below instead, set apart from Delete so the two can't be
+                  fat-fingered for each other. */}
+              <Tooltip title={!isActive ? (lang === 'en' ? 'Locked — plan is no longer active' : 'Заключено — планът вече не е активен') : ''} arrow>
+                <Box sx={{
+                  fontSize: '10px', fontWeight: 700, px: 0.75, py: 0.15, borderRadius: '4px',
+                  background: p.is_paid ? `rgba(74,222,128,${isActive ? 0.12 : 0.08})` : `rgba(224,82,82,${isActive ? 0.12 : 0.08})`,
+                  color: p.is_paid ? (isActive ? '#4ade80' : 'rgba(74,222,128,0.6)') : (isActive ? '#e05252' : 'rgba(224,82,82,0.6)'),
+                }}>
+                  {p.is_paid ? (lang === 'en' ? 'PAID' : 'ПЛ.') : (lang === 'en' ? 'UNPAID' : 'НЕПЛ.')}
+                </Box>
+              </Tooltip>
 
               {/* Date */}
               <Typography sx={{ fontSize: '11px', color: C.muted, whiteSpace: 'nowrap' }}>
@@ -557,12 +527,16 @@ export default function SubscriptionsTab({ t, lang }) {
               </Typography>
 
               {/* Actions */}
-              {isActive && (
-                <Tooltip title={lang === 'en' ? 'Deactivate' : 'Деактивирай'} arrow>
-                  <IconButton size="small" onClick={() => handleDeactivate(p.id)}
-                    sx={{ color: '#FB923C', p: 0.4, fontSize: '14px' }}>
-                    &#x23F8;
-                  </IconButton>
+              {isActive && !p.is_paid && (
+                <Tooltip title={lang === 'en' ? 'Mark as paid' : 'Маркирай платено'} arrow>
+                  <Box component="button" onClick={() => handleTogglePaid(p.id, p.is_paid)} sx={{
+                    fontSize: '11px', fontWeight: 700, color: '#4ade80', cursor: 'pointer',
+                    background: 'rgba(74,222,128,0.12)', border: '1px solid rgba(74,222,128,0.3)',
+                    borderRadius: '100px', px: 1.25, py: 0.4, mr: 1, whiteSpace: 'nowrap',
+                    fontFamily: 'inherit', '&:hover': { background: 'rgba(74,222,128,0.2)' },
+                  }}>
+                    {lang === 'en' ? 'Mark paid' : 'Маркирай платено'}
+                  </Box>
                 </Tooltip>
               )}
               <Tooltip title={lang === 'en' ? 'Delete' : 'Изтрий'} arrow>
