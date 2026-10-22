@@ -45,14 +45,10 @@ import {
   isoToday, isoDatePlusDays, groupByDate, dayLabel, fmtTime,
   occupancyStr, planLabel, fmtValidTo, isPlanActive, creditsRemaining,
   daysUntilExpiry, effectiveValidTo, isFullAdmin,
-  PLAN_CONFIGS, LEGACY_PLAN_TYPES, NEW_PLAN_TYPES,
+  PLAN_CONFIGS, LEGACY_PLAN_TYPES, NEW_PLAN_TYPES, DEFAULT_PRICES,
 } from '../lib/bookingUtils'
 import { parseDate } from '../lib/utils'
 
-const DEFAULT_PRICES = {
-  '8': 154, '12': 179, 'unlimited': 202,
-  '4': 110, '8_new': 190, '12_new': 270,
-}
 const WEEKDAY_KEYS = [1, 2, 3, 4, 5, 6, 0] // Mon–Sun display order
 
 // ── Branded email HTML builder ────────────────────────────────
@@ -262,30 +258,13 @@ function PlanDialog({ open, onClose, onActivate, onExtend, onAdjust, onMarkPaid,
   const [credUsed,      setCredUsed]     = useState(plan?.credits_used ?? 0)
   const [refundAmount,  setRefundAmount] = useState(plan?.price ?? 0)
   const [refundReason,  setRefundReason] = useState('')
-  // Price never defaults to 0: existing plan's price if >0, else the tariff for
-  // its type, else the 8-session tariff. Keeps revenue from silently going 0.
-  const [price,         setPrice]        = useState(
-    (plan?.price && Number(plan.price) > 0)
-      ? plan.price
-      : (DEFAULT_PRICES[plan?.plan_type] ?? DEFAULT_PRICES['8'])
-  )
-  // Paid-at-creation checkbox — only meaningful while setting up a NEW plan,
-  // before there's a row to mark paid on. Payment normally happens in cash at
-  // the 2nd session, so this defaults unchecked.
-  const [isPaid,        setIsPaid]       = useState(false)
-  // Settle an unpaid OLD plan in the SAME step as renewing it, instead of a
-  // separate click elsewhere later (the split is what caused two "paid" rows
-  // for one real payment — see activatePlan's markOldPlanPaid).
-  const [markOldPaid,   setMarkOldPaid]  = useState(false)
   const [startCredits,  setStartCredits] = useState('')
   const [saving,        setSaving]       = useState(false)
   const [marking,       setMarking]      = useState(false)
 
-  // When planType changes, reset startCredits and update default price.
-  // Never fall to 0 — an unselected type shows the 8-session tariff as a floor.
+  // When planType changes, reset startCredits.
   useEffect(() => {
     setStartCredits('')
-    if (!plan) setPrice(DEFAULT_PRICES[planType] ?? DEFAULT_PRICES['8'])
   }, [planType])
 
   // When validFrom changes, update validTo to 30 days later
@@ -311,15 +290,15 @@ function PlanDialog({ open, onClose, onActivate, onExtend, onAdjust, onMarkPaid,
 
   async function handleSave() {
     setSaving(true)
-    // Price can never be 0 — fall back to the plan's tariff. This is what feeds
-    // the Finance revenue, so a blank/zero here would silently lose the income.
-    const safePrice = (Number(price) > 0)
-      ? Number(price)
-      : (DEFAULT_PRICES[planType || plan?.plan_type] ?? DEFAULT_PRICES['8'])
     let res
     if (mode === 'activate' && planType) {
+      // Activating a plan only ever grants access — it never carries a
+      // price or a paid flag. Those get set exactly once, together, the
+      // moment a real payment is recorded (see markPaidShared). That's what
+      // makes it structurally impossible for one cash handover to end up
+      // priced on two separate rows.
       const sc = startCredits !== '' ? Number(startCredits) : null
-      res = await onActivate(client.id, planType, validFrom, safePrice, sc, isPaid, validTo, markOldPaid)
+      res = await onActivate(client.id, planType, validFrom, sc, validTo)
     } else if (mode === 'extend') {
       res = await onExtend(plan.id, extendTo)
     } else if (mode === 'adjust') {
@@ -405,39 +384,12 @@ function PlanDialog({ open, onClose, onActivate, onExtend, onAdjust, onMarkPaid,
             there's nothing else to show because there's no plan yet) */}
         {mode === 'activate' && (
           <>
-            {/* The actual mechanism behind the Християн Роев / Мария Славкова
-                duplicate-row incidents: the client already has an UNPAID plan
-                on file, and instead of just confirming that payment (the
-                "Отбележи платено" button already sitting at the top of this
-                dialog), a second full "Активирай план" gets submitted —
-                inserting a brand new row and leaving the first one stranded
-                expired-but-untouched. Steer away from that before the form
-                below ever gets filled in. */}
-            {plan && !plan.is_paid && (
-              <Box sx={{ p: 1.5, borderRadius: '10px', background: 'rgba(255,107,157,0.1)', border: '1px solid rgba(255,107,157,0.3)' }}>
-                <Typography sx={{ fontSize: '12px', fontWeight: 700, color: '#FF6B9D' }}>
-                  Клиентът вече има неплатен план — вероятно просто плаща сега
-                </Typography>
-                <Typography sx={{ fontSize: '11px', color: C.muted, mt: 0.5 }}>
-                  Ако той/тя не купува нов период, а само плаща за текущия — затвори това и натисни "{t('markPaidBtn') || 'Отбележи платено'}" горе. Активиране тук създава ВТОРИ отделен план и старият остава изоставен неплатен.
-                </Typography>
-              </Box>
-            )}
-            {/* A short period on a client who already has a plan on file is
-                almost always meant to be a free grace extension, not a new
-                paid sale — this is exactly the mistake that inflated Finance
-                revenue (full price charged for a 7-9 day top-up). Nudge
-                towards "Удължи" instead of silently letting it slide. */}
-            {plan && (new Date(validTo) - new Date(validFrom)) / 86400000 < 14 && (
-              <Box sx={{ p: 1.5, borderRadius: '10px', background: 'rgba(251,146,60,0.1)', border: '1px solid rgba(251,146,60,0.3)' }}>
-                <Typography sx={{ fontSize: '12px', fontWeight: 700, color: '#FB923C' }}>
-                  Това прилича на удължение, не нов план
-                </Typography>
-                <Typography sx={{ fontSize: '11px', color: C.muted, mt: 0.5 }}>
-                  Ако клиентът не плаща отново, а просто получава няколко дни отгоре — затвори това и ползвай бутона "{t('extendPlanBtn')}" горе. Активирането тук ще запише {price || 0}€ като нов приход.
-                </Typography>
-              </Box>
-            )}
+            {/* Activating only ever grants access for a period — it never
+                carries a price or paid status (see handleSave). So there's
+                nothing left here to warn about double-charging or
+                mismatched tariffs: a plan can't become revenue until it's
+                explicitly marked paid, exactly once, via "Отбележи платено"
+                above — which is the only place an amount ever gets typed. */}
             <FormControl fullWidth size="small">
               <InputLabel sx={{ color: C.muted }}>{t('selectPlanType')}</InputLabel>
               <Select value={planType} onChange={e => setPlanType(e.target.value)} label={t('selectPlanType')}
@@ -453,51 +405,6 @@ function PlanDialog({ open, onClose, onActivate, onExtend, onAdjust, onMarkPaid,
             <TextField label={t('validFromLbl')} type="date" size="small"
               value={validFrom} onChange={e => setValidFrom(e.target.value)}
               sx={inputSx} InputLabelProps={{ shrink: true }} />
-            <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'flex-start' }}>
-              <TextField label={t('priceLbl')} type="number" size="small"
-                value={price} onChange={e => setPrice(e.target.value)}
-                inputProps={{ min: 0 }} sx={{ ...inputSx, flex: 1 }}
-                helperText={Number(price) === 0 ? t('freeLbl') : `${price} €`}
-                FormHelperTextProps={{ sx: { color: Number(price) === 0 ? C.muted : C.purple } }}
-              />
-              <FormControlLabel
-                control={<Checkbox checked={isPaid} onChange={e => setIsPaid(e.target.checked)}
-                  sx={{ color: C.primary, '&.Mui-checked': { color: C.primary }, p: 0.5 }} />}
-                label={t('markedPaid')}
-                sx={{ '& .MuiTypography-root': { fontSize: '12px', color: isPaid ? C.purple : C.muted, fontWeight: 700 }, mt: 0.5 }}
-              />
-            </Box>
-            {/* Price doesn't match the standard tariff for this plan type —
-                almost always the price field was left over from whatever was
-                selected before, not a deliberate discount (found live:
-                Анелия Георгиева's PROGRESS plan charged at the FLEX tariff
-                for months). Doesn't block saving — some clients do get a
-                real discount — just makes the mismatch visible before it
-                silently becomes the Finance number. */}
-            {planType && Number(price) > 0 && DEFAULT_PRICES[planType] != null && Number(price) !== DEFAULT_PRICES[planType] && (
-              <Box sx={{ p: 1.5, borderRadius: '10px', background: 'rgba(251,146,60,0.1)', border: '1px solid rgba(251,146,60,0.3)' }}>
-                <Typography sx={{ fontSize: '12px', fontWeight: 700, color: '#FB923C' }}>
-                  {t('priceMismatchTitle') || 'Цената не съвпада със стандартната такса'}
-                </Typography>
-                <Typography sx={{ fontSize: '11px', color: C.muted, mt: 0.5 }}>
-                  {(t('priceMismatchBody') || '{plan} обикновено е {standard} €, а тук е въведено {entered} €. Провери дали е нарочна отстъпка, преди да запазиш.')
-                    .replace('{plan}', planLabel(planType, t))
-                    .replace('{standard}', DEFAULT_PRICES[planType])
-                    .replace('{entered}', price)}
-                </Typography>
-              </Box>
-            )}
-            {/* Renewal settling an unpaid old plan — one deliberate checkbox
-                instead of a separate click somewhere else later (that split
-                is how the same cash payment ended up counted twice). */}
-            {plan && !plan.is_paid && (
-              <FormControlLabel
-                control={<Checkbox checked={markOldPaid} onChange={e => setMarkOldPaid(e.target.checked)}
-                  sx={{ color: '#F87171', '&.Mui-checked': { color: '#F87171' }, p: 0.5 }} />}
-                label={(t('markOldPlanPaidLbl') || 'Старият план ({price} €) също не е платен — маркирай и него като платен').replace('{price}', plan.price)}
-                sx={{ '& .MuiTypography-root': { fontSize: '12px', color: markOldPaid ? '#F87171' : C.muted, fontWeight: 700 }, mt: 0.5 }}
-              />
-            )}
             {/* Migration override: remaining sessions from old platform */}
             {planType && planType !== 'unlimited' && (() => {
               const total = PLAN_CONFIGS[planType]?.credits ?? 12
@@ -613,14 +520,30 @@ async function markPlanPaidShared(plan, client, auth, loadAllPlans, showSnackbar
     if (recentOther && !window.confirm(
       `${client?.name || 'Клиентът'} вече има друг план, маркиран платен през последните 24ч. Да маркирам и този като платен?`
     )) return
+    // The amount is asked for HERE, not at plan creation — a plan never
+    // carries a price until the moment it's actually paid, so there's
+    // nothing left lying around to double-count on a later renewal.
+    // Pre-filled with the standard tariff; editable for real discounts.
+    const suggested = DEFAULT_PRICES[plan.plan_type] ?? plan.price ?? 0
+    const input = window.prompt(
+      t('askAmountPaid') || 'Платена сума (€):',
+      String(suggested)
+    )
+    if (input === null) return
+    const amount = Number(input)
+    if (!Number.isFinite(amount) || amount < 0) {
+      showSnackbar(t('invalidAmountMsg') || 'Невалидна сума', 'error')
+      return
+    }
     await DB.update('client_plans', plan.id, {
       is_paid: true,
       paid_at: new Date().toISOString(),
       paid_by: auth.name,
+      price: amount,
     })
     await DB.insertNotification(
       auth.name, client.name, 'payment',
-      `${auth.name} отбеляза ${client.name} като платил ${plan.price} €`
+      `${auth.name} отбеляза ${client.name} като платил ${amount} €`
     )
     await loadAllPlans()
     showSnackbar(t('markedPaidMsg') || 'Отбелязано като платено')
@@ -1405,8 +1328,8 @@ function PlansTab({ t }) {
     return allPlans.find(p => p.client_id === clientId && p.status === 'active') || null
   }
 
-  async function handleActivate(clientId, planType, from, price, startCredits, isPaid, validTo, markOldPaid) {
-    const res = await activatePlan(clientId, planType, from, price, startCredits, isPaid, validTo, markOldPaid)
+  async function handleActivate(clientId, planType, from, startCredits, validTo) {
+    const res = await activatePlan(clientId, planType, from, startCredits, validTo)
     if (res?.error) { showSnackbar('Грешка: ' + res.error); return res }
     showSnackbar(t('planActivatedMsg'))
     return { ok: true }
@@ -1783,8 +1706,8 @@ function ClientsTab({ t }) {
     }
   }
 
-  async function handleActivate(clientId, planType, from, price, startCredits, isPaid, validTo, markOldPaid) {
-    const res = await activatePlan(clientId, planType, from, price, startCredits, isPaid, validTo, markOldPaid)
+  async function handleActivate(clientId, planType, from, startCredits, validTo) {
+    const res = await activatePlan(clientId, planType, from, startCredits, validTo)
     if (res?.error) { showSnackbar('Грешка: ' + res.error); return res }
     showSnackbar(t('planActivatedMsg'))
     return { ok: true }
@@ -2492,8 +2415,8 @@ function DashboardTab({ t, lang, goTo }) {
     await updateClientModules(client.id, studioModules)
     setPlanDlg({ client: { ...client, modules: studioModules }, plan: null })
   }
-  async function handleActivate(clientId, planType, from, price, startCredits, isPaid, validTo, markOldPaid) {
-    const res = await activatePlan(clientId, planType, from, price, startCredits, isPaid, validTo, markOldPaid)
+  async function handleActivate(clientId, planType, from, startCredits, validTo) {
+    const res = await activatePlan(clientId, planType, from, startCredits, validTo)
     if (res?.error) { showSnackbar(t('errGeneric') + ': ' + res.error); return res }
     showSnackbar(t('planActivatedMsg'))
     return { ok: true }

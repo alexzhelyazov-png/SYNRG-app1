@@ -26,6 +26,18 @@ export const PLAN_CONFIGS = {
   '12_new':   { label: '12 тренировки (нов)', credits: 12,  unlimited: false },
 }
 
+// Standard tariff per plan type — only ever used as a SUGGESTED starting
+// value when recording an actual payment, never auto-applied at plan
+// creation. A plan's price used to get set (and "paid" ticked) at
+// activation time, before any money had changed hands — the gap between
+// "access granted" and "payment recorded" is exactly what let one real cash
+// handover turn into two separate priced, paid rows (Мария Славкова /
+// Християн Роев incidents).
+export const DEFAULT_PRICES = {
+  '8': 154, '12': 179, 'unlimited': 202,
+  '4': 110, '8_new': 190, '12_new': 270,
+}
+
 export function planLabel(planType, t) {
   if (t) {
     const key = planType === 'unlimited' ? 'planTypeUnlimited' : `planType${planType}`

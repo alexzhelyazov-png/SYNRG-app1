@@ -261,7 +261,14 @@ export function BookingProvider({ children }) {
   }, [loadSlots])
 
   // ── Admin: activate plan for client ──────────────────────
-  const activatePlan = useCallback(async (clientId, planType, validFrom, price = 0, startCredits = null, isPaid = false, validTo = null, markOldPlanPaid = false) => {
+  // Activating ONLY ever grants access for a period — price and paid status
+  // are never set here (always 0 / false). A plan becomes revenue exactly
+  // once, the moment it's explicitly marked paid for a real amount (see
+  // markPaidShared in Admin.jsx) — never implicitly at creation. That's what
+  // makes it structurally impossible for one cash handover to end up priced
+  // on two separate rows, which is exactly what happened live twice
+  // (Мария Славкова, Християн Роев) when price+paid were set at activation.
+  const activatePlan = useCallback(async (clientId, planType, validFrom, startCredits = null, validTo = null) => {
     try {
       const baseTotal = PLAN_CONFIGS[planType]?.credits ?? null
       const from = validFrom || isoToday()
@@ -278,45 +285,19 @@ export function BookingProvider({ children }) {
         carryover = Math.max(0, (existing.credits_total || 0) - (existing.credits_used || 0))
       }
       // Guard: the client already has a plan created within the last few
-      // hours and this activation would expire it and insert ANOTHER one.
-      // This is the exact mechanism behind the Християн Роев duplicate-row
-      // incident — an admin re-ran "Активирай план" shortly after the first
-      // one instead of using "Отбележи платено" on the existing unpaid row.
-      // Checked regardless of paid status, before any write.
+      // hours and this activation would expire it and insert ANOTHER one —
+      // almost always a double-click or forgetting the client already has an
+      // active period, not a genuine same-day second signup.
       if (existing?.created_at &&
           (Date.now() - new Date(existing.created_at).getTime()) < 3 * 60 * 60 * 1000) {
         const ok = window.confirm(
           'Този клиент вече има план, създаден през последните няколко часа. ' +
-          'Ако просто плаща сега за същия план, затвори това и ползвай "Отбележи платено" — ' +
-          'активиране тук ще създаде ВТОРИ отделен план. Продължи само ако наистина е нов период.'
-        )
-        if (!ok) return { error: 'cancelled' }
-      }
-      // Guard: the old plan was ALREADY marked paid very recently and this
-      // new one is ALSO being created pre-paid — almost always the same cash
-      // handover counted twice, not two separate payments. Checked BEFORE any
-      // write so a cancel here leaves the old plan untouched.
-      if (isPaid && existing?.is_paid && existing.paid_at &&
-          (Date.now() - new Date(existing.paid_at).getTime()) < 24 * 60 * 60 * 1000) {
-        const ok = window.confirm(
-          'Старият план на този клиент вече е маркиран платен през последните 24ч. ' +
-          'Сигурен ли си, че това е ОТДЕЛНО плащане, а не същото пренесено по грешка?'
+          'Сигурен ли си, че искаш да създадеш нов?'
         )
         if (!ok) return { error: 'cancelled' }
       }
       if (existing) {
-        // markOldPlanPaid lets the admin settle an unpaid old plan in the SAME
-        // step as the renewal, instead of two disconnected actions across two
-        // screens — that split is what produced two separate "paid" rows for
-        // what was really one cash handover (seen live with Мария Славкова /
-        // Християн Роев). Only ever applies here, never silently elsewhere.
-        const expirePatch = { status: 'expired' }
-        if (markOldPlanPaid && !existing.is_paid) {
-          expirePatch.is_paid = true
-          expirePatch.paid_at = new Date().toISOString()
-          expirePatch.paid_by = auth.name
-        }
-        await DB.update('client_plans', existing.id, expirePatch)
+        await DB.update('client_plans', existing.id, { status: 'expired' })
       }
       // Compute final credits_total / credits_used:
       //   - If admin set startCredits explicitly: total stays at baseTotal, used = total - startCredits.
@@ -334,10 +315,10 @@ export function BookingProvider({ children }) {
         valid_to:      to,
         status:        'active',
         activated_by:  auth.name,
-        price:         Number(price) || 0,
-        is_paid:       !!isPaid,
-        paid_at:       isPaid ? new Date().toISOString() : null,
-        paid_by:       isPaid ? auth.name : null,
+        price:         0,
+        is_paid:       false,
+        paid_at:       null,
+        paid_by:       null,
       })
       // Auto-enable ALL studio modules when activating a plan. Studio access,
       // booking ("запази час"), tracking, etc. must ALWAYS be granted by default

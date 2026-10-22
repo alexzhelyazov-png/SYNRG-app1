@@ -3,6 +3,7 @@ import { Box, Typography, IconButton, Tooltip } from '@mui/material'
 import { useApp } from '../context/AppContext'
 import { C } from '../theme'
 import { DB } from '../lib/db'
+import { DEFAULT_PRICES } from '../lib/bookingUtils'
 
 const PLAN_LABELS = {
   '8': 'FLEX', '12': 'PROGRESS', 'unlimited': 'PLUS',
@@ -172,33 +173,43 @@ export default function SubscriptionsTab({ t, lang }) {
     reload()
   }
 
-  async function handleTogglePaid(planId, currentValue) {
-    // Guard against the exact mistake that double-counted real revenue twice
-    // in production (Мария Славкова, Християн Роев): marking a SECOND plan
-    // paid for the same client within a short window, when it's really the
-    // same cash handover. Doesn't block it — some clients genuinely buy twice
-    // same day — just makes the admin confirm.
-    if (!currentValue) {
-      const plan = allPlans.find(p => p.id === planId)
-      const recentOther = plan && allPlans.find(p =>
-        p.id !== planId && p.client_id === plan.client_id && p.is_paid && p.paid_at &&
-        (Date.now() - new Date(p.paid_at).getTime()) < 24 * 60 * 60 * 1000
-      )
-      if (recentOther) {
-        const msg = lang === 'en'
-          ? `${getName(plan.client_id)} already has another plan marked paid in the last 24h. Mark this one as paid too?`
-          : `${getName(plan.client_id)} вече има друг план, маркиран платен през последните 24ч. Да маркирам и този като платен?`
-        if (!window.confirm(msg)) return
-      }
+  // Only ever called to mark an unpaid plan paid — the badge that triggers
+  // it isn't clickable once a plan is already paid (see renderPlanRow), so
+  // there's no "undo" path to carry here.
+  async function handleMarkPaid(planId) {
+    const plan = allPlans.find(p => p.id === planId)
+    // Guard against the exact mistake that double-counted real revenue
+    // twice in production (Мария Славкова, Християн Роев): marking a
+    // SECOND plan paid for the same client within a short window, when
+    // it's really the same cash handover. Doesn't block it — some clients
+    // genuinely buy twice same day — just makes the admin confirm.
+    const recentOther = plan && allPlans.find(p =>
+      p.id !== planId && p.client_id === plan.client_id && p.is_paid && p.paid_at &&
+      (Date.now() - new Date(p.paid_at).getTime()) < 24 * 60 * 60 * 1000
+    )
+    if (recentOther) {
+      const msg = lang === 'en'
+        ? `${getName(plan.client_id)} already has another plan marked paid in the last 24h. Mark this one as paid too?`
+        : `${getName(plan.client_id)} вече има друг план, маркиран платен през последните 24ч. Да маркирам и този като платен?`
+      if (!window.confirm(msg)) return
     }
-    // paid_at is what Finance buckets revenue by (see AnalyticsTab) — it must
-    // be set here too, not just in the dedicated "mark paid" flow, or a plan
-    // toggled paid days after it was created silently falls back to
-    // created_at and counts as revenue in the wrong month.
-    const patch = !currentValue
-      ? { is_paid: true, paid_at: new Date().toISOString(), paid_by: auth.name }
-      : { is_paid: false, paid_at: null, paid_by: null }
-    await DB.update('client_plans', planId, patch)
+    // The amount is asked for HERE, not at plan creation — a plan never
+    // carries a price until the moment it's actually paid, so there's
+    // nothing left lying around to double-count on a later renewal.
+    const suggested = DEFAULT_PRICES[plan?.plan_type] ?? plan?.price ?? 0
+    const input = window.prompt(
+      lang === 'en' ? 'Amount paid (€):' : 'Платена сума (€):',
+      String(suggested)
+    )
+    if (input === null) return
+    const amount = Number(input)
+    if (!Number.isFinite(amount) || amount < 0) {
+      showSnackbar(lang === 'en' ? 'Invalid amount' : 'Невалидна сума', 'error')
+      return
+    }
+    await DB.update('client_plans', planId, {
+      is_paid: true, paid_at: new Date().toISOString(), paid_by: auth.name, price: amount,
+    })
     reload()
   }
 
@@ -506,7 +517,7 @@ export default function SubscriptionsTab({ t, lang }) {
                   extra space). Locked/plain once the plan isn't active. */}
               {isActive && !p.is_paid ? (
                 <Tooltip title={lang === 'en' ? 'Click to mark as paid' : 'Кликни, за да маркираш платено'} arrow>
-                  <Box component="button" onClick={() => handleTogglePaid(p.id, p.is_paid)} sx={{
+                  <Box component="button" onClick={() => handleMarkPaid(p.id)} sx={{
                     fontSize: '10px', fontWeight: 700, px: 0.75, py: 0.15, borderRadius: '4px', cursor: 'pointer',
                     background: 'rgba(224,82,82,0.12)', color: '#e05252', border: '1px solid rgba(224,82,82,0.3)',
                     fontFamily: 'inherit', '&:hover': { background: 'rgba(74,222,128,0.2)', color: '#4ade80', borderColor: 'rgba(74,222,128,0.3)' },
