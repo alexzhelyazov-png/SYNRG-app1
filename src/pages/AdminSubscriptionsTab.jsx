@@ -501,19 +501,30 @@ export default function SubscriptionsTab({ t, lang }) {
                 }
               </Typography>
 
-              {/* Paid status — plain display now, not a click target itself.
-                  The action lives in the dedicated "Маркирай платено" button
-                  below instead, set apart from Delete so the two can't be
-                  fat-fingered for each other. */}
-              <Tooltip title={!isActive ? (lang === 'en' ? 'Locked — plan is no longer active' : 'Заключено — планът вече не е активен') : ''} arrow>
-                <Box sx={{
-                  fontSize: '10px', fontWeight: 700, px: 0.75, py: 0.15, borderRadius: '4px',
-                  background: p.is_paid ? `rgba(74,222,128,${isActive ? 0.12 : 0.08})` : `rgba(224,82,82,${isActive ? 0.12 : 0.08})`,
-                  color: p.is_paid ? (isActive ? '#4ade80' : 'rgba(74,222,128,0.6)') : (isActive ? '#e05252' : 'rgba(224,82,82,0.6)'),
-                }}>
-                  {p.is_paid ? (lang === 'en' ? 'PAID' : 'ПЛ.') : (lang === 'en' ? 'UNPAID' : 'НЕПЛ.')}
-                </Box>
-              </Tooltip>
+              {/* Paid status — the badge itself IS the "mark paid" button when
+                  unpaid and active (small, no separate control taking up
+                  extra space). Locked/plain once the plan isn't active. */}
+              {isActive && !p.is_paid ? (
+                <Tooltip title={lang === 'en' ? 'Click to mark as paid' : 'Кликни, за да маркираш платено'} arrow>
+                  <Box component="button" onClick={() => handleTogglePaid(p.id, p.is_paid)} sx={{
+                    fontSize: '10px', fontWeight: 700, px: 0.75, py: 0.15, borderRadius: '4px', cursor: 'pointer',
+                    background: 'rgba(224,82,82,0.12)', color: '#e05252', border: '1px solid rgba(224,82,82,0.3)',
+                    fontFamily: 'inherit', '&:hover': { background: 'rgba(74,222,128,0.2)', color: '#4ade80', borderColor: 'rgba(74,222,128,0.3)' },
+                  }}>
+                    {lang === 'en' ? 'UNPAID' : 'НЕПЛ.'}
+                  </Box>
+                </Tooltip>
+              ) : (
+                <Tooltip title={!isActive ? (lang === 'en' ? 'Locked — plan is no longer active' : 'Заключено — планът вече не е активен') : ''} arrow>
+                  <Box sx={{
+                    fontSize: '10px', fontWeight: 700, px: 0.75, py: 0.15, borderRadius: '4px',
+                    background: `rgba(74,222,128,${isActive ? 0.12 : 0.08})`,
+                    color: isActive ? '#4ade80' : 'rgba(74,222,128,0.6)',
+                  }}>
+                    {lang === 'en' ? 'PAID' : 'ПЛ.'}
+                  </Box>
+                </Tooltip>
+              )}
 
               {/* Date */}
               <Typography sx={{ fontSize: '11px', color: C.muted, whiteSpace: 'nowrap' }}>
@@ -527,18 +538,6 @@ export default function SubscriptionsTab({ t, lang }) {
               </Typography>
 
               {/* Actions */}
-              {isActive && !p.is_paid && (
-                <Tooltip title={lang === 'en' ? 'Mark as paid' : 'Маркирай платено'} arrow>
-                  <Box component="button" onClick={() => handleTogglePaid(p.id, p.is_paid)} sx={{
-                    fontSize: '11px', fontWeight: 700, color: '#4ade80', cursor: 'pointer',
-                    background: 'rgba(74,222,128,0.12)', border: '1px solid rgba(74,222,128,0.3)',
-                    borderRadius: '100px', px: 1.25, py: 0.4, mr: 1, whiteSpace: 'nowrap',
-                    fontFamily: 'inherit', '&:hover': { background: 'rgba(74,222,128,0.2)' },
-                  }}>
-                    {lang === 'en' ? 'Mark paid' : 'Маркирай платено'}
-                  </Box>
-                </Tooltip>
-              )}
               <Tooltip title={lang === 'en' ? 'Delete' : 'Изтрий'} arrow>
                 <IconButton size="small" onClick={() => {
                   // A paid, never-refunded plan carries real revenue — hard
