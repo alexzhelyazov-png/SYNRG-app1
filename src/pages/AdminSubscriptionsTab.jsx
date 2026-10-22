@@ -21,7 +21,8 @@ export default function SubscriptionsTab({ t, lang }) {
   const [programPurchases, setProgramPurchases] = useState([])
   const [invoices, setInvoices] = useState([])
   const [pendingReviews, setPendingReviews] = useState([])
-  const [planFilter, setPlanFilter] = useState('all') // all | active | unpaid | recent | duplicates
+  const [planFilter, setPlanFilter] = useState('active') // active | unpaid
+  const [showHistory, setShowHistory] = useState(false)
 
   // Last FINANCIAL event on this plan — paid or refunded — not just when the
   // row was first created. Sorting and the "X ago" badge both use this, so
@@ -226,23 +227,17 @@ export default function SubscriptionsTab({ t, lang }) {
     .filter(([, count]) => count > 1)
     .map(([id]) => id)
 
-  const RECENT_MS = 24 * 60 * 60 * 1000
-  const isRecentlyPaid = (p) => p.is_paid && p.paid_at && (Date.now() - new Date(p.paid_at).getTime()) < RECENT_MS
-
+  // Two states, not five: what's live (default), and what needs a follow-up
+  // call (unpaid). Everything else — expired, refunded — is history, tucked
+  // under its own toggle below instead of competing for attention here.
   const FILTERS = [
-    { key: 'all',        label: lang === 'en' ? 'All'            : 'Всички' },
-    { key: 'active',      label: lang === 'en' ? 'Active'         : 'Активни' },
-    { key: 'unpaid',      label: lang === 'en' ? 'Unpaid'         : 'Неплатени' },
-    { key: 'recent',      label: lang === 'en' ? 'Recently paid'  : 'Наскоро платени' },
-    { key: 'duplicates',  label: lang === 'en' ? 'Duplicates'     : 'Дубликати' },
+    { key: 'active', label: lang === 'en' ? 'Active' : 'Активни' },
+    { key: 'unpaid', label: lang === 'en' ? 'Unpaid'  : 'Неплатени' },
   ]
-  const visiblePlans = allPlans.filter(p => {
-    if (planFilter === 'active')     return p.status === 'active'
-    if (planFilter === 'unpaid')     return p.status === 'active' && !p.is_paid
-    if (planFilter === 'recent')     return isRecentlyPaid(p)
-    if (planFilter === 'duplicates') return duplicateClientIds.includes(p.client_id) && p.status === 'active'
-    return true
-  })
+  const visiblePlans = planFilter === 'unpaid'
+    ? activePlans.filter(p => !p.is_paid)
+    : activePlans
+  const historyPlans = allPlans.filter(p => p.status !== 'active')
 
   if (loading) return <Typography sx={{ color: C.muted, py: 4, textAlign: 'center' }}>...</Typography>
 
@@ -431,25 +426,50 @@ export default function SubscriptionsTab({ t, lang }) {
 
       {/* All plans */}
       <Typography sx={{ fontSize: '11px', fontWeight: 700, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.8px', mb: 1.5 }}>
-        {lang === 'en' ? `All subscriptions (${visiblePlans.length})` : `Всички абонаменти (${visiblePlans.length})`}
+        {lang === 'en' ? 'Subscriptions' : 'Абонаменти'}
       </Typography>
 
       <Box sx={{ display: 'flex', gap: 0.75, mb: 1.5, flexWrap: 'wrap' }}>
-        {FILTERS.map(f => (
-          <Box key={f.key} onClick={() => setPlanFilter(f.key)} sx={{
-            px: 1.25, py: 0.5, borderRadius: '100px', cursor: 'pointer', fontSize: '12px', fontWeight: 700,
-            background: planFilter === f.key ? C.primary : 'transparent',
-            color:      planFilter === f.key ? C.primaryOn || '#0f1c11' : C.muted,
-            border:     `1px solid ${planFilter === f.key ? C.primary : C.border}`,
-            '&:hover':  planFilter === f.key ? {} : { borderColor: C.logan },
-          }}>
-            {f.label}
-          </Box>
-        ))}
+        {FILTERS.map(f => {
+          const count = f.key === 'unpaid' ? activePlans.filter(p => !p.is_paid).length : activePlans.length
+          return (
+            <Box key={f.key} onClick={() => setPlanFilter(f.key)} sx={{
+              px: 1.25, py: 0.5, borderRadius: '100px', cursor: 'pointer', fontSize: '12px', fontWeight: 700,
+              background: planFilter === f.key ? (f.key === 'unpaid' ? '#FF6B9D' : C.primary) : 'transparent',
+              color:      planFilter === f.key ? '#0f1c11' : (f.key === 'unpaid' ? '#FF6B9D' : C.muted),
+              border:     `1px solid ${planFilter === f.key ? (f.key === 'unpaid' ? '#FF6B9D' : C.primary) : (f.key === 'unpaid' ? 'rgba(255,107,157,0.4)' : C.border)}`,
+              '&:hover':  planFilter === f.key ? {} : { borderColor: C.logan },
+            }}>
+              {f.label} ({count})
+            </Box>
+          )
+        })}
       </Box>
 
       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75 }}>
-        {visiblePlans.map(p => {
+        {visiblePlans.map(renderPlanRow)}
+      </Box>
+
+      <Box onClick={() => setShowHistory(v => !v)} sx={{
+        display: 'flex', alignItems: 'center', gap: 1, mt: 2, cursor: 'pointer',
+        p: 1.5, borderRadius: '10px', border: `1px solid ${C.border}`,
+      }}>
+        <Typography sx={{ fontSize: '12px', fontWeight: 700, color: C.muted, flex: 1 }}>
+          {lang === 'en' ? 'History' : 'История'} — {lang === 'en' ? 'expired and refunded plans' : 'изтекли и възстановени планове'} ({historyPlans.length})
+        </Typography>
+        <Typography sx={{ fontSize: '11px', color: C.muted }}>
+          {showHistory ? (lang === 'en' ? 'Hide' : 'Скрий') : (lang === 'en' ? 'Show' : 'Покажи')}
+        </Typography>
+      </Box>
+      {showHistory && (
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75, mt: 1 }}>
+          {historyPlans.map(renderPlanRow)}
+        </Box>
+      )}
+    </Box>
+  )
+
+  function renderPlanRow(p) {
           const isActive = p.status === 'active'
           const isDuplicate = duplicateClientIds.includes(p.client_id) && isActive
           const remaining = p.plan_type === 'unlimited' ? null : p.credits_total - p.credits_used
@@ -553,8 +573,5 @@ export default function SubscriptionsTab({ t, lang }) {
               </Tooltip>
             </Box>
           )
-        })}
-      </Box>
-    </Box>
-  )
+  }
 }

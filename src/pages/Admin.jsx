@@ -467,6 +467,26 @@ function PlanDialog({ open, onClose, onActivate, onExtend, onAdjust, onMarkPaid,
                 sx={{ '& .MuiTypography-root': { fontSize: '12px', color: isPaid ? C.purple : C.muted, fontWeight: 700 }, mt: 0.5 }}
               />
             </Box>
+            {/* Price doesn't match the standard tariff for this plan type —
+                almost always the price field was left over from whatever was
+                selected before, not a deliberate discount (found live:
+                Анелия Георгиева's PROGRESS plan charged at the FLEX tariff
+                for months). Doesn't block saving — some clients do get a
+                real discount — just makes the mismatch visible before it
+                silently becomes the Finance number. */}
+            {planType && Number(price) > 0 && DEFAULT_PRICES[planType] != null && Number(price) !== DEFAULT_PRICES[planType] && (
+              <Box sx={{ p: 1.5, borderRadius: '10px', background: 'rgba(251,146,60,0.1)', border: '1px solid rgba(251,146,60,0.3)' }}>
+                <Typography sx={{ fontSize: '12px', fontWeight: 700, color: '#FB923C' }}>
+                  {t('priceMismatchTitle') || 'Цената не съвпада със стандартната такса'}
+                </Typography>
+                <Typography sx={{ fontSize: '11px', color: C.muted, mt: 0.5 }}>
+                  {(t('priceMismatchBody') || '{plan} обикновено е {standard} €, а тук е въведено {entered} €. Провери дали е нарочна отстъпка, преди да запазиш.')
+                    .replace('{plan}', planLabel(planType, t))
+                    .replace('{standard}', DEFAULT_PRICES[planType])
+                    .replace('{entered}', price)}
+                </Typography>
+              </Box>
+            )}
             {/* Renewal settling an unpaid old plan — one deliberate checkbox
                 instead of a separate click somewhere else later (that split
                 is how the same cash payment ended up counted twice). */}
