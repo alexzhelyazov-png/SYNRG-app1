@@ -486,10 +486,12 @@ export default function SubscriptionsTab({ t, lang }) {
               border: `1px solid ${isDuplicate ? 'rgba(224,82,82,0.25)' : isActive ? C.border : 'rgba(255,255,255,0.03)'}`,
               opacity: isActive ? 1 : 0.45,
             }}>
-              {/* Status dot */}
+              {/* Status dot — green only means "active AND paid". An active
+                  but unpaid plan is red, matching the НЕПЛ. badge instead of
+                  silently looking the same as a paid one. */}
               <Box sx={{
                 width: 8, height: 8, borderRadius: '50%', flexShrink: 0,
-                background: isActive ? '#4ade80' : C.muted,
+                background: !isActive ? C.muted : p.is_paid ? '#4ade80' : '#e05252',
               }} />
 
               {/* Plan badge */}
