@@ -2463,7 +2463,6 @@ function AnalyticsTab({ t }) {
 function ExpensesTab({ t }) {
   const { showSnackbar } = useApp()
   const [year, setYear] = useState(REPORT_LIVE_YEAR)
-  const [plans, setPlans] = useState([])
   const [rowsByMonth, setRowsByMonth] = useState({})
   const [loading, setLoading] = useState(true)
 
@@ -2471,24 +2470,16 @@ function ExpensesTab({ t }) {
 
   async function load() {
     setLoading(true)
-    const [hist, p] = await Promise.all([
-      DB.selectAll('monthly_financials', `&year=eq.${year}&order=month.asc`).catch(() => []),
-      DB.selectAll('client_plans').catch(() => []),
-    ])
-    setPlans(p || [])
+    const hist = await DB.selectAll('monthly_financials', `&year=eq.${year}&order=month.asc`).catch(() => [])
     const byMonth = {}
     for (let m = 1; m <= 12; m++) {
       const existing = (hist || []).find(r => r.month === m)
       byMonth[m] = existing
-        ? { id: existing.id, storedRevenue: existing.revenue, expenses_json: { ...(existing.expenses_json || {}) } }
-        : { id: null, storedRevenue: null, expenses_json: {} }
+        ? { id: existing.id, expenses_json: { ...(existing.expenses_json || {}) } }
+        : { id: null, expenses_json: {} }
     }
     setRowsByMonth(byMonth)
     setLoading(false)
-  }
-
-  function isLiveMonth(m) {
-    return year > REPORT_LIVE_YEAR || (year === REPORT_LIVE_YEAR && m >= REPORT_LIVE_MONTH)
   }
 
   // A month locks a couple of months after it ends — long enough to still
@@ -2499,11 +2490,6 @@ function ExpensesTab({ t }) {
   const monthsAgo = (y, m) => (now.getFullYear() - y) * 12 + (now.getMonth() + 1 - m)
   function isMonthClosed(m) {
     return monthsAgo(year, m) > EXPENSES_LOCK_GRACE_MONTHS
-  }
-  function revenueFor(m) {
-    const row = rowsByMonth[m]
-    if (row?.id && row.storedRevenue != null) return row.storedRevenue
-    return isLiveMonth(m) ? computeMonthRevenue(plans, year, m) : 0
   }
 
   function handleCellChange(month, label, value) {
@@ -2577,7 +2563,6 @@ function ExpensesTab({ t }) {
                   <Box component="th" key={label} sx={headCellSx}>{label}</Box>
                 ))}
                 <Box component="th" sx={headCellSx}>{t('totalExpensesLbl') || 'Разход'}</Box>
-                <Box component="th" sx={headCellSx}>{t('profitLbl') || 'Печалба'}</Box>
               </Box>
             </Box>
             <Box component="tbody">
@@ -2585,8 +2570,6 @@ function ExpensesTab({ t }) {
                 const m = i + 1
                 const row = rowsByMonth[m] || { expenses_json: {} }
                 const expTotal = Object.values(row.expenses_json).reduce((s, v) => s + (Number(v) || 0), 0)
-                const revenue = revenueFor(m)
-                const profit = revenue - expTotal
                 const closed = isMonthClosed(m)
                 return (
                   <Box component="tr" key={m}>
@@ -2627,7 +2610,6 @@ function ExpensesTab({ t }) {
                       </Box>
                     ))}
                     <Box component="td" sx={computedCellSx}>{fmt(expTotal)} €</Box>
-                    <Box component="td" sx={{ ...computedCellSx, color: profit >= 0 ? C.primary : '#F87171' }}>{fmt(profit)} €</Box>
                   </Box>
                 )
               })}
