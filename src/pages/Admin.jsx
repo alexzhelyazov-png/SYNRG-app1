@@ -2074,7 +2074,12 @@ function ReportTab({ t, lang }) {
     },
     {
       key: 'active', label: t('reportActiveClientsLbl') || 'Активни клиенти',
-      render: row => row.active_clients != null ? row.active_clients : '–',
+      render: row => {
+        if (row.active_clients == null) return '–'
+        return row.active_clients_approx
+          ? <Box component="span" title={t('approxActiveHint') || 'Приблизително — не всички плащания от онзи месец имат дигитален запис'} sx={{ color: C.muted }}>~{row.active_clients}</Box>
+          : row.active_clients
+      },
       annual: () => annual.activeAvg != null ? annual.activeAvg : '–',
     },
   ]
