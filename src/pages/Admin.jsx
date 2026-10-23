@@ -1847,6 +1847,225 @@ function ClientsTab({ t }) {
   )
 }
 
+// ── Report Tab (full year, history + live) ─────────────────────
+// Replaces the 5-year manual spreadsheet. Years before LIVE_YEAR/LIVE_MONTH
+// are frozen imports from that spreadsheet (BGN preserved alongside the EUR
+// conversion); from Октомври 2026 onward every month is computed live from
+// client_plans + expenses + recurring_expenses — nothing to re-type by hand.
+const REPORT_LIVE_YEAR = 2026
+const REPORT_LIVE_MONTH = 10
+const REPORT_MONTHS_BG = ['Януари','Февруари','Март','Април','Май','Юни','Юли','Август','Септември','Октомври','Ноември','Декември']
+
+// Names that show up as non-real-client placeholders in bookings/plans
+// (generic walk-in slots, trial/online test rows) — excluded ONLY from the
+// Отчет active-clients count. Everywhere else in the app (e.g. salary
+// formulas elsewhere) these still count as usual — don't touch that.
+const REPORT_EXCLUDED_NAMES = new Set(['клиент', 'нов клиент', 'проба'])
+function isRealStudioClient(client) {
+  if (!client) return false
+  if (client.account_type === 'online') return false
+  const name = (client.name || '').trim().toLowerCase()
+  if (REPORT_EXCLUDED_NAMES.has(name)) return false
+  if (/test|тестов/i.test(client.name || '')) return false
+  return true
+}
+
+function ReportTab({ t, lang }) {
+  const { realClients } = useApp()
+  const [year, setYear] = useState(REPORT_LIVE_YEAR)
+  const [rows, setRows] = useState({})
+  const [loading, setLoading] = useState(true)
+  const [recurring, setRecurring] = useState([])
+  const [editOpen, setEditOpen] = useState(false)
+
+  useEffect(() => { load() }, [year])
+
+  async function load() {
+    setLoading(true)
+    const [hist, rec] = await Promise.all([
+      DB.selectAll('monthly_financials', `&year=eq.${year}&order=month.asc`).catch(() => []),
+      DB.selectAll('recurring_expenses', '&active=eq.true&order=sort_order.asc').catch(() => []),
+    ])
+    setRecurring(rec || [])
+    const byMonth = {}
+    ;(hist || []).forEach(r => { byMonth[r.month] = { ...r, isLive: false } })
+
+    const liveMonths = []
+    for (let m = 1; m <= 12; m++) {
+      if (year > REPORT_LIVE_YEAR || (year === REPORT_LIVE_YEAR && m >= REPORT_LIVE_MONTH)) liveMonths.push(m)
+    }
+    if (liveMonths.length) {
+      const [plans, adhoc, slots, bookings] = await Promise.all([
+        DB.selectAll('client_plans').catch(() => []),
+        DB.selectAll('expenses').catch(() => []),
+        DB.selectAll('booking_slots', '&coach_name=in.(Coach Momchil,Coach Teodora,Coach Valentin)').catch(() => []),
+        DB.selectAll('slot_bookings', '&status=eq.active').catch(() => []),
+      ])
+      liveMonths.forEach(m => {
+        const monthStart = `${year}-${String(m).padStart(2, '0')}-01`
+        const nextM = m === 12 ? `${year + 1}-01-01` : `${year}-${String(m + 1).padStart(2, '0')}-01`
+
+        // Revenue — identical logic to Аналитика's monthly bucketing.
+        const monthPlans = (plans || []).filter(p => {
+          if (!p.is_paid) return false
+          const d = (p.paid_at || p.created_at || p.valid_from || '').slice(0, 10)
+          return d >= monthStart && d < nextM
+        })
+        const revenue = monthPlans.reduce((s, p) => s + (Number(p.price) || 0) - (Number(p.refund_amount) || 0), 0)
+
+        // Expenses — recurring fixed costs auto-applied + whatever one-off/
+        // salary entries were logged that month in Разходи.
+        const expenses = {}
+        rec.forEach(r => { expenses[r.label] = (expenses[r.label] || 0) + (Number(r.amount) || 0) })
+        ;(adhoc || []).forEach(e => {
+          const d = (e.created_at || '').slice(0, 10)
+          if (d >= monthStart && d < nextM) expenses[e.category] = (expenses[e.category] || 0) + (Number(e.amount) || 0)
+        })
+        const expensesPreTax = Object.values(expenses).reduce((s, v) => s + v, 0)
+        const tax = Math.max(0, (revenue - expensesPreTax) * 0.10)
+        expenses[t('taxLbl') || 'Данък (10%)'] = Math.round(tax * 100) / 100
+
+        // New-coach training count — active bookings on slots run by the
+        // three newest coaches, this month.
+        const monthSlotIds = new Set((slots || [])
+          .filter(s => s.slot_date >= monthStart && s.slot_date < nextM)
+          .map(s => s.id))
+        const trainings = (bookings || []).filter(b => monthSlotIds.has(b.slot_id)).length
+
+        // Active clients — distinct REAL studio clients whose plan window
+        // overlaps this month, regardless of paid status (studio access is
+        // what counts). Test/placeholder/online rows excluded — Отчет only.
+        const activeIds = new Set()
+        ;(plans || []).forEach(p => {
+          if (!p.valid_from) return
+          const to = p.extended_to || p.valid_to
+          if (p.valid_from < nextM && (!to || to >= monthStart)) {
+            const client = realClients.find(c => c.id === p.client_id)
+            if (isRealStudioClient(client)) activeIds.add(p.client_id)
+          }
+        })
+
+        byMonth[m] = {
+          year, month: m, revenue, expenses_json: expenses, isLive: true,
+          active_clients: activeIds.size, new_coach_trainings: trainings,
+        }
+      })
+    }
+    setRows(byMonth)
+    setLoading(false)
+  }
+
+  const fmt = (n) => (Math.round((Number(n) || 0) * 100) / 100).toLocaleString('bg-BG', { maximumFractionDigits: 2 })
+
+  return (
+    <Box>
+      {/* Year nav */}
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2, mb: 2 }}>
+        <IconButton size="small" onClick={() => setYear(y => y - 1)} sx={{ color: C.muted }}>‹</IconButton>
+        <Typography sx={{ fontSize: '18px', fontWeight: 800, color: C.text, fontFamily: "'MontBlanc', sans-serif" }}>{year}</Typography>
+        <IconButton size="small" onClick={() => setYear(y => y + 1)} sx={{ color: C.muted }}>›</IconButton>
+      </Box>
+
+      <Button size="small" onClick={() => setEditOpen(true)}
+        sx={{ mb: 2, fontSize: '12px', color: C.purple, textTransform: 'none', fontWeight: 700 }}>
+        {t('editRecurringBtn') || 'Редактирай фиксирани разходи'}
+      </Button>
+
+      {loading ? (
+        <Typography sx={{ color: C.muted, py: 4, textAlign: 'center' }}>…</Typography>
+      ) : (
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+          {REPORT_MONTHS_BG.map((label, i) => {
+            const m = i + 1
+            const row = rows[m]
+            if (!row) return (
+              <Box key={m} sx={{ p: 1.5, borderRadius: '12px', border: `1px solid ${C.border}`, opacity: 0.4 }}>
+                <Typography sx={{ fontSize: '13px', color: C.muted, fontWeight: 700 }}>{label}</Typography>
+              </Box>
+            )
+            const expTotal = Object.values(row.expenses_json || {}).reduce((s, v) => s + (Number(v) || 0), 0)
+            const profit = (Number(row.revenue) || 0) - expTotal
+            return (
+              <Box key={m} sx={{ p: 1.5, borderRadius: '12px', border: `1px solid ${C.border}`, background: C.card }}>
+                <Box sx={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', mb: 0.75 }}>
+                  <Typography sx={{ fontSize: '13px', fontWeight: 800, color: C.text }}>
+                    {label}{row.isLive && (
+                      <Box component="span" sx={{ ml: 1, fontSize: '9px', fontWeight: 700, color: C.primary, background: 'rgba(196,233,191,0.12)', px: 0.75, py: 0.1, borderRadius: '4px' }}>
+                        {t('liveLbl') || 'ЖИВО'}
+                      </Box>
+                    )}
+                  </Typography>
+                  <Typography sx={{ fontSize: '12px', fontWeight: 700, color: profit >= 0 ? C.primary : '#F87171' }}>
+                    {t('profitLbl') || 'Печалба'}: {fmt(profit)} €
+                  </Typography>
+                </Box>
+                <Typography sx={{ fontSize: '12px', color: C.muted, mb: 0.5 }}>
+                  {t('revenueLbl') || 'Приход'}: <Box component="span" sx={{ color: C.text, fontWeight: 700 }}>{fmt(row.revenue)} €</Box>
+                  {row.revenue_bgn != null && (
+                    <Box component="span" sx={{ color: C.muted }}> / {fmt(row.revenue_bgn)} лв</Box>
+                  )}
+                </Typography>
+                {(row.active_clients != null || row.new_coach_trainings != null) && (
+                  <Typography sx={{ fontSize: '11px', color: C.muted, mb: 0.5 }}>
+                    {row.active_clients != null && <>{t('reportActiveClientsLbl') || 'Активни клиенти'}: {row.active_clients}</>}
+                    {row.active_clients != null && row.new_coach_trainings != null && '  ·  '}
+                    {row.new_coach_trainings != null && <>{t('newCoachTrainingsLbl') || 'Трен. нови треньори'}: {row.new_coach_trainings}</>}
+                  </Typography>
+                )}
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 0.5 }}>
+                  {Object.entries(row.expenses_json || {}).filter(([, v]) => v).map(([label2, v]) => (
+                    <Box key={label2} sx={{ fontSize: '10px', color: C.muted, background: 'rgba(255,255,255,0.04)', px: 0.75, py: 0.2, borderRadius: '6px' }}>
+                      {label2}: {fmt(v)} €
+                    </Box>
+                  ))}
+                </Box>
+              </Box>
+            )
+          })}
+        </Box>
+      )}
+
+      <RecurringExpensesDialog open={editOpen} onClose={() => { setEditOpen(false); load() }} recurring={recurring} t={t} lang={lang} />
+    </Box>
+  )
+}
+
+function RecurringExpensesDialog({ open, onClose, recurring, t, lang }) {
+  const [rows2, setRows2] = useState([])
+  useEffect(() => { if (open) setRows2(recurring.map(r => ({ ...r }))) }, [open, recurring])
+
+  async function handleSave() {
+    await Promise.all(rows2.map(r => DB.update('recurring_expenses', r.id, { amount: Number(r.amount) || 0 })))
+    onClose()
+  }
+
+  return (
+    <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth
+      PaperProps={{ sx: { borderRadius: '20px', background: C.card, border: `1px solid ${C.border}` } }}>
+      <DialogTitle sx={{ fontWeight: 700, color: C.text }}>{t('editRecurringBtn') || 'Фиксирани разходи'}</DialogTitle>
+      <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, pt: '4px !important' }}>
+        <Typography sx={{ fontSize: '12px', color: C.muted }}>
+          {t('recurringHint') || 'Прилагат се автоматично всеки месец от октомври 2026 нататък. Заплатите не са тук — въвеждат се всеки месец в "Разходи", защото се смятат по формула.'}
+        </Typography>
+        {rows2.map((r, i) => (
+          <TextField key={r.id} label={r.label} type="number" size="small"
+            value={r.amount}
+            onChange={e => setRows2(prev => prev.map((p, j) => j === i ? { ...p, amount: e.target.value } : p))}
+            InputProps={{ endAdornment: <Typography sx={{ fontSize: '12px', color: C.muted }}>€</Typography> }}
+            sx={{ '& .MuiInputBase-input': { color: C.text }, '& .MuiOutlinedInput-notchedOutline': { borderColor: C.border }, '& .MuiInputLabel-root': { color: C.muted } }}
+          />
+        ))}
+      </DialogContent>
+      <DialogActions sx={{ px: 3, pb: 2 }}>
+        <Button onClick={onClose} sx={{ color: C.muted }}>{t('cancelBtn')}</Button>
+        <Button variant="contained" onClick={handleSave} sx={{ background: C.primary, color: '#0f1c11', fontWeight: 700 }}>
+          {t('saveBtn')}
+        </Button>
+      </DialogActions>
+    </Dialog>
+  )
+}
+
 // ── Analytics Tab (monthly) ───────────────────────────────────
 function AnalyticsTab({ t }) {
   const { allPlans, loadAllPlans } = useBooking()
@@ -3558,6 +3777,7 @@ export default function Admin() {
     ],
     finance: [
       { key: 'analytics', label: t('analyticsTab') || 'Аналитика' },
+      { key: 'report',    label: t('reportTab')    || 'Отчет' },
       { key: 'expenses',  label: t('expensesTab')  || 'Разходи' },
       { key: 'orders',    label: t('ordersTab')    || 'Поръчки' },
     ],
@@ -3632,6 +3852,7 @@ export default function Admin() {
 
       {section === 'finance' && fullAdmin && <>
         {financeSub === 'analytics' && <AnalyticsTab t={t} />}
+        {financeSub === 'report'    && <ReportTab t={t} lang={lang} />}
         {financeSub === 'expenses'  && <ExpensesTab t={t} />}
         {financeSub === 'orders'    && <OrdersTab t={t} />}
       </>}
