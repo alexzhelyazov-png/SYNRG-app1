@@ -29,6 +29,7 @@ import ChevronRightIcon      from '@mui/icons-material/ChevronRight'
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings'
 import EmailIcon               from '@mui/icons-material/Email'
 import LocalFireDepartmentIcon from '@mui/icons-material/LocalFireDepartment'
+import LockOutlinedIcon        from '@mui/icons-material/LockOutlined'
 import Switch                from '@mui/material/Switch'
 import { useApp }            from '../context/AppContext'
 import SiteTab               from './AdminSiteTab'
@@ -1855,6 +1856,34 @@ function ClientsTab({ t }) {
 const REPORT_LIVE_YEAR = 2026
 const REPORT_LIVE_MONTH = 10
 const REPORT_MONTHS_BG = ['Януари','Февруари','Март','Април','Май','Юни','Юли','Август','Септември','Октомври','Ноември','Декември']
+// Labels are prefixed "Трен." — salary columns are already named after the
+// same three people, and a bare "Ицко" header twice in one row (once for pay,
+// once for session count) read as a duplicate column rather than two metrics.
+const TRAINING_COACHES = [
+  { dbName: 'Ицко', label: 'Трен. Ицко' },
+  { dbName: 'Coach Valentin', label: 'Трен. Валентин' },
+  { dbName: 'Coach Momchil', label: 'Трен. Момчил' },
+]
+
+// Canonical monthly-expense columns — shared by ExpensesTab (where the team
+// types the numbers in every month) and ReportTab (where they're summarised).
+// Salaries stay grouped and in team order; everything else is itemised too,
+// since ExpensesTab needs per-category inputs even though Отчет later groups
+// the non-salary ones into one "Други разходи" column for a readable grid.
+const SALARY_PEOPLE = ['Елина', 'Алекс', 'Кари', 'Ицко', 'Валентин', 'Момчил']
+const SALARY_LABELS = SALARY_PEOPLE.map(name => `Заплата ${name}`)
+const OTHER_EXPENSE_LABELS = ['Наем', 'Ток и вода', 'Счетоводство', 'Осигуровки', 'Амортизация', 'Реклама', 'Оборудване', 'Други']
+const MONTHLY_EXPENSE_COLUMNS = [...SALARY_LABELS, ...OTHER_EXPENSE_LABELS]
+
+function computeMonthRevenue(plans, year, month) {
+  const monthStart = `${year}-${String(month).padStart(2, '0')}-01`
+  const nextM = month === 12 ? `${year + 1}-01-01` : `${year}-${String(month + 1).padStart(2, '0')}-01`
+  return (plans || []).filter(p => {
+    if (!p.is_paid) return false
+    const d = (p.paid_at || p.created_at || p.valid_from || '').slice(0, 10)
+    return d >= monthStart && d < nextM
+  }).reduce((s, p) => s + (Number(p.price) || 0) - (Number(p.refund_amount) || 0), 0)
+}
 
 // Names that show up as non-real-client placeholders in bookings/plans
 // (generic walk-in slots, trial/online test rows) — excluded ONLY from the
@@ -1875,18 +1904,12 @@ function ReportTab({ t, lang }) {
   const [year, setYear] = useState(REPORT_LIVE_YEAR)
   const [rows, setRows] = useState({})
   const [loading, setLoading] = useState(true)
-  const [recurring, setRecurring] = useState([])
-  const [editOpen, setEditOpen] = useState(false)
 
   useEffect(() => { load() }, [year])
 
   async function load() {
     setLoading(true)
-    const [hist, rec] = await Promise.all([
-      DB.selectAll('monthly_financials', `&year=eq.${year}&order=month.asc`).catch(() => []),
-      DB.selectAll('recurring_expenses', '&active=eq.true&order=sort_order.asc').catch(() => []),
-    ])
-    setRecurring(rec || [])
+    const hist = await DB.selectAll('monthly_financials', `&year=eq.${year}&order=month.asc`).catch(() => [])
     const byMonth = {}
     ;(hist || []).forEach(r => { byMonth[r.month] = { ...r, isLive: false } })
 
@@ -1895,49 +1918,29 @@ function ReportTab({ t, lang }) {
       if (year > REPORT_LIVE_YEAR || (year === REPORT_LIVE_YEAR && m >= REPORT_LIVE_MONTH)) liveMonths.push(m)
     }
     if (liveMonths.length) {
-      const [plans, adhoc, slots, bookings] = await Promise.all([
-        DB.selectAll('client_plans').catch(() => []),
-        DB.selectAll('expenses').catch(() => []),
-        DB.selectAll('booking_slots', '&coach_name=in.(Coach Momchil,Coach Teodora,Coach Valentin)').catch(() => []),
-        DB.selectAll('slot_bookings', '&status=eq.active').catch(() => []),
-      ])
+      const plans = await DB.selectAll('client_plans').catch(() => [])
       liveMonths.forEach(m => {
         const monthStart = `${year}-${String(m).padStart(2, '0')}-01`
         const nextM = m === 12 ? `${year + 1}-01-01` : `${year}-${String(m + 1).padStart(2, '0')}-01`
 
         // Revenue — identical logic to Аналитика's monthly bucketing.
-        const monthPlans = (plans || []).filter(p => {
-          if (!p.is_paid) return false
-          const d = (p.paid_at || p.created_at || p.valid_from || '').slice(0, 10)
-          return d >= monthStart && d < nextM
-        })
-        const revenue = monthPlans.reduce((s, p) => s + (Number(p.price) || 0) - (Number(p.refund_amount) || 0), 0)
+        const revenue = computeMonthRevenue(plans, year, m)
 
-        // Expenses — recurring fixed costs auto-applied + whatever one-off/
-        // salary entries were logged that month in Разходи.
-        const expenses = {}
-        rec.forEach(r => { expenses[r.label] = (expenses[r.label] || 0) + (Number(r.amount) || 0) })
-        ;(adhoc || []).forEach(e => {
-          const d = (e.created_at || '').slice(0, 10)
-          if (d >= monthStart && d < nextM) expenses[e.category] = (expenses[e.category] || 0) + (Number(e.amount) || 0)
-        })
-        const expensesPreTax = Object.values(expenses).reduce((s, v) => s + v, 0)
+        // Expenses — whatever the team typed into the Разходи grid for this
+        // month (byMonth[m] was already seeded from `hist` above, if a row
+        // exists), plus the tax figure, which is always derived, never typed.
+        const taxLabel = t('taxLbl') || 'Данък (10%)'
+        const expenses = { ...(byMonth[m]?.expenses_json || {}) }
+        const expensesPreTax = Object.values(expenses).reduce((s, v) => s + (Number(v) || 0), 0)
         const tax = Math.max(0, (revenue - expensesPreTax) * 0.10)
-        expenses[t('taxLbl') || 'Данък (10%)'] = Math.round(tax * 100) / 100
+        expenses[taxLabel] = Math.round(tax * 100) / 100
 
-        // New-coach training count — active bookings on slots run by the
-        // three newest coaches, this month.
-        const monthSlotIds = new Set((slots || [])
-          .filter(s => s.slot_date >= monthStart && s.slot_date < nextM)
-          .map(s => s.id))
-        const trainings = (bookings || []).filter(b => monthSlotIds.has(b.slot_id)).length
-
-        // Active clients — distinct REAL studio clients whose plan window
-        // overlaps this month, regardless of paid status (studio access is
-        // what counts). Test/placeholder/online rows excluded — Отчет only.
+        // Active clients — distinct REAL studio clients with a PAID plan
+        // whose window overlaps this month. Test/placeholder/online rows
+        // excluded — Отчет only.
         const activeIds = new Set()
         ;(plans || []).forEach(p => {
-          if (!p.valid_from) return
+          if (!p.valid_from || !p.is_paid) return
           const to = p.extended_to || p.valid_to
           if (p.valid_from < nextM && (!to || to >= monthStart)) {
             const client = realClients.find(c => c.id === p.client_id)
@@ -1947,7 +1950,7 @@ function ReportTab({ t, lang }) {
 
         byMonth[m] = {
           year, month: m, revenue, expenses_json: expenses, isLive: true,
-          active_clients: activeIds.size, new_coach_trainings: trainings,
+          active_clients: activeIds.size,
         }
       })
     }
@@ -1956,6 +1959,137 @@ function ReportTab({ t, lang }) {
   }
 
   const fmt = (n) => (Math.round((Number(n) || 0) * 100) / 100).toLocaleString('bg-BG', { maximumFractionDigits: 2 })
+  const monthsShort = REPORT_MONTHS_BG.map(l => l.slice(0, 3))
+
+  // Stable row order: the canonical salary/expense columns (same order as the
+  // Разходи input grid), then tax, then anything else found in any month's
+  // data (e.g. historical rows from the old spreadsheet with older category
+  // names) — so nothing from history is silently dropped.
+  const taxLabel = t('taxLbl') || 'Данък (10%)'
+  const expenseLabels = (() => {
+    const order = [...MONTHLY_EXPENSE_COLUMNS, taxLabel]
+    const seen = new Set(order)
+    const extra = []
+    Object.values(rows).forEach(row => {
+      Object.keys(row.expenses_json || {}).forEach(k => {
+        if (!seen.has(k)) { seen.add(k); extra.push(k) }
+      })
+    })
+    return [...order, ...extra]
+  })()
+
+  // Salaries stay visible as their own line (each person's pay matters on its
+  // own); everything else the team fills in via "Разходи" collapses into one
+  // grouped total, so the grid doesn't grow a column per utility bill.
+  const isSalaryLabel = (label) => /^запл/i.test((label || '').trim())
+  const salaryLabels = expenseLabels.filter(isSalaryLabel)
+  const otherLabels = expenseLabels.filter(l => l !== taxLabel && !isSalaryLabel(l))
+
+  // Annual column — sums across all 12 months (averages for the two headcount
+  // metrics, since summing a monthly snapshot count doesn't mean anything).
+  const annual = (() => {
+    let revenue = 0, revenueBgn = 0, hasBgn = false, expensesTotal = 0
+    const expenseSums = {}
+    let activeSum = 0, activeCount = 0
+    for (let m = 1; m <= 12; m++) {
+      const row = rows[m]
+      if (!row) continue
+      revenue += Number(row.revenue) || 0
+      if (row.revenue_bgn != null) { revenueBgn += Number(row.revenue_bgn) || 0; hasBgn = true }
+      Object.entries(row.expenses_json || {}).forEach(([k, v]) => {
+        expenseSums[k] = (expenseSums[k] || 0) + (Number(v) || 0)
+        expensesTotal += Number(v) || 0
+      })
+      if (row.active_clients != null) { activeSum += row.active_clients; activeCount++ }
+    }
+    return {
+      revenue, revenueBgn: hasBgn ? revenueBgn : null, expenseSums, expensesTotal,
+      profit: revenue - expensesTotal,
+      activeAvg: activeCount ? Math.round(activeSum / activeCount) : null,
+    }
+  })()
+  const annualLabel = t('reportAnnualLbl') || 'Годишно'
+
+  // Columns = metrics (Excel-style: months run down the left, metrics run
+  // across the top — keeps the whole year readable without a wide,
+  // horizontally-scrolling table).
+  const expTotalOf = (row) => Object.values(row?.expenses_json || {}).reduce((s, v) => s + (Number(v) || 0), 0)
+  const columns = [
+    {
+      key: 'revenue', label: t('revenueLbl') || 'Приход', bold: true,
+      render: row => (
+        <>
+          <Box component="span" sx={{ fontWeight: 700 }}>{fmt(row.revenue)} €</Box>
+          {row.revenue_bgn != null && (
+            <Box component="span" sx={{ color: C.muted, fontSize: '9px', ml: 0.5 }}>({fmt(row.revenue_bgn)} лв)</Box>
+          )}
+        </>
+      ),
+      annual: () => (
+        <>
+          {fmt(annual.revenue)} €
+          {annual.revenueBgn != null && <Box component="span" sx={{ color: C.muted, fontSize: '9px', ml: 0.5 }}>({fmt(annual.revenueBgn)} лв)</Box>}
+        </>
+      ),
+    },
+    ...salaryLabels.map(label => ({
+      key: label, label,
+      render: row => { const v = row.expenses_json?.[label]; return v ? `${fmt(v)} €` : '–' },
+      annual: () => { const v = annual.expenseSums[label]; return v ? `${fmt(v)} €` : '–' },
+    })),
+    {
+      key: 'otherExp', label: t('otherExpensesLbl') || 'Други разходи',
+      render: row => {
+        const v = otherLabels.reduce((s, l) => s + (Number(row.expenses_json?.[l]) || 0), 0)
+        return v ? `${fmt(v)} €` : '–'
+      },
+      annual: () => {
+        const v = otherLabels.reduce((s, l) => s + (Number(annual.expenseSums[l]) || 0), 0)
+        return v ? `${fmt(v)} €` : '–'
+      },
+    },
+    {
+      key: taxLabel, label: taxLabel,
+      render: row => { const v = row.expenses_json?.[taxLabel]; return v ? `${fmt(v)} €` : '–' },
+      annual: () => { const v = annual.expenseSums[taxLabel]; return v ? `${fmt(v)} €` : '–' },
+    },
+    {
+      key: 'totalExp', label: t('totalExpensesLbl') || 'Общо разходи', bold: true,
+      render: row => `${fmt(expTotalOf(row))} €`,
+      annual: () => `${fmt(annual.expensesTotal)} €`,
+    },
+    {
+      key: 'profit', label: t('profitLbl') || 'Печалба', bold: true,
+      render: row => {
+        const profit = (Number(row.revenue) || 0) - expTotalOf(row)
+        return <Box component="span" sx={{ color: profit >= 0 ? C.primary : '#F87171' }}>{fmt(profit)} €</Box>
+      },
+      annual: () => <Box component="span" sx={{ color: annual.profit >= 0 ? C.primary : '#F87171' }}>{fmt(annual.profit)} €</Box>,
+    },
+    {
+      key: 'active', label: t('reportActiveClientsLbl') || 'Активни клиенти',
+      render: row => row.active_clients != null ? row.active_clients : '–',
+      annual: () => annual.activeAvg != null ? annual.activeAvg : '–',
+    },
+  ]
+
+  const headCellSx = {
+    px: 1, py: 0.6, textAlign: 'right', whiteSpace: 'nowrap',
+    borderBottom: `1px solid ${C.border}`, borderRight: `1px solid ${C.border}`,
+    fontSize: '10px', fontWeight: 800, color: C.muted,
+  }
+  const monthCellSx = {
+    px: 1, py: 0.6, textAlign: 'left', whiteSpace: 'nowrap', fontWeight: 700,
+    borderBottom: `1px solid ${C.border}`, borderRight: `1px solid ${C.border}`,
+    fontSize: '11px', color: C.text,
+    position: 'sticky', left: 0, background: C.card, zIndex: 1,
+  }
+  const cellSx = {
+    px: 1, py: 0.6, textAlign: 'right', whiteSpace: 'nowrap',
+    borderBottom: `1px solid ${C.border}`, borderRight: `1px solid ${C.border}`,
+    fontSize: '11px', color: C.text,
+  }
+  const annualRowSx = { background: 'rgba(196,233,191,0.06)' }
 
   return (
     <Box>
@@ -1966,103 +2100,52 @@ function ReportTab({ t, lang }) {
         <IconButton size="small" onClick={() => setYear(y => y + 1)} sx={{ color: C.muted }}>›</IconButton>
       </Box>
 
-      <Button size="small" onClick={() => setEditOpen(true)}
-        sx={{ mb: 2, fontSize: '12px', color: C.purple, textTransform: 'none', fontWeight: 700 }}>
-        {t('editRecurringBtn') || 'Редактирай фиксирани разходи'}
-      </Button>
-
       {loading ? (
         <Typography sx={{ color: C.muted, py: 4, textAlign: 'center' }}>…</Typography>
       ) : (
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-          {REPORT_MONTHS_BG.map((label, i) => {
-            const m = i + 1
-            const row = rows[m]
-            if (!row) return (
-              <Box key={m} sx={{ p: 1.5, borderRadius: '12px', border: `1px solid ${C.border}`, opacity: 0.4 }}>
-                <Typography sx={{ fontSize: '13px', color: C.muted, fontWeight: 700 }}>{label}</Typography>
+        <Box sx={{ overflowX: 'auto', border: `1px solid ${C.border}`, borderRadius: '12px' }}>
+          <Box component="table" sx={{ width: '100%', borderCollapse: 'collapse' }}>
+            <Box component="thead">
+              <Box component="tr">
+                <Box component="th" sx={{ ...monthCellSx, zIndex: 2 }} />
+                {columns.map(col => (
+                  <Box component="th" key={col.key} sx={headCellSx}>{col.label}</Box>
+                ))}
               </Box>
-            )
-            const expTotal = Object.values(row.expenses_json || {}).reduce((s, v) => s + (Number(v) || 0), 0)
-            const profit = (Number(row.revenue) || 0) - expTotal
-            return (
-              <Box key={m} sx={{ p: 1.5, borderRadius: '12px', border: `1px solid ${C.border}`, background: C.card }}>
-                <Box sx={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', mb: 0.75 }}>
-                  <Typography sx={{ fontSize: '13px', fontWeight: 800, color: C.text }}>
-                    {label}{row.isLive && (
-                      <Box component="span" sx={{ ml: 1, fontSize: '9px', fontWeight: 700, color: C.primary, background: 'rgba(196,233,191,0.12)', px: 0.75, py: 0.1, borderRadius: '4px' }}>
-                        {t('liveLbl') || 'ЖИВО'}
-                      </Box>
-                    )}
-                  </Typography>
-                  <Typography sx={{ fontSize: '12px', fontWeight: 700, color: profit >= 0 ? C.primary : '#F87171' }}>
-                    {t('profitLbl') || 'Печалба'}: {fmt(profit)} €
-                  </Typography>
-                </Box>
-                <Typography sx={{ fontSize: '12px', color: C.muted, mb: 0.5 }}>
-                  {t('revenueLbl') || 'Приход'}: <Box component="span" sx={{ color: C.text, fontWeight: 700 }}>{fmt(row.revenue)} €</Box>
-                  {row.revenue_bgn != null && (
-                    <Box component="span" sx={{ color: C.muted }}> / {fmt(row.revenue_bgn)} лв</Box>
-                  )}
-                </Typography>
-                {(row.active_clients != null || row.new_coach_trainings != null) && (
-                  <Typography sx={{ fontSize: '11px', color: C.muted, mb: 0.5 }}>
-                    {row.active_clients != null && <>{t('reportActiveClientsLbl') || 'Активни клиенти'}: {row.active_clients}</>}
-                    {row.active_clients != null && row.new_coach_trainings != null && '  ·  '}
-                    {row.new_coach_trainings != null && <>{t('newCoachTrainingsLbl') || 'Трен. нови треньори'}: {row.new_coach_trainings}</>}
-                  </Typography>
-                )}
-                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 0.5 }}>
-                  {Object.entries(row.expenses_json || {}).filter(([, v]) => v).map(([label2, v]) => (
-                    <Box key={label2} sx={{ fontSize: '10px', color: C.muted, background: 'rgba(255,255,255,0.04)', px: 0.75, py: 0.2, borderRadius: '6px' }}>
-                      {label2}: {fmt(v)} €
+            </Box>
+            <Box component="tbody">
+              {monthsShort.map((label, i) => {
+                const m = i + 1
+                const row = rows[m]
+                return (
+                  <Box component="tr" key={m}>
+                    <Box component="th" sx={monthCellSx}>
+                      {label}
+                      {row?.isLive && (
+                        <Box component="span" sx={{ ml: 0.5, fontSize: '8px', fontWeight: 700, color: C.primary }}>●</Box>
+                      )}
                     </Box>
-                  ))}
-                </Box>
+                    {columns.map(col => (
+                      <Box component="td" key={col.key} sx={{ ...cellSx, fontWeight: col.bold ? 700 : 400 }}>
+                        {row ? col.render(row) : '–'}
+                      </Box>
+                    ))}
+                  </Box>
+                )
+              })}
+              {/* Годишно total row */}
+              <Box component="tr" sx={annualRowSx}>
+                <Box component="th" sx={{ ...monthCellSx, fontWeight: 800, background: C.card }}>{annualLabel}</Box>
+                {columns.map(col => (
+                  <Box component="td" key={col.key} sx={{ ...cellSx, fontWeight: 800 }}>{col.annual()}</Box>
+                ))}
               </Box>
-            )
-          })}
+            </Box>
+          </Box>
         </Box>
       )}
 
-      <RecurringExpensesDialog open={editOpen} onClose={() => { setEditOpen(false); load() }} recurring={recurring} t={t} lang={lang} />
     </Box>
-  )
-}
-
-function RecurringExpensesDialog({ open, onClose, recurring, t, lang }) {
-  const [rows2, setRows2] = useState([])
-  useEffect(() => { if (open) setRows2(recurring.map(r => ({ ...r }))) }, [open, recurring])
-
-  async function handleSave() {
-    await Promise.all(rows2.map(r => DB.update('recurring_expenses', r.id, { amount: Number(r.amount) || 0 })))
-    onClose()
-  }
-
-  return (
-    <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth
-      PaperProps={{ sx: { borderRadius: '20px', background: C.card, border: `1px solid ${C.border}` } }}>
-      <DialogTitle sx={{ fontWeight: 700, color: C.text }}>{t('editRecurringBtn') || 'Фиксирани разходи'}</DialogTitle>
-      <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, pt: '4px !important' }}>
-        <Typography sx={{ fontSize: '12px', color: C.muted }}>
-          {t('recurringHint') || 'Прилагат се автоматично всеки месец от октомври 2026 нататък. Заплатите не са тук — въвеждат се всеки месец в "Разходи", защото се смятат по формула.'}
-        </Typography>
-        {rows2.map((r, i) => (
-          <TextField key={r.id} label={r.label} type="number" size="small"
-            value={r.amount}
-            onChange={e => setRows2(prev => prev.map((p, j) => j === i ? { ...p, amount: e.target.value } : p))}
-            InputProps={{ endAdornment: <Typography sx={{ fontSize: '12px', color: C.muted }}>€</Typography> }}
-            sx={{ '& .MuiInputBase-input': { color: C.text }, '& .MuiOutlinedInput-notchedOutline': { borderColor: C.border }, '& .MuiInputLabel-root': { color: C.muted } }}
-          />
-        ))}
-      </DialogContent>
-      <DialogActions sx={{ px: 3, pb: 2 }}>
-        <Button onClick={onClose} sx={{ color: C.muted }}>{t('cancelBtn')}</Button>
-        <Button variant="contained" onClick={handleSave} sx={{ background: C.primary, color: '#0f1c11', fontWeight: 700 }}>
-          {t('saveBtn')}
-        </Button>
-      </DialogActions>
-    </Dialog>
   )
 }
 
@@ -2070,7 +2153,7 @@ function RecurringExpensesDialog({ open, onClose, recurring, t, lang }) {
 function AnalyticsTab({ t }) {
   const { allPlans, loadAllPlans } = useBooking()
   const { realClients } = useApp()
-  const [expenses,          setExpenses]          = useState([])
+  const [monthFinancials,   setMonthFinancials]    = useState(null)
   const [programPurchases,  setProgramPurchases]  = useState([])
   const [appEvents,         setAppEvents]         = useState([])
   const [featureDays,       setFeatureDays]       = useState(30)
@@ -2080,7 +2163,6 @@ function AnalyticsTab({ t }) {
 
   useEffect(() => {
     loadAllPlans()
-    DB.selectAll('expenses').then(rows => setExpenses(rows || []))
     DB.selectAll('program_purchases').then(rows => setProgramPurchases(rows || [])).catch(() => {})
     DB.selectAll('app_events', '&select=event,client_id,created_at&order=created_at.desc&limit=100000')
       .catch(() => []).then(rows => setAppEvents(rows || []))
@@ -2093,6 +2175,14 @@ function AnalyticsTab({ t }) {
     return m === 12 ? `${y + 1}-01-01` : `${y}-${String(m + 1).padStart(2, '0')}-01`
   })()
 
+  // Expenses now live in monthly_financials (typed in via the Разходи grid) —
+  // re-fetch whenever the selected month changes.
+  useEffect(() => {
+    const [y, m] = month.split('-').map(Number)
+    DB.selectAll('monthly_financials', `&year=eq.${y}&month=eq.${m}`).catch(() => [])
+      .then(rows => setMonthFinancials(rows?.[0] || null))
+  }, [month])
+
   // Bucket revenue by the date the payment was actually recorded. paid_at is
   // set at the moment a plan is marked paid, which is the true payment date;
   // created_at is only a fallback for plans marked paid at creation (no
@@ -2103,15 +2193,11 @@ function AnalyticsTab({ t }) {
     const d = (p.paid_at || p.created_at || p.valid_from || '').slice(0, 10)
     return d >= monthStart && d < nextMonth
   })
-  const monthExpenses = expenses.filter(e => {
-    const d = (e.created_at || '').slice(0, 10)
-    return d >= monthStart && d < nextMonth
-  })
 
   // Net of any refund — a partially refunded plan (e.g. 154 paid, 115
   // refunded after 2 sessions) must count the 39 kept, not the full price.
   const revenue = monthPlans.reduce((sum, p) => sum + (Number(p.price) || 0) - (Number(p.refund_amount) || 0), 0)
-  const expTotal = monthExpenses.reduce((sum, e) => sum + (Number(e.amount) || 0), 0)
+  const expTotal = Object.values(monthFinancials?.expenses_json || {}).reduce((sum, v) => sum + (Number(v) || 0), 0)
   const profit = revenue - expTotal
 
   // ── Extra metrics ──────────────────────────────────────────
@@ -2363,129 +2449,186 @@ function AnalyticsTab({ t }) {
   )
 }
 
-// ── Expenses Tab ──────────────────────────────────────────────
-const EXPENSE_CATEGORIES = [
-  'expCategoryTok', 'expCategoryOsig', 'expCategoryToalet', 'expCategoryReklama',
-  'expCategoryNaem', 'expCategoryVoda', 'expCategoryIcko', 'expCategoryEli',
-  'expCategoryNiki', 'expCategoryVivi', 'expCategorySche',
-]
-
+// ── Expenses Tab — monthly input grid ───────────────────────────
+// One row per month, one column per category (salaries grouped first, in
+// team order), filled in by hand. Writes straight into monthly_financials,
+// the same table Отчет reads — so there's exactly one place expense numbers
+// live, not a dated list that then has to be re-aggregated per month.
 function ExpensesTab({ t }) {
   const { showSnackbar } = useApp()
-  const [expenses, setExpenses]   = useState([])
-  const [open, setOpen]           = useState(false)
-  const [category, setCategory]   = useState('')
-  const [amount, setAmount]       = useState('')
-  const [saving, setSaving]       = useState(false)
+  const [year, setYear] = useState(REPORT_LIVE_YEAR)
+  const [plans, setPlans] = useState([])
+  const [rowsByMonth, setRowsByMonth] = useState({})
+  const [loading, setLoading] = useState(true)
 
-  async function loadExpenses() {
-    const rows = await DB.selectAll('expenses')
-    setExpenses((rows || []).sort((a, b) => b.created_at?.localeCompare(a.created_at || '') || 0))
+  useEffect(() => { load() }, [year])
+
+  async function load() {
+    setLoading(true)
+    const [hist, p] = await Promise.all([
+      DB.selectAll('monthly_financials', `&year=eq.${year}&order=month.asc`).catch(() => []),
+      DB.selectAll('client_plans').catch(() => []),
+    ])
+    setPlans(p || [])
+    const byMonth = {}
+    for (let m = 1; m <= 12; m++) {
+      const existing = (hist || []).find(r => r.month === m)
+      byMonth[m] = existing
+        ? { id: existing.id, storedRevenue: existing.revenue, expenses_json: { ...(existing.expenses_json || {}) } }
+        : { id: null, storedRevenue: null, expenses_json: {} }
+    }
+    setRowsByMonth(byMonth)
+    setLoading(false)
   }
 
-  useEffect(() => { loadExpenses() }, [])
-
-  async function handleAdd() {
-    if (!category || !amount || Number(amount) <= 0) return
-    setSaving(true)
-    await DB.insert('expenses', {
-      category,
-      amount: Number(amount),
-      created_at: new Date().toISOString(),
-    })
-    setSaving(false)
-    setOpen(false)
-    setCategory('')
-    setAmount('')
-    loadExpenses()
-    showSnackbar?.(t('expenseAddedMsg'))
+  function isLiveMonth(m) {
+    return year > REPORT_LIVE_YEAR || (year === REPORT_LIVE_YEAR && m >= REPORT_LIVE_MONTH)
   }
 
-  async function handleDelete(id) {
-    await DB.deleteById('expenses', id)
-    loadExpenses()
+  // A month locks a couple of months after it ends — long enough to still
+  // catch up on a month that wasn't fully filled in on time, but old enough
+  // that settled numbers from further back can't be edited by accident.
+  const EXPENSES_LOCK_GRACE_MONTHS = 2
+  const now = new Date()
+  const monthsAgo = (y, m) => (now.getFullYear() - y) * 12 + (now.getMonth() + 1 - m)
+  function isMonthClosed(m) {
+    return monthsAgo(year, m) > EXPENSES_LOCK_GRACE_MONTHS
+  }
+  function revenueFor(m) {
+    const row = rowsByMonth[m]
+    if (row?.id && row.storedRevenue != null) return row.storedRevenue
+    return isLiveMonth(m) ? computeMonthRevenue(plans, year, m) : 0
   }
 
-  const total = expenses.reduce((s, e) => s + (Number(e.amount) || 0), 0)
+  function handleCellChange(month, label, value) {
+    setRowsByMonth(prev => ({
+      ...prev,
+      [month]: { ...prev[month], expenses_json: { ...prev[month].expenses_json, [label]: value } },
+    }))
+  }
+
+  async function handleCellBlur(month, label) {
+    const row = rowsByMonth[month]
+    const amount = Number(row.expenses_json[label]) || 0
+    const cleaned = { ...row.expenses_json }
+    if (amount) cleaned[label] = amount; else delete cleaned[label]
+    try {
+      if (row.id) {
+        await DB.update('monthly_financials', row.id, { expenses_json: cleaned })
+        setRowsByMonth(prev => ({ ...prev, [month]: { ...prev[month], expenses_json: cleaned } }))
+      } else {
+        const created = await DB.insert('monthly_financials', {
+          year, month, revenue: 0, expenses_json: cleaned, source: 'computed',
+        })
+        setRowsByMonth(prev => ({ ...prev, [month]: { ...prev[month], id: created?.id, expenses_json: cleaned } }))
+      }
+    } catch {
+      showSnackbar?.(t('saveFailedMsg') || 'Неуспешен запис')
+    }
+  }
+
+  const fmt = (n) => (Math.round((Number(n) || 0) * 100) / 100).toLocaleString('bg-BG', { maximumFractionDigits: 2 })
+  const monthsShort = REPORT_MONTHS_BG.map(l => l.slice(0, 3))
+
+  const labelCellSx = {
+    px: 1, py: 0.6, textAlign: 'left', whiteSpace: 'nowrap', fontWeight: 700,
+    borderBottom: `1px solid ${C.border}`, borderRight: `1px solid ${C.border}`,
+    fontSize: '11px', color: C.text,
+    position: 'sticky', left: 0, background: C.card, zIndex: 1,
+  }
+  const headCellSx = {
+    px: 1, py: 0.6, textAlign: 'right', whiteSpace: 'nowrap',
+    borderBottom: `1px solid ${C.border}`, borderRight: `1px solid ${C.border}`,
+    fontSize: '10px', fontWeight: 800, color: C.muted,
+  }
+  const inputCellSx = {
+    px: 0.5, py: 0.4, borderBottom: `1px solid ${C.border}`, borderRight: `1px solid ${C.border}`,
+  }
+  const computedCellSx = {
+    px: 1, py: 0.6, textAlign: 'right', whiteSpace: 'nowrap',
+    borderBottom: `1px solid ${C.border}`, borderRight: `1px solid ${C.border}`,
+    fontSize: '11px', fontWeight: 700, color: C.text,
+  }
 
   return (
     <Box>
-      {/* Total + Add button */}
-      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-        <Box>
-          <Typography sx={{ fontSize: '11px', color: C.muted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.9px' }}>
-            {t('totalExpensesLbl')}
-          </Typography>
-          <Typography sx={{ fontSize: '36px', fontWeight: 800, color: '#F87171',
-            fontFamily: "'MontBlanc', sans-serif", lineHeight: 1, letterSpacing: '-1px' }}>
-            {total} <Typography component="span" sx={{ fontSize: '18px', fontWeight: 600, color: '#F87171' }}>€</Typography>
-          </Typography>
-        </Box>
-        <Button variant="contained" startIcon={<AddIcon />}
-          onClick={() => setOpen(true)}
-          sx={{ borderRadius: '12px', background: C.primary, color: '#0a0a0a',
-            fontWeight: 700, textTransform: 'none', px: 2 }}>
-          {t('addExpenseBtn')}
-        </Button>
+      {/* Year nav */}
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2, mb: 2 }}>
+        <IconButton size="small" onClick={() => setYear(y => y - 1)} sx={{ color: C.muted }}>‹</IconButton>
+        <Typography sx={{ fontSize: '18px', fontWeight: 800, color: C.text, fontFamily: "'MontBlanc', sans-serif" }}>{year}</Typography>
+        <IconButton size="small" onClick={() => setYear(y => y + 1)} sx={{ color: C.muted }}>›</IconButton>
       </Box>
 
-      {/* Expenses list */}
-      <Paper sx={{ borderRadius: '16px', border: `1px solid ${C.border}`, overflow: 'hidden' }}>
-        {expenses.length === 0 ? (
-          <Typography sx={{ color: C.muted, p: 3, textAlign: 'center' }}>{t('noExpensesLbl')}</Typography>
-        ) : expenses.map(exp => (
-          <Box key={exp.id} sx={{ display: 'flex', alignItems: 'center', gap: 1.5,
-            px: 2, py: 1.25,
-            borderBottom: `1px solid ${C.border}`, '&:last-child': { borderBottom: 'none' } }}>
-            <Box sx={{ flex: 1 }}>
-              <Typography sx={{ fontWeight: 600, fontSize: '14px', color: C.text }}>{exp.category}</Typography>
-              <Typography sx={{ fontSize: '11px', color: C.muted }}>
-                {exp.created_at ? new Date(exp.created_at).toLocaleDateString('bg-BG') : ''}
-              </Typography>
+      {loading ? (
+        <Typography sx={{ color: C.muted, py: 4, textAlign: 'center' }}>…</Typography>
+      ) : (
+        <Box sx={{ overflowX: 'auto', border: `1px solid ${C.border}`, borderRadius: '12px' }}>
+          <Box component="table" sx={{ width: '100%', borderCollapse: 'collapse' }}>
+            <Box component="thead">
+              <Box component="tr">
+                <Box component="th" sx={{ ...labelCellSx, zIndex: 2 }} />
+                {MONTHLY_EXPENSE_COLUMNS.map(label => (
+                  <Box component="th" key={label} sx={headCellSx}>{label}</Box>
+                ))}
+                <Box component="th" sx={headCellSx}>{t('totalExpensesLbl') || 'Разход'}</Box>
+                <Box component="th" sx={headCellSx}>{t('profitLbl') || 'Печалба'}</Box>
+              </Box>
             </Box>
-            <Typography sx={{ fontWeight: 700, fontSize: '15px', color: '#F87171',
-              fontFamily: "'MontBlanc', sans-serif", minWidth: '64px', textAlign: 'right' }}>
-              {exp.amount} €
-            </Typography>
-            <IconButton size="small" onClick={() => handleDelete(exp.id)}
-              sx={{ color: C.muted, '&:hover': { color: '#F87171' } }}>
-              <DeleteOutlineIcon fontSize="small" />
-            </IconButton>
+            <Box component="tbody">
+              {monthsShort.map((label, i) => {
+                const m = i + 1
+                const row = rowsByMonth[m] || { expenses_json: {} }
+                const expTotal = Object.values(row.expenses_json).reduce((s, v) => s + (Number(v) || 0), 0)
+                const revenue = revenueFor(m)
+                const profit = revenue - expTotal
+                const closed = isMonthClosed(m)
+                return (
+                  <Box component="tr" key={m}>
+                    <Box component="th" sx={labelCellSx}>
+                      {label}
+                      {closed && (
+                        <LockOutlinedIcon titleAccess={t('monthClosedHint') || 'Приключен месец'}
+                          sx={{ fontSize: '11px', color: C.muted, ml: 0.5, verticalAlign: 'middle' }} />
+                      )}
+                    </Box>
+                    {MONTHLY_EXPENSE_COLUMNS.map(col => (
+                      <Box component="td" key={col} sx={inputCellSx}>
+                        {closed ? (
+                          <Box sx={{ width: '64px', textAlign: 'right', fontSize: '11px', color: C.muted, px: '6px', py: '3px' }}>
+                            {row.expenses_json[col] ? fmt(row.expenses_json[col]) : '–'}
+                          </Box>
+                        ) : (
+                          <Box
+                            component="input"
+                            type="number"
+                            placeholder="0"
+                            value={row.expenses_json[col] ?? ''}
+                            onChange={e => handleCellChange(m, col, e.target.value)}
+                            onBlur={() => handleCellBlur(m, col)}
+                            sx={{
+                              width: '64px', textAlign: 'right', fontSize: '11px',
+                              background: 'rgba(255,255,255,0.05)', border: `1px solid ${C.border}`,
+                              borderRadius: '6px', px: '6px', py: '3px', outline: 'none',
+                              color: C.text, fontFamily: 'inherit',
+                              '&:hover': { background: 'rgba(255,255,255,0.09)' },
+                              '&:focus': { borderColor: C.primary, background: 'rgba(255,255,255,0.09)' },
+                              '&::placeholder': { color: C.muted, opacity: 0.5 },
+                              '&::-webkit-inner-spin-button, &::-webkit-outer-spin-button': { WebkitAppearance: 'none', margin: 0 },
+                              MozAppearance: 'textfield',
+                            }}
+                          />
+                        )}
+                      </Box>
+                    ))}
+                    <Box component="td" sx={computedCellSx}>{fmt(expTotal)} €</Box>
+                    <Box component="td" sx={{ ...computedCellSx, color: profit >= 0 ? C.primary : '#F87171' }}>{fmt(profit)} €</Box>
+                  </Box>
+                )
+              })}
+            </Box>
           </Box>
-        ))}
-      </Paper>
-
-      {/* Add Dialog */}
-      <Dialog open={open} onClose={() => setOpen(false)} PaperProps={{
-        sx: { background: '#1a1a1a', border: `1px solid ${C.border}`, borderRadius: '20px', minWidth: 320 }
-      }}>
-        <DialogTitle sx={{ color: C.text, fontWeight: 700 }}>{t('addExpenseBtn')}</DialogTitle>
-        <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: '8px !important' }}>
-          <FormControl fullWidth size="small">
-            <InputLabel sx={{ color: C.muted }}>{t('expenseCategoryLbl')}</InputLabel>
-            <Select value={category} onChange={e => setCategory(e.target.value)}
-              label={t('expenseCategoryLbl')}
-              sx={{ color: C.text, '& .MuiOutlinedInput-notchedOutline': { borderColor: C.border } }}>
-              {EXPENSE_CATEGORIES.map(key => (
-                <MenuItem key={key} value={t(key)}>{t(key)}</MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-          <TextField label={t('expenseAmountLbl')} type="number" size="small"
-            value={amount} onChange={e => setAmount(e.target.value)}
-            inputProps={{ min: 0 }}
-            sx={{ '& .MuiOutlinedInput-root': { color: C.text, '& fieldset': { borderColor: C.border } },
-              '& .MuiInputLabel-root': { color: C.muted } }} />
-        </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button onClick={() => setOpen(false)} sx={{ color: C.muted, textTransform: 'none' }}>Откажи</Button>
-          <Button onClick={handleAdd} disabled={saving || !category || Number(amount) <= 0}
-            variant="contained"
-            sx={{ background: C.primary, color: '#0a0a0a', fontWeight: 700, textTransform: 'none', borderRadius: '10px' }}>
-            {saving ? <CircularProgress size={18} /> : t('addBtn')}
-          </Button>
-        </DialogActions>
-      </Dialog>
+        </Box>
+      )}
     </Box>
   )
 }
