@@ -1875,14 +1875,22 @@ const SALARY_LABELS = SALARY_PEOPLE.map(name => `Заплата ${name}`)
 const OTHER_EXPENSE_LABELS = ['Наем', 'Ток и вода', 'Счетоводство', 'Осигуровки', 'Амортизация', 'Реклама', 'Оборудване', 'Други']
 const MONTHLY_EXPENSE_COLUMNS = [...SALARY_LABELS, ...OTHER_EXPENSE_LABELS]
 
-function computeMonthRevenue(plans, year, month) {
+// Plans that count as this month's revenue — paid, bucketed by the date the
+// payment was actually recorded (paid_at, falling back to created_at/
+// valid_from for plans marked paid at creation).
+function monthPaidPlans(plans, year, month) {
   const monthStart = `${year}-${String(month).padStart(2, '0')}-01`
   const nextM = month === 12 ? `${year + 1}-01-01` : `${year}-${String(month + 1).padStart(2, '0')}-01`
   return (plans || []).filter(p => {
     if (!p.is_paid) return false
     const d = (p.paid_at || p.created_at || p.valid_from || '').slice(0, 10)
     return d >= monthStart && d < nextM
-  }).reduce((s, p) => s + (Number(p.price) || 0) - (Number(p.refund_amount) || 0), 0)
+  })
+}
+
+function computeMonthRevenue(plans, year, month) {
+  return monthPaidPlans(plans, year, month)
+    .reduce((s, p) => s + (Number(p.price) || 0) - (Number(p.refund_amount) || 0), 0)
 }
 
 // Names that show up as non-real-client placeholders in bookings/plans
@@ -1935,17 +1943,15 @@ function ReportTab({ t, lang }) {
         const tax = Math.max(0, (revenue - expensesPreTax) * 0.10)
         expenses[taxLabel] = Math.round(tax * 100) / 100
 
-        // Active clients — distinct REAL studio clients with a PAID plan
-        // whose window overlaps this month. Test/placeholder/online rows
-        // excluded — Отчет only.
+        // Active clients — distinct REAL studio clients who PAID a fee this
+        // month. Same plan set as revenue (monthPaidPlans), not a date-window
+        // overlap — a client only counts the month they actually paid, same
+        // as the money does. Test/placeholder/online rows excluded — Отчет
+        // only, revenue itself still counts everyone.
         const activeIds = new Set()
-        ;(plans || []).forEach(p => {
-          if (!p.valid_from || !p.is_paid) return
-          const to = p.extended_to || p.valid_to
-          if (p.valid_from < nextM && (!to || to >= monthStart)) {
-            const client = realClients.find(c => c.id === p.client_id)
-            if (isRealStudioClient(client)) activeIds.add(p.client_id)
-          }
+        monthPaidPlans(plans, year, m).forEach(p => {
+          const client = realClients.find(c => c.id === p.client_id)
+          if (isRealStudioClient(client)) activeIds.add(p.client_id)
         })
 
         byMonth[m] = {
