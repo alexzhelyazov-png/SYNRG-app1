@@ -1,24 +1,21 @@
-import { Dialog, DialogContent, Box, Typography, Button, IconButton } from '@mui/material'
-import CloseIcon  from '@mui/icons-material/Close'
+import { Dialog, DialogContent, Box, Typography, Button } from '@mui/material'
 import GroupsIcon from '@mui/icons-material/Groups'
 import { VIBER_GROUP_URL } from '../lib/constants'
 import { C } from '../theme'
 
-export default function ViberInvitePopup({ open, onClose, t }) {
+// Forces an explicit answer — no X, no backdrop/escape dismiss. Either button
+// marks the invite as permanently seen (see Dashboard.jsx), so this is the
+// client's one and only chance to react to it; there's no persistent nav
+// button as a fallback, by design.
+export default function ViberInvitePopup({ open, onAlreadyIn, onJoin, t }) {
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth
+    <Dialog open={open} disableEscapeKeyDown onClose={() => {}} maxWidth="xs" fullWidth
       PaperProps={{ sx: {
         borderRadius: '20px', background: C.cardHigh, border: `1px solid ${C.border}`,
         boxShadow: '0 24px 60px rgba(0,0,0,0.4)',
       } }}
     >
-      <DialogContent sx={{ p: 3, pt: 4, textAlign: 'center', position: 'relative' }}>
-        <IconButton onClick={onClose} size="small"
-          sx={{ position: 'absolute', top: 8, right: 8, color: C.muted }}
-        >
-          <CloseIcon sx={{ fontSize: 18 }} />
-        </IconButton>
-
+      <DialogContent sx={{ p: 3, pt: 4, textAlign: 'center' }}>
         <Box sx={{
           width: 56, height: 56, borderRadius: '50%', background: C.accentSoft,
           display: 'flex', alignItems: 'center', justifyContent: 'center', mx: 'auto', mb: 2,
@@ -31,14 +28,21 @@ export default function ViberInvitePopup({ open, onClose, t }) {
           {t('viberJoinBody')}
         </Typography>
 
-        <Button
-          fullWidth variant="contained"
-          component="a" href={VIBER_GROUP_URL} target="_blank" rel="noopener"
-          onClick={onClose}
-          sx={{ py: 1.4, fontWeight: 700, fontSize: '14px' }}
-        >
-          {t('viberJoinBtn')}
-        </Button>
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+          <Button
+            fullWidth variant="contained"
+            component="a" href={VIBER_GROUP_URL} target="_blank" rel="noopener"
+            onClick={onJoin}
+            sx={{ py: 1.4, fontWeight: 700, fontSize: '14px' }}
+          >
+            {t('viberJoinBtn')}
+          </Button>
+          <Button fullWidth variant="outlined" onClick={onAlreadyIn}
+            sx={{ py: 1.2, fontWeight: 600, fontSize: '13.5px', color: C.muted, borderColor: C.border }}
+          >
+            {t('viberAlreadyInBtn')}
+          </Button>
+        </Box>
       </DialogContent>
     </Dialog>
   )

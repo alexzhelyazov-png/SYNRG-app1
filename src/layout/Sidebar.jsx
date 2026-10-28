@@ -19,13 +19,10 @@ import PlayCircleOutlineIcon from '@mui/icons-material/PlayCircleOutline'
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings'
 import MenuBookIcon           from '@mui/icons-material/MenuBook'
 import AutoAwesomeIcon        from '@mui/icons-material/AutoAwesome'
-import GroupsIcon             from '@mui/icons-material/Groups'
 import { useApp }            from '../context/AppContext'
-import { useBooking }        from '../context/BookingContext'
 import { C, EASE }           from '../theme'
-import { isAdmin, isPlanActive } from '../lib/bookingUtils'
+import { isAdmin }           from '../lib/bookingUtils'
 import { hasModule }         from '../lib/modules'
-import { VIBER_GROUP_URL }   from '../lib/constants'
 import useClientTier         from '../hooks/useClientTier'
 const DRAWER_WIDTH = 272
 const RAIL_WIDTH   = 72
@@ -86,7 +83,6 @@ export default function Sidebar() {
     lang, setLang, t,
     client, saveWorkoutDraft,
   } = useApp()
-  const { myPlan } = useBooking()
 
   const admin = isAdmin(auth)
   // Chat visibility:
@@ -342,25 +338,6 @@ export default function Sidebar() {
               <Typography sx={{ fontSize: '10px', fontWeight: 700, color: C.muted }}>
                 {lang === 'bg' ? 'EN' : 'BG'}
               </Typography>
-            </ListItemButton>
-          </Tooltip>
-        )}
-
-        {/* Viber group (clients with an active studio plan) */}
-        {auth.role === 'client' && isPlanActive(myPlan) && (
-          <Tooltip title={!open ? t('viberNavTooltip') : ''} placement="right" arrow>
-            <ListItemButton
-              component="a" href={VIBER_GROUP_URL} target="_blank" rel="noopener"
-              sx={{
-                justifyContent: open ? 'flex-start' : 'center',
-                px: open ? 2 : 0, mx: open ? 1.5 : 1, my: '2px', minHeight: 44,
-                color: C.muted,
-                '&:hover': { color: C.purple, backgroundColor: 'rgba(200,197,255,0.08)' },
-              }}>
-              <ListItemIcon sx={{ minWidth: open ? 38 : 'unset', justifyContent: 'center', color: 'inherit' }}>
-                <GroupsIcon sx={{ fontSize: '18px' }} />
-              </ListItemIcon>
-              {open && <ListItemText primary={t('viberNavTooltip')} sx={{ '& .MuiListItemText-primary': { fontWeight: 600 } }} />}
             </ListItemButton>
           </Tooltip>
         )}

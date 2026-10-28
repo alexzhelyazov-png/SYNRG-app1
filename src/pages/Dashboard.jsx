@@ -2205,7 +2205,8 @@ function DashboardClient({ isCoachView = false }) {
 
       <ViberInvitePopup
         open={showViberPopup}
-        onClose={() => { setShowViberPopup(false); dismissBadge('viber_popup_seen') }}
+        onAlreadyIn={() => { setShowViberPopup(false); dismissBadge('viber_popup_seen') }}
+        onJoin={() => { setShowViberPopup(false); dismissBadge('viber_popup_seen') }}
         t={t}
       />
     </>
