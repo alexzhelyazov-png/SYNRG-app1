@@ -26,6 +26,7 @@ import { WORKOUT_CATEGORIES } from '../lib/constants'
 import { isFullAdmin } from '../lib/bookingUtils'
 import { C, EASE } from '../theme'
 import PushToggle from '../components/PushToggle'
+import ViberInvitePopup from '../components/ViberInvitePopup'
 import FoodTracker from './FoodTracker'
 import WeightTracker from './WeightTracker'
 import { todayDate, fmt1, parseDate, inputToDate } from '../lib/utils'
@@ -1546,7 +1547,7 @@ export function ClientDetail() {
 
 // ─── Client / tracker view ────────────────────────────────────────
 function DashboardClient({ isCoachView = false }) {
-  const { client, auth, t, setView, viewingCoach, feedPosts, postReactions, postComments, markFeedSeen, setPendingProgressTab, deleteClient, logout } = useApp()
+  const { client, auth, t, setView, viewingCoach, feedPosts, postReactions, postComments, markFeedSeen, setPendingProgressTab, deleteClient, logout, dismissBadge } = useApp()
   const { slots, myBookings, myPlan, bookingBusy, loadSlots, loadMyBookings, loadMyPlan, cancelBookingForSlot } = useBooking()
 
   const [tab, setTab] = useState(0)
@@ -1554,6 +1555,16 @@ function DashboardClient({ isCoachView = false }) {
   const [deletingAccount,        setDeletingAccount]        = useState(false)
   const [deleteConfirmPassword,  setDeleteConfirmPassword]  = useState('')
   const [deleteError,            setDeleteError]            = useState('')
+  const [showViberPopup,         setShowViberPopup]         = useState(false)
+
+  // One-time Viber group invite — shown once per client, the first time they
+  // have an active plan. Dismissing (either button) marks it seen for good.
+  useEffect(() => {
+    if (isCoachView || auth.role !== 'client') return
+    if (isPlanActive(myPlan) && !(client?.dismissedBadges || []).includes('viber_popup_seen')) {
+      setShowViberPopup(true)
+    }
+  }, [isCoachView, auth.role, myPlan, client?.dismissedBadges])
 
   // Load booking data for client (not in coach-viewing-own-tracker mode)
   useEffect(() => {
@@ -2191,6 +2202,12 @@ function DashboardClient({ isCoachView = false }) {
           </Button>
         </DialogActions>
       </Dialog>
+
+      <ViberInvitePopup
+        open={showViberPopup}
+        onClose={() => { setShowViberPopup(false); dismissBadge('viber_popup_seen') }}
+        t={t}
+      />
     </>
   )
 }

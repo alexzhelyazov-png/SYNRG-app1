@@ -519,6 +519,8 @@ export const quickFoods = [
   { key: 'яйце',          grams: 50, count: 1 }, // 1 яйце
 ]
 
+export const VIBER_GROUP_URL = 'https://invite.viber.com/?g2=AQApwlYTdaOwKlUiXULjakpF%2FOR6YVqBgfI7%2FzJ2LwevYXF2%2BgU9DnJXGV5txo7N'
+
 export const WORKOUT_CATEGORIES = [
   { key: 'Предна верига' },
   { key: 'Задна верига'  },

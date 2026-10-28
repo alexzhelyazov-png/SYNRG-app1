@@ -15,11 +15,13 @@ import HomeIcon             from '@mui/icons-material/Home'
 import StorefrontIcon       from '@mui/icons-material/Storefront'
 import OndemandVideoIcon    from '@mui/icons-material/OndemandVideo'
 import AttachMoneyIcon      from '@mui/icons-material/AttachMoney'
+import GroupsIcon           from '@mui/icons-material/Groups'
 import { useApp } from '../context/AppContext'
 import { useBooking } from '../context/BookingContext'
 import { DB } from '../lib/db'
 import { hasModule } from '../lib/modules'
-import { creditsRemaining, daysUntilExpiry, fmtValidTo } from '../lib/bookingUtils'
+import { VIBER_GROUP_URL } from '../lib/constants'
+import { creditsRemaining, daysUntilExpiry, fmtValidTo, isPlanActive } from '../lib/bookingUtils'
 import { C, EASE } from '../theme'
 import SynrgLogo from './SynrgLogo'
 
@@ -144,6 +146,24 @@ export default function MobileHeader() {
               )}
             </Box>
           </Box>
+
+          {/* ── Viber group (clients with an active studio plan) ──── */}
+          {auth.role === 'client' && isPlanActive(myPlan) && (
+            <IconButton
+              component="a" href={VIBER_GROUP_URL} target="_blank" rel="noopener"
+              size="small"
+              aria-label={t('viberNavTooltip')}
+              title={t('viberNavTooltip')}
+              sx={{
+                color:      C.muted,
+                flexShrink: 0,
+                transition: `color 0.18s ${EASE.standard}`,
+                '&:hover':  { color: C.purple },
+              }}
+            >
+              <GroupsIcon sx={{ fontSize: 22 }} />
+            </IconButton>
+          )}
 
           {/* ── Coach chat (SYNRG Метод clients + all staff) ──────── */}
           {(hasCoachChat || isStaffChat) && (
