@@ -1799,13 +1799,20 @@ function DashboardClient({ isCoachView = false }) {
             {t('hasActivePlan') || 'Активен план'}: <strong>{planLabel(myPlan.plan_type, t)}</strong>
             {myPlan.plan_type !== 'unlimited' && ` · ${credits} ${t('creditsLeft') || 'оставащи'}`}
           </Typography>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, px: 1, py: 0.25, borderRadius: '100px',
-            background: myPlan.is_paid ? 'rgba(74,222,128,0.1)' : 'rgba(248,113,113,0.1)',
-            border: `1px solid ${myPlan.is_paid ? 'rgba(74,222,128,0.25)' : 'rgba(248,113,113,0.25)'}` }}>
-            <Box sx={{ width: 6, height: 6, borderRadius: '50%', background: myPlan.is_paid ? C.primary : '#F87171' }} />
-            <Typography sx={{ fontSize: '11px', fontWeight: 700, color: myPlan.is_paid ? C.primary : '#F87171' }}>
-              {myPlan.is_paid ? (t('paidLbl') || 'Платен') : (t('unpaidLbl') || 'Неплатен')}
-            </Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            {myPlan.price > 0 && (
+              <Typography sx={{ fontSize: '13px', fontWeight: 700, color: C.text }}>
+                {myPlan.price} €
+              </Typography>
+            )}
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, px: 1, py: 0.25, borderRadius: '100px',
+              background: myPlan.is_paid ? 'rgba(74,222,128,0.1)' : 'rgba(248,113,113,0.1)',
+              border: `1px solid ${myPlan.is_paid ? 'rgba(74,222,128,0.25)' : 'rgba(248,113,113,0.25)'}` }}>
+              <Box sx={{ width: 6, height: 6, borderRadius: '50%', background: myPlan.is_paid ? C.primary : '#F87171' }} />
+              <Typography sx={{ fontSize: '11px', fontWeight: 700, color: myPlan.is_paid ? C.primary : '#F87171' }}>
+                {myPlan.is_paid ? (t('paidLbl') || 'Платен') : (t('unpaidLbl') || 'Неплатен')}
+              </Typography>
+            </Box>
           </Box>
         </Box>
       )}

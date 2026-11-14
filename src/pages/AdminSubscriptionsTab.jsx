@@ -537,9 +537,13 @@ export default function SubscriptionsTab({ t, lang }) {
                 </Tooltip>
               )}
 
-              {/* Date */}
+              {/* Date — the plan's actual paid-on date (matches the sort
+                  order above, which is also paid_at-driven), not valid_from
+                  (the subscription period's start). A renewal keeps its old
+                  valid_from while being paid today, so showing valid_from
+                  here made recently-paid rows look stale/out of order. */}
               <Typography sx={{ fontSize: '11px', color: C.muted, whiteSpace: 'nowrap' }}>
-                {formatDate(p.valid_from)}
+                {formatDate(p.paid_at || p.created_at)}
               </Typography>
 
               {/* Price — net of any refund, so a partially refunded plan shows
