@@ -155,15 +155,20 @@ Deno.serve(async (req: Request) => {
     }
 
     // If the identifier looks like an email, resolve it to a name first.
+    // Several live accounts can share an email (older duplicates), so keep
+    // every candidate and let the password decide which one it is.
+    let candidates: string[] = [name];
     if (name.includes("@")) {
+      const likeExact = name.trim().replace(/[\\%_]/g, (m: string) => "\\" + m);
       const emailRes = await fetch(
-        `${SUPABASE_URL}/rest/v1/clients?select=name&email=ilike.${encodeURIComponent(name)}&is_coach=eq.false&limit=1`,
+        `${SUPABASE_URL}/rest/v1/clients?select=name&email=ilike.${encodeURIComponent(likeExact)}&is_coach=eq.false&is_archived=not.is.true&order=created_at.asc&limit=5`,
         { headers: sbHeaders() }
       );
       if (emailRes.ok) {
         const rows = await emailRes.json() as Array<{ name: string }>;
         if (rows.length > 0) {
-          name = rows[0].name;
+          candidates = rows.map(r => r.name);
+          name = candidates[0];
         } else {
           return new Response(
             JSON.stringify({ error: "Invalid credentials" }),
@@ -193,13 +198,17 @@ Deno.serve(async (req: Request) => {
     }
 
     // 3. Verify password via Postgres RPC (uses crypt() for bcrypt comparison)
-    const verifyRes = await fetch(`${SUPABASE_URL}/rest/v1/rpc/verify_client_password`, {
-      method: "POST",
-      headers: sbHeaders(),
-      body: JSON.stringify({ p_name: name, p_password: password }),
-    });
-    const verifyData = await verifyRes.json();
-    const row = Array.isArray(verifyData) ? verifyData[0] : verifyData;
+    let row: { id: string; valid: boolean } | null = null;
+    for (const candidate of candidates) {
+      const verifyRes = await fetch(`${SUPABASE_URL}/rest/v1/rpc/verify_client_password`, {
+        method: "POST",
+        headers: sbHeaders(),
+        body: JSON.stringify({ p_name: candidate, p_password: password }),
+      });
+      const verifyData = await verifyRes.json();
+      const r = Array.isArray(verifyData) ? verifyData[0] : verifyData;
+      if (r && r.valid) { row = r; break; }
+    }
 
     if (!row || !row.valid) {
       await logAttempt(ip, name, "login", false);

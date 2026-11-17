@@ -1855,6 +1855,12 @@ function ClientsTab({ t }) {
 // client_plans + expenses + recurring_expenses — nothing to re-type by hand.
 const REPORT_LIVE_YEAR = 2026
 const REPORT_LIVE_MONTH = 10
+// Fixed BGN/EUR peg (1 EUR = 1.95583 BGN) — the historical monthly_financials
+// rows are this exact conversion of their own revenue (verified against all
+// of 2026's frozen months), so live months get the same лв figure by
+// applying it directly instead of leaving it blank once there's no more
+// hand-typed spreadsheet row to pull it from.
+const BGN_PER_EUR = 1.95583
 const REPORT_MONTHS_BG = ['Януари','Февруари','Март','Април','Май','Юни','Юли','Август','Септември','Октомври','Ноември','Декември']
 // Labels are prefixed "Трен." — salary columns are already named after the
 // same three people, and a bare "Ицко" header twice in one row (once for pay,
@@ -1955,7 +1961,8 @@ function ReportTab({ t, lang }) {
         })
 
         byMonth[m] = {
-          year, month: m, revenue, expenses_json: expenses, isLive: true,
+          year, month: m, revenue, revenue_bgn: Math.round(revenue * BGN_PER_EUR * 100) / 100,
+          expenses_json: expenses, isLive: true,
           active_clients: activeIds.size,
         }
       })
@@ -2242,12 +2249,31 @@ function AnalyticsTab({ t }) {
     return last && parseDate(last) >= thirtyAgo
   }).length
 
-  // Plan breakdown
-  const activePlans    = allPlans.filter(p => isPlanActive(p))
-  const plan8Count     = activePlans.filter(p => p.plan_type === '8').length
-  const plan12Count    = activePlans.filter(p => p.plan_type === '12').length
-  const planUCount     = activePlans.filter(p => p.plan_type === 'unlimited').length
-  const planTotal      = plan8Count + plan12Count + planUCount || 1
+  // Plan breakdown — every type (legacy AND the new price tiers), so a
+  // client on '8_new'/'12_new'/'4' isn't silently excluded from the chart
+  // while still being counted in the Paper's own (N) header above it.
+  const activePlans = allPlans.filter(p => isPlanActive(p))
+  const planTotal   = activePlans.length || 1
+  const PLAN_BREAKDOWN_ORDER = ['8', '8_new', '4', '12', '12_new', 'unlimited']
+  const PLAN_BREAKDOWN_COLORS = {
+    '8': '#60A5FA', '8_new': '#93C5FD', '4': '#FBBF24',
+    '12': '#aaa9cd', '12_new': '#C8C5FF', 'unlimited': '#c4e9bf',
+  }
+  function typicalPrice(planType, plans) {
+    const prices = plans.filter(p => p.plan_type === planType).map(p => Number(p.price) || 0)
+    if (!prices.length) return DEFAULT_PRICES[planType] ?? 0
+    const counts = {}
+    prices.forEach(p => { counts[p] = (counts[p] || 0) + 1 })
+    return Number(Object.entries(counts).sort((a, b) => b[1] - a[1])[0][0])
+  }
+  const planBreakdown = PLAN_BREAKDOWN_ORDER
+    .map(planType => ({
+      planType,
+      label: `${planLabel(planType, t)} · ${typicalPrice(planType, activePlans)}€`,
+      count: activePlans.filter(p => p.plan_type === planType).length,
+      color: PLAN_BREAKDOWN_COLORS[planType],
+    }))
+    .filter(row => row.count > 0)
 
   // ── Feature usage analytics ────────────────────────────────
   const featureCutoff  = new Date(Date.now() - featureDays * 86400000)
@@ -2436,11 +2462,7 @@ function AnalyticsTab({ t }) {
           <Typography sx={{ fontSize: '10px', color: C.muted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.6px', mb: 1.5 }}>
             {t('planBreakdownLbl')} ({activePlans.length})
           </Typography>
-          {[
-            { label: '8 тр.', count: plan8Count,  color: '#60A5FA' },
-            { label: '12 тр.', count: plan12Count, color: '#aaa9cd' },
-            { label: 'Unlimited', count: planUCount, color: '#c4e9bf' },
-          ].map(({ label, count, color }) => {
+          {planBreakdown.map(({ label, count, color }) => {
             const pct = Math.round(count / planTotal * 100)
             return (
               <Box key={label} sx={{ mb: 1 }}>

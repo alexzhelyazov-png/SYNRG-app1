@@ -733,7 +733,7 @@ export function AppProvider({ children }) {
       })
       result = await res.json()
       if (!res.ok || !result.ok) {
-        if (res.status === 409) return t('errClientExists')
+        if (res.status === 409) return result.error === 'email_exists' ? t('errEmailExists') : t('errClientExists')
         if (res.status === 429) return t('errRateLimited')
         if (res.status === 403) return t('errBotCheck')
         if (res.status === 400) {

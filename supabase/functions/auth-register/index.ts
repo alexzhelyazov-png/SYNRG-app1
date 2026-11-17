@@ -171,6 +171,24 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    // One email = one account. A second row with the same email makes email
+    // login and password reset resolve to an arbitrary one of the two.
+    if (email) {
+      const likeExact = email.trim().replace(/[\\%_]/g, (m: string) => "\\" + m);
+      const emailRes = await fetch(
+        `${SUPABASE_URL}/rest/v1/clients?select=id&email=ilike.${encodeURIComponent(likeExact)}&is_archived=not.is.true&limit=1`,
+        { headers: sbHeaders() }
+      );
+      const emailRows = await emailRes.json();
+      if (Array.isArray(emailRows) && emailRows.length > 0) {
+        await logAttempt(ip, name, "register", false);
+        return new Response(
+          JSON.stringify({ error: "email_exists" }),
+          { status: 409, headers: { ...cors, "Content-Type": "application/json" } }
+        );
+      }
+    }
+
     // Hash password via Postgres crypt()
     const hashRes = await fetch(`${SUPABASE_URL}/rest/v1/rpc/hash_password`, {
       method: "POST",

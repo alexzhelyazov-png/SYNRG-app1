@@ -54,7 +54,7 @@ Deno.serve(async (req) => {
     if (action === "request") {
       // Find client by email
       const clientRes = await fetch(
-        `${supabaseUrl}/rest/v1/clients?email=eq.${encodeURIComponent(email)}&is_coach=eq.false&select=id,name,email&limit=1`,
+        `${supabaseUrl}/rest/v1/clients?email=eq.${encodeURIComponent(email)}&is_coach=eq.false&is_archived=not.is.true&order=created_at.asc&select=id,name,email&limit=1`,
         { headers: sbHeaders }
       );
       const clients = await clientRes.json();
